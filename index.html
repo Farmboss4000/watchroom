@@ -1457,7 +1457,7 @@ function removePhoto(slot) {
 async function callClaude(base64, mimeType, prompt) {
     if (!apiKey) { toast('Set your Anthropic API key in Settings first.','error'); return null; }
     const msgPayload = {
-        model: 'claude-3-5-sonnet-latest',
+        model: 'claude-3-5-haiku-20241022',
         max_tokens: 512,
         messages: [{ role:'user', content:[
             { type:'image', source:{ type:'base64', media_type:mimeType, data:base64 }},
@@ -1878,7 +1878,7 @@ async function testApiKey() {
     const el = document.getElementById('api-status');
     el.style.display='block'; el.className='api-status'; el.textContent='Testing…';
     try {
-        const testPayload = { model:'claude-3-5-sonnet-latest', max_tokens:10, messages:[{role:'user',content:'Hi'}] };
+        const testPayload = { model:'claude-3-5-haiku-20241022', max_tokens:10, messages:[{role:'user',content:'Hi'}] };
         let res;
         if (proxy) {
             res = await fetch(proxy, {

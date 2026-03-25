@@ -540,10 +540,13 @@
                 </div>
                 <div class="form-group">
                     <label>VIN <span id="vin-decode-spinner" style="display:none;font-size:0.75rem;color:var(--accent);font-weight:400;">⏳ Decoding…</span></label>
-                    <input type="text" id="f-serial" placeholder="e.g. 1FTEW1EP5NFC00001"
-                        maxlength="17"
-                        oninput="this.value=this.value.toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g,'');onVINFieldInput(this)"
-                        style="font-family:monospace;letter-spacing:1px;">
+                    <div style="display:flex;gap:6px;align-items:center;">
+                        <input type="text" id="f-serial" placeholder="e.g. 1FTEW1EP5NFC00001"
+                            maxlength="17"
+                            oninput="this.value=this.value.toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g,'');onVINFieldInput(this)"
+                            style="font-family:monospace;letter-spacing:1px;flex:1;min-width:0;">
+                        <button type="button" class="btn btn-secondary" onclick="manualDecodeVINField()" style="white-space:nowrap;padding:6px 10px;font-size:0.8rem;flex-shrink:0;">🔍 Decode</button>
+                    </div>
                     <div id="vin-field-status" style="font-size:0.76rem;margin-top:4px;display:none;"></div>
                 </div>
                 <div class="form-group">
@@ -1430,6 +1433,21 @@ function onVINFieldInput(input) {
     }
 }
 
+function manualDecodeVINField() {
+    const input = document.getElementById('f-serial');
+    const vin = (input.value || '').trim().toUpperCase();
+    const status = document.getElementById('vin-field-status');
+    const spinner = document.getElementById('vin-decode-spinner');
+    clearTimeout(_vinFieldTimer);
+    if (vin.length !== 17) {
+        if (status) { status.style.display = 'block'; status.style.color = 'var(--danger)'; status.textContent = '⚠️ VIN must be exactly 17 characters.'; }
+        return;
+    }
+    if (status) { status.style.display = 'block'; status.style.color = 'var(--accent)'; status.textContent = '🔍 Decoding VIN…'; }
+    if (spinner) spinner.style.display = '';
+    autoFillFromVIN(vin, status, spinner);
+}
+
 async function autoFillFromVIN(vin, statusEl, spinnerEl) {
     try {
         const res = await fetch(`https://vpic.nhtsa.dot.gov/api/vehicles/decodevin/${encodeURIComponent(vin)}?format=json`);
@@ -1446,10 +1464,10 @@ async function autoFillFromVIN(vin, statusEl, spinnerEl) {
         const year  = get('Model Year');
         if (!make && !model && !year) throw new Error('No vehicle data found for this VIN');
 
-        // Fill all available fields
-        if (make  && !document.getElementById('f-make').value)  document.getElementById('f-make').value  = make;
-        if (model && !document.getElementById('f-model').value) document.getElementById('f-model').value = model;
-        if (year  && !document.getElementById('f-year').value)  document.getElementById('f-year').value  = year;
+        // Fill all available fields (always overwrite — user explicitly triggered decode)
+        if (make)  document.getElementById('f-make').value  = make;
+        if (model) document.getElementById('f-model').value = model;
+        if (year)  document.getElementById('f-year').value  = year;
 
         const bodyClass = get('Body Class');
         let category = '';
@@ -1459,7 +1477,7 @@ async function autoFillFromVIN(vin, statusEl, spinnerEl) {
         else if (/van|minivan/i.test(bodyClass))              category = 'Van';
         else if (/truck/i.test(bodyClass))                    category = 'Truck';
         else if (/motorcycle/i.test(bodyClass))               category = 'Motorcycle';
-        if (category && !document.getElementById('f-category').value) {
+        if (category) {
             populateCatSelect();
             document.getElementById('f-category').value = category;
         }
@@ -1472,14 +1490,14 @@ async function autoFillFromVIN(vin, statusEl, spinnerEl) {
         if (engineCyl)  engineStr += 'V' + engineCyl + ' ';
         if (fuelType && fuelType !== 'Gasoline') engineStr += fuelType;
         engineStr = engineStr.trim();
-        if (engineStr && !document.getElementById('f-engine').value) document.getElementById('f-engine').value = engineStr;
+        if (engineStr) document.getElementById('f-engine').value = engineStr;
 
         const transStyle = get('Transmission Style');
         let trans = '';
         if (/automatic/i.test(transStyle))            trans = 'Automatic';
         else if (/manual|standard/i.test(transStyle)) trans = 'Manual';
         else if (/cvt/i.test(transStyle))             trans = 'CVT';
-        if (trans && !document.getElementById('f-transmission').value) document.getElementById('f-transmission').value = trans;
+        if (trans) document.getElementById('f-transmission').value = trans;
 
         const extras = [];
         const driveType = get('Drive Type');
@@ -1489,12 +1507,12 @@ async function autoFillFromVIN(vin, statusEl, spinnerEl) {
         if (doors)     extras.push('Doors: ' + doors);
         if (bodyClass) extras.push('Body: ' + bodyClass);
         if (plant)     extras.push('Plant: ' + plant);
-        if (extras.length && !document.getElementById('f-notes').value) {
+        if (extras.length) {
             document.getElementById('f-notes').value = 'VIN Decoded: ' + extras.join(' | ');
         }
 
-        const filled = [make, model, year].filter(Boolean).join(' ');
-        if (statusEl) { statusEl.style.display = 'block'; statusEl.style.color = 'var(--success)'; statusEl.textContent = `✅ Decoded: ${filled}`; }
+        const filled = [year, make, model].filter(Boolean).join(' ');
+        if (statusEl) { statusEl.style.display = 'block'; statusEl.style.color = 'var(--success)'; statusEl.textContent = `✅ Decoded: ${filled} — Color must be entered manually`; }
     } catch(e) {
         if (statusEl) { statusEl.style.display = 'block'; statusEl.style.color = 'var(--danger)'; statusEl.textContent = '⚠️ Could not decode VIN: ' + e.message; }
     } finally {

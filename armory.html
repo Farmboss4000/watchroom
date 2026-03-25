@@ -264,10 +264,63 @@
         /* ── TOAST ── */
         .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(80px);
             background:#1a1a2e; color:#fff; padding:10px 20px; border-radius:8px; font-size:0.87rem;
-            font-weight:500; opacity:0; transition:all 0.3s; z-index:9999; pointer-events:none; white-space:nowrap; max-width:90vw; }
-        .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+            font-weight:500; opacity:0; transition:all 0.3s; z-index:9999; pointer-events:none; white-space:nowrap; max-width:90vw;
+            display:flex; align-items:center; gap:6px; }
+        .toast.show { opacity:1; transform:translateX(-50%) translateY(0); pointer-events:all; }
         .toast.success { background:var(--success); }
         .toast.error   { background:var(--danger); }
+
+        /* ── DIARY ── */
+        .diary-record-btn {
+            width: 64px; height: 64px; border-radius: 50%; border: none;
+            background: var(--accent); color: #fff; font-size: 1.6rem;
+            cursor: pointer; transition: all 0.2s; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+        }
+        .diary-record-btn.recording {
+            background: #dc2626; animation: pulse 1s ease-in-out infinite;
+        }
+        .diary-record-btn:hover { transform: scale(1.05); }
+        .diary-input-row { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 16px; }
+        .diary-textarea {
+            flex: 1; padding: 12px 14px; border: 1px solid var(--border);
+            border-radius: 8px; font-size: 0.9rem; font-family: inherit;
+            background: var(--bg-card); color: var(--text-primary);
+            resize: vertical; min-height: 80px;
+        }
+        .diary-textarea:focus { outline: none; border-color: var(--accent); }
+        .diary-entry {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 10px; padding: 14px 16px; margin-bottom: 10px;
+        }
+        .diary-entry-header {
+            display: flex; justify-content: space-between; align-items: flex-start;
+            margin-bottom: 8px;
+        }
+        .diary-entry-date {
+            font-size: 0.75rem; color: var(--accent); font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .diary-entry-del {
+            background: none; border: none; color: var(--text-secondary);
+            cursor: pointer; font-size: 0.9rem; padding: 0;
+            transition: color 0.15s;
+        }
+        .diary-entry-del:hover { color: var(--danger); }
+        .diary-entry-text { font-size: 0.9rem; line-height: 1.6; color: var(--text-primary); white-space: pre-wrap; }
+        .diary-summary-box {
+            background: linear-gradient(135deg, rgba(var(--accent-rgb, 59,130,246),0.1), rgba(var(--accent-rgb, 59,130,246),0.05));
+            border: 1px solid rgba(59,130,246,0.3);
+            border-radius: 10px; padding: 16px; margin-bottom: 20px;
+        }
+        .diary-summary-title { font-size: 0.78rem; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.5px; color: var(--accent); margin-bottom: 8px; }
+        .diary-summary-text { font-size: 0.87rem; color: var(--text-primary); line-height: 1.6; font-style: italic; }
+        .diary-search { width: 100%; padding: 9px 14px; border: 1px solid var(--border);
+            border-radius: 8px; font-size: 0.88rem; background: var(--bg-card);
+            color: var(--text-primary); margin-bottom: 16px; }
+        .diary-search:focus { outline: none; border-color: var(--accent); }
 
         /* ── PRINT ── */
         #print-area { display:none; }
@@ -313,6 +366,29 @@
             .stat-value  { font-size:1.5rem; }
             .hero-title  { font-size:1.2rem; }
             nav button   { padding:6px 9px; font-size:0.74rem; }
+        }
+
+        /* ── MOBILE TABLE: hide less-important columns ── */
+        @media (max-width:640px) {
+            /* Inventory table */
+            #inv-table th:nth-child(7), #inv-table td:nth-child(7),  /* serial # */
+            #inv-table th:nth-child(9), #inv-table td:nth-child(9),  /* purchased */
+            #inv-table th:nth-child(10), #inv-table td:nth-child(10) /* actions merged below */
+            { display:none; }
+            /* Packing picker table */
+            #pack-picker-table th:nth-child(6), #pack-picker-table td:nth-child(6) /* serial */
+            { display:none; }
+            /* Recent items table: hide purchased date */
+            #recent-tbody td:nth-child(8), #recent-tbody + * th:nth-child(8) { display:none; }
+        }
+        @media (max-width:480px) {
+            .site-switcher { gap:2px; padding:5px 10px; overflow-x:auto; flex-wrap:nowrap; }
+            .site-link { padding:4px 8px; font-size:0.72rem; }
+            main { padding:10px; }
+            .card { padding:16px; }
+            /* Further hide columns on very small screens */
+            #inv-table th:nth-child(8), #inv-table td:nth-child(8)  /* purchased */
+            { display:none; }
         }
     </style>
 </head>
@@ -378,6 +454,7 @@
         <button onclick="showView('packing-list')">Packing List</button>
         <button onclick="showView('settings')">⚙ Settings</button>
         <button onclick="showView('recycle-bin')">🗑 Recycle Bin</button>
+        <button onclick="showView('diary')">📓 Diary</button>
     </nav>
     <div class="header-right">
         <span class="user-badge" id="user-email"></span>
@@ -683,16 +760,51 @@
 
 <!-- ══ PACKING LIST ══ -->
 <div id="view-packing-list" class="view">
-    <div class="card">
-        <div class="card-title">
+
+    <!-- Header + print bar -->
+    <div class="card" style="margin-bottom:14px;">
+        <div class="card-title" style="margin-bottom:12px;">
             <div class="card-title-left">🎒 Packing List</div>
+            <div style="font-size:0.82rem;color:var(--text-secondary);font-weight:400;" id="pack-selected-count">0 items selected</div>
         </div>
-        <p style="color:var(--text-secondary);margin-bottom:16px;">Select items in the Inventory view using the checkboxes, then click "Print Packing List" to generate a printable list.</p>
-        <div class="toolbar">
-            <input type="text" id="pack-name" placeholder="Packing list name (e.g. Range Day, Hunting Trip)..." style="flex:1">
+        <div class="toolbar" style="flex-wrap:wrap;gap:10px;">
+            <input type="text" id="pack-name" placeholder="List name — e.g. Range Day, Hunting Trip, Competition..." style="flex:1;min-width:220px;">
+            <button class="btn btn-ghost btn-sm" onclick="packSelectAll()">☑ Select All</button>
+            <button class="btn btn-ghost btn-sm" onclick="packClearAll()">☐ Clear All</button>
             <button class="btn btn-primary" onclick="generatePackingList()">🖨 Print Packing List</button>
         </div>
-        <div id="packing-list-preview"></div>
+    </div>
+
+    <!-- Search + filter -->
+    <div class="toolbar" style="margin-bottom:12px;">
+        <input type="text" id="pack-search" placeholder="🔍 Filter by manufacturer, model, caliber, category..." style="flex:1;" oninput="renderPackingPicker()">
+        <select id="pack-filter-cat" onchange="renderPackingPicker()" style="min-width:160px;">
+            <option value="">All Categories</option>
+        </select>
+    </div>
+
+    <!-- Item picker table -->
+    <div class="card">
+        <div class="table-wrapper">
+            <table id="pack-picker-table">
+                <thead><tr>
+                    <th class="no-sort" style="width:36px;text-align:center;">
+                        <input type="checkbox" id="pack-check-all" onchange="packToggleAll(this)" title="Select all visible">
+                    </th>
+                    <th class="no-sort" style="width:52px;">Photo</th>
+                    <th>Category</th>
+                    <th>Manufacturer</th>
+                    <th>Model</th>
+                    <th>Serial #</th>
+                    <th>Caliber</th>
+                    <th>Qty</th>
+                </tr></thead>
+                <tbody id="pack-picker-tbody"></tbody>
+            </table>
+        </div>
+        <div id="pack-picker-empty" class="empty" style="display:none;">
+            <div class="empty-icon">🔍</div><p>No items match your filter.</p>
+        </div>
     </div>
 </div>
 
@@ -794,6 +906,36 @@ service cloud.firestore {
     <div class="card">
         <div id="recycle-bin-list"><div class="empty"><div class="empty-icon">🗑</div><p>Recycle bin is empty</p></div></div>
     </div>
+</div>
+
+<!-- ══ DIARY ══ -->
+<div id="view-diary" class="view">
+    <div class="card" style="margin-bottom:16px;">
+        <div class="card-title" style="margin-bottom:12px;">📓 New Entry</div>
+        <div class="diary-input-row">
+            <button class="diary-record-btn" id="diary-mic-btn" onclick="toggleDiaryRecording()" title="Hold to record voice note">🎤</button>
+            <textarea class="diary-textarea" id="diary-text" placeholder="Type an entry or click the microphone to record a voice note..."></textarea>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;">
+            <button class="btn btn-primary" onclick="saveDiaryEntry()">💾 Save Entry</button>
+            <button class="btn btn-ghost" onclick="document.getElementById('diary-text').value=''">Clear</button>
+            <span id="diary-record-status" style="font-size:0.8rem;color:var(--text-secondary);"></span>
+        </div>
+    </div>
+
+    <!-- AI Daily Summary -->
+    <div class="diary-summary-box" id="diary-summary-box" style="display:none;">
+        <div class="diary-summary-title">🤖 AI Daily Summary <span id="diary-summary-date" style="font-weight:400;opacity:0.7;"></span></div>
+        <div class="diary-summary-text" id="diary-summary-text">Loading...</div>
+    </div>
+
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;">
+        <input type="text" class="diary-search" id="diary-search" placeholder="🔍 Search diary entries..." oninput="renderDiaryEntries()">
+        <button class="btn btn-ghost btn-sm" onclick="refreshDiarySummary()" title="Refresh AI summary" style="white-space:nowrap;flex-shrink:0;">🤖 Refresh Summary</button>
+    </div>
+
+    <div id="diary-count" style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:10px;"></div>
+    <div id="diary-list"></div>
 </div>
 
 </main>
@@ -960,7 +1102,7 @@ let formPhotos = {
     paperwork: { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false }
 };
 
-const VIEWS = ['dashboard','add-item','inventory','reports','categories','packing-list','settings','recycle-bin'];
+const VIEWS = ['dashboard','add-item','inventory','reports','categories','packing-list','settings','recycle-bin','diary'];
 
 // ═══════════════════════════════════════
 //  AUTH
@@ -1090,6 +1232,8 @@ function showView(v) {
     if (v==='categories')   renderCatTags();
     if (v==='add-item')     populateCatSelect();
     if (v==='recycle-bin')  loadRecycleBin();
+    if (v === 'diary') initDiary();
+    if (v === 'packing-list') { syncCatFilters(); renderPackingPicker(); }
 }
 
 // ═══════════════════════════════════════
@@ -1125,7 +1269,7 @@ function renderDashboard() {
             const thumb = mainUrl
                 ? `<img src="${mainUrl}" class="thumb" alt="" style="cursor:pointer" onclick="window.open('${mainUrl}','_blank')" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb-placeholder',innerHTML:'🔫'}))">`
                 : `<div class="thumb-placeholder">🔫</div>`;
-            return `<tr>
+            return `<tr style="cursor:pointer" title="Click to edit" onclick="editItem('${it._docId}')">
                 <td>${thumb}</td>
                 <td class="mono">#${it.id}</td>
                 <td><span class="badge ${catClass(it.category)}">${it.category||'—'}</span></td>
@@ -1441,7 +1585,7 @@ async function softDelete(docId) {
         const ref = db.collection('items').doc(docId);
         const snap = await ref.get();
         if (!snap.exists) return;
-        await db.collection('recycle_bin').add({
+        const binRef = await db.collection('recycle_bin').add({
             originalCollection: 'items',
             originalDocId: docId,
             site: 'armory',
@@ -1449,22 +1593,32 @@ async function softDelete(docId) {
             data: snap.data()
         });
         await ref.delete();
-        toast('Item moved to Recycle Bin.');
+        return binRef.id;
     } catch(e) {
-        toast('Delete failed: ' + e.message, true);
+        toast('Delete failed: ' + e.message, 'error');
+        return null;
     }
 }
 
 async function deleteItem(docId) {
-    if (!confirm('Move this item to the Recycle Bin?')) return;
-    await softDelete(docId);
+    const it = items.find(i => i._docId === docId);
+    const label = it ? `${it.manufacturer||''} ${it.model||''}`.trim() || 'Item' : 'Item';
+    const binId = await softDelete(docId);
+    if (!binId) return;
+    toast(`"${label}" moved to Recycle Bin.`, '', async () => {
+        try {
+            await db.collection('items').add(it);
+            await db.collection('recycle_bin').doc(binId).delete();
+            toast('Restored!', 'success');
+        } catch(e) { toast('Undo failed: ' + e.message, 'error'); }
+    });
 }
 
 // ═══════════════════════════════════════
 //  INVENTORY
 // ═══════════════════════════════════════
 function syncCatFilters() {
-    ['inv-filter-cat','rpt-filter-cat'].forEach(sid => {
+    ['inv-filter-cat','rpt-filter-cat','pack-filter-cat'].forEach(sid => {
         const sel = document.getElementById(sid); if (!sel) return;
         const cur = sel.value;
         sel.innerHTML = '<option value="">All Categories</option>';
@@ -1539,9 +1693,78 @@ function toggleSelectAll(cb) {
 }
 
 function getSelectedItems() {
-    return [...document.querySelectorAll('.pack-check:checked')]
+    return [...document.querySelectorAll('#pack-picker-tbody input[type="checkbox"]:checked')]
         .map(cb => items.find(i => i._docId === cb.dataset.docid))
         .filter(Boolean);
+}
+
+// ═══════════════════════════════════════
+//  PACKING PICKER
+// ═══════════════════════════════════════
+function renderPackingPicker() {
+    const q   = (document.getElementById('pack-search')?.value||'').toLowerCase();
+    const cat = document.getElementById('pack-filter-cat')?.value||'';
+    let data = [...items];
+    if (cat) data = data.filter(it => it.category === cat);
+    if (q)   data = data.filter(it =>
+        (it.manufacturer||'').toLowerCase().includes(q) ||
+        (it.model||'').toLowerCase().includes(q) ||
+        (it.caliber||'').toLowerCase().includes(q) ||
+        (it.category||'').toLowerCase().includes(q) ||
+        (it.serialNumber||'').toLowerCase().includes(q)
+    );
+    const tbody = document.getElementById('pack-picker-tbody');
+    const empty = document.getElementById('pack-picker-empty');
+    if (!data.length) {
+        tbody.innerHTML = '';
+        empty.style.display = '';
+    } else {
+        empty.style.display = 'none';
+        tbody.innerHTML = data.map(it => {
+            const mainUrl = it.photos?.find(p=>p.slot==='main')?.url;
+            const thumb = mainUrl
+                ? `<img src="${mainUrl}" class="thumb" style="width:36px;height:36px;" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb-placeholder',innerHTML:'🔫'}))">`
+                : `<div class="thumb-placeholder">🔫</div>`;
+            return `<tr>
+                <td style="text-align:center;width:36px;">
+                    <input type="checkbox" class="pack-item-check" data-docid="${it._docId}" onchange="updatePackCount()">
+                </td>
+                <td>${thumb}</td>
+                <td><span class="badge ${catClass(it.category)}">${esc(it.category)||'—'}</span></td>
+                <td>${esc(it.manufacturer)||'—'}</td>
+                <td>${esc(it.model)||'—'}</td>
+                <td class="mono">${esc(it.serialNumber)||'—'}</td>
+                <td>${esc(it.caliber)||'—'}</td>
+                <td style="text-align:center">${it.quantity||1}</td>
+            </tr>`;
+        }).join('');
+    }
+    updatePackCount();
+}
+
+function updatePackCount() {
+    const n = document.querySelectorAll('#pack-picker-tbody input[type="checkbox"]:checked').length;
+    const el = document.getElementById('pack-selected-count');
+    if (el) el.textContent = `${n} item${n!==1?'s':''} selected`;
+}
+
+function packSelectAll() {
+    document.querySelectorAll('#pack-picker-tbody input[type="checkbox"]').forEach(c => c.checked = true);
+    const allCb = document.getElementById('pack-check-all');
+    if (allCb) allCb.checked = true;
+    updatePackCount();
+}
+
+function packClearAll() {
+    document.querySelectorAll('#pack-picker-tbody input[type="checkbox"]').forEach(c => c.checked = false);
+    const allCb = document.getElementById('pack-check-all');
+    if (allCb) allCb.checked = false;
+    updatePackCount();
+}
+
+function packToggleAll(cb) {
+    document.querySelectorAll('#pack-picker-tbody input[type="checkbox"]').forEach(c => c.checked = cb.checked);
+    updatePackCount();
 }
 
 // ═══════════════════════════════════════
@@ -1597,7 +1820,7 @@ function printReport() {
 // ═══════════════════════════════════════
 function generatePackingList() {
     const selected = getSelectedItems();
-    if (!selected.length) { toast('Select at least one item from Inventory first.','error'); return; }
+    if (!selected.length) { toast('Check at least one item from the list above.','error'); return; }
     const name = document.getElementById('pack-name').value.trim() || 'Packing List';
     const html = `
         <style>
@@ -1940,11 +2163,26 @@ function catClass(cat) {
 }
 
 function esc(s) { return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'):''; }
+function escHtml(s) { return esc(s); }
 
-function toast(msg, type='') {
+let _toastUndoFn = null;
+function toast(msg, type='', undoFn=null) {
+    _toastUndoFn = undoFn;
     const el = document.getElementById('toast');
-    el.textContent=msg; el.className=`toast show${type?' '+type:''}`;
-    clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),3500);
+    if (undoFn) {
+        el.innerHTML = `<span>${msg}</span><button onclick="doToastUndo()" style="margin-left:12px;background:rgba(255,255,255,0.25);border:1px solid rgba(255,255,255,0.5);color:#fff;padding:3px 11px;border-radius:4px;cursor:pointer;font-size:0.78rem;font-weight:600;">Undo</button>`;
+    } else {
+        el.textContent = msg;
+    }
+    el.className = `toast show${type?' '+type:''}`;
+    clearTimeout(el._t);
+    el._t = setTimeout(() => { el.classList.remove('show'); _toastUndoFn = null; }, undoFn ? 6000 : 3500);
+}
+function doToastUndo() {
+    if (_toastUndoFn) { _toastUndoFn(); _toastUndoFn = null; }
+    const el = document.getElementById('toast');
+    clearTimeout(el._t);
+    el.classList.remove('show');
 }
 
 // ── RECYCLE BIN ──
@@ -2030,6 +2268,250 @@ async function permanentDeleteBinItem(binId) {
     } catch(e) {
         toast('Error: ' + e.message, true);
     }
+}
+
+// ═══════════════════════════════════════
+//  DIARY
+// ═══════════════════════════════════════
+let diaryEntries = [], diaryUnsubscribe = null, diaryInitialized = false;
+let speechRecognition = null, diaryRecording = false;
+
+function initDiary() {
+    if (diaryInitialized) { renderDiaryEntries(); return; }
+    diaryInitialized = true;
+    if (diaryUnsubscribe) diaryUnsubscribe();
+    diaryUnsubscribe = db.collection('diary_entries')
+        .orderBy('createdAt', 'desc')
+        .onSnapshot(snap => {
+            diaryEntries = snap.docs.map(doc => ({ _docId: doc.id, ...doc.data() }));
+            renderDiaryEntries();
+        }, err => {
+            // fallback to .get() if onSnapshot fails
+            db.collection('diary_entries').get().then(snap => {
+                diaryEntries = snap.docs.map(doc => ({ _docId: doc.id, ...doc.data() }));
+                diaryEntries.sort((a, b) => {
+                    const ta = a.createdAt && typeof a.createdAt.toMillis === 'function' ? a.createdAt.toMillis() : 0;
+                    const tb = b.createdAt && typeof b.createdAt.toMillis === 'function' ? b.createdAt.toMillis() : 0;
+                    return tb - ta;
+                });
+                renderDiaryEntries();
+            });
+        });
+    loadDiarySummary();
+}
+
+function renderDiaryEntries() {
+    const search = (document.getElementById('diary-search')?.value || '').toLowerCase().trim();
+    let data = diaryEntries;
+    if (search) data = data.filter(e => (e.text || '').toLowerCase().includes(search));
+
+    const countEl = document.getElementById('diary-count');
+    if (countEl) countEl.textContent = search
+        ? `${data.length} of ${diaryEntries.length} entries match "${search}"`
+        : `${diaryEntries.length} total entries`;
+
+    const list = document.getElementById('diary-list');
+    if (!list) return;
+    if (!data.length) {
+        list.innerHTML = '<div class="empty"><div class="empty-icon">📓</div><p>' + (search ? 'No entries match your search.' : 'No diary entries yet. Add your first one above!') + '</p></div>';
+        return;
+    }
+    list.innerHTML = data.map(entry => {
+        let dateStr = '';
+        if (entry.createdAt) {
+            try {
+                const d = typeof entry.createdAt.toDate === 'function' ? entry.createdAt.toDate() : new Date(entry.createdAt);
+                dateStr = d.toLocaleDateString('en-US', { weekday:'short', year:'numeric', month:'short', day:'numeric' })
+                    + ' · ' + d.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', hour12:true });
+            } catch(e) {}
+        }
+        const text = entry.text || '';
+        return `<div class="diary-entry">
+            <div class="diary-entry-header">
+                <div class="diary-entry-date">${dateStr || 'Unknown date'}</div>
+                <button class="diary-entry-del" onclick="deleteDiaryEntry('${entry._docId}')" title="Delete entry">🗑</button>
+            </div>
+            <div class="diary-entry-text">${escHtml(text)}</div>
+        </div>`;
+    }).join('');
+}
+
+async function saveDiaryEntry() {
+    const text = (document.getElementById('diary-text')?.value || '').trim();
+    if (!text) { toast('Enter some text first.', true); return; }
+    try {
+        await db.collection('diary_entries').add({
+            text,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        document.getElementById('diary-text').value = '';
+        toast('Entry saved!');
+        // Check if we should refresh summary (new entry today)
+        await refreshDiarySummary();
+    } catch(e) {
+        toast('Failed to save: ' + e.message, true);
+    }
+}
+
+async function deleteDiaryEntry(docId) {
+    if (!confirm('Delete this diary entry?')) return;
+    try {
+        await db.collection('diary_entries').doc(docId).delete();
+        toast('Entry deleted.');
+    } catch(e) {
+        toast('Delete failed: ' + e.message, true);
+    }
+}
+
+// ── VOICE RECORDING ──
+function toggleDiaryRecording() {
+    if (diaryRecording) {
+        stopDiaryRecording();
+    } else {
+        startDiaryRecording();
+    }
+}
+
+function startDiaryRecording() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        toast('Speech recognition not supported in this browser. Use Chrome or Safari.', true);
+        return;
+    }
+    speechRecognition = new SpeechRecognition();
+    speechRecognition.continuous = true;
+    speechRecognition.interimResults = true;
+    speechRecognition.lang = 'en-US';
+
+    const existing = document.getElementById('diary-text').value;
+    let interimText = '';
+
+    speechRecognition.onresult = e => {
+        interimText = '';
+        let finalText = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+            if (e.results[i].isFinal) {
+                finalText += e.results[i][0].transcript + ' ';
+            } else {
+                interimText += e.results[i][0].transcript;
+            }
+        }
+        if (finalText) {
+            const sep = existing && !existing.endsWith(' ') ? ' ' : '';
+            document.getElementById('diary-text').value = existing + sep + finalText;
+        }
+        const status = document.getElementById('diary-record-status');
+        if (status) status.textContent = interimText ? `"${interimText}"` : '🎙 Listening...';
+    };
+
+    speechRecognition.onerror = e => {
+        toast('Microphone error: ' + e.error, true);
+        stopDiaryRecording();
+    };
+
+    speechRecognition.onend = () => {
+        if (diaryRecording) speechRecognition.start(); // keep going if still recording
+    };
+
+    speechRecognition.start();
+    diaryRecording = true;
+    const btn = document.getElementById('diary-mic-btn');
+    if (btn) { btn.classList.add('recording'); btn.textContent = '⏹'; }
+    const status = document.getElementById('diary-record-status');
+    if (status) status.textContent = '🎙 Recording... click ⏹ to stop';
+}
+
+function stopDiaryRecording() {
+    diaryRecording = false;
+    if (speechRecognition) { speechRecognition.stop(); speechRecognition = null; }
+    const btn = document.getElementById('diary-mic-btn');
+    if (btn) { btn.classList.remove('recording'); btn.textContent = '🎤'; }
+    const status = document.getElementById('diary-record-status');
+    if (status) status.textContent = '✅ Recording stopped.';
+    setTimeout(() => { const s = document.getElementById('diary-record-status'); if (s) s.textContent = ''; }, 2000);
+}
+
+// ── AI DAILY SUMMARY ──
+async function loadDiarySummary() {
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    try {
+        const doc = await db.collection('diary_summaries').doc(today).get();
+        if (doc.exists) {
+            showDiarySummary(doc.data().summary, today);
+        } else if (apiKey && diaryEntries.length > 0) {
+            await refreshDiarySummary();
+        }
+    } catch(e) { /* silent */ }
+}
+
+async function refreshDiarySummary() {
+    if (!apiKey) { toast('Set your API key in Settings to enable AI summaries.', true); return; }
+    const today = new Date().toISOString().slice(0, 10);
+    // Get today's entries
+    const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+    const todaysEntries = diaryEntries.filter(e => {
+        if (!e.createdAt) return false;
+        const d = typeof e.createdAt.toDate === 'function' ? e.createdAt.toDate() : new Date(e.createdAt);
+        return d >= todayStart;
+    });
+    const allRecent = diaryEntries.slice(0, 20); // up to 20 most recent for context
+    const toSummarize = todaysEntries.length > 0 ? todaysEntries : allRecent;
+    if (!toSummarize.length) return;
+
+    const summaryBox = document.getElementById('diary-summary-box');
+    const summaryText = document.getElementById('diary-summary-text');
+    if (summaryBox) summaryBox.style.display = 'block';
+    if (summaryText) summaryText.textContent = '⏳ Generating AI summary...';
+
+    try {
+        const entriesText = toSummarize.map((e, i) => {
+            let dateStr = '';
+            if (e.createdAt) {
+                try { const d = typeof e.createdAt.toDate === 'function' ? e.createdAt.toDate() : new Date(e.createdAt); dateStr = d.toLocaleString(); } catch(x) {}
+            }
+            return `Entry ${i+1} [${dateStr}]: ${e.text}`;
+        }).join('\n\n');
+
+        const prompt = `You are summarizing diary entries from a firearms/armory owner's personal journal. Write a concise, insightful summary of these entries in 2-4 sentences. Focus on key themes, activities, and observations. Write in third person.
+
+Diary entries:
+${entriesText}
+
+Summary:`;
+
+        const msgPayload = { model: aiModel, max_tokens: 300,
+            messages: [{ role: 'user', content: prompt }] };
+        let res;
+        if (proxyUrl) {
+            res = await fetch(proxyUrl, { method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...msgPayload, apiKey }) });
+        } else {
+            res = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', mode: 'cors',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey,
+                    'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-calls': 'true' },
+                body: JSON.stringify(msgPayload) });
+        }
+        if (!res.ok) throw new Error('API error ' + res.status);
+        const data = await res.json();
+        const summary = data.content[0].text.trim();
+
+        // Save to Firestore
+        await db.collection('diary_summaries').doc(today).set({ summary, generatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+        showDiarySummary(summary, today);
+        toast('Summary updated!');
+    } catch(err) {
+        if (summaryText) summaryText.textContent = '❌ Could not generate summary: ' + err.message;
+    }
+}
+
+function showDiarySummary(summary, date) {
+    const box = document.getElementById('diary-summary-box');
+    const text = document.getElementById('diary-summary-text');
+    const dateEl = document.getElementById('diary-summary-date');
+    if (box) box.style.display = 'block';
+    if (text) text.textContent = summary;
+    if (dateEl) dateEl.textContent = '— ' + date;
 }
 </script>
 </body>

@@ -272,8 +272,9 @@
         /* ── TOAST ── */
         .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(80px);
             background:#1e2a1e; color:#fff; padding:10px 20px; border-radius:8px; font-size:0.87rem;
-            font-weight:500; opacity:0; transition:all 0.3s; z-index:9999; pointer-events:none; white-space:nowrap; max-width:90vw; }
-        .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+            font-weight:500; opacity:0; transition:all 0.3s; z-index:9999; pointer-events:none; white-space:nowrap; max-width:90vw;
+            display:flex; align-items:center; gap:6px; }
+        .toast.show { opacity:1; transform:translateX(-50%) translateY(0); pointer-events:all; }
         .toast.success { background:var(--success); }
         .toast.error   { background:var(--danger); }
 
@@ -292,12 +293,11 @@
         @media (max-width:720px) {
             main { padding:12px; }
             .stats-grid { grid-template-columns:1fr 1fr; gap:10px; }
-            .form-grid { grid-template-columns:1fr; gap:12px; }
+            .form-grid { grid-template-columns:1fr; }
             .form-group.full-width, .form-group.span2 { grid-column:1; }
             .photo-grid { grid-template-columns:1fr; }
             .toolbar { flex-direction:column; align-items:stretch; }
-            .toolbar input[type="text"], .toolbar select { width:100%; }
-            .toolbar .btn { width:100%; justify-content:center; }
+            .toolbar input, .toolbar select, .toolbar .btn { width:100%; justify-content:center; }
             table { font-size:0.8rem; }
             thead th, tbody td { padding:8px 10px; }
             .btn { min-height:40px; }
@@ -307,11 +307,17 @@
             .form-actions .btn { width:100%; justify-content:center; }
             .modal { padding:20px 18px; }
             .login-box { padding:30px 22px; margin:16px; }
-            .card-title { flex-direction:column; align-items:flex-start; gap:6px; }
+            .card-title { flex-direction:column; align-items:flex-start; }
             .cat-breakdown { grid-template-columns:1fr; }
             .api-key-row { flex-direction:column; }
             .api-key-row .btn { width:100%; justify-content:center; }
             nav button { padding:7px 11px; font-size:0.78rem; flex-shrink:0; }
+        }
+        @media (max-width:480px) {
+            .site-switcher { overflow-x:auto; flex-wrap:nowrap; padding:5px 10px; }
+            .site-link { padding:4px 8px; font-size:0.72rem; }
+            main { padding:10px; }
+            .card { padding:16px; }
         }
         @media (max-width:400px) {
             .stats-grid { grid-template-columns:1fr 1fr; gap:8px; }
@@ -1123,7 +1129,7 @@ function renderDashboard() {
             const thumb = mainUrl
                 ? `<img src="${mainUrl}" class="thumb" alt="" style="cursor:pointer" onclick="window.open('${mainUrl}','_blank')" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb-placeholder',innerHTML:'🐄'}))">`
                 : `<div class="thumb-placeholder">🐄</div>`;
-            return `<tr>
+            return `<tr style="cursor:pointer" title="Click to edit" onclick="editItem('${it._docId}')">
                 <td>${thumb}</td>
                 <td class="mono">#${it.id}</td>
                 <td><span class="badge ${catClass(it.category)}">${it.category||'—'}</span></td>
@@ -1409,8 +1415,8 @@ async function softDelete(docId) {
     try {
         const ref = db.collection('livestock_items').doc(docId);
         const snap = await ref.get();
-        if (!snap.exists) return;
-        await db.collection('recycle_bin').add({
+        if (!snap.exists) return null;
+        const binRef = await db.collection('recycle_bin').add({
             originalCollection: 'livestock_items',
             originalDocId: docId,
             site: 'livestock',
@@ -1418,15 +1424,25 @@ async function softDelete(docId) {
             data: snap.data()
         });
         await ref.delete();
-        toast('Animal moved to Recycle Bin.');
+        return binRef.id;
     } catch(e) {
-        toast('Delete failed: ' + e.message, true);
+        toast('Delete failed: ' + e.message, 'error');
+        return null;
     }
 }
 
 async function deleteItem(docId) {
-    if (!confirm('Move this animal to the Recycle Bin?')) return;
-    await softDelete(docId);
+    const it = items.find(i => i._docId === docId);
+    const label = it ? (it.name||it.manufacturer||it.make||'Item') : 'Item';
+    const binId = await softDelete(docId);
+    if (!binId) return;
+    toast(`"${label}" moved to Recycle Bin.`, '', async () => {
+        try {
+            await db.collection('livestock_items').add(it);
+            await db.collection('recycle_bin').doc(binId).delete();
+            toast('Restored!', 'success');
+        } catch(e) { toast('Undo failed: ' + e.message, 'error'); }
+    });
 }
 
 // ═══════════════════════════════════════
@@ -1843,10 +1859,24 @@ function catClass(cat) {
     return 'cat-default';
 }
 function esc(s) { return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'):''; }
-function toast(msg, type='') {
+let _toastUndoFn = null;
+function toast(msg, type='', undoFn=null) {
+    _toastUndoFn = undoFn;
     const el = document.getElementById('toast');
-    el.textContent=msg; el.className=`toast show${type?' '+type:''}`;
-    clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),3500);
+    if (undoFn) {
+        el.innerHTML = `<span>${msg}</span><button onclick="doToastUndo()" style="margin-left:12px;background:rgba(255,255,255,0.25);border:1px solid rgba(255,255,255,0.5);color:#fff;padding:3px 11px;border-radius:4px;cursor:pointer;font-size:0.78rem;font-weight:600;">Undo</button>`;
+    } else {
+        el.textContent = msg;
+    }
+    el.className = `toast show${type?' '+type:''}`;
+    clearTimeout(el._t);
+    el._t = setTimeout(() => { el.classList.remove('show'); _toastUndoFn = null; }, undoFn ? 6000 : 3500);
+}
+function doToastUndo() {
+    if (_toastUndoFn) { _toastUndoFn(); _toastUndoFn = null; }
+    const el = document.getElementById('toast');
+    clearTimeout(el._t);
+    el.classList.remove('show');
 }
 
 // ── RECYCLE BIN ──

@@ -771,8 +771,25 @@
             <input type="text" id="pack-name" placeholder="List name — e.g. Range Day, Hunting Trip, Competition..." style="flex:1;min-width:220px;">
             <button class="btn btn-ghost btn-sm" onclick="packSelectAll()">☑ Select All</button>
             <button class="btn btn-ghost btn-sm" onclick="packClearAll()">☐ Clear All</button>
-            <button class="btn btn-primary" onclick="generatePackingList()">🖨 Print Packing List</button>
+            <button class="btn btn-primary" onclick="generatePackingList()">📋 Generate Checklist</button>
         </div>
+    </div>
+
+    <!-- Generated checklist output -->
+    <div id="pack-output-card" class="card" style="display:none;margin-bottom:14px;">
+        <div class="card-title" style="margin-bottom:12px;">
+            <div class="card-title-left">📋 Your Checklist</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="btn btn-ghost btn-sm" onclick="copyPackingList()" id="pack-copy-btn">📄 Copy to Clipboard</button>
+                <button class="btn btn-ghost btn-sm" onclick="document.getElementById('pack-output-card').style.display='none'">✕ Close</button>
+            </div>
+        </div>
+        <textarea id="pack-output-text" readonly
+            style="width:100%;font-family:'Courier New',Courier,monospace;font-size:0.85rem;line-height:1.7;
+                   border:1px solid var(--border);border-radius:8px;padding:14px 16px;resize:vertical;
+                   background:var(--bg-card);color:var(--text-primary);min-height:220px;outline:none;"
+            onclick="this.select()"></textarea>
+        <p style="font-size:0.76rem;color:var(--text-secondary);margin-top:8px;">Click inside the box to select all, or use the Copy button above.</p>
     </div>
 
     <!-- Search + filter -->
@@ -1822,41 +1839,61 @@ function generatePackingList() {
     const selected = getSelectedItems();
     if (!selected.length) { toast('Check at least one item from the list above.','error'); return; }
     const name = document.getElementById('pack-name').value.trim() || 'Packing List';
-    const html = `
-        <style>
-            body{font-family:Arial,sans-serif;margin:20px;}
-            h2{font-size:16px;margin-bottom:4px;}
-            p{color:#666;font-size:10px;margin-bottom:12px;}
-            table{width:100%;border-collapse:collapse;font-size:10px;}
-            th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;}
-            th{background:#f0f0f0;font-weight:bold;}
-            .check-col{width:30px;text-align:center;}
-            @media print{body{margin:10px}}
-        </style>
-        <h2>🎒 ${name}</h2>
-        <p>Farmboss Armory — Generated: ${new Date().toLocaleString()} | ${selected.length} item(s)</p>
-        <table>
-            <thead><tr>
-                <th class="check-col">✓</th>
-                <th>ID</th><th>Category</th><th>Manufacturer</th><th>Model</th>
-                <th>Serial #</th><th>Caliber</th><th>Qty</th><th>Notes</th>
-            </tr></thead>
-            <tbody>
-                ${selected.map(it=>`<tr>
-                    <td class="check-col">☐</td>
-                    <td>#${it.id}</td>
-                    <td>${it.category||''}</td>
-                    <td>${it.manufacturer||''}</td>
-                    <td>${it.model||''}</td>
-                    <td>${it.serialNumber||''}</td>
-                    <td>${it.caliber||''}</td>
-                    <td>${it.quantity||1}</td>
-                    <td>${it.notes||''}</td>
-                </tr>`).join('')}
-            </tbody>
-        </table>`;
-    document.getElementById('print-content').innerHTML = html;
-    window.print();
+    const now  = new Date().toLocaleString();
+
+    // Build plain-text checklist suitable for any app (Notes, Messages, email, etc.)
+    const lines = [];
+    lines.push(`🎒 ${name}`);
+    lines.push(`Farmboss Armory  |  ${now}  |  ${selected.length} item${selected.length!==1?'s':''}`);
+    lines.push('─'.repeat(52));
+
+    // Group by category for a cleaner list
+    const byCat = {};
+    selected.forEach(it => {
+        const cat = it.category || 'Uncategorized';
+        if (!byCat[cat]) byCat[cat] = [];
+        byCat[cat].push(it);
+    });
+
+    Object.keys(byCat).sort().forEach(cat => {
+        lines.push('');
+        lines.push(`▸ ${cat.toUpperCase()}`);
+        byCat[cat].forEach(it => {
+            const label = [it.manufacturer, it.model].filter(Boolean).join(' ') || `Item #${it.id}`;
+            const detail = [
+                it.caliber   ? it.caliber           : null,
+                it.serialNumber ? `S/N: ${it.serialNumber}` : null,
+                (it.quantity && it.quantity > 1) ? `Qty: ${it.quantity}` : null,
+                it.notes     ? `(${it.notes})`      : null
+            ].filter(Boolean).join('  |  ');
+            lines.push(`  ☐  ${label}${detail ? '   — ' + detail : ''}`);
+        });
+    });
+
+    lines.push('');
+    lines.push('─'.repeat(52));
+    lines.push('Generated by Farmboss Armory');
+
+    const text = lines.join('\n');
+    document.getElementById('pack-output-text').value = text;
+    const card = document.getElementById('pack-output-card');
+    card.style.display = '';
+    card.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+async function copyPackingList() {
+    const text = document.getElementById('pack-output-text').value;
+    if (!text) return;
+    try {
+        await navigator.clipboard.writeText(text);
+        const btn = document.getElementById('pack-copy-btn');
+        btn.textContent = '✅ Copied!';
+        setTimeout(() => btn.textContent = '📄 Copy to Clipboard', 2200);
+    } catch(e) {
+        // Fallback: select the textarea
+        document.getElementById('pack-output-text').select();
+        toast('Press Ctrl+C / Cmd+C to copy', 'success');
+    }
 }
 
 // ═══════════════════════════════════════

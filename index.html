@@ -493,61 +493,116 @@
         }
         .form-btn:hover { background: var(--accent-hover); }
 
-        .quotes-list { display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto; }
-        .quotes-list::-webkit-scrollbar { width: 6px; }
-        .quotes-list::-webkit-scrollbar-track { background: transparent; }
-        .quotes-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+        /* ── QUOTES SECTION ── */
+        .quotes-section {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 28px;
+            margin-top: 8px;
+        }
+        .quotes-add-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 12px;
+            align-items: flex-end;
+            margin-bottom: 28px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border);
+        }
+        @media (max-width: 700px) { .quotes-add-row { grid-template-columns: 1fr; } }
+        .quotes-add-row textarea, .quotes-add-row input {
+            width: 100%; padding: 10px 13px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.88rem;
+            font-family: inherit;
+            resize: vertical;
+        }
+        .quotes-add-row textarea:focus, .quotes-add-row input:focus { outline: none; border-color: var(--accent); }
+        .quotes-add-row label { display: block; font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.5px; color: var(--text-secondary); margin-bottom: 5px; }
+
+        .quotes-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 14px;
+        }
+        @media (max-width: 680px) { .quotes-list { grid-template-columns: 1fr; } }
 
         .quote-item {
-            background: rgba(255,255,255,0.04);
+            background: rgba(255,255,255,0.05);
             border: 1px solid var(--border);
+            border-left: 4px solid var(--accent);
             border-radius: 10px;
-            padding: 12px 14px;
+            padding: 16px 16px 12px;
+            transition: background 0.15s;
         }
+        .quote-item:hover { background: rgba(255,255,255,0.08); }
         .quote-item-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
         }
         .quote-num {
-            font-size: 0.7rem;
+            font-size: 0.68rem;
             color: var(--accent);
             font-weight: 700;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.6px;
+            text-transform: uppercase;
         }
         .quote-del {
             background: none;
             border: none;
-            color: #64748b;
+            color: #475569;
             cursor: pointer;
-            font-size: 0.95rem;
-            padding: 0 4px;
+            font-size: 1rem;
+            padding: 0 2px;
             transition: color 0.15s;
+            line-height: 1;
         }
         .quote-del:hover { color: #f87171; }
         .quote-text {
             font-style: italic;
             color: var(--text-primary);
-            font-size: 0.88rem;
-            margin-bottom: 5px;
-            line-height: 1.5;
+            font-size: 0.92rem;
+            line-height: 1.55;
+            margin-bottom: 8px;
         }
         .quote-author {
-            font-size: 0.76rem;
+            font-size: 0.78rem;
             color: var(--accent);
             font-weight: 600;
         }
         .quote-date {
-            font-size: 0.71rem;
+            font-size: 0.7rem;
             color: var(--text-secondary);
-            margin-top: 2px;
+            margin-top: 4px;
         }
         .quotes-empty {
             color: var(--text-secondary);
-            font-size: 0.85rem;
+            font-size: 0.9rem;
             text-align: center;
-            padding: 24px 0;
+            padding: 32px 0;
+            grid-column: 1 / -1;
+        }
+        .quotes-count-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+        .quotes-count-label {
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+        }
+        .quotes-count-num {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: var(--accent);
         }
 
         /* ── TOAST ── */
@@ -763,25 +818,31 @@
         </div>
 
         <!-- QUOTES SECTION -->
-        <div class="section-title">Quote Collection</div>
-        <div class="quotes-grid">
+        <div class="section-title">📚 Quote Collection</div>
+        <div class="quotes-section">
 
-            <!-- Add Quote -->
-            <div class="card">
-                <div class="card-title">💬 Add a Quote</div>
-                <label class="form-label" for="q-text">Quote</label>
-                <textarea class="form-textarea" id="q-text" rows="3" placeholder="Enter the quote..."></textarea>
-                <label class="form-label" for="q-author">Author / Attribution</label>
-                <input class="form-input" type="text" id="q-author" placeholder="— Author, Year">
-                <button class="form-btn" onclick="addQuote()">Add Quote</button>
+            <!-- Add Quote Row -->
+            <div class="quotes-add-row">
+                <div>
+                    <label for="q-text">Quote</label>
+                    <textarea id="q-text" rows="2" placeholder="Enter a quote..."></textarea>
+                </div>
+                <div>
+                    <label for="q-author">Author / Attribution</label>
+                    <input type="text" id="q-author" placeholder="— Author, Year">
+                </div>
+                <button class="form-btn" style="white-space:nowrap;" onclick="addQuote()">＋ Add Quote</button>
             </div>
 
-            <!-- Quote Collection -->
-            <div class="card">
-                <div class="card-title">📚 Saved Quotes <span style="color:var(--text-secondary);font-size:0.8rem;font-weight:400;" id="quotes-count"></span></div>
-                <div class="quotes-list" id="quotes-list">
-                    <div class="quotes-empty">No quotes yet. Add one!</div>
-                </div>
+            <!-- Count bar -->
+            <div class="quotes-count-bar">
+                <span class="quotes-count-label">All saved quotes</span>
+                <span class="quotes-count-num" id="quotes-count"></span>
+            </div>
+
+            <!-- Quote Cards Grid -->
+            <div class="quotes-list" id="quotes-list">
+                <div class="quotes-empty">No quotes yet. Add one above!</div>
             </div>
 
         </div>
@@ -958,20 +1019,20 @@
     function renderQuotes() {
         const list = document.getElementById('quotes-list');
         const countEl = document.getElementById('quotes-count');
-        countEl.textContent = quotes.length ? `(${quotes.length})` : '';
+        countEl.textContent = quotes.length ? `${quotes.length} quotes` : '';
         if (!quotes.length) {
-            list.innerHTML = '<div class="quotes-empty">No quotes yet. Add one!</div>';
+            list.innerHTML = '<div class="quotes-empty">No quotes yet. Add one above!</div>';
             return;
         }
         list.innerHTML = quotes.map((q, i) => `
             <div class="quote-item">
                 <div class="quote-item-header">
-                    <span class="quote-num">QUOTE #${i + 1}</span>
-                    <button class="quote-del" onclick="deleteQuote('${q._docId}')" title="Delete">🗑</button>
+                    <span class="quote-num"># ${i + 1}</span>
+                    <button class="quote-del" onclick="deleteQuote('${q._docId}')" title="Delete quote">🗑</button>
                 </div>
                 <div class="quote-text">"${escHtml(q.text)}"</div>
                 ${q.author ? `<div class="quote-author">— ${escHtml(q.author)}</div>` : ''}
-                <div class="quote-date">${q.addedAt ? new Date(q.addedAt.toDate()).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'}) : ''}</div>
+                ${q.addedAt ? `<div class="quote-date">${new Date(q.addedAt.toDate()).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'})}</div>` : ''}
             </div>
         `).join('');
     }

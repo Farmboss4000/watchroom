@@ -114,7 +114,7 @@
 
         /* ── STATS ── */
         main { padding:20px; max-width:1400px; margin:0 auto; flex:1; }
-        .stats-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:20px; }
+        .stats-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-bottom:20px; }
         .stat-card { background:var(--bg-secondary); border:1px solid var(--border); border-radius:10px;
             padding:18px 16px; text-align:center; }
         .stat-value { font-size:2rem; font-weight:800; color:var(--accent); line-height:1; margin-bottom:4px; }
@@ -350,7 +350,7 @@
 <!-- ══ LOGIN ══ -->
 <div id="login-screen">
     <div class="login-site-links">
-        <a href="index.html">🏠 HQ</a>
+        <a href="index.html">🏠 Headquarters</a>
         <a href="armory.html">🔫 Armory</a>
         <a href="machinery.html">🚜 Machinery</a>
         <a href="automotive.html" class="active">🚗 Automotive</a>
@@ -385,7 +385,7 @@
 <div id="app">
 <div class="site-switcher">
     <span class="site-switcher-label">Farmboss Headquarters</span>
-    <a href="index.html" class="site-link">🏠 HQ</a>
+    <a href="index.html" class="site-link">🏠 Headquarters</a>
     <a href="armory.html" class="site-link">🔫 Armory</a>
     <a href="machinery.html" class="site-link">🚜 Machinery</a>
     <a href="automotive.html" class="site-link active">🚗 Automotive</a>
@@ -403,6 +403,7 @@
         <button onclick="showView('reports')">Reports</button>
         <button onclick="showView('categories')">Vehicle Types</button>
         <button onclick="showView('settings')">⚙ Settings</button>
+        <button onclick="showView('recycle-bin')">🗑 Recycle Bin</button>
     </nav>
     <div class="header-right">
         <span class="user-badge" id="user-email"></span>
@@ -666,6 +667,7 @@
                     <th onclick="sortBy('condition')">Condition</th>
                     <th onclick="sortBy('location')">Location</th>
                     <th onclick="sortBy('purchaseDate')">Purchased</th>
+                    <th onclick="sortBy('marketValue')">Market Value</th>
                     <th class="no-sort">Actions</th>
                 </tr></thead>
                 <tbody id="inv-tbody"></tbody>
@@ -799,6 +801,22 @@ service firebase.storage {
 }</div>
             </li>
         </ol>
+    </div>
+</div>
+
+<!-- ══ RECYCLE BIN ══ -->
+<div id="view-recycle-bin" class="view">
+    <div class="toolbar">
+        <div class="toolbar-left">
+            <h2 style="font-size:1.1rem;font-weight:700;">🗑 Recycle Bin</h2>
+            <span style="font-size:0.82rem;color:var(--text-secondary);">Vehicles deleted from Automotive — restore or permanently delete</span>
+        </div>
+        <div style="display:flex;gap:8px;">
+            <button class="btn btn-ghost btn-sm" onclick="loadRecycleBin()">🔄 Refresh</button>
+        </div>
+    </div>
+    <div class="card">
+        <div id="recycle-bin-list"><div class="empty"><div class="empty-icon">🗑</div><p>Recycle bin is empty</p></div></div>
     </div>
 </div>
 
@@ -953,7 +971,7 @@ let formPhotos = {
     extra:  { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false }
 };
 
-const VIEWS = ['dashboard','add-item','inventory','reports','categories','settings'];
+const VIEWS = ['dashboard','add-item','inventory','reports','categories','settings','recycle-bin'];
 
 // ═══════════════════════════════════════
 //  AUTH
@@ -1020,9 +1038,11 @@ async function initApp() {
         if (modelDoc.exists && modelDoc.data().model) {
             aiModel = modelDoc.data().model;
         }
+        let firstLoad = true;
         unsubItems = db.collection('automotive_items').onSnapshot(snap => {
             items = snap.docs.map(doc => ({ _docId:doc.id, ...doc.data() }));
             renderDashboard(); renderInventory(); renderReport();
+            if (firstLoad) { firstLoad = false; autoRefreshMarketValues(); }
         });
         document.getElementById('loading-screen').style.display = 'none';
         document.getElementById('app').style.display            = 'block';
@@ -1078,6 +1098,7 @@ function showView(v) {
     if (v==='reports')    { syncCatFilters(); renderReport(); }
     if (v==='categories') renderCatTags();
     if (v==='add-item')   populateCatSelect();
+    if (v==='recycle-bin') loadRecycleBin();
 }
 
 // ═══════════════════════════════════════
@@ -1090,11 +1111,17 @@ function renderDashboard() {
     const miles  = items.filter(i=>i.mileage).map(i=>Number(i.mileage)||0);
     const avgMi  = miles.length ? Math.round(miles.reduce((a,b)=>a+b,0)/miles.length).toLocaleString() : '—';
     const catSet = new Set(items.map(i=>i.category).filter(Boolean));
+    const valued = items.filter(i=>i.marketValue && Number(i.marketValue)>0);
+    const totalVal = valued.length
+        ? '$' + valued.reduce((s,i)=>s+(Number(i.marketValue)||0),0).toLocaleString()
+        : '—';
+    const valLabel = valued.length ? `Fleet Value <span style="font-size:0.65rem;opacity:0.6;">(${valued.length}/${total} valued)</span>` : 'Fleet Value';
     document.getElementById('stats-grid').innerHTML = `
         <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Total Vehicles</div></div>
         <div class="stat-card"><div class="stat-value">${catSet.size}</div><div class="stat-label">Vehicle Types</div></div>
         <div class="stat-card"><div class="stat-value">${recent}</div><div class="stat-label">Added This Month</div></div>
-        <div class="stat-card"><div class="stat-value">${avgMi}</div><div class="stat-label">Avg Mileage</div></div>`;
+        <div class="stat-card"><div class="stat-value">${avgMi}</div><div class="stat-label">Avg Mileage</div></div>
+        <div class="stat-card" style="border-color:#22c55e;"><div class="stat-value" style="color:#22c55e;">${totalVal}</div><div class="stat-label">${valLabel}</div></div>`;
     const counts = {};
     items.forEach(it => { counts[it.category]=(counts[it.category]||0)+1; });
     const maxC = Math.max(...Object.values(counts),1);
@@ -1602,11 +1629,28 @@ function editItem(docId) {
     window.scrollTo(0,0);
 }
 
+async function softDelete(docId) {
+    try {
+        const ref = db.collection('automotive_items').doc(docId);
+        const snap = await ref.get();
+        if (!snap.exists) return;
+        await db.collection('recycle_bin').add({
+            originalCollection: 'automotive_items',
+            originalDocId: docId,
+            site: 'automotive',
+            deletedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            data: snap.data()
+        });
+        await ref.delete();
+        toast('Vehicle moved to Recycle Bin.');
+    } catch(e) {
+        toast('Delete failed: ' + e.message, true);
+    }
+}
+
 async function deleteItem(docId) {
-    const it = items.find(i=>i._docId===docId); if (!it) return;
-    if (!confirm(`Delete #${it.id} (${it.year||''} ${it.make||''} ${it.model||''})? This cannot be undone.`)) return;
-    try { await dbDeleteItem(it._docId); toast('Vehicle deleted.'); }
-    catch(err) { toast('Error: '+err.message,'error'); }
+    if (!confirm('Move this vehicle to the Recycle Bin?')) return;
+    await softDelete(docId);
 }
 
 // ═══════════════════════════════════════
@@ -1675,6 +1719,9 @@ function renderInventory() {
             <td>${condBadge}</td>
             <td style="font-size:0.82rem">${esc(it.location)||'—'}</td>
             <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():'—'}</td>
+            <td style="white-space:nowrap;min-width:120px;" id="mv-cell-${it._docId}">
+                ${marketValueCell(it)}
+            </td>
             <td style="white-space:nowrap">
                 <button class="btn btn-ghost btn-sm" onclick="showMaintenance('${it._docId}')" title="Maintenance Log">🔧</button>
                 <button class="btn btn-info btn-sm" onclick="showBarcode('${it._docId}')" title="Barcode/Photos">▣</button>
@@ -2012,6 +2059,190 @@ function toast(msg, type='') {
     const el = document.getElementById('toast');
     el.textContent=msg; el.className=`toast show${type?' '+type:''}`;
     clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),3500);
+}
+
+// ── RECYCLE BIN ──
+let recycleBinItems = [];
+
+async function loadRecycleBin() {
+    const list = document.getElementById('recycle-bin-list');
+    list.innerHTML = '<div class="empty"><div class="empty-icon">⏳</div><p>Loading...</p></div>';
+    try {
+        const snap = await db.collection('recycle_bin')
+            .where('site', '==', 'automotive')
+            .get();
+        recycleBinItems = snap.docs.map(doc => ({ _binId: doc.id, ...doc.data() }));
+        recycleBinItems.sort((a, b) => {
+            const ta = a.deletedAt && typeof a.deletedAt.toMillis === 'function' ? a.deletedAt.toMillis() : 0;
+            const tb = b.deletedAt && typeof b.deletedAt.toMillis === 'function' ? b.deletedAt.toMillis() : 0;
+            return tb - ta;
+        });
+        renderRecycleBin();
+    } catch(e) {
+        list.innerHTML = `<div class="empty"><p style="color:var(--danger);">Error: ${e.message}</p></div>`;
+    }
+}
+
+function renderRecycleBin() {
+    const list = document.getElementById('recycle-bin-list');
+    if (!recycleBinItems.length) {
+        list.innerHTML = '<div class="empty"><div class="empty-icon">🗑</div><p>Recycle bin is empty</p></div>';
+        return;
+    }
+    list.innerHTML = `
+        <div class="table-wrapper">
+        <table>
+            <thead><tr>
+                <th>Vehicle</th>
+                <th>Type</th>
+                <th>VIN</th>
+                <th>Deleted</th>
+                <th>Actions</th>
+            </tr></thead>
+            <tbody>
+            ${recycleBinItems.map(item => {
+                const d = item.data || {};
+                const deletedDate = item.deletedAt && typeof item.deletedAt.toDate === 'function'
+                    ? item.deletedAt.toDate().toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'})
+                    : 'Unknown';
+                const name = [d.year, d.make, d.model].filter(Boolean).join(' ') || 'Unnamed Vehicle';
+                return `<tr>
+                    <td><strong>${name}</strong></td>
+                    <td>${d.category || '—'}</td>
+                    <td style="font-family:monospace;font-size:0.8rem;">${d.serialNumber || d.vin || '—'}</td>
+                    <td style="font-size:0.82rem;color:var(--text-secondary);">${deletedDate}</td>
+                    <td>
+                        <button class="btn btn-primary btn-sm" onclick="restoreBinItem('${item._binId}')">↩ Restore</button>
+                        <button class="btn btn-danger btn-sm" onclick="permanentDeleteBinItem('${item._binId}')" style="margin-left:4px;">✕ Delete Forever</button>
+                    </td>
+                </tr>`;
+            }).join('')}
+            </tbody>
+        </table>
+        </div>`;
+}
+
+async function restoreBinItem(binId) {
+    const item = recycleBinItems.find(i => i._binId === binId);
+    if (!item) return;
+    try {
+        await db.collection(item.originalCollection).add(item.data);
+        await db.collection('recycle_bin').doc(binId).delete();
+        toast('Vehicle restored!');
+        loadRecycleBin();
+    } catch(e) {
+        toast('Restore failed: ' + e.message, true);
+    }
+}
+
+async function permanentDeleteBinItem(binId) {
+    if (!confirm('Permanently delete this vehicle? This cannot be undone.')) return;
+    try {
+        await db.collection('recycle_bin').doc(binId).delete();
+        toast('Permanently deleted.');
+        loadRecycleBin();
+    } catch(e) {
+        toast('Error: ' + e.message, true);
+    }
+}
+
+// ═══════════════════════════════════════
+//  MARKET VALUE (AI-estimated, NADA basis)
+// ═══════════════════════════════════════
+const MV_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+function marketValueAge(it) {
+    if (!it.marketValueDate) return Infinity;
+    return Date.now() - new Date(it.marketValueDate).getTime();
+}
+
+function marketValueCell(it) {
+    if (it.marketValue && Number(it.marketValue) > 0) {
+        const age  = marketValueAge(it);
+        const stale = age > MV_MAX_AGE_MS;
+        const ageStr = age < 3600000 ? 'Just now'
+            : age < 86400000 ? Math.floor(age/3600000) + 'h ago'
+            : Math.floor(age/86400000) + 'd ago';
+        return `<div style="font-weight:700;color:#22c55e;">$${Number(it.marketValue).toLocaleString()}</div>
+                <div style="font-size:0.68rem;color:${stale?'#f59e0b':'var(--text-secondary)'};">${stale?'⚠ Stale · ':''}${ageStr}
+                  <button onclick="refreshMarketValue('${it._docId}')" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:0.72rem;padding:0 0 0 4px;" title="Refresh value">↻</button>
+                </div>`;
+    }
+    return `<button class="btn btn-ghost btn-sm" style="font-size:0.75rem;" onclick="refreshMarketValue('${it._docId}')">💲 Get Value</button>`;
+}
+
+async function refreshMarketValue(docId) {
+    if (!apiKey) { toast('Set your API key in Settings first.', true); return; }
+    const it = items.find(i => i._docId === docId);
+    if (!it) return;
+    if (!it.make || !it.model || !it.year) { toast('Vehicle needs Make, Model, and Year to estimate value.', true); return; }
+
+    // Update UI immediately to show loading
+    const cell = document.getElementById('mv-cell-' + docId);
+    if (cell) cell.innerHTML = '<span style="font-size:0.78rem;color:var(--text-secondary);">⏳ Estimating…</span>';
+
+    try {
+        const prompt = `You are a vehicle valuation expert using NADA Guides methodology. Estimate the current fair market value for this vehicle in US dollars. Consider year, make, model, mileage, and condition. Return ONLY a whole number integer with no dollar sign, no commas, no text — just the number.
+
+Year: ${it.year}
+Make: ${it.make}
+Model: ${it.model}
+${it.mileage ? 'Mileage: ' + Number(it.mileage).toLocaleString() + ' miles' : ''}
+${it.condition ? 'Condition: ' + it.condition : ''}
+${it.engine ? 'Engine: ' + it.engine : ''}
+${it.transmission ? 'Transmission: ' + it.transmission : ''}`;
+
+        // Use text-only Claude call (no image)
+        const msgPayload = { model: aiModel, max_tokens: 64,
+            messages:[{ role:'user', content: prompt }] };
+        let res;
+        if (proxyUrl) {
+            res = await fetch(proxyUrl, { method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({...msgPayload, apiKey}) });
+        } else {
+            res = await fetch('https://api.anthropic.com/v1/messages', { method:'POST', mode:'cors',
+                headers:{'Content-Type':'application/json','x-api-key':apiKey,
+                    'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true'},
+                body: JSON.stringify(msgPayload) });
+        }
+        if (!res.ok) throw new Error('API error ' + res.status);
+        const data = await res.json();
+        const raw  = data.content[0].text.trim().replace(/[^0-9]/g,'');
+        const val  = parseInt(raw, 10);
+        if (!val || val < 100) throw new Error('Could not parse a valid value from AI response');
+
+        // Save to Firestore
+        await db.collection('automotive_items').doc(docId).update({
+            marketValue: val,
+            marketValueDate: new Date().toISOString()
+        });
+        toast(`Market value updated: $${val.toLocaleString()}`);
+        // items array will update via onSnapshot; dashboard re-renders automatically
+    } catch(err) {
+        toast('Value estimate failed: ' + err.message, true);
+        // Restore cell
+        const it2 = items.find(i => i._docId === docId);
+        const cell2 = document.getElementById('mv-cell-' + docId);
+        if (cell2 && it2) cell2.innerHTML = marketValueCell(it2);
+    }
+}
+
+// Auto-refresh stale or missing values on page load (if API key is set)
+async function autoRefreshMarketValues() {
+    if (!apiKey) return;
+    const staleItems = items.filter(it =>
+        it.make && it.model && it.year &&
+        (!it.marketValue || marketValueAge(it) > MV_MAX_AGE_MS)
+    );
+    // Throttle: refresh up to 3 at a time to avoid rate limits
+    for (let i = 0; i < Math.min(staleItems.length, 3); i++) {
+        await refreshMarketValue(staleItems[i]._docId);
+        await new Promise(r => setTimeout(r, 1500)); // 1.5s between calls
+    }
+    if (staleItems.length > 3) {
+        toast(`${staleItems.length - 3} more vehicles need valuation — visit Inventory to refresh them.`);
+    }
 }
 </script>
 </body>

@@ -684,6 +684,7 @@
             </select>
             <button class="btn btn-primary btn-sm" onclick="showView('add-item');resetForm()">+ Add Item</button>
             <button class="btn btn-ghost btn-sm" onclick="openScanner()" title="Scan barcode">📷 Scan</button>
+            <button class="btn btn-ghost btn-sm" id="btn-refresh-all-mv" onclick="refreshAllMarketValues()" title="Re-estimate market value for all firearms">💲 Refresh All Values</button>
             <button class="btn btn-ghost btn-sm" onclick="exportCSV()">↓ Export CSV</button>
             <button class="btn btn-ghost btn-sm" onclick="showView('packing-list')">🎒 Packing List</button>
         </div>
@@ -700,6 +701,7 @@
                     <th onclick="sortBy('caliber')">Caliber</th>
                     <th onclick="sortBy('quantity')">Qty</th>
                     <th onclick="sortBy('purchaseDate')">Purchased</th>
+                    <th onclick="sortBy('marketValue')">Market Value</th>
                     <th class="no-sort">Actions</th>
                 </tr></thead>
                 <tbody id="inv-tbody"></tbody>
@@ -733,6 +735,7 @@
                 <option value="caliber">Sort: Caliber</option>
                 <option value="quantity">Sort: Quantity</option>
                 <option value="purchaseDate">Sort: Purchase Date</option>
+                <option value="marketValue">Sort: Market Value</option>
             </select>
             <select id="rpt-sort-dir" onchange="renderReport()" style="min-width:120px;">
                 <option value="asc">Ascending</option>
@@ -751,6 +754,7 @@
                 <th onclick="rptSortBy('caliber')">Caliber</th>
                 <th onclick="rptSortBy('quantity')">Qty</th>
                 <th onclick="rptSortBy('purchaseDate')">Purchased</th>
+                <th onclick="rptSortBy('marketValue')">Market Value</th>
                 <th class="no-sort">Notes</th>
             </tr></thead>
             <tbody id="rpt-tbody"></tbody></table>
@@ -1202,9 +1206,11 @@ async function initApp() {
         } else {
             document.getElementById('model-input').value = aiModel;
         }
+        let firstLoad = true;
         unsubItems = db.collection('items').onSnapshot(snap => {
             items = snap.docs.map(doc => ({ _docId:doc.id, ...doc.data() }));
             renderDashboard(); renderInventory(); renderReport();
+            if (firstLoad) { firstLoad = false; autoRefreshMarketValues(); }
         });
         document.getElementById('loading-screen').style.display = 'none';
         document.getElementById('app').style.display            = 'flex';
@@ -1273,11 +1279,16 @@ function renderDashboard() {
     const totalQty   = items.reduce((s,i)=>s+(Number(i.quantity)||1),0);
     const ms30       = 30*24*60*60*1000;
     const recent     = items.filter(i => i.addedAt && (Date.now()-new Date(i.addedAt).getTime())<ms30).length;
+    const valued = items.filter(i => i.marketValue && Number(i.marketValue) > 0);
+    const totalVal = valued.length
+        ? '$' + valued.reduce((s,i) => s + (Number(i.marketValue)||0), 0).toLocaleString()
+        : '—';
     document.getElementById('stats-grid').innerHTML = `
         <div class="stat-card"><div class="stat-value">${totalLines}</div><div class="stat-label">Total Line Items</div></div>
         <div class="stat-card"><div class="stat-value">${totalQty}</div><div class="stat-label">Total Quantity</div></div>
         <div class="stat-card"><div class="stat-value">${categories.length}</div><div class="stat-label">Categories</div></div>
-        <div class="stat-card"><div class="stat-value">${recent}</div><div class="stat-label">Added This Month</div></div>`;
+        <div class="stat-card"><div class="stat-value">${recent}</div><div class="stat-label">Added This Month</div></div>
+        <div class="stat-card"><div class="stat-value" style="font-size:1.5rem;">${totalVal}</div><div class="stat-label">Est. Collection Value</div></div>`;
 
     const counts = {};
     items.forEach(it => { counts[it.category]=(counts[it.category]||0)+1; });
@@ -1712,8 +1723,8 @@ function renderInventory() {
     const data  = sorted(filteredItems('inv-search','inv-filter-cat'), invSortField, invSortDir);
     document.getElementById('inv-count').textContent = `${data.length} item${data.length!==1?'s':''}`;
     document.querySelectorAll('#inv-table thead th').forEach(th=>th.classList.remove('sort-asc','sort-desc'));
-    // col indices: 0=checkbox, 1=photo, 2=id, 3=category, 4=manufacturer, 5=model, 6=serial, 7=caliber, 8=qty, 9=purchased
-    const thIdx = {id:2,category:3,manufacturer:4,model:5,serialNumber:6,caliber:7,quantity:8,purchaseDate:9};
+    // col indices: 0=checkbox, 1=photo, 2=id, 3=category, 4=manufacturer, 5=model, 6=serial, 7=caliber, 8=qty, 9=purchased, 10=marketValue
+    const thIdx = {id:2,category:3,manufacturer:4,model:5,serialNumber:6,caliber:7,quantity:8,purchaseDate:9,marketValue:10};
     const ti = thIdx[invSortField];
     if (ti!==undefined) document.querySelectorAll('#inv-table thead th')[ti]?.classList.add(invSortDir==='asc'?'sort-asc':'sort-desc');
     const tbody = document.getElementById('inv-tbody');
@@ -1736,6 +1747,7 @@ function renderInventory() {
             <td>${esc(it.caliber)||'—'}</td>
             <td style="text-align:center">${it.quantity||1}</td>
             <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():'—'}</td>
+            <td id="mv-cell-${it._docId}" style="white-space:nowrap;min-width:90px;">${marketValueCell(it)}</td>
             <td style="white-space:nowrap">
                 <button class="btn btn-info btn-sm" onclick="showBarcode('${it._docId}')" title="Barcode/Photos">▣</button>
                 <button class="btn btn-ghost btn-sm" onclick="openMaintenance('${it._docId}')" title="Maintenance Log">🔧</button>
@@ -1851,9 +1863,10 @@ function renderReport() {
             <td>${esc(it.caliber)||'—'}</td>
             <td style="text-align:center">${it.quantity||1}</td>
             <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():'—'}</td>
+            <td>${it.marketValue && Number(it.marketValue)>0 ? `<span style="font-weight:700;color:#22c55e;">$${Number(it.marketValue).toLocaleString()}</span>` : '—'}</td>
             <td style="color:var(--text-secondary);font-size:0.82rem">${esc(it.notes)||'—'}</td>
           </tr>`).join('')
-        :'<tr><td colspan="9" style="text-align:center;color:var(--text-secondary);padding:30px">No items match filters.</td></tr>';
+        :'<tr><td colspan="10" style="text-align:center;color:var(--text-secondary);padding:30px">No items match filters.</td></tr>';
 }
 
 function printReport() {
@@ -1866,14 +1879,127 @@ function printReport() {
         <h2>Farmboss Armory — Inventory Report</h2>
         <p>Generated: ${new Date().toLocaleString()} | Items: ${data.length}</p>
         <table><thead><tr><th>ID</th><th>Category</th><th>Manufacturer</th><th>Model</th>
-        <th>Serial #</th><th>Caliber</th><th>Qty</th><th>Purchased</th><th>Notes</th>
+        <th>Serial #</th><th>Caliber</th><th>Qty</th><th>Purchased</th><th>Market Value</th><th>Notes</th>
         </tr></thead><tbody>${data.map(it=>`<tr>
             <td>#${it.id}</td><td>${it.category||''}</td><td>${it.manufacturer||''}</td><td>${it.model||''}</td>
             <td>${it.serialNumber||''}</td><td>${it.caliber||''}</td>
             <td>${it.quantity||1}</td>
             <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():''}</td>
+            <td>${it.marketValue && Number(it.marketValue)>0 ? '$'+Number(it.marketValue).toLocaleString() : ''}</td>
             <td>${it.notes||''}</td></tr>`).join('')}</tbody></table>`;
     window.print();
+}
+
+// ═══════════════════════════════════════
+//  MARKET VALUE (AI-estimated, Blue Book basis)
+// ═══════════════════════════════════════
+const MV_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+function marketValueAge(it) {
+    if (!it.marketValueDate) return Infinity;
+    return Date.now() - new Date(it.marketValueDate).getTime();
+}
+
+function marketValueCell(it) {
+    if (!it.manufacturer || !it.model) return '—';
+    if (it.marketValue && Number(it.marketValue) > 0) {
+        const age    = marketValueAge(it);
+        const stale  = age > MV_MAX_AGE_MS;
+        const ageStr = age < 3600000   ? 'Just now'
+                     : age < 86400000  ? Math.floor(age / 3600000) + 'h ago'
+                     : Math.floor(age / 86400000) + 'd ago';
+        return `<div style="font-weight:700;color:#22c55e;">$${Number(it.marketValue).toLocaleString()}</div>
+                <div style="font-size:0.68rem;color:${stale ? '#f59e0b' : 'var(--text-secondary)'};">${stale ? '⚠ Stale · ' : ''}${ageStr}
+                  <button onclick="refreshMarketValue('${it._docId}')" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:0.72rem;padding:0 0 0 4px;" title="Refresh value">↻</button>
+                </div>`;
+    }
+    return `<button class="btn btn-ghost btn-sm" style="font-size:0.75rem;" onclick="refreshMarketValue('${it._docId}')">💲 Get Value</button>`;
+}
+
+async function refreshMarketValue(docId) {
+    if (!apiKey) { toast('Set your API key in Settings first.', 'error'); return; }
+    const it = items.find(i => i._docId === docId);
+    if (!it) return;
+    if (!it.manufacturer || !it.model) { toast('Item needs Manufacturer and Model to estimate value.', 'error'); return; }
+
+    const cell = document.getElementById('mv-cell-' + docId);
+    if (cell) cell.innerHTML = '<span style="font-size:0.78rem;color:var(--text-secondary);">⏳ Estimating…</span>';
+
+    try {
+        const prompt = `You are a firearms valuation expert using Blue Book of Gun Values methodology. Estimate the current used fair market value for this firearm in US dollars. Consider manufacturer, model, caliber, and condition. Return ONLY a whole number integer — no dollar sign, no commas, no extra text.
+
+Manufacturer: ${it.manufacturer}
+Model: ${it.model}
+${it.caliber      ? 'Caliber: '       + it.caliber      : ''}
+${it.category     ? 'Category: '      + it.category     : ''}
+${it.condition    ? 'Condition: '     + it.condition    : ''}
+${it.magnification? 'Optics/Config: ' + it.magnification: ''}
+${it.purchaseDate ? 'Purchase Date: ' + it.purchaseDate  : ''}`;
+
+        const msgPayload = { model: aiModel, max_tokens: 64,
+            messages: [{ role: 'user', content: prompt }] };
+        let res;
+        if (proxyUrl) {
+            res = await fetch(proxyUrl, { method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...msgPayload, apiKey }) });
+        } else {
+            res = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', mode: 'cors',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey,
+                    'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-calls': 'true' },
+                body: JSON.stringify(msgPayload) });
+        }
+        if (!res.ok) throw new Error('API error ' + res.status);
+        const data = await res.json();
+        const raw  = data.content[0].text.trim().replace(/[^0-9]/g, '');
+        const val  = parseInt(raw, 10);
+        if (!val || val < 10) throw new Error('Could not parse a valid value from AI response');
+
+        await db.collection('items').doc(docId).update({
+            marketValue:     val,
+            marketValueDate: new Date().toISOString()
+        });
+        toast(`Market value updated: $${val.toLocaleString()}`);
+    } catch(err) {
+        toast('Value estimate failed: ' + err.message, 'error');
+        const it2   = items.find(i => i._docId === docId);
+        const cell2 = document.getElementById('mv-cell-' + docId);
+        if (cell2 && it2) cell2.innerHTML = marketValueCell(it2);
+    }
+}
+
+async function refreshAllMarketValues() {
+    if (!apiKey) { toast('Set your API key in Settings first.', 'error'); return; }
+    const eligible = items.filter(it => it.manufacturer && it.model);
+    if (!eligible.length) { toast('No items with Manufacturer & Model to value.', 'error'); return; }
+
+    const btn = document.getElementById('btn-refresh-all-mv');
+    if (btn) { btn.disabled = true; btn.textContent = `⏳ 0 / ${eligible.length}`; }
+
+    for (let i = 0; i < eligible.length; i++) {
+        if (btn) btn.textContent = `⏳ ${i + 1} / ${eligible.length}`;
+        await refreshMarketValue(eligible[i]._docId);
+        if (i < eligible.length - 1) await new Promise(r => setTimeout(r, 1500));
+    }
+
+    if (btn) { btn.disabled = false; btn.textContent = '💲 Refresh All Values'; }
+    toast(`✅ Market values updated for ${eligible.length} item${eligible.length !== 1 ? 's' : ''}`);
+}
+
+// Auto-refresh stale or missing values on page load (if API key is set)
+async function autoRefreshMarketValues() {
+    if (!apiKey) return;
+    const staleItems = items.filter(it =>
+        it.manufacturer && it.model &&
+        (!it.marketValue || marketValueAge(it) > MV_MAX_AGE_MS)
+    );
+    for (let i = 0; i < Math.min(staleItems.length, 3); i++) {
+        await refreshMarketValue(staleItems[i]._docId);
+        await new Promise(r => setTimeout(r, 1500));
+    }
+    if (staleItems.length > 3) {
+        toast(`${staleItems.length - 3} more items need valuation — visit Inventory to refresh.`);
+    }
 }
 
 // ═══════════════════════════════════════

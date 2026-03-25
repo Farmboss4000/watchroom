@@ -366,6 +366,60 @@
         }
         .photo-modal-imgs img:hover { border-color:var(--accent); }
 
+        /* ── QUOTES ── */
+        .quote-add-wrap { display:flex; flex-direction:column; gap:10px; }
+        .quote-add-wrap textarea {
+            width:100%; resize:vertical; padding:10px 12px;
+            border:1px solid var(--border); border-radius:8px;
+            font-family:inherit; font-size:0.9rem;
+            background:var(--bg-secondary); color:var(--text-primary);
+        }
+        .quote-add-wrap textarea:focus { outline:none; border-color:var(--accent); }
+        .quote-add-meta { display:flex; gap:10px; flex-wrap:wrap; }
+        .quote-add-meta input[type="text"] {
+            flex:1; min-width:200px; padding:8px 12px;
+            border:1px solid var(--border); border-radius:8px;
+            font-family:inherit; font-size:0.9rem;
+            background:var(--bg-secondary); color:var(--text-primary);
+        }
+        .quote-add-meta input:focus { outline:none; border-color:var(--accent); }
+        .quote-entry {
+            border-left:4px solid var(--accent);
+            background:var(--bg-card);
+            border-radius:0 8px 8px 0;
+            padding:14px 16px;
+            margin-bottom:14px;
+            position:relative;
+        }
+        .quote-entry:last-child { margin-bottom:0; }
+        .quote-number {
+            font-size:0.72rem; font-weight:700; color:var(--accent);
+            text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;
+        }
+        .quote-body {
+            font-size:1rem; font-style:italic; line-height:1.6;
+            color:var(--text-primary); white-space:pre-wrap;
+        }
+        .quote-attribution {
+            font-size:0.82rem; color:var(--text-secondary);
+            margin-top:6px; font-style:normal;
+        }
+        .quote-footer {
+            display:flex; align-items:center; justify-content:space-between;
+            margin-top:10px; flex-wrap:wrap; gap:6px;
+        }
+        .quote-date { font-size:0.75rem; color:var(--text-secondary); }
+        .quote-del {
+            background:none; border:none; cursor:pointer;
+            color:var(--text-secondary); font-size:0.8rem; padding:2px 6px;
+            border-radius:4px; transition:color 0.15s;
+        }
+        .quote-del:hover { color:var(--danger); }
+        @media (max-width:720px) {
+            .quote-add-meta { flex-direction:column; }
+            .quote-add-meta .btn { width:100%; justify-content:center; }
+        }
+
         /* ── DATE / TIME / WEATHER BAR ── */
         #dtw-bar {
             display: flex; align-items: center; gap: 0;
@@ -601,6 +655,7 @@
         <button onclick="showView('inventory')">Inventory</button>
         <button onclick="showView('reports')">Reports</button>
         <button onclick="showView('categories')">Categories</button>
+        <button onclick="showView('quotes')">&#128172; Quotes</button>
         <button onclick="showView('settings')">⚙ Settings</button>
     </nav>
     <div class="header-right">
@@ -981,6 +1036,27 @@ service cloud.firestore {
     </div>
 </div>
 
+<!-- ══ QUOTES ══ -->
+<div id="view-quotes" class="view">
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">&#128172; Add a Quote</div></div>
+        <div class="quote-add-wrap">
+            <textarea id="quote-text" rows="3" placeholder="Enter a quote…" maxlength="1000"></textarea>
+            <div class="quote-add-meta">
+                <input type="text" id="quote-author" placeholder="— Author / Source (optional)" maxlength="120">
+                <button class="btn btn-primary" onclick="addQuote()">&#10010; Add Quote</button>
+            </div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-title">
+            <div class="card-title-left">&#128218; Quote Collection</div>
+            <span id="quote-count" style="font-size:0.8rem;color:var(--text-secondary);font-weight:400;"></span>
+        </div>
+        <div id="quotes-list"><p style="color:var(--text-secondary);padding:12px 0;">No quotes yet.</p></div>
+    </div>
+</div>
+
 </main>
 </div><!-- end #app -->
 
@@ -1089,7 +1165,7 @@ let formPhotos = {
     extra:  { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false }
 };
 
-const VIEWS = ['dashboard','add-item','inventory','reports','categories','settings'];
+const VIEWS = ['dashboard','add-item','inventory','reports','categories','quotes','settings'];
 
 // ═══════════════════════════════════════
 //  AUTH
@@ -1208,6 +1284,7 @@ function showView(v) {
     if (v==='inventory')  { syncCatFilters(); renderInventory(); }
     if (v==='reports')    { syncCatFilters(); renderReport(); }
     if (v==='categories') renderCatTags();
+    if (v==='quotes')     initQuotes();
     if (v==='add-item')   populateCatSelect();
 }
 
@@ -1768,6 +1845,70 @@ function catClass(cat) {
             'Binoculars':'cat-binoculars','Spotting Scope':'cat-spotting'}[cat]||'cat-default';
 }
 function esc(s) { return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'):''; }
+
+// ═══════════════════════════════════════
+//  QUOTES
+// ═══════════════════════════════════════
+let quotes = [];
+let unsubQuotes = null;
+
+function initQuotes() {
+    if (unsubQuotes) return;
+    unsubQuotes = db.collection('quotes').orderBy('addedAt', 'asc').onSnapshot(snap => {
+        quotes = snap.docs.map(doc => ({ _docId: doc.id, ...doc.data() }));
+        renderQuotes();
+    });
+}
+
+function renderQuotes() {
+    const list  = document.getElementById('quotes-list');
+    const count = document.getElementById('quote-count');
+    if (!list) return;
+    if (count) count.textContent = `${quotes.length} quote${quotes.length !== 1 ? 's' : ''}`;
+    if (!quotes.length) {
+        list.innerHTML = '<p style="color:var(--text-secondary);padding:12px 0;">No quotes yet. Add the first one above!</p>';
+        return;
+    }
+    list.innerHTML = quotes.map((q, i) => `
+        <div class="quote-entry">
+            <div class="quote-number"># ${i + 1}</div>
+            <div class="quote-body">${esc(q.text)}</div>
+            ${q.author ? `<div class="quote-attribution">${esc(q.author)}</div>` : ''}
+            <div class="quote-footer">
+                <span class="quote-date">${q.addedAt ? new Date(q.addedAt).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'}) : ''}</span>
+                <button class="quote-del" onclick="deleteQuote('${q._docId}')" title="Delete quote">&#128465; Delete</button>
+            </div>
+        </div>`).join('');
+}
+
+async function addQuote() {
+    const textEl   = document.getElementById('quote-text');
+    const authorEl = document.getElementById('quote-author');
+    const text     = textEl.value.trim();
+    if (!text) { toast('Enter a quote first.', 'error'); return; }
+    try {
+        await db.collection('quotes').add({
+            text,
+            author:  authorEl.value.trim(),
+            addedAt: new Date().toISOString()
+        });
+        textEl.value   = '';
+        authorEl.value = '';
+        toast('Quote added!', 'success');
+    } catch(err) {
+        toast('Error saving quote: ' + err.message, 'error');
+    }
+}
+
+async function deleteQuote(docId) {
+    if (!confirm('Delete this quote? This cannot be undone.')) return;
+    try {
+        await db.collection('quotes').doc(docId).delete();
+        toast('Quote deleted.');
+    } catch(err) {
+        toast('Error: ' + err.message, 'error');
+    }
+}
 function toast(msg,type='') {
     const el=document.getElementById('toast');
     el.textContent=msg; el.className=`toast show${type?' '+type:''}`;
@@ -1782,7 +1923,7 @@ function toast(msg,type='') {
     function updateClock() {
         const now = new Date();
         const date = now.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
-        const time = now.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit', second:'2-digit', hour12:true });
+        const time = now.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', hour12:false });
         const el = document.getElementById('dtw-clock');
         if (el) el.textContent = `${date}  ·  ${time}`;
     }

@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Armory Database II</title>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -30,346 +33,223 @@
             min-height: 100vh;
         }
 
+        /* ── LOGIN SCREEN ── */
+        #login-screen {
+            position: fixed; inset: 0;
+            background: var(--bg-primary);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 9000;
+        }
+        .login-box {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-top: 3px solid var(--accent);
+            border-radius: 12px;
+            padding: 40px 36px;
+            width: 100%; max-width: 400px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+        }
+        .login-logo {
+            width: 48px; height: 48px;
+            background: var(--accent);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 24px; margin: 0 auto 16px;
+        }
+        .login-box h2 {
+            text-align: center; font-size: 1.3rem;
+            margin-bottom: 4px; color: var(--text-primary);
+        }
+        .login-box p {
+            text-align: center; font-size: 0.85rem;
+            color: var(--text-secondary); margin-bottom: 28px;
+        }
+        .login-error {
+            color: var(--danger); font-size: 0.82rem;
+            margin-bottom: 12px; min-height: 18px;
+            text-align: center;
+        }
+        .login-full { width: 100%; justify-content: center; }
+
+        /* ── LOADING SCREEN ── */
+        #loading-screen {
+            position: fixed; inset: 0;
+            background: var(--bg-primary);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 8000; flex-direction: column; gap: 16px;
+        }
+        .spinner {
+            width: 40px; height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        #loading-screen p { color: var(--text-secondary); font-size: 0.9rem; }
+
+        /* ── APP WRAPPER ── */
+        #app { display: none; }
+
         /* ── HEADER ── */
         header {
             background: var(--bg-secondary);
             border-bottom: 2px solid var(--accent);
             padding: 0 24px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            position: sticky;
-            top: 0;
-            z-index: 100;
+            display: flex; align-items: center; justify-content: space-between;
+            position: sticky; top: 0; z-index: 100;
             box-shadow: 0 2px 16px rgba(0,0,0,0.6);
             height: 60px;
         }
-
-        .logo-area {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
+        .logo-area { display: flex; align-items: center; gap: 12px; }
         .logo-icon {
-            width: 36px;
-            height: 36px;
-            background: var(--accent);
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
+            width: 36px; height: 36px; background: var(--accent);
+            border-radius: 6px; display: flex; align-items: center;
+            justify-content: center; font-size: 18px;
+        }
+        header h1 { font-size: 1.15rem; font-weight: 600; letter-spacing: 0.5px; }
+        header h1 span { color: var(--accent); }
+        .header-right { display: flex; align-items: center; gap: 12px; }
+        .user-badge {
+            font-size: 0.78rem; color: var(--text-secondary);
+            background: var(--bg-primary); border: 1px solid var(--border);
+            padding: 4px 10px; border-radius: 20px;
         }
 
-        header h1 {
-            font-size: 1.15rem;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-            color: var(--text-primary);
-        }
-
-        header h1 span {
-            color: var(--accent);
-        }
-
-        nav {
-            display: flex;
-            gap: 2px;
-        }
-
+        nav { display: flex; gap: 2px; }
         nav button {
-            background: transparent;
-            border: none;
-            color: var(--text-secondary);
-            padding: 8px 14px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.875rem;
-            transition: all 0.15s;
-            white-space: nowrap;
+            background: transparent; border: none; color: var(--text-secondary);
+            padding: 8px 14px; border-radius: 6px; cursor: pointer;
+            font-size: 0.875rem; transition: all 0.15s; white-space: nowrap;
         }
-
-        nav button:hover {
-            background: var(--accent-dim);
-            color: var(--text-primary);
-        }
-
-        nav button.active {
-            background: var(--accent);
-            color: #1a1a1a;
-            font-weight: 600;
-        }
+        nav button:hover { background: var(--accent-dim); color: var(--text-primary); }
+        nav button.active { background: var(--accent); color: #1a1a1a; font-weight: 600; }
 
         /* ── MAIN ── */
-        main {
-            padding: 24px;
-            max-width: 1440px;
-            margin: 0 auto;
-        }
-
+        main { padding: 24px; max-width: 1440px; margin: 0 auto; }
         .view { display: none; }
         .view.active { display: block; }
 
         /* ── CARD ── */
         .card {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 22px 24px;
-            margin-bottom: 20px;
+            background: var(--bg-secondary); border: 1px solid var(--border);
+            border-radius: 10px; padding: 22px 24px; margin-bottom: 20px;
         }
-
         .card-title {
-            font-size: 1rem;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin-bottom: 18px;
-            padding-bottom: 14px;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+            font-size: 1rem; font-weight: 600; color: var(--text-primary);
+            margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: space-between;
         }
-
-        .card-title-left {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
+        .card-title-left { display: flex; align-items: center; gap: 8px; }
 
         /* ── STATS ── */
         .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-            gap: 14px;
-            margin-bottom: 20px;
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 14px; margin-bottom: 20px;
         }
-
         .stat-card {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 18px 20px;
-            border-left: 3px solid var(--accent);
+            background: var(--bg-secondary); border: 1px solid var(--border);
+            border-radius: 10px; padding: 18px 20px; border-left: 3px solid var(--accent);
         }
-
-        .stat-value {
-            font-size: 2.2rem;
-            font-weight: 700;
-            color: var(--accent);
-            line-height: 1;
-        }
-
+        .stat-value { font-size: 2.2rem; font-weight: 700; color: var(--accent); line-height: 1; }
         .stat-label {
-            font-size: 0.78rem;
-            color: var(--text-secondary);
-            margin-top: 5px;
-            text-transform: uppercase;
-            letter-spacing: 0.6px;
+            font-size: 0.78rem; color: var(--text-secondary);
+            margin-top: 5px; text-transform: uppercase; letter-spacing: 0.6px;
         }
 
         /* ── CATEGORY BREAKDOWN ── */
         .cat-breakdown {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 10px;
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px;
         }
-
         .cat-breakdown-item {
-            background: var(--bg-primary);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 12px 14px;
+            background: var(--bg-primary); border: 1px solid var(--border);
+            border-radius: 8px; padding: 12px 14px;
         }
-
         .cat-breakdown-item .cbi-name {
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-            margin-bottom: 4px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 4px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
-
-        .cat-breakdown-item .cbi-count {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--accent);
-        }
-
-        .cbi-bar {
-            height: 3px;
-            background: var(--border);
-            border-radius: 2px;
-            margin-top: 8px;
-        }
-
-        .cbi-bar-fill {
-            height: 100%;
-            background: var(--accent);
-            border-radius: 2px;
-        }
+        .cat-breakdown-item .cbi-count { font-size: 1.5rem; font-weight: 700; color: var(--accent); }
+        .cbi-bar { height: 3px; background: var(--border); border-radius: 2px; margin-top: 8px; }
+        .cbi-bar-fill { height: 100%; background: var(--accent); border-radius: 2px; }
 
         /* ── FORM ── */
         .form-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
-            gap: 16px;
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 16px;
         }
-
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-
-        .form-group.full-width {
-            grid-column: 1 / -1;
-        }
-
+        .form-group { display: flex; flex-direction: column; gap: 5px; }
+        .form-group.full-width { grid-column: 1 / -1; }
         label {
-            font-size: 0.78rem;
-            color: var(--text-secondary);
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            font-size: 0.78rem; color: var(--text-secondary); font-weight: 500;
+            text-transform: uppercase; letter-spacing: 0.5px;
         }
-
-        input[type="text"],
-        input[type="number"],
-        input[type="date"],
-        select,
-        textarea {
-            background: var(--bg-primary);
-            border: 1px solid var(--border);
-            color: var(--text-primary);
-            padding: 9px 12px;
-            border-radius: 6px;
-            font-size: 0.9rem;
-            font-family: inherit;
-            transition: border-color 0.15s;
-            width: 100%;
+        input[type="text"], input[type="number"], input[type="date"],
+        input[type="email"], input[type="password"], select, textarea {
+            background: var(--bg-primary); border: 1px solid var(--border);
+            color: var(--text-primary); padding: 9px 12px; border-radius: 6px;
+            font-size: 0.9rem; font-family: inherit; transition: border-color 0.15s; width: 100%;
         }
-
-        input:focus, select:focus, textarea:focus {
-            outline: none;
-            border-color: var(--accent);
-        }
-
-        select option {
-            background: var(--bg-secondary);
-        }
-
-        textarea {
-            resize: vertical;
-        }
-
-        .form-actions {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-            flex-wrap: wrap;
-        }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+        select option { background: var(--bg-secondary); }
+        textarea { resize: vertical; }
+        .form-actions { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
 
         /* ── BUTTONS ── */
         .btn {
-            padding: 9px 18px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.875rem;
-            font-weight: 500;
-            border: none;
-            font-family: inherit;
-            transition: all 0.15s;
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            white-space: nowrap;
+            padding: 9px 18px; border-radius: 6px; cursor: pointer;
+            font-size: 0.875rem; font-weight: 500; border: none; font-family: inherit;
+            transition: all 0.15s; display: inline-flex; align-items: center;
+            gap: 5px; white-space: nowrap;
         }
-
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn-primary { background: var(--accent); color: #1a1a1a; }
-        .btn-primary:hover { background: var(--accent-hover); }
-
-        .btn-ghost {
-            background: transparent;
-            color: var(--text-secondary);
-            border: 1px solid var(--border);
-        }
+        .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+        .btn-ghost { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
         .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
-
         .btn-danger { background: var(--danger); color: white; }
         .btn-danger:hover { background: #c44; }
-
         .btn-info { background: var(--info); color: white; }
         .btn-info:hover { filter: brightness(1.1); }
-
         .btn-sm { padding: 5px 10px; font-size: 0.8rem; }
+        .btn-dark { background: #222; color: #fff; }
+        .btn-dark:hover { background: #333; }
+        .btn-gold { background: #c8a96e; color: #1a1a1a; }
+        .btn-gold:hover { background: #b8955a; }
+        .btn-signout {
+            background: transparent; border: 1px solid var(--border);
+            color: var(--text-secondary); padding: 5px 12px; border-radius: 6px;
+            cursor: pointer; font-size: 0.8rem; transition: all 0.15s;
+        }
+        .btn-signout:hover { border-color: var(--danger); color: var(--danger); }
 
         /* ── TOOLBAR ── */
-        .toolbar {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 16px;
-            flex-wrap: wrap;
-            align-items: center;
-        }
-
-        .toolbar input[type="text"] {
-            flex: 1;
-            min-width: 200px;
-        }
+        .toolbar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+        .toolbar input[type="text"] { flex: 1; min-width: 200px; }
 
         /* ── TABLE ── */
         .table-wrapper {
-            overflow-x: auto;
-            border-radius: 8px;
-            border: 1px solid var(--border);
+            overflow-x: auto; border-radius: 8px; border: 1px solid var(--border);
         }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.875rem;
-        }
-
+        table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
         thead th {
-            background: var(--bg-card);
-            padding: 11px 14px;
-            text-align: left;
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: var(--text-secondary);
-            white-space: nowrap;
-            cursor: pointer;
-            user-select: none;
-            transition: color 0.15s;
+            background: var(--bg-card); padding: 11px 14px; text-align: left;
+            font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;
+            color: var(--text-secondary); white-space: nowrap; cursor: pointer;
+            user-select: none; transition: color 0.15s;
         }
-
         thead th:hover { color: var(--accent); }
-        thead th.sort-asc::after { content: ' \2191'; color: var(--accent); }
+        thead th.sort-asc::after  { content: ' \2191'; color: var(--accent); }
         thead th.sort-desc::after { content: ' \2193'; color: var(--accent); }
-
         thead th.no-sort { cursor: default; }
         thead th.no-sort:hover { color: var(--text-secondary); }
-
         tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
         tbody tr:last-child { border-bottom: none; }
         tbody tr:hover { background: rgba(200,169,110,0.04); }
         tbody td { padding: 11px 14px; }
-
         .mono { font-family: 'Courier New', monospace; color: var(--text-secondary); }
 
         /* ── BADGES ── */
-        .badge {
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 10px;
-            font-size: 0.75rem;
-            font-weight: 500;
-        }
-
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; font-weight: 500; }
         .cat-rifle       { background: rgba(220,50,50,.2);   color: #f08080; }
         .cat-shotgun     { background: rgba(220,130,50,.2);  color: #f0b070; }
         .cat-pistol      { background: rgba(80,180,80,.2);   color: #90e090; }
@@ -382,118 +262,53 @@
         .cat-default     { background: rgba(120,120,140,.2); color: #b0b0c0; }
 
         /* ── EMPTY STATE ── */
-        .empty {
-            text-align: center;
-            padding: 50px 20px;
-            color: var(--text-secondary);
-        }
+        .empty { text-align: center; padding: 50px 20px; color: var(--text-secondary); }
         .empty-icon { font-size: 3rem; margin-bottom: 12px; }
 
         /* ── TAGS ── */
-        .tags {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-top: 12px;
-        }
-
+        .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
         .tag {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            background: var(--bg-primary);
-            border: 1px solid var(--border);
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 0.83rem;
+            display: inline-flex; align-items: center; gap: 6px;
+            background: var(--bg-primary); border: 1px solid var(--border);
+            padding: 5px 12px; border-radius: 20px; font-size: 0.83rem;
         }
-
         .tag-remove {
-            background: none;
-            border: none;
-            color: var(--text-secondary);
-            cursor: pointer;
-            padding: 0;
-            font-size: 0.9rem;
-            line-height: 1;
-            display: flex;
-            align-items: center;
+            background: none; border: none; color: var(--text-secondary);
+            cursor: pointer; padding: 0; font-size: 0.9rem; line-height: 1;
+            display: flex; align-items: center;
         }
         .tag-remove:hover { color: var(--danger); }
 
         /* ── MODAL ── */
         .modal-overlay {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.75);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.75); z-index: 1000;
+            align-items: center; justify-content: center;
         }
         .modal-overlay.show { display: flex; }
-
         .modal {
-            background: #fff;
-            color: #222;
-            border-radius: 10px;
-            padding: 28px 32px;
-            max-width: 480px;
-            width: 92%;
-            text-align: center;
+            background: #fff; color: #222; border-radius: 10px;
+            padding: 28px 32px; max-width: 480px; width: 92%; text-align: center;
         }
-
-        .modal-title {
-            font-size: 1rem;
-            font-weight: 700;
-            margin-bottom: 4px;
-            color: #222;
-        }
-
-        .modal-sub {
-            font-size: 0.8rem;
-            color: #777;
-            margin-bottom: 18px;
-        }
-
+        .modal-title { font-size: 1rem; font-weight: 700; margin-bottom: 4px; color: #222; }
+        .modal-sub { font-size: 0.8rem; color: #777; margin-bottom: 18px; }
         .modal svg { max-width: 100%; }
+        .modal-actions { margin-top: 18px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
 
-        .modal-actions {
-            margin-top: 18px;
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-
-        .btn-dark { background: #222; color: #fff; }
-        .btn-dark:hover { background: #333; }
-        .btn-gold { background: #c8a96e; color: #1a1a1a; }
-        .btn-gold:hover { background: #b8955a; }
-
-        /* ── NOTIFICATION ── */
+        /* ── TOAST ── */
         .toast {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-left: 4px solid var(--accent);
-            padding: 13px 18px;
-            border-radius: 8px;
-            z-index: 2000;
-            transform: translateY(80px);
-            opacity: 0;
-            transition: all 0.3s;
-            font-size: 0.875rem;
-            max-width: 280px;
+            position: fixed; bottom: 20px; right: 20px;
+            background: var(--bg-secondary); border: 1px solid var(--border);
+            border-left: 4px solid var(--accent); padding: 13px 18px;
+            border-radius: 8px; z-index: 2000; transform: translateY(80px);
+            opacity: 0; transition: all 0.3s; font-size: 0.875rem; max-width: 280px;
         }
         .toast.show { transform: translateY(0); opacity: 1; }
         .toast.success { border-left-color: var(--success); }
+        .toast.error   { border-left-color: var(--danger); }
 
         /* ── PRINT ── */
         #print-area { display: none; }
-
         @media print {
             body * { visibility: hidden; }
             #print-area, #print-area * { visibility: visible; }
@@ -505,10 +320,41 @@
             header { height: auto; padding: 12px 16px; flex-direction: column; gap: 10px; }
             nav { flex-wrap: wrap; justify-content: center; }
             main { padding: 14px; }
+            .header-right { flex-wrap: wrap; justify-content: center; }
         }
     </style>
 </head>
 <body>
+
+<!-- ═══════════════════════ LOGIN SCREEN ═══════════════════════ -->
+<div id="login-screen">
+    <div class="login-box">
+        <div class="login-logo">&#9881;</div>
+        <h2>Armory Database II</h2>
+        <p>Sign in to access your collection</p>
+        <form id="login-form">
+            <div class="form-group" style="margin-bottom:14px;">
+                <label>Email</label>
+                <input type="email" id="login-email" placeholder="your@email.com" required autocomplete="username">
+            </div>
+            <div class="form-group" style="margin-bottom:20px;">
+                <label>Password</label>
+                <input type="password" id="login-password" placeholder="••••••••" required autocomplete="current-password">
+            </div>
+            <div class="login-error" id="login-error"></div>
+            <button type="submit" class="btn btn-primary login-full" id="login-btn">Sign In</button>
+        </form>
+    </div>
+</div>
+
+<!-- ═══════════════════════ LOADING SCREEN ═══════════════════════ -->
+<div id="loading-screen" style="display:none;">
+    <div class="spinner"></div>
+    <p>Loading your collection...</p>
+</div>
+
+<!-- ═══════════════════════ MAIN APP ═══════════════════════ -->
+<div id="app">
 
 <header>
     <div class="logo-area">
@@ -522,11 +368,15 @@
         <button onclick="showView('reports')">Reports</button>
         <button onclick="showView('categories')">Categories</button>
     </nav>
+    <div class="header-right">
+        <span class="user-badge" id="user-email"></span>
+        <button class="btn-signout" onclick="doSignOut()">Sign Out</button>
+    </div>
 </header>
 
 <main>
 
-    <!-- ═══════════════════════ DASHBOARD ═══════════════════════ -->
+    <!-- ═══ DASHBOARD ═══ -->
     <div id="view-dashboard" class="view active">
         <div class="stats-grid" id="stats-grid"></div>
         <div class="card">
@@ -537,23 +387,21 @@
             <div class="card-title"><div class="card-title-left">&#128336; Recently Added</div></div>
             <div class="table-wrapper">
                 <table>
-                    <thead>
-                        <tr>
-                            <th class="no-sort">ID</th>
-                            <th class="no-sort">Category</th>
-                            <th class="no-sort">Manufacturer</th>
-                            <th class="no-sort">Model</th>
-                            <th class="no-sort">Serial #</th>
-                            <th class="no-sort">Added</th>
-                        </tr>
-                    </thead>
+                    <thead><tr>
+                        <th class="no-sort">ID</th>
+                        <th class="no-sort">Category</th>
+                        <th class="no-sort">Manufacturer</th>
+                        <th class="no-sort">Model</th>
+                        <th class="no-sort">Serial #</th>
+                        <th class="no-sort">Added</th>
+                    </tr></thead>
                     <tbody id="recent-tbody"></tbody>
                 </table>
             </div>
         </div>
     </div>
 
-    <!-- ═══════════════════════ ADD / EDIT ITEM ═══════════════════════ -->
+    <!-- ═══ ADD / EDIT ITEM ═══ -->
     <div id="view-add-item" class="view">
         <div class="card">
             <div class="card-title">
@@ -561,12 +409,11 @@
             </div>
             <form id="item-form">
                 <input type="hidden" id="edit-id">
+                <input type="hidden" id="edit-doc-id">
                 <div class="form-grid">
                     <div class="form-group">
                         <label>Category *</label>
-                        <select id="f-category" required>
-                            <option value="">Select category...</option>
-                        </select>
+                        <select id="f-category" required><option value="">Select category...</option></select>
                     </div>
                     <div class="form-group">
                         <label>Manufacturer</label>
@@ -611,7 +458,7 @@
         </div>
     </div>
 
-    <!-- ═══════════════════════ INVENTORY ═══════════════════════ -->
+    <!-- ═══ INVENTORY ═══ -->
     <div id="view-inventory" class="view">
         <div class="card">
             <div class="card-title">
@@ -628,20 +475,18 @@
             </div>
             <div class="table-wrapper">
                 <table id="inv-table">
-                    <thead>
-                        <tr>
-                            <th onclick="sortBy('id')">ID</th>
-                            <th onclick="sortBy('category')">Category</th>
-                            <th onclick="sortBy('manufacturer')">Manufacturer</th>
-                            <th onclick="sortBy('model')">Model</th>
-                            <th onclick="sortBy('serialNumber')">Serial #</th>
-                            <th onclick="sortBy('caliber')">Caliber</th>
-                            <th onclick="sortBy('magnification')">Magnification</th>
-                            <th onclick="sortBy('purchaseDate')">Purchase Date</th>
-                            <th onclick="sortBy('quantity')">Qty</th>
-                            <th class="no-sort">Actions</th>
-                        </tr>
-                    </thead>
+                    <thead><tr>
+                        <th onclick="sortBy('id')">ID</th>
+                        <th onclick="sortBy('category')">Category</th>
+                        <th onclick="sortBy('manufacturer')">Manufacturer</th>
+                        <th onclick="sortBy('model')">Model</th>
+                        <th onclick="sortBy('serialNumber')">Serial #</th>
+                        <th onclick="sortBy('caliber')">Caliber</th>
+                        <th onclick="sortBy('magnification')">Magnification</th>
+                        <th onclick="sortBy('purchaseDate')">Purchase Date</th>
+                        <th onclick="sortBy('quantity')">Qty</th>
+                        <th class="no-sort">Actions</th>
+                    </tr></thead>
                     <tbody id="inv-tbody"></tbody>
                 </table>
             </div>
@@ -652,7 +497,7 @@
         </div>
     </div>
 
-    <!-- ═══════════════════════ REPORTS ═══════════════════════ -->
+    <!-- ═══ REPORTS ═══ -->
     <div id="view-reports" class="view">
         <div class="card">
             <div class="card-title">
@@ -684,27 +529,25 @@
             </div>
             <div class="table-wrapper">
                 <table>
-                    <thead>
-                        <tr>
-                            <th onclick="rptSortBy('id')">ID</th>
-                            <th onclick="rptSortBy('category')">Category</th>
-                            <th onclick="rptSortBy('manufacturer')">Manufacturer</th>
-                            <th onclick="rptSortBy('model')">Model</th>
-                            <th onclick="rptSortBy('serialNumber')">Serial #</th>
-                            <th onclick="rptSortBy('caliber')">Caliber</th>
-                            <th onclick="rptSortBy('magnification')">Magnification</th>
-                            <th onclick="rptSortBy('purchaseDate')">Purchase Date</th>
-                            <th onclick="rptSortBy('quantity')">Qty</th>
-                            <th class="no-sort">Notes</th>
-                        </tr>
-                    </thead>
+                    <thead><tr>
+                        <th onclick="rptSortBy('id')">ID</th>
+                        <th onclick="rptSortBy('category')">Category</th>
+                        <th onclick="rptSortBy('manufacturer')">Manufacturer</th>
+                        <th onclick="rptSortBy('model')">Model</th>
+                        <th onclick="rptSortBy('serialNumber')">Serial #</th>
+                        <th onclick="rptSortBy('caliber')">Caliber</th>
+                        <th onclick="rptSortBy('magnification')">Magnification</th>
+                        <th onclick="rptSortBy('purchaseDate')">Purchase Date</th>
+                        <th onclick="rptSortBy('quantity')">Qty</th>
+                        <th class="no-sort">Notes</th>
+                    </tr></thead>
                     <tbody id="rpt-tbody"></tbody>
                 </table>
             </div>
         </div>
     </div>
 
-    <!-- ═══════════════════════ CATEGORIES ═══════════════════════ -->
+    <!-- ═══ CATEGORIES ═══ -->
     <div id="view-categories" class="view">
         <div class="card">
             <div class="card-title"><div class="card-title-left">&#127991; Manage Categories</div></div>
@@ -717,16 +560,17 @@
         <div class="card">
             <div class="card-title"><div class="card-title-left">&#8505; About Categories</div></div>
             <p style="font-size:0.875rem; color:var(--text-secondary); line-height:1.6;">
-                Categories are used to classify items in your inventory. You can add as many custom categories as needed.
-                Removing a category will not delete items that use it — those items will simply show their category name without a color badge.
-                Categories are saved locally in your browser and persist between sessions.
+                Categories classify items in your inventory. Add as many custom categories as needed.
+                Removing a category will not delete items that use it.
+                All categories are saved to the cloud and shared across all your devices.
             </p>
         </div>
     </div>
 
 </main>
+</div><!-- end #app -->
 
-<!-- ═══════════════════════ BARCODE MODAL ═══════════════════════ -->
+<!-- ═══ BARCODE MODAL ═══ -->
 <div class="modal-overlay" id="barcode-modal">
     <div class="modal">
         <div class="modal-title" id="bc-title">Item Barcode</div>
@@ -740,53 +584,143 @@
     </div>
 </div>
 
-<!-- Hidden print area -->
 <div id="print-area"><div id="print-content"></div></div>
-
-<!-- Toast notification -->
 <div class="toast" id="toast"></div>
 
 <script>
 // ════════════════════════════════════════════
-//  DATA
+//  FIREBASE INIT
 // ════════════════════════════════════════════
-let items = JSON.parse(localStorage.getItem('armory-items') || '[]');
-let manufacturers = JSON.parse(localStorage.getItem('armory-mfrs') || JSON.stringify([
-    'Barrett','Benelli','Beretta','Browning','Bushmaster','CMMG','Colt',
-    'Daniel Defense','FN America','Glock','H&K','Kimber','Leupold','Nightforce',
-    'Nikon','Remington','Ruger','Savage','Sig Sauer','Smith & Wesson',
-    'Springfield Armory','Steyr','Taurus','Tikka','Vortex','Weatherby','Winchester'
-]));
-let categories = JSON.parse(localStorage.getItem('armory-cats') || JSON.stringify([
-    'Rifle','Shotgun','Pistol','Revolver','Suppressor',
-    'Magazine','Scope','Binoculars','Spotting Scope',
-    'Ammunition','Handgun Accessory','Rifle Accessory','Other'
-]));
-let nextId = parseInt(localStorage.getItem('armory-next-id') || '1001');
+const firebaseConfig = {
+    apiKey: "AIzaSyB7c4urD9tJO80S7nADItxjwhSYVqlrkEU",
+    authDomain: "watchroom-714a0.firebaseapp.com",
+    projectId: "watchroom-714a0",
+    storageBucket: "watchroom-714a0.firebasestorage.app",
+    messagingSenderId: "911514107783",
+    appId: "1:911514107783:web:20e8a729fd66577c28dd22"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db   = firebase.firestore();
 
-// inventory sort state
+// ════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════
+let items        = [];
+let categories   = ['Rifle','Shotgun','Pistol','Revolver','Suppressor','Magazine',
+                    'Scope','Binoculars','Spotting Scope','Ammunition',
+                    'Handgun Accessory','Rifle Accessory','Other'];
+let manufacturers = ['Barrett','Benelli','Beretta','Browning','Bushmaster','CMMG','Colt',
+                     'Daniel Defense','FN America','Glock','H&K','Kimber','Leupold',
+                     'Nightforce','Nikon','Remington','Ruger','Savage','Sig Sauer',
+                     'Smith & Wesson','Springfield Armory','Steyr','Taurus','Tikka',
+                     'Vortex','Weatherby','Winchester'];
+let nextId       = 1001;
 let invSortField = 'id';
-let invSortDir = 'asc';
+let invSortDir   = 'asc';
+let activeBcId   = null;
+let unsubItems   = null;
 
-function save() {
-    localStorage.setItem('armory-items', JSON.stringify(items));
-    localStorage.setItem('armory-cats', JSON.stringify(categories));
-    localStorage.setItem('armory-mfrs', JSON.stringify(manufacturers));
-    localStorage.setItem('armory-next-id', String(nextId));
-}
-
-function populateMfrList() {
-    const dl = document.getElementById('manufacturer-list');
-    if (!dl) return;
-    dl.innerHTML = manufacturers.slice().sort((a,b)=>a.localeCompare(b))
-        .map(m=>`<option value="${esc(m)}">`).join('');
-}
-
-function addMfrIfNew(name) {
-    if (!name) return;
-    if (!manufacturers.some(m=>m.toLowerCase()===name.toLowerCase())) {
-        manufacturers.push(name);
+// ════════════════════════════════════════════
+//  AUTH
+// ════════════════════════════════════════════
+auth.onAuthStateChanged(user => {
+    if (user) {
+        document.getElementById('login-screen').style.display  = 'none';
+        document.getElementById('loading-screen').style.display = 'flex';
+        document.getElementById('app').style.display           = 'none';
+        document.getElementById('user-email').textContent      = user.email;
+        initApp();
+    } else {
+        document.getElementById('login-screen').style.display  = 'flex';
+        document.getElementById('loading-screen').style.display = 'none';
+        document.getElementById('app').style.display           = 'none';
+        if (unsubItems) { unsubItems(); unsubItems = null; }
+        items = [];
     }
+});
+
+document.getElementById('login-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const email = document.getElementById('login-email').value.trim();
+    const pass  = document.getElementById('login-password').value;
+    const errEl = document.getElementById('login-error');
+    const btn   = document.getElementById('login-btn');
+    errEl.textContent = '';
+    btn.textContent   = 'Signing in...';
+    btn.disabled      = true;
+    try {
+        await auth.signInWithEmailAndPassword(email, pass);
+    } catch(err) {
+        errEl.textContent = 'Invalid email or password. Please try again.';
+        btn.textContent   = 'Sign In';
+        btn.disabled      = false;
+    }
+});
+
+async function doSignOut() {
+    if (!confirm('Sign out?')) return;
+    await auth.signOut();
+}
+
+// ════════════════════════════════════════════
+//  APP INIT (after login)
+// ════════════════════════════════════════════
+async function initApp() {
+    try {
+        // Load config
+        const cfgDoc = await db.collection('config').doc('data').get();
+        if (cfgDoc.exists) {
+            const d = cfgDoc.data();
+            if (d.categories    && d.categories.length)    categories    = d.categories;
+            if (d.manufacturers && d.manufacturers.length) manufacturers = d.manufacturers;
+            if (d.nextId)                                   nextId        = d.nextId;
+        }
+
+        // Subscribe to items — real-time sync across all devices
+        unsubItems = db.collection('items').onSnapshot(snap => {
+            items = snap.docs.map(doc => ({ _docId: doc.id, ...doc.data() }));
+            renderDashboard();
+            renderInventory();
+            renderReport();
+        });
+
+        // Show app
+        document.getElementById('loading-screen').style.display = 'none';
+        document.getElementById('app').style.display            = 'block';
+        populateCatSelect();
+        populateMfrList();
+        syncCatFilters();
+        showView('dashboard');
+    } catch(err) {
+        console.error('Init error:', err);
+        document.getElementById('loading-screen').innerHTML =
+            `<p style="color:var(--danger);padding:20px;text-align:center;">
+             Error loading data.<br><small>${err.message}</small><br><br>
+             <button class="btn btn-ghost" onclick="doSignOut()">Sign Out</button></p>`;
+    }
+}
+
+// ════════════════════════════════════════════
+//  FIRESTORE HELPERS
+// ════════════════════════════════════════════
+async function saveConfig() {
+    await db.collection('config').doc('data').set({ categories, manufacturers, nextId });
+}
+
+async function dbAddItem(data) {
+    const item = { id: nextId++, addedAt: new Date().toISOString(), ...data };
+    await db.collection('items').add(item);
+    await saveConfig();
+    return item;
+}
+
+async function dbUpdateItem(docId, data) {
+    await db.collection('items').doc(docId).update(data);
+}
+
+async function dbDeleteItem(docId) {
+    await db.collection('items').doc(docId).delete();
 }
 
 // ════════════════════════════════════════════
@@ -811,9 +745,9 @@ function showView(v) {
 //  DASHBOARD
 // ════════════════════════════════════════════
 function renderDashboard() {
-    const total = items.length;
-    const qty = items.reduce((s,i) => s + (parseInt(i.quantity)||1), 0);
-    const ms30 = 30*24*60*60*1000;
+    const total  = items.length;
+    const qty    = items.reduce((s,i) => s + (parseInt(i.quantity)||1), 0);
+    const ms30   = 30*24*60*60*1000;
     const recent = items.filter(i => i.addedAt && (Date.now()-new Date(i.addedAt).getTime()) < ms30).length;
 
     document.getElementById('stats-grid').innerHTML = `
@@ -823,30 +757,25 @@ function renderDashboard() {
         <div class="stat-card"><div class="stat-value">${recent}</div><div class="stat-label">Added This Month</div></div>
     `;
 
-    // Category breakdown
     const counts = {};
     items.forEach(it => { counts[it.category] = (counts[it.category]||0) + (parseInt(it.quantity)||1); });
     const maxC = Math.max(...Object.values(counts), 1);
-    const el = document.getElementById('cat-breakdown');
-    if (!Object.keys(counts).length) {
-        el.innerHTML = '<p style="color:var(--text-secondary);padding:16px 0;">No items yet.</p>';
-    } else {
-        el.innerHTML = Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([cat,c])=>`
+    const el   = document.getElementById('cat-breakdown');
+    el.innerHTML = Object.keys(counts).length
+        ? Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([cat,c])=>`
             <div class="cat-breakdown-item">
                 <div class="cbi-name">${cat}</div>
                 <div class="cbi-count">${c}</div>
                 <div class="cbi-bar"><div class="cbi-bar-fill" style="width:${(c/maxC*100).toFixed(1)}%"></div></div>
-            </div>`).join('');
-    }
+            </div>`).join('')
+        : '<p style="color:var(--text-secondary);padding:16px 0;">No items yet.</p>';
 
-    // Recent 10
     const recItems = [...items].sort((a,b)=>b.id-a.id).slice(0,10);
     document.getElementById('recent-tbody').innerHTML = recItems.length
         ? recItems.map(it=>`<tr>
             <td class="mono">#${it.id}</td>
             <td><span class="badge ${catClass(it.category)}">${it.category||'—'}</span></td>
-            <td>${it.manufacturer||'—'}</td>
-            <td>${it.model||'—'}</td>
+            <td>${it.manufacturer||'—'}</td><td>${it.model||'—'}</td>
             <td class="mono">${it.serialNumber||'—'}</td>
             <td style="color:var(--text-secondary)">${it.addedAt?new Date(it.addedAt).toLocaleDateString():'—'}</td>
           </tr>`).join('')
@@ -863,15 +792,30 @@ function populateCatSelect() {
     categories.forEach(c => {
         const o = document.createElement('option');
         o.value = o.textContent = c;
-        if (c===cur) o.selected=true;
+        if (c===cur) o.selected = true;
         sel.appendChild(o);
     });
 }
 
-document.getElementById('item-form').addEventListener('submit', e => {
+function populateMfrList() {
+    const dl = document.getElementById('manufacturer-list');
+    if (!dl) return;
+    dl.innerHTML = manufacturers.slice().sort((a,b)=>a.localeCompare(b))
+        .map(m=>`<option value="${esc(m)}">`).join('');
+}
+
+function addMfrIfNew(name) {
+    if (!name) return;
+    if (!manufacturers.some(m=>m.toLowerCase()===name.toLowerCase()))
+        manufacturers.push(name);
+}
+
+document.getElementById('item-form').addEventListener('submit', async e => {
     e.preventDefault();
-    const eid = document.getElementById('edit-id').value;
-    const data = {
+    const eid    = document.getElementById('edit-id').value;
+    const docId  = document.getElementById('edit-doc-id').value;
+    const btn    = document.getElementById('form-submit-btn');
+    const data   = {
         category:      document.getElementById('f-category').value,
         manufacturer:  document.getElementById('f-manufacturer').value.trim(),
         model:         document.getElementById('f-model').value.trim(),
@@ -882,27 +826,37 @@ document.getElementById('item-form').addEventListener('submit', e => {
         quantity:      parseInt(document.getElementById('f-quantity').value)||1,
         notes:         document.getElementById('f-notes').value.trim(),
     };
-    addMfrIfNew(data.manufacturer);
-    if (eid) {
-        const idx = items.findIndex(i=>i.id==eid);
-        if (idx>-1) { items[idx]={...items[idx],...data}; toast('Item updated.','success'); }
-    } else {
-        const item = {id:nextId++, addedAt:new Date().toISOString(), ...data};
-        items.push(item);
-        toast(`Item #${item.id} added!`,'success');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+    try {
+        addMfrIfNew(data.manufacturer);
+        if (eid && docId) {
+            await dbUpdateItem(docId, data);
+            await saveConfig();
+            toast('Item updated.', 'success');
+        } else {
+            await dbAddItem(data);
+            toast('Item added!', 'success');
+        }
+        populateMfrList();
+        resetForm();
+        showView('inventory');
+    } catch(err) {
+        toast('Error saving item: ' + err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = eid ? 'Update Item' : 'Save Item';
     }
-    save();
-    populateMfrList();
-    resetForm();
-    showView('inventory');
 });
 
 function resetForm() {
-    document.getElementById('edit-id').value = '';
+    document.getElementById('edit-id').value     = '';
+    document.getElementById('edit-doc-id').value = '';
     document.getElementById('item-form').reset();
-    document.getElementById('f-quantity').value = '1';
-    document.getElementById('form-title').textContent = '➕ Add New Item';
+    document.getElementById('f-quantity').value          = '1';
+    document.getElementById('form-title').textContent    = '➕ Add New Item';
     document.getElementById('form-submit-btn').textContent = 'Save Item';
+    document.getElementById('form-submit-btn').disabled  = false;
     populateCatSelect();
     populateMfrList();
 }
@@ -911,25 +865,32 @@ function editItem(id) {
     const it = items.find(i=>i.id==id); if (!it) return;
     showView('add-item');
     populateCatSelect();
-    document.getElementById('edit-id').value = it.id;
-    document.getElementById('f-category').value     = it.category||'';
-    document.getElementById('f-manufacturer').value = it.manufacturer||'';
-    document.getElementById('f-model').value        = it.model||'';
-    document.getElementById('f-serial').value       = it.serialNumber||'';
-    document.getElementById('f-caliber').value      = it.caliber||'';
-    document.getElementById('f-magnification').value= it.magnification||'';
-    document.getElementById('f-purchase-date').value= it.purchaseDate||'';
-    document.getElementById('f-quantity').value     = it.quantity||1;
-    document.getElementById('f-notes').value        = it.notes||'';
+    document.getElementById('edit-id').value          = it.id;
+    document.getElementById('edit-doc-id').value      = it._docId;
+    document.getElementById('f-category').value       = it.category||'';
+    document.getElementById('f-manufacturer').value   = it.manufacturer||'';
+    document.getElementById('f-model').value          = it.model||'';
+    document.getElementById('f-serial').value         = it.serialNumber||'';
+    document.getElementById('f-caliber').value        = it.caliber||'';
+    document.getElementById('f-magnification').value  = it.magnification||'';
+    document.getElementById('f-purchase-date').value  = it.purchaseDate||'';
+    document.getElementById('f-quantity').value       = it.quantity||1;
+    document.getElementById('f-notes').value          = it.notes||'';
     document.getElementById('form-title').textContent    = `✏️ Edit Item #${it.id}`;
     document.getElementById('form-submit-btn').textContent = 'Update Item';
     window.scrollTo(0,0);
 }
 
-function deleteItem(id) {
+async function deleteItem(id) {
     if (!confirm(`Delete item #${id}? This cannot be undone.`)) return;
-    items = items.filter(i=>i.id!=id);
-    save(); renderInventory(); toast('Item deleted.');
+    const it = items.find(i=>i.id==id);
+    if (!it) return;
+    try {
+        await dbDeleteItem(it._docId);
+        toast('Item deleted.');
+    } catch(err) {
+        toast('Error deleting: ' + err.message, 'error');
+    }
 }
 
 // ════════════════════════════════════════════
@@ -950,11 +911,11 @@ function syncCatFilters() {
 }
 
 function filteredItems(searchId, catId) {
-    const q = (document.getElementById(searchId)?.value||'').toLowerCase();
+    const q   = (document.getElementById(searchId)?.value||'').toLowerCase();
     const cat = document.getElementById(catId)?.value||'';
     return items.filter(it => {
         const mc = !cat || it.category===cat;
-        const ms = !q || [it.id?.toString(),it.category,it.manufacturer,it.model,
+        const ms = !q   || [it.id?.toString(),it.category,it.manufacturer,it.model,
             it.serialNumber,it.caliber,it.magnification,it.notes].some(v=>v?.toLowerCase().includes(q));
         return mc && ms;
     });
@@ -964,8 +925,8 @@ function sorted(arr, field, dir) {
     return [...arr].sort((a,b) => {
         let va=a[field]??'', vb=b[field]??'';
         if (field==='id'||field==='quantity') { va=Number(va)||0; vb=Number(vb)||0; }
-        else if (field==='purchaseDate') { va=va?new Date(va).getTime():0; vb=vb?new Date(vb).getTime():0; }
-        else { va=String(va).toLowerCase(); vb=String(vb).toLowerCase(); }
+        else if (field==='purchaseDate')      { va=va?new Date(va).getTime():0; vb=vb?new Date(vb).getTime():0; }
+        else                                  { va=String(va).toLowerCase(); vb=String(vb).toLowerCase(); }
         return va<vb ? (dir==='asc'?-1:1) : va>vb ? (dir==='asc'?1:-1) : 0;
     });
 }
@@ -974,23 +935,17 @@ function renderInventory() {
     const data = sorted(filteredItems('inv-search','inv-filter-cat'), invSortField, invSortDir);
     document.getElementById('inv-count').textContent = `${data.length} item${data.length!==1?'s':''}`;
 
-    // Update sort indicators
-    document.querySelectorAll('#inv-table thead th').forEach(th => {
-        th.classList.remove('sort-asc','sort-desc');
-    });
-    const thIndex = {id:0,category:1,manufacturer:2,model:3,serialNumber:4,caliber:5,magnification:6,purchaseDate:7,quantity:8};
-    const ti = thIndex[invSortField];
+    document.querySelectorAll('#inv-table thead th').forEach(th => th.classList.remove('sort-asc','sort-desc'));
+    const thIdx = {id:0,category:1,manufacturer:2,model:3,serialNumber:4,caliber:5,magnification:6,purchaseDate:7,quantity:8};
+    const ti = thIdx[invSortField];
     if (ti !== undefined) {
-        const ths = document.querySelectorAll('#inv-table thead th');
-        ths[ti]?.classList.add(invSortDir==='asc'?'sort-asc':'sort-desc');
+        document.querySelectorAll('#inv-table thead th')[ti]?.classList.add(invSortDir==='asc'?'sort-asc':'sort-desc');
     }
 
     const tbody = document.getElementById('inv-tbody');
     const empty = document.getElementById('inv-empty');
-    if (!data.length) {
-        tbody.innerHTML=''; empty.style.display='block'; return;
-    }
-    empty.style.display='none';
+    if (!data.length) { tbody.innerHTML=''; empty.style.display='block'; return; }
+    empty.style.display = 'none';
     tbody.innerHTML = data.map(it=>`<tr>
         <td class="mono">#${it.id}</td>
         <td><span class="badge ${catClass(it.category)}">${it.category||'—'}</span></td>
@@ -1009,7 +964,7 @@ function renderInventory() {
 }
 
 function sortBy(field) {
-    invSortDir = invSortField===field ? (invSortDir==='asc'?'desc':'asc') : 'asc';
+    invSortDir   = invSortField===field ? (invSortDir==='asc'?'desc':'asc') : 'asc';
     invSortField = field;
     renderInventory();
 }
@@ -1021,7 +976,7 @@ function rptSortBy(field) {
     const fd = document.getElementById('rpt-sort-field');
     const dd = document.getElementById('rpt-sort-dir');
     if (fd.value===field) dd.value = dd.value==='asc'?'desc':'asc';
-    else fd.value=field;
+    else fd.value = field;
     renderReport();
 }
 
@@ -1034,11 +989,9 @@ function renderReport() {
         ? data.map(it=>`<tr>
             <td class="mono">#${it.id}</td>
             <td><span class="badge ${catClass(it.category)}">${it.category||'—'}</span></td>
-            <td>${esc(it.manufacturer)||'—'}</td>
-            <td>${esc(it.model)||'—'}</td>
+            <td>${esc(it.manufacturer)||'—'}</td><td>${esc(it.model)||'—'}</td>
             <td class="mono">${esc(it.serialNumber)||'—'}</td>
-            <td>${esc(it.caliber)||'—'}</td>
-            <td>${esc(it.magnification)||'—'}</td>
+            <td>${esc(it.caliber)||'—'}</td><td>${esc(it.magnification)||'—'}</td>
             <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():'—'}</td>
             <td style="text-align:center">${it.quantity||1}</td>
             <td style="color:var(--text-secondary);font-size:0.82rem">${esc(it.notes)||'—'}</td>
@@ -1053,28 +1006,23 @@ function printReport() {
     document.getElementById('print-content').innerHTML = `
         <style>
             body{font-family:Arial,sans-serif;font-size:10px;}
-            h2{font-size:14px;margin-bottom:4px;}
-            p{color:#666;margin-bottom:8px;font-size:9px;}
+            h2{font-size:14px;margin-bottom:4px;}p{color:#666;margin-bottom:8px;font-size:9px;}
             table{width:100%;border-collapse:collapse;}
             th,td{border:1px solid #ccc;padding:4px 6px;text-align:left;}
-            th{background:#f0f0f0;font-weight:700;}
-            tr:nth-child(even){background:#f9f9f9;}
+            th{background:#f0f0f0;font-weight:700;}tr:nth-child(even){background:#f9f9f9;}
         </style>
         <h2>Armory Database II — Inventory Report</h2>
         <p>Generated: ${new Date().toLocaleString()} &nbsp;|&nbsp; Items: ${data.length}</p>
-        <table>
-            <thead><tr>
-                <th>ID</th><th>Category</th><th>Manufacturer</th><th>Model</th>
-                <th>Serial #</th><th>Caliber</th><th>Magnification</th>
-                <th>Purchase Date</th><th>Qty</th><th>Notes</th>
-            </tr></thead>
-            <tbody>${data.map(it=>`<tr>
-                <td>#${it.id}</td><td>${it.category||''}</td><td>${it.manufacturer||''}</td><td>${it.model||''}</td>
-                <td>${it.serialNumber||''}</td><td>${it.caliber||''}</td><td>${it.magnification||''}</td>
-                <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():''}</td>
-                <td>${it.quantity||1}</td><td>${it.notes||''}</td>
-            </tr>`).join('')}</tbody>
-        </table>`;
+        <table><thead><tr>
+            <th>ID</th><th>Category</th><th>Manufacturer</th><th>Model</th>
+            <th>Serial #</th><th>Caliber</th><th>Magnification</th>
+            <th>Purchase Date</th><th>Qty</th><th>Notes</th>
+        </tr></thead><tbody>${data.map(it=>`<tr>
+            <td>#${it.id}</td><td>${it.category||''}</td><td>${it.manufacturer||''}</td><td>${it.model||''}</td>
+            <td>${it.serialNumber||''}</td><td>${it.caliber||''}</td><td>${it.magnification||''}</td>
+            <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():''}</td>
+            <td>${it.quantity||1}</td><td>${it.notes||''}</td>
+        </tr>`).join('')}</tbody></table>`;
     window.print();
 }
 
@@ -1092,46 +1040,51 @@ function renderCatTags() {
         : '<p style="color:var(--text-secondary)">No categories defined.</p>';
 }
 
-function addCategory() {
-    const inp = document.getElementById('new-cat-input');
+async function addCategory() {
+    const inp  = document.getElementById('new-cat-input');
     const name = inp.value.trim();
     if (!name) return;
     if (categories.map(c=>c.toLowerCase()).includes(name.toLowerCase())) {
         toast('Category already exists.'); return;
     }
-    categories.push(name); save(); inp.value=''; renderCatTags();
-    toast(`"${name}" added!`,'success');
+    categories.push(name);
+    await saveConfig();
+    inp.value = '';
+    renderCatTags();
+    syncCatFilters();
+    populateCatSelect();
+    toast(`"${name}" added!`, 'success');
 }
 
 document.getElementById('new-cat-input').addEventListener('keydown', e => {
     if (e.key==='Enter') { e.preventDefault(); addCategory(); }
 });
 
-function removeCat(i) {
-    const c = categories[i];
+async function removeCat(i) {
+    const c    = categories[i];
     const used = items.filter(it=>it.category===c).length;
     if (used && !confirm(`"${c}" is used by ${used} item(s). Remove anyway?`)) return;
-    categories.splice(i,1); save(); renderCatTags();
+    categories.splice(i,1);
+    await saveConfig();
+    renderCatTags();
+    syncCatFilters();
     toast(`"${c}" removed.`);
 }
 
 // ════════════════════════════════════════════
 //  BARCODE
 // ════════════════════════════════════════════
-let activeBcId = null;
-
 function showBarcode(id) {
     const it = items.find(i=>i.id==id); if (!it) return;
     activeBcId = id;
     const label = [it.manufacturer, it.model].filter(Boolean).join(' ') || `Item #${id}`;
     document.getElementById('bc-title').textContent = label;
-    document.getElementById('bc-sub').textContent =
-        `${it.category||''}  |  SN: ${it.serialNumber||'N/A'}`;
+    document.getElementById('bc-sub').textContent   = `${it.category||''}  |  SN: ${it.serialNumber||'N/A'}`;
     const code = `ARM${String(it.id).padStart(6,'0')}`;
-    document.getElementById('bc-code').textContent = code;
+    document.getElementById('bc-code').textContent  = code;
     try {
         JsBarcode('#bc-svg', code, {
-            format: 'CODE128', width:2.2, height:80,
+            format:'CODE128', width:2.2, height:80,
             displayValue:true, fontSize:13, margin:10,
             background:'#ffffff', lineColor:'#000000'
         });
@@ -1151,19 +1104,17 @@ document.getElementById('barcode-modal').addEventListener('click', e => {
 function printBarcode() {
     if (!activeBcId) return;
     const it = items.find(i=>i.id==activeBcId); if (!it) return;
-    const svgHtml = document.getElementById('bc-svg').outerHTML;
     const label = [it.manufacturer, it.model].filter(Boolean).join(' ') || `Item #${it.id}`;
     document.getElementById('print-content').innerHTML = `
         <style>
             body{font-family:Arial,sans-serif;text-align:center;padding:30px;}
             .lbl{display:inline-block;border:2px solid #333;padding:16px 24px;border-radius:8px;min-width:300px;}
-            h3{margin:0 0 3px;font-size:13px;}
-            p{margin:0 0 10px;font-size:10px;color:#555;}
+            h3{margin:0 0 3px;font-size:13px;}p{margin:0 0 10px;font-size:10px;color:#555;}
         </style>
         <div class="lbl">
             <h3>${label}</h3>
             <p>${it.category||''} &nbsp;|&nbsp; SN: ${it.serialNumber||'N/A'}</p>
-            ${svgHtml}
+            ${document.getElementById('bc-svg').outerHTML}
         </div>`;
     window.print();
 }
@@ -1177,10 +1128,10 @@ function exportCSV() {
     const rows = items.map(it=>[
         it.id, it.category, it.manufacturer, it.model, it.serialNumber,
         it.caliber, it.magnification, it.purchaseDate, it.quantity, it.notes,
-        it.addedAt?new Date(it.addedAt).toLocaleDateString():''
+        it.addedAt ? new Date(it.addedAt).toLocaleDateString() : ''
     ].map(v=>`"${String(v??'').replace(/"/g,'""')}"`));
     const csv = [hdrs.join(','), ...rows.map(r=>r.join(','))].join('\n');
-    const a = Object.assign(document.createElement('a'), {
+    const a   = Object.assign(document.createElement('a'), {
         href: URL.createObjectURL(new Blob([csv],{type:'text/csv'})),
         download: `armory-${new Date().toISOString().slice(0,10)}.csv`
     });
@@ -1192,13 +1143,9 @@ function exportCSV() {
 //  UTILITIES
 // ════════════════════════════════════════════
 function catClass(cat) {
-    const map = {
-        'Rifle':'cat-rifle','Shotgun':'cat-shotgun','Pistol':'cat-pistol',
-        'Revolver':'cat-revolver','Suppressor':'cat-suppressor',
-        'Magazine':'cat-magazine','Scope':'cat-scope',
-        'Binoculars':'cat-binoculars','Spotting Scope':'cat-spotting'
-    };
-    return map[cat]||'cat-default';
+    return {'Rifle':'cat-rifle','Shotgun':'cat-shotgun','Pistol':'cat-pistol',
+            'Revolver':'cat-revolver','Suppressor':'cat-suppressor','Magazine':'cat-magazine',
+            'Scope':'cat-scope','Binoculars':'cat-binoculars','Spotting Scope':'cat-spotting'}[cat] || 'cat-default';
 }
 
 function esc(s) {
@@ -1209,18 +1156,10 @@ function esc(s) {
 function toast(msg, type='') {
     const el = document.getElementById('toast');
     el.textContent = msg;
-    el.className = `toast show${type?' '+type:''}`;
+    el.className   = `toast show${type?' '+type:''}`;
     clearTimeout(el._t);
-    el._t = setTimeout(()=>el.classList.remove('show'), 3000);
+    el._t = setTimeout(()=>el.classList.remove('show'), 3500);
 }
-
-// ════════════════════════════════════════════
-//  INIT
-// ════════════════════════════════════════════
-renderDashboard();
-populateCatSelect();
-populateMfrList();
-syncCatFilters();
 </script>
 </body>
 </html>

@@ -283,10 +283,23 @@
             content: '';
             position: absolute;
             bottom: 0; left: 0; right: 0;
-            height: 60px;
-            background: linear-gradient(to top, #0f172a, transparent);
+            height: 80px;
+            background: linear-gradient(to top, #0f172a 20%, transparent);
             z-index: 1;
             pointer-events: none;
+        }
+        .hero-photo-caption {
+            position: absolute;
+            bottom: 10px;
+            left: 0; right: 0;
+            text-align: center;
+            z-index: 2;
+            font-family: 'Georgia', 'Palatino Linotype', serif;
+            font-style: italic;
+            font-size: 0.92rem;
+            color: var(--accent);
+            letter-spacing: 0.5px;
+            text-shadow: 0 1px 6px rgba(0,0,0,0.8);
         }
         /* Text on the left */
         .hero-text {
@@ -728,6 +741,7 @@
     <div class="hero">
         <div class="hero-photo">
             <img src="farmboss.jpeg" alt="Farmboss">
+            <div class="hero-photo-caption">your Supreme Leader &mdash; Farmboss</div>
         </div>
         <div class="hero-text">
             <div class="hero-title">FARMBOSS<br><span>HEADQUARTERS</span></div>

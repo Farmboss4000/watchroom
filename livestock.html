@@ -1067,7 +1067,7 @@ async function saveConfig() {
 }
 
 async function uploadPhoto(slot, file) {
-    const ext  = file.name.split('.').pop();
+    const ext  = file.name ? file.name.split('.').pop() : 'jpg';
     const path = `livestock_photos/${Date.now()}_${slot}.${ext}`;
     const ref  = storage.ref().child(path);
     await ref.put(file);
@@ -1156,19 +1156,48 @@ function renderDashboard() {
 // ═══════════════════════════════════════
 //  PHOTOS & AI
 // ═══════════════════════════════════════
-function onPhotoSelected(slot, input) {
+
+// ── IMAGE COMPRESSION: auto-resize large photos before AI/upload ──
+async function compressImage(file, maxPx = 1920, maxMB = 4) {
+    return new Promise(resolve => {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+            URL.revokeObjectURL(url);
+            let w = img.naturalWidth, h = img.naturalHeight;
+            if (w > maxPx || h > maxPx) {
+                if (w >= h) { h = Math.round(h * maxPx / w); w = maxPx; }
+                else        { w = Math.round(w * maxPx / h); h = maxPx; }
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            let quality = 0.90;
+            const encode = () => {
+                const dataUrl = canvas.toDataURL('image/jpeg', quality);
+                const bytes = Math.ceil((dataUrl.length - 'data:image/jpeg;base64,'.length) * 0.75);
+                if (bytes <= maxMB * 1024 * 1024 || quality <= 0.25) { resolve(dataUrl); }
+                else { quality -= 0.10; encode(); }
+            };
+            encode();
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+        img.src = url;
+    });
+}
+
+async function onPhotoSelected(slot, input) {
     const file = input.files[0]; if (!file) return;
-    formPhotos[slot].file = file;
+    formPhotos[slot].file    = file;
     formPhotos[slot].deleted = false;
-    const reader = new FileReader();
-    reader.onload = e => {
-        formPhotos[slot].base64   = e.target.result.split(',')[1];
-        formPhotos[slot].mimeType = file.type;
-        renderPhotoPreview(slot, e.target.result);
-        if (slot==='main')   document.getElementById('btn-identify').disabled = false;
-        if (slot==='serial') document.getElementById('btn-ocr').disabled      = false;
-    };
-    reader.readAsDataURL(file);
+    const dataUrl = await compressImage(file) || await new Promise(r => {
+        const fr = new FileReader(); fr.onload = e => r(e.target.result); fr.readAsDataURL(file);
+    });
+    formPhotos[slot].base64   = dataUrl.split(',')[1];
+    formPhotos[slot].mimeType = 'image/jpeg';
+    renderPhotoPreview(slot, dataUrl);
+    if (slot==='main')   document.getElementById('btn-identify').disabled = false;
+    if (slot==='serial') document.getElementById('btn-ocr').disabled      = false;
 }
 
 function renderPhotoPreview(slot, dataUrl) {
@@ -1340,7 +1369,10 @@ document.getElementById('item-form').addEventListener('submit', async e => {
             const p = formPhotos[slot];
             if (p.file) {
                 try {
-                    const url = await uploadPhoto(slot, p.file);
+                    const uploadData = p.base64
+                        ? await fetch('data:image/jpeg;base64,' + p.base64).then(r => r.blob())
+                        : p.file;
+                    const url = await uploadPhoto(slot, uploadData);
                     photos.push({ slot, url });
                 } catch(uploadErr) {
                     toast(`Photo upload failed (${slot}): check Firebase Storage in Settings.`, 'error');

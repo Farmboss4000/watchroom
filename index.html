@@ -1038,39 +1038,65 @@
     // ── QUOTES ──
     let quotes = [], unsubQuotes = null;
 
+    function sortQuotes(arr) {
+        return arr.sort((a, b) => {
+            const ta = a.addedAt ? a.addedAt.toMillis() : 0;
+            const tb = b.addedAt ? b.addedAt.toMillis() : 0;
+            return ta - tb;
+        });
+    }
+
     function initQuotes() {
-        if (unsubQuotes) return;
-        unsubQuotes = db.collection('quotes').onSnapshot(snap => {
-            quotes = snap.docs.map(doc => ({ _docId: doc.id, ...doc.data() }));
-            // Sort client-side so quotes without addedAt still appear
-            quotes.sort((a, b) => {
-                const ta = a.addedAt ? a.addedAt.toMillis() : 0;
-                const tb = b.addedAt ? b.addedAt.toMillis() : 0;
-                return ta - tb;
-            });
+        // Show loading state
+        const list = document.getElementById('quotes-list');
+        if (list) list.innerHTML = '<div class="quotes-empty">Loading quotes…</div>';
+
+        // Immediately load quotes with .get() so they always show
+        db.collection('quotes').get().then(snap => {
+            quotes = sortQuotes(snap.docs.map(doc => ({ _docId: doc.id, ...doc.data() })));
             renderQuotes();
-        }, err => { console.error('Quotes error:', err); });
+        }).catch(err => {
+            if (list) list.innerHTML = `<div class="quotes-empty" style="color:#f87171;">⚠️ Could not load quotes: ${err.message}</div>`;
+        });
+
+        // Also set up real-time listener for updates
+        if (unsubQuotes) unsubQuotes(); // cancel any existing listener before re-subscribing
+        unsubQuotes = db.collection('quotes').onSnapshot(snap => {
+            quotes = sortQuotes(snap.docs.map(doc => ({ _docId: doc.id, ...doc.data() })));
+            renderQuotes();
+        }, err => {
+            // Show error in the UI — don't silently fail
+            const el = document.getElementById('quotes-list');
+            if (el && !quotes.length) {
+                el.innerHTML = `<div class="quotes-empty" style="color:#f87171;">⚠️ Live updates unavailable: ${err.message}<br><button onclick="initQuotes()" style="margin-top:10px;padding:6px 14px;background:var(--accent);color:#0f172a;border:none;border-radius:6px;cursor:pointer;font-weight:700;">Retry</button></div>`;
+            }
+        });
     }
 
     function renderQuotes() {
         const list = document.getElementById('quotes-list');
         const countEl = document.getElementById('quotes-count');
+        if (!list) return;
         countEl.textContent = quotes.length ? `${quotes.length} quotes` : '';
         if (!quotes.length) {
             list.innerHTML = '<div class="quotes-empty">No quotes yet. Add one above!</div>';
             return;
         }
-        list.innerHTML = quotes.map((q, i) => `
+        list.innerHTML = quotes.map((q, i) => {
+            // Handle any field naming (text or quote)
+            const text   = q.text || q.quote || q.body || '';
+            const author = q.author || q.attribution || '';
+            return `
             <div class="quote-item">
                 <div class="quote-item-header">
                     <span class="quote-num"># ${i + 1}</span>
                     <button class="quote-del" onclick="deleteQuote('${q._docId}')" title="Delete quote">🗑</button>
                 </div>
-                <div class="quote-text">"${escHtml(q.text)}"</div>
-                ${q.author ? `<div class="quote-author">— ${escHtml(q.author)}</div>` : ''}
+                <div class="quote-text">"${escHtml(text)}"</div>
+                ${author ? `<div class="quote-author">— ${escHtml(author)}</div>` : ''}
                 ${q.addedAt ? `<div class="quote-date">${new Date(q.addedAt.toDate()).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'})}</div>` : ''}
-            </div>
-        `).join('');
+            </div>`;
+        }).join('');
     }
 
     async function addQuote() {

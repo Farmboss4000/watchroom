@@ -681,6 +681,39 @@
         }
         #toast.show { opacity: 1; transform: translateY(0); }
         #toast.error { background: #ef4444; }
+
+        /* ── MOBILE RESPONSIVE ADDITIONS ── */
+
+        /* Site switcher: horizontal scroll on small screens */
+        @media (max-width: 480px) {
+            .site-switcher { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; padding: 5px 10px; scrollbar-width: none; }
+            .site-switcher::-webkit-scrollbar { display: none; }
+            .site-link { padding: 4px 8px; font-size: 0.72rem; white-space: nowrap; flex-shrink: 0; }
+        }
+
+        /* Hero photo: constrain height and cover-fit on mobile */
+        @media (max-width: 640px) {
+            .hero-photo { width: 100%; max-height: 200px; overflow: hidden; }
+            .hero-photo img { object-fit: cover; width: 100%; height: 200px; }
+        }
+
+        /* Main content: reduce padding on mobile */
+        @media (max-width: 720px) {
+            .main-content { padding: 12px 12px 40px; }
+        }
+
+        /* Site card button: full-width on mobile */
+        @media (max-width: 480px) {
+            .site-card-btn { display: block; width: 100%; text-align: center; }
+        }
+
+        /* Header: shrink user badge and sign-out on very small screens */
+        @media (max-width: 400px) {
+            .header { padding: 0 12px; }
+            .user-badge { max-width: 120px; font-size: 0.72rem; padding: 4px 8px; }
+            .signout-btn { padding: 4px 10px; font-size: 0.75rem; }
+            .header-title { font-size: 1rem; }
+        }
     </style>
 </head>
 <body>

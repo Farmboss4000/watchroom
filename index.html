@@ -412,10 +412,95 @@
         }
 
         /* ── RESPONSIVE ── */
+
+        /* Tablet / large phone */
+        @media (max-width:900px) {
+            .form-grid { grid-template-columns: 1fr 1fr; }
+            .photo-grid { grid-template-columns: 1fr 1fr; }
+        }
+
         @media (max-width:720px) {
-            header { height:auto; padding:12px 16px; flex-direction:column; gap:10px; }
-            nav { flex-wrap:wrap; justify-content:center; }
-            main { padding:14px; }
+            /* Header */
+            header { height:auto; padding:10px 14px; flex-direction:column; gap:8px; }
+            .logo-area { width:100%; justify-content:center; }
+            header h1 { font-size:1rem; }
+            nav {
+                flex-wrap:nowrap; overflow-x:auto; justify-content:flex-start;
+                width:100%; padding-bottom:2px; gap:2px;
+                -webkit-overflow-scrolling:touch; scrollbar-width:none;
+            }
+            nav::-webkit-scrollbar { display:none; }
+            nav button { padding:7px 11px; font-size:0.78rem; flex-shrink:0; }
+            .header-right { width:100%; justify-content:center; }
+            .user-badge { font-size:0.72rem; }
+
+            /* Main */
+            main { padding:12px; }
+
+            /* Hero */
+            .hero { padding:20px 18px; }
+            .hero-title { font-size:1.4rem; }
+            .hero-badge { display:none; }
+
+            /* Cards */
+            .card { padding:16px; }
+
+            /* Stats — 2 columns */
+            .stats-grid { grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; }
+            .stat-value  { font-size:1.7rem; }
+
+            /* Category breakdown — 2 columns */
+            .cat-breakdown { grid-template-columns:1fr 1fr; }
+
+            /* Form — single column */
+            .form-grid { grid-template-columns:1fr; gap:12px; }
+            .form-group.full-width { grid-column:1; }
+
+            /* Photos — single column */
+            .photo-grid { grid-template-columns:1fr; }
+
+            /* Toolbar — stack vertically */
+            .toolbar { flex-direction:column; align-items:stretch; }
+            .toolbar input[type="text"],
+            .toolbar select { width:100%; }
+            .toolbar .btn { width:100%; justify-content:center; }
+
+            /* Tables — horizontal scroll already works, reduce font */
+            table { font-size:0.8rem; }
+            thead th, tbody td { padding:8px 10px; }
+
+            /* Buttons — bigger touch targets */
+            .btn { min-height:40px; }
+            .btn-sm { min-height:34px; padding:6px 10px; }
+            .btn-ai { min-height:38px; }
+
+            /* Form actions — stack */
+            .form-actions { flex-direction:column; }
+            .form-actions .btn { width:100%; justify-content:center; }
+
+            /* Modal */
+            .modal { padding:20px 18px; }
+
+            /* Login box */
+            .login-box { padding:30px 22px; margin:16px; }
+
+            /* Card title */
+            .card-title { flex-direction:column; align-items:flex-start; gap:6px; }
+
+            /* Tags */
+            .tags { gap:6px; }
+
+            /* Settings */
+            .api-key-row { flex-direction:column; }
+            .api-key-row .btn { width:100%; justify-content:center; }
+        }
+
+        /* Small phones */
+        @media (max-width:400px) {
+            .stats-grid { grid-template-columns:1fr 1fr; gap:8px; }
+            .stat-value  { font-size:1.5rem; }
+            .hero-title  { font-size:1.2rem; }
+            nav button   { padding:6px 9px; font-size:0.74rem; }
         }
     </style>
 </head>

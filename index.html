@@ -1379,7 +1379,7 @@ async function callClaude(base64, mimeType, prompt) {
                 'anthropic-dangerous-direct-browser-calls': 'true'
             },
             body: JSON.stringify({
-                model: 'claude-3-7-sonnet-20250219',
+                model: 'claude-3-5-sonnet-20241022',
                 max_tokens: 512,
                 messages: [{ role:'user', content:[
                     { type:'image', source:{ type:'base64', media_type:mimeType, data:base64 }},
@@ -1778,16 +1778,34 @@ async function testApiKey() {
     const key = document.getElementById('api-key-input').value.trim();
     if (!key) { toast('Enter an API key first.','error'); return; }
     const el  = document.getElementById('api-status');
-    el.style.display='block'; el.className='api-status'; el.textContent='Testing...';
+    el.style.display='block'; el.className='api-status'; el.textContent='Testing…';
     try {
         const res = await fetch('https://api.anthropic.com/v1/messages', {
             method:'POST',
-            headers:{ 'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true' },
-            body: JSON.stringify({ model:'claude-3-7-sonnet-20250219', max_tokens:10, messages:[{role:'user',content:'Hi'}] })
+            mode:'cors',
+            headers:{
+                'Content-Type':'application/json',
+                'x-api-key':key,
+                'anthropic-version':'2023-06-01',
+                'anthropic-dangerous-direct-browser-calls':'true'
+            },
+            body: JSON.stringify({ model:'claude-3-5-sonnet-20241022', max_tokens:10, messages:[{role:'user',content:'Hi'}] })
         });
-        if (res.ok) { el.className='api-status ok'; el.textContent='✅ Connection successful! AI identification is ready.'; }
-        else        { const d=await res.json(); el.className='api-status err'; el.textContent='❌ Error: '+(d.error?.message||res.status); }
-    } catch(err) { el.className='api-status err'; el.textContent='❌ '+err.message; }
+        if (res.ok) {
+            el.className='api-status ok';
+            el.textContent='✅ Connection successful! AI identification is ready.';
+        } else {
+            const d = await res.json().catch(()=>({}));
+            el.className='api-status err';
+            el.textContent=`❌ HTTP ${res.status}: ${d.error?.message||d.error?.type||res.statusText}`;
+        }
+    } catch(err) {
+        el.className='api-status err';
+        const isSafari = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
+        const hint = isSafari ? ' — Safari detected: try Chrome or Firefox' : '';
+        el.textContent=`❌ Network error: ${err.message}${hint}`;
+        console.error('Anthropic API test error:', err);
+    }
 }
 
 // ═══════════════════════════════════════

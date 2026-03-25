@@ -581,9 +581,14 @@
                         <input type="number" id="f-price" placeholder="0.00" min="0" step="0.01" style="padding-left:24px;">
                     </div>
                 </div>
-                <div class="form-group span2">
+                <div class="form-group">
                     <label>Storage Location</label>
                     <input type="text" id="f-location" placeholder="e.g. Garage Bay 2, North lot">
+                </div>
+                <div class="form-group span2">
+                    <label>👤 Default Driver / Assigned User</label>
+                    <input type="text" id="f-driver" list="driver-list" placeholder="e.g. Jeff, Farm Crew, Ranch Manager" autocomplete="off">
+                    <datalist id="driver-list"></datalist>
                 </div>
                 <div class="form-group full-width">
                     <label>Notes</label>
@@ -662,6 +667,9 @@
                 <option value="">All Conditions</option>
                 <option>Excellent</option><option>Good</option><option>Fair</option><option>Poor</option>
             </select>
+            <select id="inv-filter-driver" onchange="renderInventory()" style="min-width:150px;">
+                <option value="">All Drivers</option>
+            </select>
             <button class="btn btn-primary btn-sm" onclick="showView('add-item');resetForm()">+ Add Vehicle</button>
             <button class="btn btn-ghost btn-sm" onclick="openScanner()" title="Scan barcode">📷 Scan</button>
             <button class="btn btn-ghost btn-sm" onclick="exportCSV()">↓ Export CSV</button>
@@ -679,6 +687,7 @@
                     <th onclick="sortBy('mileage')">Mileage</th>
                     <th onclick="sortBy('condition')">Condition</th>
                     <th onclick="sortBy('location')">Location</th>
+                    <th onclick="sortBy('defaultDriver')">Driver</th>
                     <th onclick="sortBy('purchaseDate')">Purchased</th>
                     <th onclick="sortBy('marketValue')">Market Value</th>
                     <th class="no-sort">Actions</th>
@@ -1055,6 +1064,7 @@ async function initApp() {
         unsubItems = db.collection('automotive_items').onSnapshot(snap => {
             items = snap.docs.map(doc => ({ _docId:doc.id, ...doc.data() }));
             renderDashboard(); renderInventory(); renderReport();
+            populateDriverList();
             if (firstLoad) { firstLoad = false; autoRefreshMarketValues(); }
         });
         document.getElementById('loading-screen').style.display = 'none';
@@ -1524,6 +1534,20 @@ function populateMakeList() {
     dl.innerHTML = makes.slice().sort((a,b)=>a.localeCompare(b)).map(m=>`<option value="${esc(m)}">`).join('');
 }
 
+function populateDriverList() {
+    const drivers = [...new Set(items.map(i=>i.defaultDriver).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+    // Autocomplete datalist
+    const dl = document.getElementById('driver-list');
+    if (dl) dl.innerHTML = drivers.map(d=>`<option value="${esc(d)}">`).join('');
+    // Filter dropdown
+    const sel = document.getElementById('inv-filter-driver');
+    if (sel) {
+        const cur = sel.value;
+        sel.innerHTML = '<option value="">All Drivers</option>' +
+            drivers.map(d=>`<option value="${esc(d)}"${d===cur?' selected':''}>${esc(d)}</option>`).join('');
+    }
+}
+
 function addMakeIfNew(name) {
     if (!name) return;
     if (!makes.some(m=>m.toLowerCase()===name.toLowerCase())) makes.push(name);
@@ -1548,8 +1572,9 @@ document.getElementById('item-form').addEventListener('submit', async e => {
         condition:    document.getElementById('f-condition').value,
         purchaseDate: document.getElementById('f-purchase-date').value,
         price:        document.getElementById('f-price').value.trim(),
-        location:     document.getElementById('f-location').value.trim(),
-        notes:        document.getElementById('f-notes').value.trim(),
+        location:      document.getElementById('f-location').value.trim(),
+        defaultDriver: document.getElementById('f-driver').value.trim(),
+        notes:         document.getElementById('f-notes').value.trim(),
     };
     btn.disabled = true; btn.textContent = 'Saving...';
     try {
@@ -1578,7 +1603,7 @@ document.getElementById('item-form').addEventListener('submit', async e => {
             await dbAddItem(data, photos);
             toast('Vehicle added!','success');
         }
-        populateMakeList();
+        populateMakeList(); populateDriverList();
         resetForm();
         showView('inventory');
     } catch(err) {
@@ -1597,7 +1622,7 @@ function resetForm() {
     document.getElementById('form-submit-btn').textContent = 'Save Vehicle';
     document.getElementById('form-submit-btn').disabled    = false;
     document.getElementById('ai-status').textContent   = '';
-    populateCatSelect(); populateMakeList();
+    populateCatSelect(); populateMakeList(); populateDriverList();
     for (const slot of ['main','serial','extra']) {
         formPhotos[slot] = { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false };
     }
@@ -1626,6 +1651,7 @@ function editItem(docId) {
     document.getElementById('f-purchase-date').value   = it.purchaseDate||'';
     document.getElementById('f-price').value           = it.price||'';
     document.getElementById('f-location').value        = it.location||'';
+    document.getElementById('f-driver').value          = it.defaultDriver||'';
     document.getElementById('f-notes').value           = it.notes||'';
     document.getElementById('form-title').textContent      = `✏️ Edit Vehicle #${it.id}`;
     document.getElementById('form-submit-btn').textContent = 'Update Vehicle';
@@ -1691,13 +1717,15 @@ function syncCatFilters() {
 function filteredItems(searchId, catId) {
     const q    = (document.getElementById(searchId)?.value||'').toLowerCase();
     const cat  = document.getElementById(catId)?.value||'';
-    const cond = document.getElementById('inv-filter-cond')?.value||'';
+    const cond   = document.getElementById('inv-filter-cond')?.value||'';
+    const driver = document.getElementById('inv-filter-driver')?.value||'';
     return items.filter(it => {
-        const mc = !cat  || it.category===cat;
-        const mco= !cond || it.condition===cond;
-        const ms = !q    || [it.id?.toString(),it.category,it.make,it.model,it.year,
-            it.serialNumber,it.licensePlate,it.color,it.condition,it.location,it.notes].some(v=>v?.toString().toLowerCase().includes(q));
-        return mc && mco && ms;
+        const mc  = !cat    || it.category===cat;
+        const mco = !cond   || it.condition===cond;
+        const mdr = !driver || it.defaultDriver===driver;
+        const ms  = !q      || [it.id?.toString(),it.category,it.make,it.model,it.year,
+            it.serialNumber,it.licensePlate,it.color,it.condition,it.location,it.defaultDriver,it.notes].some(v=>v?.toString().toLowerCase().includes(q));
+        return mc && mco && mdr && ms;
     });
 }
 
@@ -1716,7 +1744,7 @@ function renderInventory() {
     const data  = sorted(filteredItems('inv-search','inv-filter-cat'), invSortField, invSortDir);
     document.getElementById('inv-count').textContent = `${data.length} item${data.length!==1?'s':''}`;
     document.querySelectorAll('#inv-table thead th').forEach(th=>th.classList.remove('sort-asc','sort-desc'));
-    const thIdx = {id:1,category:2,make:3,model:4,year:5,serialNumber:6,mileage:7,condition:8,location:9,purchaseDate:10};
+    const thIdx = {id:1,category:2,make:3,model:4,year:5,serialNumber:6,mileage:7,condition:8,location:9,defaultDriver:10,purchaseDate:11};
     const ti = thIdx[invSortField];
     if (ti!==undefined) document.querySelectorAll('#inv-table thead th')[ti]?.classList.add(invSortDir==='asc'?'sort-asc':'sort-desc');
     const tbody = document.getElementById('inv-tbody');
@@ -1741,6 +1769,7 @@ function renderInventory() {
             <td>${it.mileage ? Number(it.mileage).toLocaleString()+' mi' : '—'}</td>
             <td>${condBadge}</td>
             <td style="font-size:0.82rem">${esc(it.location)||'—'}</td>
+            <td>${it.defaultDriver ? `<span style="display:inline-flex;align-items:center;gap:5px;background:var(--accent-dim);color:var(--accent);padding:2px 9px;border-radius:12px;font-size:0.78rem;font-weight:600;">👤 ${esc(it.defaultDriver)}</span>` : '<span style="color:var(--text-secondary);font-size:0.8rem;">—</span>'}</td>
             <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():'—'}</td>
             <td style="white-space:nowrap;min-width:120px;" id="mv-cell-${it._docId}">
                 ${marketValueCell(it)}

@@ -1018,6 +1018,67 @@
     </div>
 
     <div class="card">
+        <div class="card-title"><div class="card-title-left">&#127760; CORS Proxy (Required for AI on GitHub Pages)</div></div>
+        <p style="font-size:0.875rem;color:var(--text-secondary);margin-bottom:16px;line-height:1.6;">
+            GitHub Pages blocks direct calls to the Anthropic API (CORS policy). A free Cloudflare Worker proxy fixes this in about 5 minutes.
+        </p>
+
+        <div style="margin-bottom:18px;">
+            <div style="font-size:0.82rem;font-weight:700;color:var(--text-primary);margin-bottom:10px;">Step 1 — Create a free Cloudflare Worker</div>
+            <ol class="setup-steps">
+                <li>Go to <strong>cloudflare.com</strong> → sign up free → Dashboard → <strong>Workers &amp; Pages</strong> → <strong>Create</strong> → <strong>Create Worker</strong></li>
+                <li>Delete all default code and paste the code below, then click <strong>Deploy</strong></li>
+                <li>Copy your Worker URL (looks like <code style="font-size:0.8rem;background:#f0f0f0;padding:2px 5px;border-radius:3px;">https://your-worker.your-name.workers.dev</code>)</li>
+                <li>Paste the Worker URL in the Proxy URL field below and click <strong>Save Proxy URL</strong></li>
+                <li>Click <strong>Test Connection</strong> above — it should now say ✅ Connection successful (via proxy)</li>
+            </ol>
+        </div>
+
+        <div style="font-size:0.82rem;font-weight:700;color:var(--text-primary);margin-bottom:8px;">Cloudflare Worker Code — copy and paste this:</div>
+        <div class="code-block" style="user-select:all;cursor:text;font-size:0.76rem;">export default {
+  async fetch(request) {
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type'
+      }});
+    }
+    try {
+      const body = await request.json();
+      const { apiKey, ...payload } = body;
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      return new Response(JSON.stringify(data), {
+        status: res.status,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+      });
+    } catch(err) {
+      return new Response(JSON.stringify({error:{message:err.message}}), {
+        status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+      });
+    }
+  }
+};</div>
+
+        <div style="margin-top:18px;">
+            <div style="font-size:0.82rem;font-weight:700;color:var(--text-primary);margin-bottom:10px;">Step 2 — Enter your Worker URL</div>
+            <div class="api-key-row">
+                <div class="form-group">
+                    <label>Proxy URL</label>
+                    <input type="text" id="api-proxy-input" placeholder="https://your-worker.your-name.workers.dev">
+                </div>
+                <button class="btn btn-primary" onclick="saveProxyUrl()" style="height:38px;align-self:flex-end;">Save Proxy URL</button>
+            </div>
+            <p style="font-size:0.78rem;color:var(--text-secondary);margin-top:8px;">Once saved, click <strong>Test Connection</strong> in the API Key section above to confirm it works.</p>
+        </div>
+    </div>
+
+    <div class="card">
         <div class="card-title"><div class="card-title-left">&#128247; Firebase Storage Setup (for Photo Uploads)</div></div>
         <p style="font-size:0.875rem;color:var(--text-secondary);margin-bottom:16px;line-height:1.6;">
             Photo uploads require Firebase Storage. Follow these steps if you haven't set it up yet:
@@ -1178,6 +1239,7 @@ let invSortDir    = 'asc';
 let activeBcId    = null;
 let unsubItems    = null;
 let apiKey        = '';
+let proxyUrl      = '';
 
 // per-form photo state
 let formPhotos = {
@@ -1244,6 +1306,11 @@ async function initApp() {
         if (keyDoc.exists && keyDoc.data().key) {
             apiKey = keyDoc.data().key;
             document.getElementById('api-key-input').value = apiKey;
+        }
+        const proxyDoc = await db.collection('settings').doc('proxy').get();
+        if (proxyDoc.exists && proxyDoc.data().url) {
+            proxyUrl = proxyDoc.data().url;
+            document.getElementById('api-proxy-input').value = proxyUrl;
         }
         unsubItems = db.collection('items').onSnapshot(snap => {
             items = snap.docs.map(doc => ({ _docId:doc.id, ...doc.data() }));
@@ -1389,27 +1456,36 @@ function removePhoto(slot) {
 
 async function callClaude(base64, mimeType, prompt) {
     if (!apiKey) { toast('Set your Anthropic API key in Settings first.','error'); return null; }
+    const msgPayload = {
+        model: 'claude-3-5-sonnet-20241022',
+        max_tokens: 512,
+        messages: [{ role:'user', content:[
+            { type:'image', source:{ type:'base64', media_type:mimeType, data:base64 }},
+            { type:'text',  text: prompt }
+        ]}]
+    };
     let res;
     try {
-        res = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': apiKey,
-                'anthropic-version': '2023-06-01',
-                'anthropic-dangerous-direct-browser-calls': 'true'
-            },
-            body: JSON.stringify({
-                model: 'claude-3-5-sonnet-20241022',
-                max_tokens: 512,
-                messages: [{ role:'user', content:[
-                    { type:'image', source:{ type:'base64', media_type:mimeType, data:base64 }},
-                    { type:'text',  text: prompt }
-                ]}]
-            })
-        });
+        if (proxyUrl) {
+            res = await fetch(proxyUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...msgPayload, apiKey })
+            });
+        } else {
+            res = await fetch('https://api.anthropic.com/v1/messages', {
+                method: 'POST', mode: 'cors',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': apiKey,
+                    'anthropic-version': '2023-06-01',
+                    'anthropic-dangerous-direct-browser-calls': 'true'
+                },
+                body: JSON.stringify(msgPayload)
+            });
+        }
     } catch(networkErr) {
-        throw new Error('Network error — check your internet connection.');
+        throw new Error('Network error — set up a Proxy URL in Settings to fix CORS issues.');
     }
     if (!res.ok) {
         let errMsg = `API error ${res.status}`;
@@ -1796,25 +1872,29 @@ async function saveApiKey() {
     toast('API key saved!','success');
 }
 async function testApiKey() {
-    const key = document.getElementById('api-key-input').value.trim();
+    const key   = document.getElementById('api-key-input').value.trim();
+    const proxy = document.getElementById('api-proxy-input').value.trim();
     if (!key) { toast('Enter an API key first.','error'); return; }
-    const el  = document.getElementById('api-status');
+    const el = document.getElementById('api-status');
     el.style.display='block'; el.className='api-status'; el.textContent='Testing…';
     try {
-        const res = await fetch('https://api.anthropic.com/v1/messages', {
-            method:'POST',
-            mode:'cors',
-            headers:{
-                'Content-Type':'application/json',
-                'x-api-key':key,
-                'anthropic-version':'2023-06-01',
-                'anthropic-dangerous-direct-browser-calls':'true'
-            },
-            body: JSON.stringify({ model:'claude-3-5-sonnet-20241022', max_tokens:10, messages:[{role:'user',content:'Hi'}] })
-        });
+        const testPayload = { model:'claude-3-5-sonnet-20241022', max_tokens:10, messages:[{role:'user',content:'Hi'}] };
+        let res;
+        if (proxy) {
+            res = await fetch(proxy, {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({ ...testPayload, apiKey: key })
+            });
+        } else {
+            res = await fetch('https://api.anthropic.com/v1/messages', {
+                method:'POST', mode:'cors',
+                headers:{ 'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true' },
+                body: JSON.stringify(testPayload)
+            });
+        }
         if (res.ok) {
             el.className='api-status ok';
-            el.textContent='✅ Connection successful! AI identification is ready.';
+            el.textContent=`✅ Connection successful${proxy?' (via proxy)':''}! AI identification is ready.`;
         } else {
             const d = await res.json().catch(()=>({}));
             el.className='api-status err';
@@ -1822,11 +1902,16 @@ async function testApiKey() {
         }
     } catch(err) {
         el.className='api-status err';
-        const isSafari = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
-        const hint = isSafari ? ' — Safari detected: try Chrome or Firefox' : '';
-        el.textContent=`❌ Network error: ${err.message}${hint}`;
+        el.textContent=`❌ Network error: ${err.message}${proxy?'':' — Add a Proxy URL below to fix CORS.'}`;
         console.error('Anthropic API test error:', err);
     }
+}
+
+async function saveProxyUrl() {
+    const url = document.getElementById('api-proxy-input').value.trim();
+    await db.collection('settings').doc('proxy').set({ url });
+    proxyUrl = url;
+    toast(url ? 'Proxy URL saved!' : 'Proxy URL cleared.', 'success');
 }
 
 // ═══════════════════════════════════════

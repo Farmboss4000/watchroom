@@ -3,29 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Farmboss Armory</title>
-    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
+    <title>Farmboss Suite</title>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         :root {
-            --bg-primary:   #f4f5f7;
-            --bg-secondary: #ffffff;
-            --bg-card:      #f0f2f5;
+            --bg-primary:   #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-card:      #1e293b;
             --accent:       #c8a96e;
-            --accent-hover: #b8955a;
-            --accent-dim:   rgba(200,169,110,0.15);
-            --text-primary: #1a1a2e;
-            --text-secondary:#6b7280;
-            --border:       #e2e8f0;
-            --success:      #16a34a;
-            --danger:       #dc2626;
-            --info:         #2563eb;
+            --accent-hover: #d4b97e;
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --border:       rgba(255,255,255,0.08);
         }
 
         body {
@@ -37,2169 +30,986 @@
 
         /* ── SITE SWITCHER ── */
         .site-switcher {
-            background:#111827; display:flex; align-items:center; padding:5px 18px;
-            gap:4px; font-size:0.77rem; border-bottom:1px solid rgba(255,255,255,0.07);
+            background: #020617;
+            display: flex;
+            align-items: center;
+            padding: 5px 18px;
+            gap: 4px;
+            font-size: 0.77rem;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
         }
-        .site-switcher-label { color:#4b5563; font-size:0.69rem; font-weight:600;
-            text-transform:uppercase; letter-spacing:0.6px; margin-right:8px; }
-        .site-link { text-decoration:none; color:#9ca3af; padding:4px 12px; border-radius:4px;
-            display:inline-flex; align-items:center; gap:6px; font-weight:500; transition:all 0.15s; white-space:nowrap; }
-        .site-link:hover { background:rgba(255,255,255,0.1); color:#e5e7eb; }
-        .site-link.active { background:rgba(255,255,255,0.13); color:#fff; font-weight:600; }
-
-        /* ── LOGIN ── */
-        #login-screen {
-            position: fixed; inset: 0;
-            background: linear-gradient(135deg, #1a1a2e 0%, #2d2d44 100%);
-            display: flex; align-items: center; justify-content: center;
-            z-index: 9000;
+        .site-switcher-label {
+            color: #4b5563;
+            font-size: 0.69rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            margin-right: 8px;
         }
-        .login-box {
-            background: #fff; border-radius: 14px;
-            padding: 44px 40px; width: 100%; max-width: 400px;
-            box-shadow: 0 24px 64px rgba(0,0,0,0.4);
+        .site-link {
+            text-decoration: none;
+            color: #9ca3af;
+            padding: 4px 12px;
+            border-radius: 4px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 500;
+            transition: all 0.15s;
+            white-space: nowrap;
         }
-        .login-logo {
-            width: 56px; height: 56px; background: var(--accent);
-            border-radius: 12px; display: flex; align-items: center;
-            justify-content: center; font-size: 28px;
-            margin: 0 auto 16px; color: #fff;
-        }
-        .login-box h2 { text-align:center; font-size:1.5rem; color:#1a1a2e; margin-bottom:4px; }
-        .login-box .login-sub { text-align:center; font-size:0.85rem; color:#6b7280; margin-bottom:28px; }
-        .login-error { color:var(--danger); font-size:0.82rem; margin-bottom:12px; min-height:18px; text-align:center; }
-        .login-full  { width:100%; justify-content:center; }
+        .site-link:hover { background: rgba(255,255,255,0.08); color: #e5e7eb; }
+        .site-link.active { background: rgba(255,255,255,0.12); color: #fff; font-weight: 600; }
 
         /* ── LOADING ── */
         #loading-screen {
-            position: fixed; inset: 0; background: var(--bg-primary);
+            position: fixed; inset: 0;
+            background: var(--bg-primary);
             display: flex; align-items: center; justify-content: center;
-            z-index: 8000; flex-direction: column; gap: 16px;
+            z-index: 9999;
         }
         .spinner {
-            width: 40px; height: 40px;
-            border: 3px solid var(--border); border-top-color: var(--accent);
-            border-radius: 50%; animation: spin 0.7s linear infinite;
+            width: 44px; height: 44px;
+            border: 4px solid rgba(200,169,110,0.2);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.75s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
-        #loading-screen p { color: var(--text-secondary); font-size: 0.9rem; }
 
-        #app { display: none; }
+        /* ── LOGIN ── */
+        #login-screen {
+            display: none;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            padding: 20px;
+        }
+        .login-box {
+            background: #1e293b;
+            border: 1px solid rgba(200,169,110,0.25);
+            border-radius: 16px;
+            padding: 44px 40px 36px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        .login-logo {
+            width: 64px; height: 64px;
+            background: var(--accent);
+            border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2rem;
+            margin: 0 auto 20px;
+        }
+        .login-title {
+            text-align: center;
+            font-size: 1.6rem;
+            font-weight: 800;
+            letter-spacing: 2px;
+            color: #fff;
+            margin-bottom: 6px;
+        }
+        .login-subtitle {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.87rem;
+            margin-bottom: 32px;
+        }
+        .login-label {
+            display: block;
+            color: var(--text-secondary);
+            font-size: 0.82rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+            letter-spacing: 0.4px;
+        }
+        .login-input {
+            width: 100%;
+            padding: 11px 14px;
+            background: #0f172a;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 0.95rem;
+            margin-bottom: 16px;
+            transition: border-color 0.2s;
+        }
+        .login-input:focus { outline: none; border-color: var(--accent); }
+        .login-btn {
+            width: 100%;
+            padding: 12px;
+            background: var(--accent);
+            color: #0f172a;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            letter-spacing: 0.5px;
+            transition: background 0.2s, transform 0.1s;
+        }
+        .login-btn:hover { background: var(--accent-hover); }
+        .login-btn:active { transform: scale(0.98); }
+        .login-error {
+            color: #f87171;
+            font-size: 0.84rem;
+            margin-top: 12px;
+            text-align: center;
+            min-height: 20px;
+        }
+        .login-links {
+            margin-top: 28px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
+        }
+        .login-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.78rem;
+            padding: 4px 10px;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 20px;
+            transition: all 0.15s;
+        }
+        .login-links a:hover { color: var(--accent); border-color: var(--accent); }
+
+        /* ── APP ── */
+        #app-screen { display: none; }
 
         /* ── HEADER ── */
-        header {
-            background: #1a1a2e;
+        .header {
+            background: #0f172a;
+            border-bottom: 1px solid var(--border);
             padding: 0 24px;
-            display: flex; align-items: center; justify-content: space-between;
-            position: sticky; top: 0; z-index: 100;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.2);
-            height: 62px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
-        .logo-area { display:flex; align-items:center; gap:12px; }
-        .logo-icon {
-            width:38px; height:38px; background:var(--accent);
-            border-radius:8px; display:flex; align-items:center;
-            justify-content:center; font-size:20px; color:#fff;
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
-        header h1 { font-size:1.2rem; font-weight:700; color:#fff; letter-spacing:0.5px; }
-        header h1 span { color:var(--accent); }
-        .header-right { display:flex; align-items:center; gap:10px; }
-        .user-badge {
-            font-size:0.75rem; color:#9ca3af;
-            background:#2d2d44; border:1px solid #3d3d54;
-            padding:4px 10px; border-radius:20px;
+        .header-icon {
+            width: 38px; height: 38px;
+            background: var(--accent);
+            border-radius: 9px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.15rem;
         }
-        .btn-signout {
-            background:transparent; border:1px solid #3d3d54;
-            color:#9ca3af; padding:5px 12px; border-radius:6px;
-            cursor:pointer; font-size:0.8rem; transition:all 0.15s;
-        }
-        .btn-signout:hover { border-color:var(--danger); color:var(--danger); }
-
-        nav { display:flex; gap:2px; }
-        nav button {
-            background:transparent; border:none; color:#9ca3af;
-            padding:8px 13px; border-radius:6px; cursor:pointer;
-            font-size:0.83rem; transition:all 0.15s; white-space:nowrap;
-        }
-        nav button:hover { background:rgba(200,169,110,0.15); color:#fff; }
-        nav button.active { background:var(--accent); color:#1a1a2e; font-weight:600; }
-
-        /* ── HERO BANNER ── */
-        .hero {
-            background: linear-gradient(135deg, #1a1a2e 0%, #2d2d44 100%);
-            padding: 32px 28px 28px;
-            margin-bottom: 24px;
-            border-radius: 12px;
+        .header-title {
+            font-size: 1.25rem;
+            font-weight: 700;
             color: #fff;
-            display: flex; align-items: center; justify-content: space-between;
-            flex-wrap: wrap; gap: 16px;
+            letter-spacing: 0.5px;
         }
-        .hero-title { font-size: 2rem; font-weight: 800; letter-spacing: 1px; }
-        .hero-title span { color: var(--accent); }
-        .hero-sub { font-size: 0.9rem; color: #9ca3af; margin-top: 4px; }
-        .hero-rifle {
-            opacity: 0.92;
-            filter: drop-shadow(0 3px 10px rgba(0,0,0,0.5));
-            max-width: 320px;
-            width: 100%;
+        .header-title span { color: var(--accent); }
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
-
-        /* ── MAIN ── */
-        main { padding:24px; max-width:1440px; margin:0 auto; }
-        .view { display:none; }
-        .view.active { display:block; }
-
-        /* ── CARD ── */
-        .card {
-            background:var(--bg-secondary); border:1px solid var(--border);
-            border-radius:10px; padding:22px 24px; margin-bottom:20px;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-        }
-        .card-title {
-            font-size:1rem; font-weight:600; color:var(--text-primary);
-            margin-bottom:18px; padding-bottom:14px; border-bottom:1px solid var(--border);
-            display:flex; align-items:center; justify-content:space-between;
-        }
-        .card-title-left { display:flex; align-items:center; gap:8px; }
-
-        /* ── STATS ── */
-        .stats-grid {
-            display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr));
-            gap:14px; margin-bottom:20px;
-        }
-        .stat-card {
-            background:var(--bg-secondary); border:1px solid var(--border);
-            border-radius:10px; padding:18px 20px; border-left:3px solid var(--accent);
-            box-shadow:0 1px 4px rgba(0,0,0,0.06);
-        }
-        .stat-value { font-size:2.2rem; font-weight:700; color:var(--accent); line-height:1; }
-        .stat-label {
-            font-size:0.78rem; color:var(--text-secondary);
-            margin-top:5px; text-transform:uppercase; letter-spacing:0.6px;
-        }
-
-        /* ── CATEGORY BREAKDOWN ── */
-        .cat-breakdown {
-            display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px;
-        }
-        .cat-breakdown-item {
-            background:var(--bg-primary); border:1px solid var(--border);
-            border-radius:8px; padding:12px 14px;
-        }
-        .cbi-name { font-size:0.8rem; color:var(--text-secondary); margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .cbi-count { font-size:1.5rem; font-weight:700; color:var(--accent); }
-        .cbi-bar { height:3px; background:var(--border); border-radius:2px; margin-top:8px; }
-        .cbi-bar-fill { height:100%; background:var(--accent); border-radius:2px; }
-
-        /* ── FORM ── */
-        .form-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:16px; }
-        .form-group { display:flex; flex-direction:column; gap:5px; }
-        .form-group.full-width { grid-column:1/-1; }
-        label { font-size:0.78rem; color:var(--text-secondary); font-weight:500; text-transform:uppercase; letter-spacing:0.5px; }
-
-        input[type="text"], input[type="number"], input[type="date"],
-        input[type="email"], input[type="password"], select, textarea {
-            background:var(--bg-primary); border:1px solid var(--border);
-            color:var(--text-primary); padding:9px 12px; border-radius:6px;
-            font-size:0.9rem; font-family:inherit; transition:border-color 0.15s; width:100%;
-        }
-        input:focus, select:focus, textarea:focus { outline:none; border-color:var(--accent); }
-        select option { background:#fff; }
-        textarea { resize:vertical; }
-        .form-actions { display:flex; gap:10px; margin-top:20px; flex-wrap:wrap; }
-
-        /* ── PHOTO UPLOAD ── */
-        .photo-grid {
-            display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:16px;
-            margin-top:8px;
-        }
-        .photo-slot {
-            background:var(--bg-primary); border:2px dashed var(--border);
-            border-radius:10px; padding:16px; display:flex; flex-direction:column; gap:10px;
-            transition:border-color 0.2s;
-        }
-        .photo-slot:hover { border-color:var(--accent); }
-        .photo-slot-label {
-            font-size:0.78rem; font-weight:600; text-transform:uppercase;
-            letter-spacing:0.5px; color:var(--text-secondary);
-        }
-        .photo-preview {
-            width:100%; aspect-ratio:4/3; background:var(--bg-card);
-            border-radius:8px; overflow:hidden; display:flex;
-            align-items:center; justify-content:center;
-            position:relative;
-        }
-        .photo-preview img {
-            width:100%; height:100%; object-fit:cover; border-radius:8px;
-        }
-        .photo-preview .no-photo {
-            font-size:2.5rem; color:#cbd5e1;
-        }
-        .photo-preview .remove-photo {
-            position:absolute; top:6px; right:6px;
-            background:rgba(220,38,38,0.9); color:#fff;
-            border:none; border-radius:50%; width:22px; height:22px;
-            cursor:pointer; font-size:0.7rem; display:none;
-            align-items:center; justify-content:center;
-        }
-        .photo-preview:hover .remove-photo { display:flex; }
-        .photo-file-input { font-size:0.82rem; color:var(--text-secondary); }
-        .photo-file-input input[type="file"] {
-            width:100%; padding:6px; font-size:0.82rem;
-            background:var(--bg-secondary); border:1px solid var(--border);
-            border-radius:6px; cursor:pointer;
-        }
-        .btn-ai {
-            background:linear-gradient(135deg,#667eea,#764ba2);
-            color:#fff; border:none; padding:8px 12px; border-radius:6px;
-            font-size:0.8rem; font-weight:600; cursor:pointer;
-            display:flex; align-items:center; gap:6px; transition:opacity 0.15s;
-            font-family:inherit;
-        }
-        .btn-ai:hover:not(:disabled) { opacity:0.85; }
-        .btn-ai:disabled { opacity:0.4; cursor:not-allowed; }
-        .btn-ai.scanning { animation: pulse 1s ease-in-out infinite; }
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
-
-        /* ── BUTTONS ── */
-        .btn {
-            padding:9px 18px; border-radius:6px; cursor:pointer;
-            font-size:0.875rem; font-weight:500; border:none; font-family:inherit;
-            transition:all 0.15s; display:inline-flex; align-items:center;
-            gap:5px; white-space:nowrap;
-        }
-        .btn:disabled { opacity:0.5; cursor:not-allowed; }
-        .btn-primary { background:var(--accent); color:#1a1a2e; }
-        .btn-primary:hover:not(:disabled) { background:var(--accent-hover); }
-        .btn-ghost { background:transparent; color:var(--text-secondary); border:1px solid var(--border); }
-        .btn-ghost:hover { border-color:var(--accent); color:var(--accent); }
-        .btn-danger { background:var(--danger); color:#fff; }
-        .btn-danger:hover { filter:brightness(1.1); }
-        .btn-info { background:var(--info); color:#fff; }
-        .btn-info:hover { filter:brightness(1.1); }
-        .btn-sm { padding:5px 10px; font-size:0.8rem; }
-        .btn-dark { background:#1a1a2e; color:#fff; }
-        .btn-dark:hover { background:#2d2d44; }
-        .btn-gold { background:var(--accent); color:#1a1a2e; }
-        .btn-gold:hover { background:var(--accent-hover); }
-
-        /* ── TOOLBAR ── */
-        .toolbar { display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; align-items:center; }
-        .toolbar input[type="text"] { flex:1; min-width:200px; }
-
-        /* ── TABLE ── */
-        .table-wrapper { overflow-x:auto; border-radius:8px; border:1px solid var(--border); }
-        table { width:100%; border-collapse:collapse; font-size:0.875rem; }
-        thead th {
-            background:var(--bg-card); padding:11px 14px; text-align:left;
-            font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px;
-            color:var(--text-secondary); white-space:nowrap; cursor:pointer;
-            user-select:none; transition:color 0.15s;
-        }
-        thead th:hover { color:var(--accent); }
-        thead th.sort-asc::after  { content:' \2191'; color:var(--accent); }
-        thead th.sort-desc::after { content:' \2193'; color:var(--accent); }
-        thead th.no-sort { cursor:default; }
-        thead th.no-sort:hover { color:var(--text-secondary); }
-        tbody tr { border-bottom:1px solid var(--border); transition:background 0.1s; }
-        tbody tr:last-child { border-bottom:none; }
-        tbody tr:hover { background:rgba(200,169,110,0.06); }
-        tbody td { padding:10px 14px; }
-        .mono { font-family:'Courier New',monospace; color:var(--text-secondary); }
-
-        /* Thumbnail in table */
-        .thumb {
-            width:40px; height:40px; border-radius:6px; object-fit:cover;
-            border:1px solid var(--border);
-        }
-        .thumb-placeholder {
-            width:40px; height:40px; border-radius:6px;
-            background:var(--bg-card); border:1px solid var(--border);
-            display:flex; align-items:center; justify-content:center;
-            font-size:1.2rem; color:#cbd5e1;
-        }
-
-        /* ── BADGES ── */
-        .badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:0.75rem; font-weight:500; }
-        .cat-rifle       { background:rgba(220,50,50,.15);   color:#b91c1c; }
-        .cat-shotgun     { background:rgba(220,130,50,.15);  color:#c2410c; }
-        .cat-pistol      { background:rgba(22,163,74,.15);   color:#15803d; }
-        .cat-revolver    { background:rgba(37,99,235,.15);   color:#1d4ed8; }
-        .cat-suppressor  { background:rgba(126,34,206,.15);  color:#7e22ce; }
-        .cat-magazine    { background:rgba(8,145,178,.15);   color:#0e7490; }
-        .cat-scope       { background:rgba(180,160,20,.15);  color:#a16207; }
-        .cat-binoculars  { background:rgba(220,100,50,.15);  color:#c2410c; }
-        .cat-spotting    { background:rgba(20,184,166,.15);  color:#0f766e; }
-        .cat-default     { background:rgba(107,114,128,.15); color:#4b5563; }
-
-        /* ── EMPTY STATE ── */
-        .empty { text-align:center; padding:50px 20px; color:var(--text-secondary); }
-        .empty-icon { font-size:3rem; margin-bottom:12px; }
-
-        /* ── TAGS ── */
-        .tags { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
-        .tag {
-            display:inline-flex; align-items:center; gap:6px;
-            background:var(--bg-primary); border:1px solid var(--border);
-            padding:5px 12px; border-radius:20px; font-size:0.83rem;
-        }
-        .tag-remove {
-            background:none; border:none; color:var(--text-secondary);
-            cursor:pointer; padding:0; font-size:0.9rem; line-height:1;
-        }
-        .tag-remove:hover { color:var(--danger); }
-
-        /* ── MODAL ── */
-        .modal-overlay {
-            display:none; position:fixed; inset:0;
-            background:rgba(0,0,0,0.6); z-index:1000;
-            align-items:center; justify-content:center;
-        }
-        .modal-overlay.show { display:flex; }
-        .modal {
-            background:#fff; color:#222; border-radius:12px;
-            padding:28px 32px; max-width:520px; width:92%; text-align:center;
-            box-shadow:0 20px 60px rgba(0,0,0,0.3);
-        }
-        .modal-title { font-size:1rem; font-weight:700; margin-bottom:4px; }
-        .modal-sub { font-size:0.8rem; color:#777; margin-bottom:14px; }
-        .modal svg { max-width:100%; }
-        .modal-actions { margin-top:18px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
-
-        /* Photo viewer modal */
-        .photo-modal-imgs {
-            display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
-            gap:10px; margin:14px 0;
-        }
-        .photo-modal-imgs img {
-            width:100%; border-radius:8px; cursor:pointer;
-            border:2px solid transparent; transition:border-color 0.15s;
-        }
-        .photo-modal-imgs img:hover { border-color:var(--accent); }
-
-        /* ── QUOTES ── */
-        .quote-add-wrap { display:flex; flex-direction:column; gap:10px; }
-        .quote-add-wrap textarea {
-            width:100%; resize:vertical; padding:10px 12px;
-            border:1px solid var(--border); border-radius:8px;
-            font-family:inherit; font-size:0.9rem;
-            background:var(--bg-secondary); color:var(--text-primary);
-        }
-        .quote-add-wrap textarea:focus { outline:none; border-color:var(--accent); }
-        .quote-add-meta { display:flex; gap:10px; flex-wrap:wrap; }
-        .quote-add-meta input[type="text"] {
-            flex:1; min-width:200px; padding:8px 12px;
-            border:1px solid var(--border); border-radius:8px;
-            font-family:inherit; font-size:0.9rem;
-            background:var(--bg-secondary); color:var(--text-primary);
-        }
-        .quote-add-meta input:focus { outline:none; border-color:var(--accent); }
-        .quote-entry {
-            border-left:4px solid var(--accent);
-            background:var(--bg-card);
-            border-radius:0 8px 8px 0;
-            padding:14px 16px;
-            margin-bottom:14px;
-            position:relative;
-        }
-        .quote-entry:last-child { margin-bottom:0; }
-        .quote-number {
-            font-size:0.72rem; font-weight:700; color:var(--accent);
-            text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;
-        }
-        .quote-body {
-            font-size:1rem; font-style:italic; line-height:1.6;
-            color:var(--text-primary); white-space:pre-wrap;
-        }
-        .quote-attribution {
-            font-size:0.82rem; color:var(--text-secondary);
-            margin-top:6px; font-style:normal;
-        }
-        .quote-footer {
-            display:flex; align-items:center; justify-content:space-between;
-            margin-top:10px; flex-wrap:wrap; gap:6px;
-        }
-        .quote-date { font-size:0.75rem; color:var(--text-secondary); }
-        .quote-del {
-            background:none; border:none; cursor:pointer;
-            color:var(--text-secondary); font-size:0.8rem; padding:2px 6px;
-            border-radius:4px; transition:color 0.15s;
-        }
-        .quote-del:hover { color:var(--danger); }
-        @media (max-width:720px) {
-            .quote-add-meta { flex-direction:column; }
-            .quote-add-meta .btn { width:100%; justify-content:center; }
-        }
-
-        /* ── DATE / TIME / WEATHER BAR ── */
-        #dtw-bar {
-            display: flex; align-items: center; gap: 0;
+        .user-badge {
             background: var(--bg-secondary);
             border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 10px 18px;
-            margin-bottom: 20px;
-            flex-wrap: wrap; gap: 6px 0;
+            color: var(--text-secondary);
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
-        .dtw-item {
-            display: flex; align-items: center; gap: 8px;
-            padding: 0 14px;
-            font-size: 0.9rem; color: var(--text-primary);
+        .signout-btn {
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.15);
+            color: var(--text-secondary);
+            padding: 5px 14px;
+            border-radius: 8px;
+            font-size: 0.82rem;
+            cursor: pointer;
+            transition: all 0.15s;
         }
-        .dtw-item:first-child { padding-left: 0; }
-        .dtw-divider {
-            width: 1px; height: 28px;
-            background: var(--border);
+        .signout-btn:hover { border-color: #f87171; color: #f87171; }
+
+        /* ── HERO ── */
+        .hero {
+            background: linear-gradient(135deg, #0f172a, #1e3a5f 60%, #0f2a4a);
+            padding: 48px 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 24px;
+            overflow: hidden;
+            position: relative;
+        }
+        .hero-text { flex: 1; }
+        .hero-title {
+            font-size: 2.5rem;
+            font-weight: 900;
+            letter-spacing: 3px;
+            color: #fff;
+            line-height: 1.1;
+            margin-bottom: 12px;
+        }
+        .hero-title span { color: var(--accent); }
+        .hero-subtitle {
+            color: #94a3b8;
+            font-size: 1rem;
+            max-width: 480px;
+        }
+        .hero-art {
+            opacity: 0.08;
             flex-shrink: 0;
         }
-        .dtw-icon { font-size: 1.15rem; }
-        .dtw-location { margin-left: auto; }
-        #dtw-clock { font-weight: 600; letter-spacing: 0.3px; }
-        @media (max-width:720px) {
-            #dtw-bar { flex-direction: column; align-items: flex-start; padding: 12px 14px; gap: 6px; }
-            .dtw-divider { display: none; }
-            .dtw-item { padding: 0; }
-            .dtw-location { margin-left: 0; }
+
+        /* ── MAIN CONTENT ── */
+        .main-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 28px 24px 60px;
         }
 
-        /* ── BARCODE SCANNER ── */
-        #scanner-modal .modal { max-width:480px; padding:20px; }
-        #scanner-video-wrap {
-            position:relative; width:100%; background:#000;
-            border-radius:10px; overflow:hidden; margin:14px 0;
+        /* ── DATE/TIME/WEATHER ── */
+        .dtw-bar {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px 22px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-bottom: 24px;
         }
-        #scanner-video { width:100%; display:block; max-height:300px; object-fit:cover; }
-        #scanner-overlay {
-            position:absolute; inset:0; pointer-events:none;
-            display:flex; align-items:center; justify-content:center;
+        .dtw-clock-area { flex: 1; min-width: 200px; }
+        .dtw-clock {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--text-primary);
         }
-        .scan-aim {
-            width:200px; height:80px;
-            border:3px solid var(--accent);
-            border-radius:8px;
-            box-shadow:0 0 0 2000px rgba(0,0,0,0.35);
+        .dtw-location {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 3px;
         }
-        #scanner-result {
-            font-size:0.85rem; min-height:20px;
-            color:var(--text-secondary); margin-bottom:8px;
+        .dtw-weather {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .dtw-weather-icon { font-size: 2.2rem; line-height: 1; }
+        .dtw-temp { font-size: 1.6rem; font-weight: 700; color: var(--accent); }
+        .dtw-details { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.7; }
+
+        /* ── QUOTE ── */
+        .dashboard-quote {
+            text-align: center;
+            font-style: italic;
+            color: var(--accent);
+            font-size: 0.92rem;
+            margin-bottom: 28px;
+            opacity: 0.9;
         }
 
-        /* ── SETTINGS ── */
-        .settings-section { margin-bottom:24px; }
-        .settings-section h3 { font-size:0.9rem; font-weight:600; margin-bottom:12px; color:var(--text-primary); }
-        .api-key-row { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; }
-        .api-key-row .form-group { flex:1; min-width:260px; }
-        .api-status { font-size:0.82rem; margin-top:8px; padding:8px 12px; border-radius:6px; }
-        .api-status.ok  { background:#dcfce7; color:#15803d; }
-        .api-status.err { background:#fee2e2; color:#b91c1c; }
-        .setup-steps { list-style:none; counter-reset:steps; }
-        .setup-steps li {
-            counter-increment:steps; padding:10px 12px 10px 44px; position:relative;
-            border-bottom:1px solid var(--border); font-size:0.875rem; color:var(--text-secondary);
+        /* ── SECTION TITLE ── */
+        .section-title {
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-secondary);
+            margin-bottom: 14px;
         }
-        .setup-steps li:last-child { border-bottom:none; }
-        .setup-steps li::before {
-            content:counter(steps); position:absolute; left:12px; top:10px;
-            width:22px; height:22px; background:var(--accent); color:#1a1a2e;
-            border-radius:50%; display:flex; align-items:center; justify-content:center;
-            font-size:0.75rem; font-weight:700;
+
+        /* ── STAT CARDS ── */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 14px;
+            margin-bottom: 32px;
         }
-        .code-block {
-            background:#1a1a2e; color:#c8a96e; padding:12px 16px;
-            border-radius:8px; font-family:'Courier New',monospace;
-            font-size:0.8rem; margin:8px 0; line-height:1.6;
-            white-space:pre; overflow-x:auto;
+        @media (max-width: 800px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 480px) { .stats-grid { grid-template-columns: 1fr; } }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--accent);
+            border-radius: 10px;
+            padding: 18px 20px;
+        }
+        .stat-number {
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: var(--accent);
+            line-height: 1;
+            margin-bottom: 6px;
+        }
+        .stat-label {
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        /* ── SITE CARDS ── */
+        .sites-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 18px;
+            margin-bottom: 36px;
+        }
+        @media (max-width: 640px) { .sites-grid { grid-template-columns: 1fr; } }
+
+        .site-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            overflow: hidden;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .site-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 32px rgba(0,0,0,0.35);
+        }
+        .site-card-top {
+            height: 5px;
+        }
+        .site-card-body {
+            padding: 22px 22px 20px;
+        }
+        .site-card-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .site-card-icon { font-size: 1.9rem; line-height: 1; }
+        .site-card-badge {
+            background: rgba(255,255,255,0.07);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            padding: 3px 10px;
+            border-radius: 20px;
+            white-space: nowrap;
+        }
+        .site-card-title {
+            font-size: 1rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+        .site-card-desc {
+            color: var(--text-secondary);
+            font-size: 0.83rem;
+            margin-bottom: 6px;
+        }
+        .site-card-meta {
+            color: var(--text-secondary);
+            font-size: 0.76rem;
+            margin-bottom: 18px;
+        }
+        .site-card-meta strong { color: var(--text-primary); }
+        .site-card-btn {
+            display: inline-block;
+            padding: 9px 20px;
+            border-radius: 8px;
+            font-size: 0.88rem;
+            font-weight: 700;
+            text-decoration: none;
+            transition: opacity 0.15s, transform 0.1s;
+        }
+        .site-card-btn:hover { opacity: 0.88; }
+        .site-card-btn:active { transform: scale(0.97); }
+
+        /* ── QUOTES SECTION ── */
+        .quotes-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+        }
+        @media (max-width: 700px) { .quotes-grid { grid-template-columns: 1fr; } }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 22px;
+        }
+        .card-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .form-label {
+            display: block;
+            color: var(--text-secondary);
+            font-size: 0.79rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+            letter-spacing: 0.3px;
+        }
+        .form-input, .form-textarea {
+            width: 100%;
+            background: #0f172a;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 0.9rem;
+            padding: 9px 12px;
+            margin-bottom: 12px;
+            font-family: inherit;
+            transition: border-color 0.2s;
+            resize: vertical;
+        }
+        .form-input:focus, .form-textarea:focus { outline: none; border-color: var(--accent); }
+        .form-btn {
+            padding: 9px 22px;
+            background: var(--accent);
+            color: #0f172a;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .form-btn:hover { background: var(--accent-hover); }
+
+        .quotes-list { display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto; }
+        .quotes-list::-webkit-scrollbar { width: 6px; }
+        .quotes-list::-webkit-scrollbar-track { background: transparent; }
+        .quotes-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+        .quote-item {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 14px;
+        }
+        .quote-item-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+        .quote-num {
+            font-size: 0.7rem;
+            color: var(--accent);
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+        .quote-del {
+            background: none;
+            border: none;
+            color: #64748b;
+            cursor: pointer;
+            font-size: 0.95rem;
+            padding: 0 4px;
+            transition: color 0.15s;
+        }
+        .quote-del:hover { color: #f87171; }
+        .quote-text {
+            font-style: italic;
+            color: var(--text-primary);
+            font-size: 0.88rem;
+            margin-bottom: 5px;
+            line-height: 1.5;
+        }
+        .quote-author {
+            font-size: 0.76rem;
+            color: var(--accent);
+            font-weight: 600;
+        }
+        .quote-date {
+            font-size: 0.71rem;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+        .quotes-empty {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            text-align: center;
+            padding: 24px 0;
         }
 
         /* ── TOAST ── */
-        .toast {
-            position:fixed; bottom:20px; right:20px;
-            background:#1a1a2e; color:#fff;
-            border-left:4px solid var(--accent); padding:13px 18px;
-            border-radius:8px; z-index:2000; transform:translateY(80px);
-            opacity:0; transition:all 0.3s; font-size:0.875rem; max-width:300px;
+        #toast {
+            position: fixed;
+            bottom: 24px; right: 24px;
+            background: #22c55e;
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            z-index: 9999;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: opacity 0.25s, transform 0.25s;
+            pointer-events: none;
         }
-        .toast.show { transform:translateY(0); opacity:1; }
-        .toast.success { border-left-color:var(--success); }
-        .toast.error   { border-left-color:var(--danger); }
-
-        /* ── PRINT ── */
-        #print-area { display:none; }
-        @media print {
-            body * { visibility:hidden; }
-            #print-area, #print-area * { visibility:visible; }
-            #print-area { position:fixed; left:0; top:0; width:100%; }
-        }
-
-        /* ── RESPONSIVE ── */
-
-        /* Tablet / large phone */
-        @media (max-width:900px) {
-            .form-grid { grid-template-columns: 1fr 1fr; }
-            .photo-grid { grid-template-columns: 1fr 1fr; }
-        }
-
-        @media (max-width:720px) {
-            /* Header */
-            header { height:auto; padding:10px 14px; flex-direction:column; gap:8px; }
-            .logo-area { width:100%; justify-content:center; }
-            header h1 { font-size:1rem; }
-            nav {
-                flex-wrap:nowrap; overflow-x:auto; justify-content:flex-start;
-                width:100%; padding-bottom:2px; gap:2px;
-                -webkit-overflow-scrolling:touch; scrollbar-width:none;
-            }
-            nav::-webkit-scrollbar { display:none; }
-            nav button { padding:7px 11px; font-size:0.78rem; flex-shrink:0; }
-            .header-right { width:100%; justify-content:center; }
-            .user-badge { font-size:0.72rem; }
-
-            /* Main */
-            main { padding:12px; }
-
-            /* Hero */
-            .hero { padding:20px 18px; }
-            .hero-title { font-size:1.4rem; }
-            .hero-rifle { max-width:200px; }
-
-            /* Cards */
-            .card { padding:16px; }
-
-            /* Stats — 2 columns */
-            .stats-grid { grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; }
-            .stat-value  { font-size:1.7rem; }
-
-            /* Category breakdown — 2 columns */
-            .cat-breakdown { grid-template-columns:1fr 1fr; }
-
-            /* Form — single column */
-            .form-grid { grid-template-columns:1fr; gap:12px; }
-            .form-group.full-width { grid-column:1; }
-
-            /* Photos — single column */
-            .photo-grid { grid-template-columns:1fr; }
-
-            /* Toolbar — stack vertically */
-            .toolbar { flex-direction:column; align-items:stretch; }
-            .toolbar input[type="text"],
-            .toolbar select { width:100%; }
-            .toolbar .btn { width:100%; justify-content:center; }
-
-            /* Tables — horizontal scroll already works, reduce font */
-            table { font-size:0.8rem; }
-            thead th, tbody td { padding:8px 10px; }
-
-            /* Buttons — bigger touch targets */
-            .btn { min-height:40px; }
-            .btn-sm { min-height:34px; padding:6px 10px; }
-            .btn-ai { min-height:38px; }
-
-            /* Form actions — stack */
-            .form-actions { flex-direction:column; }
-            .form-actions .btn { width:100%; justify-content:center; }
-
-            /* Modal */
-            .modal { padding:20px 18px; }
-
-            /* Login box */
-            .login-box { padding:30px 22px; margin:16px; }
-
-            /* Card title */
-            .card-title { flex-direction:column; align-items:flex-start; gap:6px; }
-
-            /* Tags */
-            .tags { gap:6px; }
-
-            /* Settings */
-            .api-key-row { flex-direction:column; }
-            .api-key-row .btn { width:100%; justify-content:center; }
-        }
-
-        /* Small phones */
-        @media (max-width:400px) {
-            .stats-grid { grid-template-columns:1fr 1fr; gap:8px; }
-            .stat-value  { font-size:1.5rem; }
-            .hero-title  { font-size:1.2rem; }
-            nav button   { padding:6px 9px; font-size:0.74rem; }
-        }
+        #toast.show { opacity: 1; transform: translateY(0); }
+        #toast.error { background: #ef4444; }
     </style>
 </head>
 <body>
 
-<!-- ══ LOGIN ══ -->
-<div id="login-screen">
-    <div style="display:flex;gap:8px;margin-bottom:12px;">
-        <a href="index.html" style="color:var(--accent);font-size:0.78rem;text-decoration:none;padding:4px 12px;border:1px solid var(--accent);border-radius:4px;">🔫 Armory</a>
-        <a href="machinery.html" style="color:rgba(255,255,255,0.5);font-size:0.78rem;text-decoration:none;padding:4px 12px;border:1px solid rgba(255,255,255,0.2);border-radius:4px;transition:all 0.15s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,0.5)'">🚜 Machinery</a>
-    </div>
-    <div class="login-box">
-        <div class="login-logo">&#9881;</div>
-        <h2>Farmboss Armory</h2>
-        <p class="login-sub">Sign in to access your collection</p>
-        <form id="login-form">
-            <div class="form-group" style="margin-bottom:14px;">
-                <label>Email</label>
-                <input type="email" id="login-email" placeholder="your@email.com" required autocomplete="username">
-            </div>
-            <div class="form-group" style="margin-bottom:20px;">
-                <label>Password</label>
-                <input type="password" id="login-password" placeholder="••••••••" required autocomplete="current-password">
-            </div>
-            <div class="login-error" id="login-error"></div>
-            <button type="submit" class="btn btn-primary login-full" id="login-btn">Sign In</button>
-        </form>
-    </div>
-</div>
-
-<!-- ══ LOADING ══ -->
-<div id="loading-screen" style="display:none;">
-    <div class="spinner"></div>
-    <p>Loading your collection...</p>
-</div>
-
-<!-- ══ APP ══ -->
-<div id="app">
+<!-- SITE SWITCHER -->
 <div class="site-switcher">
     <span class="site-switcher-label">Farmboss Suite</span>
-    <a href="index.html" class="site-link active">🔫 Armory</a>
+    <a href="index.html" class="site-link active">🏠 Suite</a>
+    <a href="armory.html" class="site-link">🔫 Armory</a>
     <a href="machinery.html" class="site-link">🚜 Machinery</a>
+    <a href="automotive.html" class="site-link">🚗 Automotive</a>
+    <a href="livestock.html" class="site-link">🐄 Livestock</a>
 </div>
-<header>
-    <div class="logo-area">
-        <div class="logo-icon">&#9881;</div>
-        <h1>Farmboss <span>Armory</span></h1>
-    </div>
-    <nav>
-        <button class="active" onclick="showView('dashboard')">Dashboard</button>
-        <button onclick="showView('add-item')">Add Item</button>
-        <button onclick="showView('inventory')">Inventory</button>
-        <button onclick="showView('reports')">Reports</button>
-        <button onclick="showView('categories')">Categories</button>
-        <button onclick="showView('quotes')">&#128172; Quotes</button>
-        <button onclick="showView('settings')">⚙ Settings</button>
-    </nav>
-    <div class="header-right">
-        <span class="user-badge" id="user-email"></span>
-        <button class="btn-signout" onclick="doSignOut()">Sign Out</button>
-    </div>
-</header>
 
-<main>
+<!-- LOADING -->
+<div id="loading-screen">
+    <div class="spinner"></div>
+</div>
 
-<!-- ══ DASHBOARD ══ -->
-<div id="view-dashboard" class="view active">
-    <p style="font-style:italic; text-align:center; color:var(--text-secondary); font-size:0.95rem; padding:10px 16px 4px;">"Only you can prevent communism — Jeff Stoebner — 1971"</p>
+<!-- LOGIN -->
+<div id="login-screen" style="display:none; min-height:100vh; background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%); align-items:center; justify-content:center; flex-direction:column; padding:20px;">
+    <div class="login-box">
+        <div class="login-logo">🏠</div>
+        <div class="login-title">FARMBOSS SUITE</div>
+        <div class="login-subtitle">Your complete farm management system</div>
+        <label class="login-label" for="login-email">Email</label>
+        <input class="login-input" type="email" id="login-email" placeholder="you@example.com" autocomplete="email">
+        <label class="login-label" for="login-password">Password</label>
+        <input class="login-input" type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
+        <button class="login-btn" onclick="doLogin()">Sign In</button>
+        <div class="login-error" id="login-error"></div>
+    </div>
+    <div class="login-links">
+        <a href="index.html">🏠 Suite</a>
+        <a href="armory.html">🔫 Armory</a>
+        <a href="machinery.html">🚜 Machinery</a>
+        <a href="automotive.html">🚗 Automotive</a>
+        <a href="livestock.html">🐄 Livestock</a>
+    </div>
+</div>
+
+<!-- APP -->
+<div id="app-screen" style="display:none;">
+
+    <!-- HEADER -->
+    <div class="header">
+        <div class="header-left">
+            <div class="header-icon">🏠</div>
+            <div class="header-title">Farmboss <span>Suite</span></div>
+        </div>
+        <div class="header-right">
+            <div class="user-badge" id="user-email-badge"></div>
+            <button class="signout-btn" onclick="doSignOut()">Sign Out</button>
+        </div>
+    </div>
+
+    <!-- HERO -->
     <div class="hero">
-        <div>
-            <div class="hero-title">Farmboss <span>Armory</span></div>
-            <div class="hero-sub">Your personal firearms & equipment inventory</div>
+        <div class="hero-text">
+            <div class="hero-title">FARMBOSS<br><span>SUITE</span></div>
+            <div class="hero-subtitle">Your complete farm &amp; property management system</div>
         </div>
-        <!-- AK-47 silhouette SVG -->
-        <svg class="hero-rifle" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 545 158" fill="white">
-          <!-- Muzzle brake -->
-          <rect x="8" y="62" width="4" height="14" rx="1"/>
-          <rect x="14" y="62" width="4" height="14" rx="1"/>
-          <rect x="20" y="62" width="4" height="14" rx="1"/>
-          <rect x="8" y="65" width="22" height="8" rx="1"/>
-          <!-- Barrel -->
-          <rect x="28" y="64" width="188" height="10" rx="2"/>
-          <!-- Front sight block -->
-          <rect x="50" y="50" width="16" height="24" rx="2"/>
-          <!-- Front sight post -->
-          <rect x="56" y="43" width="4" height="9" rx="1"/>
-          <!-- Gas tube -->
-          <rect x="68" y="56" width="126" height="8" rx="3"/>
-          <!-- Handguard -->
-          <path d="M68,74 L194,74 L194,90 Q180,95 150,95 L68,90 Z"/>
-          <!-- Receiver -->
-          <rect x="192" y="48" width="122" height="48" rx="4"/>
-          <!-- Top cover -->
-          <rect x="197" y="40" width="112" height="12" rx="2"/>
-          <!-- Rear sight -->
-          <rect x="288" y="32" width="18" height="22" rx="2"/>
-          <rect x="293" y="37" width="8" height="5" rx="1" fill="#1a1a2e"/>
-          <!-- Charging handle -->
-          <rect x="297" y="44" width="22" height="9" rx="2"/>
-          <!-- Banana magazine -->
-          <path d="M204,96 L256,96 Q272,97 269,130 Q265,152 246,155 Q227,158 216,143 Q203,126 204,96 Z"/>
-          <!-- Trigger guard -->
-          <path d="M238,96 Q233,124 269,126 L269,96 Z"/>
-          <!-- Trigger -->
-          <rect x="248" y="96" width="7" height="22" rx="2" fill="#c8a96e"/>
-          <!-- Pistol grip -->
-          <path d="M268,96 L290,96 L297,140 L270,143 L259,120 Z"/>
-          <!-- Stock connector -->
-          <rect x="312" y="58" width="18" height="30" rx="2"/>
-          <!-- Stock body -->
-          <path d="M328,49 L497,49 Q510,49 514,60 L518,75 Q518,85 508,91 L328,96 Z"/>
-          <!-- Stock cutout (AK characteristic) -->
-          <path d="M335,71 L488,71 L494,83 L335,83 Z" fill="#1a1a2e" opacity="0.55"/>
-          <!-- Buttplate -->
-          <rect x="513" y="51" width="13" height="38" rx="3"/>
-        </svg>
-    </div>
-    <!-- Date / Time / Weather bar -->
-    <div id="dtw-bar">
-        <div class="dtw-item" id="dtw-datetime">
-            <span class="dtw-icon">&#128336;</span>
-            <span id="dtw-clock">—</span>
-        </div>
-        <div class="dtw-divider"></div>
-        <div class="dtw-item" id="dtw-weather-wrap">
-            <span class="dtw-icon" id="dtw-wx-icon">&#127777;</span>
-            <span id="dtw-wx-text">Loading weather…</span>
-        </div>
-        <div class="dtw-item dtw-location">
-            <span style="font-size:0.72rem;color:var(--text-secondary);">Chaska, MN 55318</span>
+        <div class="hero-art">
+            <svg width="220" height="160" viewBox="0 0 220 160" fill="white">
+                <!-- Barn silhouette -->
+                <polygon points="110,10 180,60 180,150 40,150 40,60" />
+                <rect x="85" y="90" width="50" height="60" fill="#0f172a"/>
+                <!-- Barn roof peak lines -->
+                <line x1="110" y1="10" x2="40" y2="60" stroke="white" stroke-width="3"/>
+                <line x1="110" y1="10" x2="180" y2="60" stroke="white" stroke-width="3"/>
+                <!-- Silo -->
+                <rect x="175" y="75" width="30" height="75" fill="white"/>
+                <ellipse cx="190" cy="75" rx="15" ry="8" fill="white"/>
+                <rect x="180" y="40" width="20" height="40" rx="10" fill="white"/>
+                <!-- Ground line -->
+                <line x1="0" y1="150" x2="220" y2="150" stroke="white" stroke-width="3"/>
+                <!-- Fence posts -->
+                <rect x="5" y="130" width="5" height="22" rx="2" fill="white"/>
+                <rect x="22" y="135" width="5" height="17" rx="2" fill="white"/>
+                <line x1="5" y1="133" x2="27" y2="138" stroke="white" stroke-width="2"/>
+                <line x1="5" y1="140" x2="27" y2="145" stroke="white" stroke-width="2"/>
+            </svg>
         </div>
     </div>
 
-    <div class="stats-grid" id="stats-grid"></div>
-    <div class="card">
-        <div class="card-title"><div class="card-title-left">&#128202; Inventory by Category</div></div>
-        <div class="cat-breakdown" id="cat-breakdown"></div>
-    </div>
-    <div class="card">
-        <div class="card-title"><div class="card-title-left">&#128336; Recently Added</div></div>
-        <div class="table-wrapper">
-            <table><thead><tr>
-                <th class="no-sort" style="width:52px;">Photo</th>
-                <th class="no-sort">ID</th>
-                <th class="no-sort">Category</th>
-                <th class="no-sort">Manufacturer</th>
-                <th class="no-sort">Model</th>
-                <th class="no-sort">Serial #</th>
-                <th class="no-sort">Added</th>
-            </tr></thead>
-            <tbody id="recent-tbody"></tbody></table>
-        </div>
-    </div>
-</div>
+    <!-- MAIN CONTENT -->
+    <div class="main-content">
 
-<!-- ══ ADD / EDIT ══ -->
-<div id="view-add-item" class="view">
-    <div class="card">
-        <div class="card-title">
-            <div class="card-title-left" id="form-title">&#10133; Add New Item</div>
-        </div>
-        <form id="item-form">
-            <input type="hidden" id="edit-id">
-            <input type="hidden" id="edit-doc-id">
-            <div class="form-grid">
-                <div class="form-group">
-                    <label>Category *</label>
-                    <select id="f-category" required><option value="">Select category...</option></select>
-                </div>
-                <div class="form-group">
-                    <label>Manufacturer</label>
-                    <input type="text" id="f-manufacturer" list="manufacturer-list" placeholder="Type or select..." autocomplete="off">
-                    <datalist id="manufacturer-list"></datalist>
-                </div>
-                <div class="form-group">
-                    <label>Model</label>
-                    <input type="text" id="f-model" placeholder="e.g. Model 686">
-                </div>
-                <div class="form-group">
-                    <label>Serial Number</label>
-                    <input type="text" id="f-serial" placeholder="e.g. SN-123456">
-                </div>
-                <div class="form-group">
-                    <label>Caliber / Gauge</label>
-                    <input type="text" id="f-caliber" list="caliber-list" placeholder="Type or select a caliber..." autocomplete="off">
-                    <datalist id="caliber-list"></datalist>
-                </div>
-                <div class="form-group">
-                    <label>Magnification</label>
-                    <input type="text" id="f-magnification" placeholder="e.g. 3-9x40">
-                </div>
-                <div class="form-group">
-                    <label>Purchase Date</label>
-                    <input type="date" id="f-purchase-date">
-                </div>
-                <div class="form-group">
-                    <label>Quantity</label>
-                    <input type="number" id="f-quantity" min="1" value="1">
-                </div>
-                <div class="form-group full-width">
-                    <label>Notes</label>
-                    <textarea id="f-notes" rows="2" placeholder="Condition, storage location, accessories..."></textarea>
-                </div>
+        <!-- DATE / TIME / WEATHER -->
+        <div class="dtw-bar">
+            <div class="dtw-clock-area">
+                <div class="dtw-clock" id="dtw-clock">Loading...</div>
+                <div class="dtw-location">Chaska, MN 55318</div>
             </div>
+            <div class="dtw-weather" id="dtw-weather">
+                <div class="dtw-weather-icon" id="wx-icon">⏳</div>
+                <div class="dtw-temp" id="wx-temp">--°F</div>
+                <div class="dtw-details" id="wx-details">Loading weather...</div>
+            </div>
+        </div>
 
-            <!-- PHOTO UPLOAD SECTION -->
-            <div style="margin-top:22px; padding-top:18px; border-top:1px solid var(--border);">
-                <div style="font-size:0.85rem; font-weight:600; color:var(--text-primary); margin-bottom:14px;">
-                    &#128247; Photos &amp; AI Identification
-                    <span style="font-size:0.75rem; font-weight:400; color:var(--text-secondary); margin-left:8px;">
-                        Upload photos — AI will auto-fill fields
-                    </span>
-                </div>
-                <div class="photo-grid">
+        <!-- DASHBOARD QUOTE -->
+        <div class="dashboard-quote">
+            "Only you can prevent communism — Jeff Stoebner — 1971"
+        </div>
 
-                    <!-- MAIN PHOTO -->
-                    <div class="photo-slot">
-                        <div class="photo-slot-label">&#127775; Main Photo</div>
-                        <div class="photo-preview" id="prev-main">
-                            <span class="no-photo">&#128247;</span>
-                            <button type="button" class="remove-photo" onclick="removePhoto('main')">✕</button>
-                        </div>
-                        <div class="photo-file-input">
-                            <input type="file" id="file-main" accept="image/*" onchange="onPhotoSelected('main',this)">
-                        </div>
-                        <button type="button" class="btn-ai" id="btn-identify" onclick="identifyItem()" disabled>
-                            &#129302; Identify Item with AI
-                        </button>
+        <!-- SUITE OVERVIEW STATS -->
+        <div class="section-title">Suite Overview</div>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number" id="stat-armory">—</div>
+                <div class="stat-label">🔫 Armory Items</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="stat-machinery">—</div>
+                <div class="stat-label">🚜 Machinery Items</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="stat-automotive">—</div>
+                <div class="stat-label">🚗 Vehicles</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="stat-livestock">—</div>
+                <div class="stat-label">🐄 Livestock</div>
+            </div>
+        </div>
+
+        <!-- DAUGHTER SITE CARDS -->
+        <div class="section-title">Daughter Sites</div>
+        <div class="sites-grid">
+
+            <!-- Armory -->
+            <div class="site-card">
+                <div class="site-card-top" style="background:#c8a96e;"></div>
+                <div class="site-card-body">
+                    <div class="site-card-header">
+                        <div class="site-card-icon">🔫</div>
+                        <div class="site-card-badge"><span id="badge-armory">—</span> items &nbsp;|&nbsp; ARM barcodes</div>
                     </div>
+                    <div class="site-card-title">FARMBOSS ARMORY</div>
+                    <div class="site-card-desc">Firearms &amp; Equipment Collection</div>
+                    <div class="site-card-meta"><strong id="meta-armory">—</strong> items tracked</div>
+                    <a href="armory.html" class="site-card-btn" style="background:#c8a96e;color:#0f172a;">Go to Armory →</a>
+                </div>
+            </div>
 
-                    <!-- SERIAL NUMBER PHOTO -->
-                    <div class="photo-slot">
-                        <div class="photo-slot-label">&#128203; Serial Number Photo</div>
-                        <div class="photo-preview" id="prev-serial">
-                            <span class="no-photo">&#128203;</span>
-                            <button type="button" class="remove-photo" onclick="removePhoto('serial')">✕</button>
-                        </div>
-                        <div class="photo-file-input">
-                            <input type="file" id="file-serial" accept="image/*" onchange="onPhotoSelected('serial',this)">
-                        </div>
-                        <button type="button" class="btn-ai" id="btn-ocr" onclick="extractSerial()" disabled>
-                            &#128270; Extract Serial # with AI
-                        </button>
+            <!-- Machinery -->
+            <div class="site-card">
+                <div class="site-card-top" style="background:#d4941a;"></div>
+                <div class="site-card-body">
+                    <div class="site-card-header">
+                        <div class="site-card-icon">🚜</div>
+                        <div class="site-card-badge"><span id="badge-machinery">—</span> items &nbsp;|&nbsp; MCH barcodes</div>
                     </div>
+                    <div class="site-card-title">FARMBOSS MACHINERY</div>
+                    <div class="site-card-desc">Farm Equipment Inventory</div>
+                    <div class="site-card-meta"><strong id="meta-machinery">—</strong> items tracked</div>
+                    <a href="machinery.html" class="site-card-btn" style="background:#d4941a;color:#0f172a;">Go to Machinery →</a>
+                </div>
+            </div>
 
-                    <!-- ADDITIONAL PHOTO -->
-                    <div class="photo-slot">
-                        <div class="photo-slot-label">&#128444; Additional Photo</div>
-                        <div class="photo-preview" id="prev-extra">
-                            <span class="no-photo">&#128444;</span>
-                            <button type="button" class="remove-photo" onclick="removePhoto('extra')">✕</button>
-                        </div>
-                        <div class="photo-file-input">
-                            <input type="file" id="file-extra" accept="image/*" onchange="onPhotoSelected('extra',this)">
-                        </div>
+            <!-- Automotive -->
+            <div class="site-card">
+                <div class="site-card-top" style="background:#3b82f6;"></div>
+                <div class="site-card-body">
+                    <div class="site-card-header">
+                        <div class="site-card-icon">🚗</div>
+                        <div class="site-card-badge"><span id="badge-automotive">—</span> items &nbsp;|&nbsp; AUT barcodes</div>
                     </div>
-
+                    <div class="site-card-title">FARMBOSS AUTOMOTIVE</div>
+                    <div class="site-card-desc">Vehicle Fleet Management</div>
+                    <div class="site-card-meta"><strong id="meta-automotive">—</strong> vehicles tracked</div>
+                    <a href="automotive.html" class="site-card-btn" style="background:#3b82f6;color:#fff;">Go to Automotive →</a>
                 </div>
-                <p id="ai-status" style="font-size:0.82rem; color:var(--text-secondary); margin-top:10px; min-height:18px;"></p>
             </div>
 
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary" id="form-submit-btn">Save Item</button>
-                <button type="button" class="btn btn-ghost" onclick="resetForm()">Clear</button>
-                <button type="button" class="btn btn-ghost" onclick="showView('inventory')">Cancel</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- ══ INVENTORY ══ -->
-<div id="view-inventory" class="view">
-    <div class="card">
-        <div class="card-title">
-            <div class="card-title-left">&#128230; Inventory</div>
-            <span id="inv-count" style="font-size:0.8rem;color:var(--text-secondary);font-weight:400;"></span>
-        </div>
-        <div class="toolbar">
-            <input type="text" id="inv-search" placeholder="Search manufacturer, model, serial number..." oninput="renderInventory()">
-            <select id="inv-filter-cat" onchange="renderInventory()" style="min-width:160px;">
-                <option value="">All Categories</option>
-            </select>
-            <button class="btn btn-primary btn-sm" onclick="showView('add-item'); resetForm()">+ Add Item</button>
-            <button class="btn btn-ghost btn-sm" onclick="openScanner()" title="Scan barcode with camera">&#128247; Scan</button>
-            <button class="btn btn-ghost btn-sm" onclick="exportCSV()">&#8595; Export CSV</button>
-        </div>
-        <div class="table-wrapper">
-            <table id="inv-table">
-                <thead><tr>
-                    <th class="no-sort" style="width:52px;">Photo</th>
-                    <th onclick="sortBy('id')">ID</th>
-                    <th onclick="sortBy('category')">Category</th>
-                    <th onclick="sortBy('manufacturer')">Manufacturer</th>
-                    <th onclick="sortBy('model')">Model</th>
-                    <th onclick="sortBy('serialNumber')">Serial #</th>
-                    <th onclick="sortBy('caliber')">Caliber</th>
-                    <th onclick="sortBy('magnification')">Magnification</th>
-                    <th onclick="sortBy('purchaseDate')">Purchase Date</th>
-                    <th onclick="sortBy('quantity')">Qty</th>
-                    <th class="no-sort">Actions</th>
-                </tr></thead>
-                <tbody id="inv-tbody"></tbody>
-            </table>
-        </div>
-        <div id="inv-empty" class="empty" style="display:none;">
-            <div class="empty-icon">&#128452;</div>
-            <p>No items found. <a href="#" onclick="showView('add-item');resetForm();return false;" style="color:var(--accent);">Add your first item</a>.</p>
-        </div>
-    </div>
-</div>
-
-<!-- ══ REPORTS ══ -->
-<div id="view-reports" class="view">
-    <div class="card">
-        <div class="card-title">
-            <div class="card-title-left">&#128203; Reports</div>
-            <span id="rpt-count" style="font-size:0.8rem;color:var(--text-secondary);font-weight:400;"></span>
-        </div>
-        <div class="toolbar">
-            <input type="text" id="rpt-search" placeholder="Search all fields..." oninput="renderReport()">
-            <select id="rpt-filter-cat" onchange="renderReport()" style="min-width:160px;">
-                <option value="">All Categories</option>
-            </select>
-            <select id="rpt-sort-field" onchange="renderReport()" style="min-width:180px;">
-                <option value="id">Sort: ID</option>
-                <option value="category">Sort: Category</option>
-                <option value="manufacturer">Sort: Manufacturer</option>
-                <option value="model">Sort: Model</option>
-                <option value="serialNumber">Sort: Serial #</option>
-                <option value="caliber">Sort: Caliber</option>
-                <option value="magnification">Sort: Magnification</option>
-                <option value="purchaseDate">Sort: Purchase Date</option>
-                <option value="quantity">Sort: Quantity</option>
-            </select>
-            <select id="rpt-sort-dir" onchange="renderReport()" style="min-width:120px;">
-                <option value="asc">Ascending</option>
-                <option value="desc">Descending</option>
-            </select>
-            <button class="btn btn-ghost btn-sm" onclick="printReport()">&#128424; Print</button>
-            <button class="btn btn-ghost btn-sm" onclick="exportCSV()">&#8595; Export CSV</button>
-        </div>
-        <div class="table-wrapper">
-            <table><thead><tr>
-                <th onclick="rptSortBy('id')">ID</th>
-                <th onclick="rptSortBy('category')">Category</th>
-                <th onclick="rptSortBy('manufacturer')">Manufacturer</th>
-                <th onclick="rptSortBy('model')">Model</th>
-                <th onclick="rptSortBy('serialNumber')">Serial #</th>
-                <th onclick="rptSortBy('caliber')">Caliber</th>
-                <th onclick="rptSortBy('magnification')">Magnification</th>
-                <th onclick="rptSortBy('purchaseDate')">Purchase Date</th>
-                <th onclick="rptSortBy('quantity')">Qty</th>
-                <th class="no-sort">Notes</th>
-            </tr></thead>
-            <tbody id="rpt-tbody"></tbody></table>
-        </div>
-    </div>
-</div>
-
-<!-- ══ CATEGORIES ══ -->
-<div id="view-categories" class="view">
-    <div class="card">
-        <div class="card-title"><div class="card-title-left">&#127991; Manage Categories</div></div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-            <input type="text" id="new-cat-input" placeholder="New category name..." style="min-width:240px;max-width:340px;">
-            <button class="btn btn-primary" onclick="addCategory()">Add Category</button>
-        </div>
-        <div class="tags" id="cat-tags"></div>
-    </div>
-</div>
-
-<!-- ══ SETTINGS ══ -->
-<div id="view-settings" class="view">
-    <div class="card">
-        <div class="card-title"><div class="card-title-left">&#129302; AI Identification — Anthropic API Key</div></div>
-        <div class="settings-section">
-            <p style="font-size:0.875rem;color:var(--text-secondary);margin-bottom:16px;line-height:1.6;">
-                The AI photo identification uses Claude (by Anthropic). Enter your API key below — it is stored
-                securely in your Firebase account and never shared.
-            </p>
-            <div class="api-key-row">
-                <div class="form-group">
-                    <label>Anthropic API Key</label>
-                    <input type="password" id="api-key-input" placeholder="sk-ant-api03-...">
-                </div>
-                <button class="btn btn-primary" onclick="saveApiKey()" style="height:38px;align-self:flex-end;">Save Key</button>
-                <button class="btn btn-ghost" onclick="testApiKey()" style="height:38px;align-self:flex-end;">Test Connection</button>
-            </div>
-            <div id="api-status" class="api-status" style="display:none;margin-top:10px;"></div>
-            <p style="font-size:0.78rem;color:var(--text-secondary);margin-top:10px;">
-                Get your API key at <strong>console.anthropic.com</strong> → API Keys → Create Key
-            </p>
-            <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border);">
-                <div class="api-key-row">
-                    <div class="form-group">
-                        <label>Claude Model Name</label>
-                        <input type="text" id="ai-model-input" placeholder="e.g. claude-3-5-haiku-20241022">
+            <!-- Livestock -->
+            <div class="site-card">
+                <div class="site-card-top" style="background:#22c55e;"></div>
+                <div class="site-card-body">
+                    <div class="site-card-header">
+                        <div class="site-card-icon">🐄</div>
+                        <div class="site-card-badge"><span id="badge-livestock">—</span> items &nbsp;|&nbsp; LST barcodes</div>
                     </div>
-                    <button class="btn btn-primary" onclick="saveModel()" style="height:38px;align-self:flex-end;">Save Model</button>
+                    <div class="site-card-title">FARMBOSS LIVESTOCK</div>
+                    <div class="site-card-desc">Animal Records &amp; Health</div>
+                    <div class="site-card-meta"><strong id="meta-livestock">—</strong> animals tracked</div>
+                    <a href="livestock.html" class="site-card-btn" style="background:#22c55e;color:#0f172a;">Go to Livestock →</a>
                 </div>
-                <p style="font-size:0.78rem;color:var(--text-secondary);margin-top:6px;">
-                    Find available model names at <strong>console.anthropic.com → Models</strong>. If Test Connection shows "404: model", update this name.
-                </p>
             </div>
-        </div>
-    </div>
 
-    <div class="card">
-        <div class="card-title"><div class="card-title-left">&#127760; CORS Proxy (Required for AI on GitHub Pages)</div></div>
-        <p style="font-size:0.875rem;color:var(--text-secondary);margin-bottom:16px;line-height:1.6;">
-            GitHub Pages blocks direct calls to the Anthropic API (CORS policy). A free Cloudflare Worker proxy fixes this in about 5 minutes.
-        </p>
-
-        <div style="margin-bottom:18px;">
-            <div style="font-size:0.82rem;font-weight:700;color:var(--text-primary);margin-bottom:10px;">Step 1 — Create a free Cloudflare Worker</div>
-            <ol class="setup-steps">
-                <li>Go to <strong>cloudflare.com</strong> → sign up free → Dashboard → <strong>Workers &amp; Pages</strong> → <strong>Create</strong> → <strong>Create Worker</strong></li>
-                <li>Delete all default code and paste the code below, then click <strong>Deploy</strong></li>
-                <li>Copy your Worker URL (looks like <code style="font-size:0.8rem;background:#f0f0f0;padding:2px 5px;border-radius:3px;">https://your-worker.your-name.workers.dev</code>)</li>
-                <li>Paste the Worker URL in the Proxy URL field below and click <strong>Save Proxy URL</strong></li>
-                <li>Click <strong>Test Connection</strong> above — it should now say ✅ Connection successful (via proxy)</li>
-            </ol>
         </div>
 
-        <div style="font-size:0.82rem;font-weight:700;color:var(--text-primary);margin-bottom:8px;">Cloudflare Worker Code — copy and paste this:</div>
-        <div class="code-block" style="user-select:all;cursor:text;font-size:0.76rem;">export default {
-  async fetch(request) {
-    if (request.method === 'OPTIONS') {
-      return new Response(null, { headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type'
-      }});
-    }
-    try {
-      const body = await request.json();
-      const { apiKey, ...payload } = body;
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-        body: JSON.stringify(payload)
-      });
-      const data = await res.json();
-      return new Response(JSON.stringify(data), {
-        status: res.status,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
-      });
-    } catch(err) {
-      return new Response(JSON.stringify({error:{message:err.message}}), {
-        status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
-      });
-    }
-  }
-};</div>
+        <!-- QUOTES SECTION -->
+        <div class="section-title">Quote Collection</div>
+        <div class="quotes-grid">
 
-        <div style="margin-top:18px;">
-            <div style="font-size:0.82rem;font-weight:700;color:var(--text-primary);margin-bottom:10px;">Step 2 — Enter your Worker URL</div>
-            <div class="api-key-row">
-                <div class="form-group">
-                    <label>Proxy URL</label>
-                    <input type="text" id="api-proxy-input" placeholder="https://your-worker.your-name.workers.dev">
+            <!-- Add Quote -->
+            <div class="card">
+                <div class="card-title">💬 Add a Quote</div>
+                <label class="form-label" for="q-text">Quote</label>
+                <textarea class="form-textarea" id="q-text" rows="3" placeholder="Enter the quote..."></textarea>
+                <label class="form-label" for="q-author">Author / Attribution</label>
+                <input class="form-input" type="text" id="q-author" placeholder="— Author, Year">
+                <button class="form-btn" onclick="addQuote()">Add Quote</button>
+            </div>
+
+            <!-- Quote Collection -->
+            <div class="card">
+                <div class="card-title">📚 Saved Quotes <span style="color:var(--text-secondary);font-size:0.8rem;font-weight:400;" id="quotes-count"></span></div>
+                <div class="quotes-list" id="quotes-list">
+                    <div class="quotes-empty">No quotes yet. Add one!</div>
                 </div>
-                <button class="btn btn-primary" onclick="saveProxyUrl()" style="height:38px;align-self:flex-end;">Save Proxy URL</button>
             </div>
-            <p style="font-size:0.78rem;color:var(--text-secondary);margin-top:8px;">Once saved, click <strong>Test Connection</strong> in the API Key section above to confirm it works.</p>
+
         </div>
-    </div>
 
-    <div class="card">
-        <div class="card-title"><div class="card-title-left">&#128247; Firebase Storage Setup (for Photo Uploads)</div></div>
-        <p style="font-size:0.875rem;color:var(--text-secondary);margin-bottom:16px;line-height:1.6;">
-            Photo uploads require Firebase Storage. Follow these steps if you haven't set it up yet:
-        </p>
-        <ol class="setup-steps">
-            <li>Go to <strong>console.firebase.google.com</strong> → your <strong>watchroom</strong> project</li>
-            <li>Click <strong>Storage</strong> in the left sidebar → <strong>Get started</strong></li>
-            <li>Choose <strong>Start in production mode</strong> → Next → pick your region → Done</li>
-            <li>Click the <strong>Rules</strong> tab and replace all content with:</li>
-        </ol>
-        <div class="code-block">rules_version = '2';
-service firebase.storage {
-  match /b/{bucket}/o {
-    match /{allPaths=**} {
-      allow read, write: if request.auth != null;
-    }
-  }
-}</div>
-        <p style="font-size:0.82rem;color:var(--text-secondary);margin-top:8px;">
-            5. Click <strong>Publish</strong>. Photo uploads will then work automatically.
-        </p>
-    </div>
+    </div><!-- /main-content -->
+</div><!-- /app-screen -->
 
-    <div class="card">
-        <div class="card-title"><div class="card-title-left">&#128274; Firestore Rules Reminder</div></div>
-        <p style="font-size:0.875rem;color:var(--text-secondary);margin-bottom:12px;">
-            Make sure your Firestore rules allow authenticated users. In Firebase Console → Firestore → Rules:
-        </p>
-        <div class="code-block">rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if request.auth != null;
-    }
-  }
-}</div>
-    </div>
-</div>
-
-<!-- ══ QUOTES ══ -->
-<div id="view-quotes" class="view">
-    <div class="card">
-        <div class="card-title"><div class="card-title-left">&#128172; Add a Quote</div></div>
-        <div class="quote-add-wrap">
-            <textarea id="quote-text" rows="3" placeholder="Enter a quote…" maxlength="1000"></textarea>
-            <div class="quote-add-meta">
-                <input type="text" id="quote-author" placeholder="— Author / Source (optional)" maxlength="120">
-                <button class="btn btn-primary" onclick="addQuote()">&#10010; Add Quote</button>
-            </div>
-        </div>
-    </div>
-    <div class="card">
-        <div class="card-title">
-            <div class="card-title-left">&#128218; Quote Collection</div>
-            <span id="quote-count" style="font-size:0.8rem;color:var(--text-secondary);font-weight:400;"></span>
-        </div>
-        <div id="quotes-list"><p style="color:var(--text-secondary);padding:12px 0;">No quotes yet.</p></div>
-    </div>
-</div>
-
-</main>
-</div><!-- end #app -->
-
-<!-- ══ BARCODE MODAL ══ -->
-<div class="modal-overlay" id="barcode-modal">
-    <div class="modal" style="max-width:560px;">
-        <div class="modal-title" id="bc-title">Item Barcode</div>
-        <div class="modal-sub" id="bc-sub"></div>
-        <div id="bc-photos" class="photo-modal-imgs"></div>
-        <svg id="bc-svg"></svg>
-        <div class="modal-sub" id="bc-code" style="margin-top:6px;font-family:monospace;font-size:0.85rem;"></div>
-        <div class="modal-actions">
-            <button class="btn btn-gold" onclick="printBarcode()">&#128424; Print Label</button>
-            <button class="btn btn-dark" onclick="closeModal()">Close</button>
-        </div>
-    </div>
-</div>
-
-<div id="print-area"><div id="print-content"></div></div>
-<div class="toast" id="toast"></div>
-
-<!-- ══ SCANNER MODAL ══ -->
-<div class="modal-overlay" id="scanner-modal">
-    <div class="modal" style="max-width:480px;">
-        <div class="modal-title">&#128247; Scan Item Barcode</div>
-        <div class="modal-sub">Point your camera at an Armory barcode to look up an item.</div>
-        <div id="scanner-video-wrap">
-            <video id="scanner-video" playsinline muted autoplay></video>
-            <div id="scanner-overlay"><div class="scan-aim"></div></div>
-        </div>
-        <div id="scanner-result">Initializing camera…</div>
-        <div class="modal-actions">
-            <button class="btn btn-dark" onclick="closeScanner()">Cancel</button>
-        </div>
-    </div>
-</div>
+<div id="toast"></div>
 
 <script>
-// ═══════════════════════════════════════
-//  FIREBASE
-// ═══════════════════════════════════════
-firebase.initializeApp({
-    apiKey: "AIzaSyB7c4urD9tJO80S7nADItxjwhSYVqlrkEU",
-    authDomain: "watchroom-714a0.firebaseapp.com",
-    projectId: "watchroom-714a0",
-    storageBucket: "watchroom-714a0.firebasestorage.app",
-    messagingSenderId: "911514107783",
-    appId: "1:911514107783:web:20e8a729fd66577c28dd22"
-});
-const auth    = firebase.auth();
-const db      = firebase.firestore();
-const storage = firebase.storage();
+    // ── FIREBASE ──
+    firebase.initializeApp({
+        apiKey: "AIzaSyB7c4urD9tJO80S7nADItxjwhSYVqlrkEU",
+        authDomain: "watchroom-714a0.firebaseapp.com",
+        projectId: "watchroom-714a0",
+        storageBucket: "watchroom-714a0.firebasestorage.app",
+        messagingSenderId: "911514107783",
+        appId: "1:911514107783:web:20e8a729fd66577c28dd22"
+    });
+    const auth = firebase.auth();
+    const db   = firebase.firestore();
 
-// ═══════════════════════════════════════
-//  STATE
-// ═══════════════════════════════════════
-let items         = [];
-let categories    = ['Rifle','Shotgun','Pistol','Revolver','Suppressor','Magazine',
-                     'Scope','Binoculars','Spotting Scope','Ammunition',
-                     'Handgun Accessory','Rifle Accessory','Other'];
-let manufacturers = ['Barrett','Benelli','Beretta','Browning','Bushmaster','CMMG','Colt',
-                     'Daniel Defense','FN America','Glock','H&K','Kimber','Leupold',
-                     'Nightforce','Nikon','Remington','Ruger','Savage','Sig Sauer',
-                     'Smith & Wesson','Springfield Armory','Steyr','Taurus','Tikka',
-                     'Vortex','Weatherby','Winchester'];
-let calibers      = [
-    // Pistol / Revolver
-    '.22 LR','.22 WMR','.25 ACP','.32 ACP','.380 ACP',
-    '9mm Luger','9x18mm Makarov',
-    '.357 SIG','.357 Magnum','.38 Special','.38 Super',
-    '.40 S&W','.41 Magnum','.44 Special','.44 Magnum',
-    '.45 ACP','.45 Colt','.45 GAP',
-    '10mm Auto','.50 AE','.454 Casull','.460 S&W','.500 S&W',
-    // Rifle
-    '.17 HMR','.17 WSM',
-    '.223 Remington','5.56x45mm NATO',
-    '.224 Valkyrie','.22-250 Remington',
-    '.243 Winchester','6mm Creedmoor',
-    '6.5 Creedmoor','6.5 Grendel','6.5 PRC','6.5x55mm Swedish',
-    '.260 Remington','6.8 SPC',
-    '.270 Winchester','.270 WSM',
-    '7mm-08 Remington','7mm Remington Magnum','7mm PRC',
-    '7.62x39mm','7.62x51mm NATO','.308 Winchester',
-    '.30-06 Springfield','.30-30 Winchester','.300 Blackout',
-    '.300 Winchester Magnum','.300 WSM','.300 PRC','.300 Norma Magnum',
-    '.338 Lapua Magnum','.338 Federal',
-    '.350 Legend','.35 Whelen',
-    '.375 H&H Magnum','.375 Ruger',
-    '.416 Rigby','.416 Barrett',
-    '.45-70 Government','.450 Bushmaster','.458 SOCOM','.458 Win Mag',
-    '.50 BMG','5.45x39mm',
-    // Shotgun
-    '10 Gauge','12 Gauge','16 Gauge','20 Gauge','28 Gauge','.410 Bore'
-];
-let nextId        = 1001;
-let invSortField  = 'id';
-let invSortDir    = 'asc';
-let activeBcId    = null;
-let unsubItems    = null;
-let apiKey        = '';
-let proxyUrl      = '';
-let aiModel       = 'claude-sonnet-4-6';
-
-// per-form photo state
-let formPhotos = {
-    main:   { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false },
-    serial: { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false },
-    extra:  { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false }
-};
-
-const VIEWS = ['dashboard','add-item','inventory','reports','categories','quotes','settings'];
-
-// ═══════════════════════════════════════
-//  AUTH
-// ═══════════════════════════════════════
-auth.onAuthStateChanged(user => {
-    if (user) {
-        document.getElementById('login-screen').style.display   = 'none';
-        document.getElementById('loading-screen').style.display = 'flex';
-        document.getElementById('app').style.display            = 'none';
-        document.getElementById('user-email').textContent       = user.email;
-        initApp();
-    } else {
-        document.getElementById('login-screen').style.display   = 'flex';
+    // ── SCREENS ──
+    function showScreen(name) {
         document.getElementById('loading-screen').style.display = 'none';
-        document.getElementById('app').style.display            = 'none';
-        if (unsubItems) { unsubItems(); unsubItems = null; }
-        items = [];
+        const loginEl = document.getElementById('login-screen');
+        const appEl   = document.getElementById('app-screen');
+        loginEl.style.display = 'none';
+        appEl.style.display   = 'none';
+        if (name === 'login') { loginEl.style.display = 'flex'; }
+        if (name === 'app')   { appEl.style.display   = 'block'; }
     }
-});
 
-document.getElementById('login-form').addEventListener('submit', async e => {
-    e.preventDefault();
-    const email = document.getElementById('login-email').value.trim();
-    const pass  = document.getElementById('login-password').value;
-    const errEl = document.getElementById('login-error');
-    const btn   = document.getElementById('login-btn');
-    errEl.textContent = ''; btn.textContent = 'Signing in...'; btn.disabled = true;
-    try {
-        await auth.signInWithEmailAndPassword(email, pass);
-    } catch(err) {
-        errEl.textContent = 'Invalid email or password.';
-        btn.textContent = 'Sign In'; btn.disabled = false;
-    }
-});
-
-async function doSignOut() {
-    if (!confirm('Sign out?')) return;
-    await auth.signOut();
-}
-
-// ═══════════════════════════════════════
-//  INIT
-// ═══════════════════════════════════════
-async function initApp() {
-    try {
-        const cfgDoc = await db.collection('config').doc('data').get();
-        if (cfgDoc.exists) {
-            const d = cfgDoc.data();
-            if (d.categories    && d.categories.length)    categories    = d.categories;
-            if (d.manufacturers && d.manufacturers.length) manufacturers = d.manufacturers;
-            if (d.calibers      && d.calibers.length)      calibers      = d.calibers;
-            if (d.nextId)                                   nextId        = d.nextId;
-        }
-        const keyDoc = await db.collection('settings').doc('apikey').get();
-        if (keyDoc.exists && keyDoc.data().key) {
-            apiKey = keyDoc.data().key;
-            document.getElementById('api-key-input').value = apiKey;
-        }
-        const proxyDoc = await db.collection('settings').doc('proxy').get();
-        if (proxyDoc.exists && proxyDoc.data().url) {
-            proxyUrl = proxyDoc.data().url;
-            document.getElementById('api-proxy-input').value = proxyUrl;
-        }
-        const modelDoc = await db.collection('settings').doc('model').get();
-        if (modelDoc.exists && modelDoc.data().name) {
-            aiModel = modelDoc.data().name;
-            document.getElementById('ai-model-input').value = aiModel;
+    // ── AUTH ──
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            document.getElementById('user-email-badge').textContent = user.email;
+            initApp();
         } else {
-            document.getElementById('ai-model-input').value = aiModel;
+            showScreen('login');
         }
-        unsubItems = db.collection('items').onSnapshot(snap => {
-            items = snap.docs.map(doc => ({ _docId:doc.id, ...doc.data() }));
-            renderDashboard(); renderInventory(); renderReport();
-        });
-        document.getElementById('loading-screen').style.display = 'none';
-        document.getElementById('app').style.display            = 'block';
-        populateCatSelect(); populateMfrList(); populateCaliberList(); syncCatFilters();
-        showView('dashboard');
-    } catch(err) {
-        document.getElementById('loading-screen').innerHTML =
-            `<p style="color:var(--danger);padding:20px;text-align:center;">
-             Error: ${err.message}<br><br>
-             <button class="btn btn-ghost" onclick="doSignOut()">Sign Out</button></p>`;
-    }
-}
+    });
 
-// ═══════════════════════════════════════
-//  FIRESTORE / STORAGE
-// ═══════════════════════════════════════
-async function saveConfig() {
-    await db.collection('config').doc('data').set({ categories, manufacturers, calibers, nextId });
-}
-
-async function uploadPhoto(slot, file) {
-    const ext  = file.name.split('.').pop();
-    const path = `photos/${Date.now()}_${slot}.${ext}`;
-    const ref  = storage.ref().child(path);
-    console.log(`[Photo] Uploading ${slot} → ${path}`);
-    await ref.put(file);
-    const url = await ref.getDownloadURL();
-    console.log(`[Photo] Upload OK ${slot}:`, url);
-    return url;
-}
-
-async function dbAddItem(data, photos) {
-    const item = { id:nextId++, addedAt:new Date().toISOString(), photos, ...data };
-    const docRef = await db.collection('items').add(item);
-    await saveConfig();
-    return { ...item, _docId:docRef.id };
-}
-
-async function dbUpdateItem(docId, data, photos) {
-    await db.collection('items').doc(docId).update({ ...data, photos });
-}
-
-async function dbDeleteItem(docId) {
-    await db.collection('items').doc(docId).delete();
-}
-
-// ═══════════════════════════════════════
-//  NAVIGATION
-// ═══════════════════════════════════════
-function showView(v) {
-    VIEWS.forEach(id => document.getElementById('view-'+id).classList.remove('active'));
-    document.getElementById('view-'+v).classList.add('active');
-    document.querySelectorAll('nav button').forEach((btn,i) => btn.classList.toggle('active', VIEWS[i]===v));
-    if (v==='dashboard')  renderDashboard();
-    if (v==='inventory')  { syncCatFilters(); renderInventory(); }
-    if (v==='reports')    { syncCatFilters(); renderReport(); }
-    if (v==='categories') renderCatTags();
-    if (v==='quotes')     initQuotes();
-    if (v==='add-item')   populateCatSelect();
-}
-
-// ═══════════════════════════════════════
-//  DASHBOARD
-// ═══════════════════════════════════════
-function renderDashboard() {
-    const total  = items.length;
-    const qty    = items.reduce((s,i) => s+(parseInt(i.quantity)||1), 0);
-    const ms30   = 30*24*60*60*1000;
-    const recent = items.filter(i => i.addedAt && (Date.now()-new Date(i.addedAt).getTime())<ms30).length;
-    document.getElementById('stats-grid').innerHTML = `
-        <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Total Line Items</div></div>
-        <div class="stat-card"><div class="stat-value">${qty}</div><div class="stat-label">Total Quantity</div></div>
-        <div class="stat-card"><div class="stat-value">${categories.length}</div><div class="stat-label">Categories</div></div>
-        <div class="stat-card"><div class="stat-value">${recent}</div><div class="stat-label">Added This Month</div></div>`;
-    const counts = {};
-    items.forEach(it => { counts[it.category]=(counts[it.category]||0)+(parseInt(it.quantity)||1); });
-    const maxC = Math.max(...Object.values(counts),1);
-    document.getElementById('cat-breakdown').innerHTML = Object.keys(counts).length
-        ? Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([cat,c])=>`
-            <div class="cat-breakdown-item">
-                <div class="cbi-name">${cat}</div>
-                <div class="cbi-count">${c}</div>
-                <div class="cbi-bar"><div class="cbi-bar-fill" style="width:${(c/maxC*100).toFixed(1)}%"></div></div>
-            </div>`).join('')
-        : '<p style="color:var(--text-secondary);padding:16px 0;">No items yet.</p>';
-    const rec = [...items].sort((a,b)=>b.id-a.id).slice(0,10);
-    console.log('[Dashboard] Recent items:', rec.map(i=>({id:i.id, photos:i.photos})));
-    document.getElementById('recent-tbody').innerHTML = rec.length
-        ? rec.map(it => {
-            const mainUrl = it.photos?.find(p=>p.slot==='main')?.url;
-            const thumb   = mainUrl
-                ? `<img src="${mainUrl}" class="thumb" alt="" style="cursor:pointer" title="Click to view photo" onclick="window.open('${mainUrl}','_blank')" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb-placeholder',innerHTML:'&#128247;'}))">`
-                : `<div class="thumb-placeholder">&#128247;</div>`;
-            return `<tr>
-                <td>${thumb}</td>
-                <td class="mono">#${it.id}</td>
-                <td><span class="badge ${catClass(it.category)}">${it.category||'—'}</span></td>
-                <td>${it.manufacturer||'—'}</td><td>${it.model||'—'}</td>
-                <td class="mono">${it.serialNumber||'—'}</td>
-                <td style="color:var(--text-secondary)">${it.addedAt?new Date(it.addedAt).toLocaleDateString():'—'}</td>
-            </tr>`;}).join('')
-        : '<tr><td colspan="7" style="text-align:center;color:var(--text-secondary);padding:30px;">No items yet.</td></tr>';
-}
-
-// ═══════════════════════════════════════
-//  PHOTO UPLOAD & AI
-// ═══════════════════════════════════════
-function onPhotoSelected(slot, input) {
-    const file = input.files[0]; if (!file) return;
-    formPhotos[slot].file = file;
-    formPhotos[slot].deleted = false;
-    const reader = new FileReader();
-    reader.onload = e => {
-        formPhotos[slot].base64    = e.target.result.split(',')[1];
-        formPhotos[slot].mimeType  = file.type;
-        renderPhotoPreview(slot, e.target.result);
-        if (slot==='main')   document.getElementById('btn-identify').disabled = false;
-        if (slot==='serial') document.getElementById('btn-ocr').disabled      = false;
-    };
-    reader.readAsDataURL(file);
-}
-
-function renderPhotoPreview(slot, dataUrl) {
-    const prev = document.getElementById('prev-'+slot);
-    prev.innerHTML = `
-        <img src="${dataUrl}" alt="${slot} photo">
-        <button type="button" class="remove-photo" onclick="removePhoto('${slot}')">✕</button>`;
-}
-
-function removePhoto(slot) {
-    formPhotos[slot] = { file:null, base64:null, mimeType:null, existingUrl:null, deleted:true };
-    const prev = document.getElementById('prev-'+slot);
-    const icons = { main:'&#128247;', serial:'&#128203;', extra:'&#128444;' };
-    prev.innerHTML = `<span class="no-photo">${icons[slot]}</span><button type="button" class="remove-photo" onclick="removePhoto('${slot}')">✕</button>`;
-    document.getElementById('file-'+slot).value = '';
-    if (slot==='main')   document.getElementById('btn-identify').disabled = true;
-    if (slot==='serial') document.getElementById('btn-ocr').disabled      = true;
-}
-
-async function callClaude(base64, mimeType, prompt) {
-    if (!apiKey) { toast('Set your Anthropic API key in Settings first.','error'); return null; }
-    const msgPayload = {
-        model: aiModel,
-        max_tokens: 512,
-        messages: [{ role:'user', content:[
-            { type:'image', source:{ type:'base64', media_type:mimeType, data:base64 }},
-            { type:'text',  text: prompt }
-        ]}]
-    };
-    let res;
-    try {
-        if (proxyUrl) {
-            res = await fetch(proxyUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...msgPayload, apiKey })
-            });
-        } else {
-            res = await fetch('https://api.anthropic.com/v1/messages', {
-                method: 'POST', mode: 'cors',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-api-key': apiKey,
-                    'anthropic-version': '2023-06-01',
-                    'anthropic-dangerous-direct-browser-calls': 'true'
-                },
-                body: JSON.stringify(msgPayload)
-            });
-        }
-    } catch(networkErr) {
-        throw new Error('Network error — set up a Proxy URL in Settings to fix CORS issues.');
-    }
-    if (!res.ok) {
-        let errMsg = `API error ${res.status}`;
+    async function doLogin() {
+        const email = document.getElementById('login-email').value.trim();
+        const pass  = document.getElementById('login-password').value;
+        const errEl = document.getElementById('login-error');
+        errEl.textContent = '';
         try {
-            const errData = await res.json();
-            errMsg = errData.error?.message || errMsg;
-            if (res.status === 401) errMsg = 'Invalid API key — re-enter your key in Settings.';
-            if (res.status === 429) errMsg = 'Rate limit reached — please wait a moment.';
-        } catch(e) {}
-        throw new Error(errMsg);
-    }
-    const data = await res.json();
-    return data.content[0].text;
-}
-
-async function identifyItem() {
-    const p = formPhotos.main;
-    if (!p.base64) return;
-    const btn = document.getElementById('btn-identify');
-    const status = document.getElementById('ai-status');
-    btn.disabled = true; btn.classList.add('scanning');
-    btn.textContent = '⏳ Identifying...';
-    status.textContent = 'Analyzing image with AI...';
-    try {
-        const prompt = `Analyze this firearm or equipment image. Return ONLY valid JSON with these fields:
-{"manufacturer":"brand name or empty","model":"model name or empty","category":"one of: Rifle,Shotgun,Pistol,Revolver,Suppressor,Magazine,Scope,Binoculars,Spotting Scope,Ammunition,Other","caliber":"caliber/gauge or empty","magnification":"magnification range if optic or empty"}
-Only include values you are reasonably confident about. Return only the JSON object, no other text.`;
-        const raw = await callClaude(p.base64, p.mimeType, prompt);
-        if (!raw) return;
-        const jsonMatch = raw.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) throw new Error('Could not parse AI response');
-        const result = JSON.parse(jsonMatch[0]);
-        let filled = [];
-        if (result.manufacturer) { document.getElementById('f-manufacturer').value = result.manufacturer; filled.push('Manufacturer'); }
-        if (result.model)         { document.getElementById('f-model').value = result.model; filled.push('Model'); }
-        if (result.category)      { populateCatSelect(); document.getElementById('f-category').value = result.category; filled.push('Category'); }
-        if (result.caliber)       { document.getElementById('f-caliber').value = result.caliber; filled.push('Caliber'); }
-        if (result.magnification) { document.getElementById('f-magnification').value = result.magnification; filled.push('Magnification'); }
-        status.textContent = filled.length
-            ? `✅ AI filled in: ${filled.join(', ')}. Review and adjust as needed.`
-            : '⚠️ AI could not identify specific details. Fill in fields manually.';
-        status.style.color = filled.length ? 'var(--success)' : 'var(--text-secondary)';
-    } catch(err) {
-        status.textContent = '❌ Error: ' + err.message;
-        status.style.color = 'var(--danger)';
-    } finally {
-        btn.disabled = false; btn.classList.remove('scanning');
-        btn.innerHTML = '&#129302; Identify Item with AI';
-    }
-}
-
-async function extractSerial() {
-    const p = formPhotos.serial;
-    if (!p.base64) return;
-    const btn    = document.getElementById('btn-ocr');
-    const status = document.getElementById('ai-status');
-    btn.disabled = true; btn.classList.add('scanning');
-    btn.textContent = '⏳ Reading...';
-    status.textContent = 'Reading serial number...';
-    try {
-        const prompt = `This image shows a firearm serial number. Extract ONLY the serial number text exactly as it appears, character by character. Return ONLY the serial number — no explanation, no punctuation, no other text.`;
-        const result = await callClaude(p.base64, p.mimeType, prompt);
-        if (!result) return;
-        const sn = result.trim().replace(/['"]/g,'');
-        if (sn) {
-            document.getElementById('f-serial').value = sn;
-            status.textContent = `✅ Serial number extracted: ${sn}`;
-            status.style.color  = 'var(--success)';
-        } else {
-            status.textContent = '⚠️ Could not read serial number clearly.';
-            status.style.color  = 'var(--text-secondary)';
+            await auth.signInWithEmailAndPassword(email, pass);
+        } catch(e) {
+            errEl.textContent = e.message;
         }
-    } catch(err) {
-        status.textContent = '❌ Error: ' + err.message;
-        status.style.color  = 'var(--danger)';
-    } finally {
-        btn.disabled = false; btn.classList.remove('scanning');
-        btn.innerHTML = '&#128270; Extract Serial # with AI';
     }
-}
 
-// ═══════════════════════════════════════
-//  FORM
-// ═══════════════════════════════════════
-function populateCatSelect() {
-    const sel = document.getElementById('f-category');
-    const cur = sel.value;
-    sel.innerHTML = '<option value="">Select category...</option>';
-    categories.forEach(c => {
-        const o = document.createElement('option');
-        o.value = o.textContent = c;
-        if (c===cur) o.selected = true;
-        sel.appendChild(o);
+    document.getElementById('login-password').addEventListener('keydown', e => {
+        if (e.key === 'Enter') doLogin();
     });
-}
 
-function populateMfrList() {
-    const dl = document.getElementById('manufacturer-list'); if (!dl) return;
-    dl.innerHTML = manufacturers.slice().sort((a,b)=>a.localeCompare(b)).map(m=>`<option value="${esc(m)}">`).join('');
-}
-
-function addMfrIfNew(name) {
-    if (!name) return;
-    if (!manufacturers.some(m=>m.toLowerCase()===name.toLowerCase())) manufacturers.push(name);
-}
-
-function populateCaliberList() {
-    const dl = document.getElementById('caliber-list'); if (!dl) return;
-    dl.innerHTML = calibers.slice().sort((a,b)=>a.localeCompare(b))
-        .map(c=>`<option value="${esc(c)}">`).join('');
-}
-
-function addCaliberIfNew(name) {
-    if (!name) return;
-    if (!calibers.some(c=>c.toLowerCase()===name.toLowerCase())) calibers.push(name);
-}
-
-document.getElementById('item-form').addEventListener('submit', async e => {
-    e.preventDefault();
-    const eid   = document.getElementById('edit-id').value;
-    const docId = document.getElementById('edit-doc-id').value;
-    const btn   = document.getElementById('form-submit-btn');
-    const data  = {
-        category:      document.getElementById('f-category').value,
-        manufacturer:  document.getElementById('f-manufacturer').value.trim(),
-        model:         document.getElementById('f-model').value.trim(),
-        serialNumber:  document.getElementById('f-serial').value.trim(),
-        caliber:       document.getElementById('f-caliber').value.trim(),
-        magnification: document.getElementById('f-magnification').value.trim(),
-        purchaseDate:  document.getElementById('f-purchase-date').value,
-        quantity:      parseInt(document.getElementById('f-quantity').value)||1,
-        notes:         document.getElementById('f-notes').value.trim(),
-    };
-    btn.disabled = true; btn.textContent = 'Saving...';
-    try {
-        addMfrIfNew(data.manufacturer);
-        addCaliberIfNew(data.caliber);
-
-        // Build photos array — upload new files, keep existing URLs
-        const existingPhotos = docId ? (items.find(i=>i._docId===docId)?.photos||[]) : [];
-        const photos = [];
-        for (const slot of ['main','serial','extra']) {
-            const p = formPhotos[slot];
-            if (p.file) {
-                try {
-                    const url = await uploadPhoto(slot, p.file);
-                    photos.push({ slot, url });
-                } catch(uploadErr) {
-                    toast(`Photo upload failed (${slot}): check Firebase Storage setup in Settings.`, 'error');
-                    console.warn('Photo upload error:', uploadErr);
-                }
-            } else if (!p.deleted) {
-                const existing = existingPhotos.find(ph=>ph.slot===slot);
-                if (existing) photos.push(existing);
-            }
-        }
-
-        console.log('[Save] photos array being saved:', JSON.stringify(photos));
-        if (eid && docId) {
-            await dbUpdateItem(docId, data, photos);
-            await saveConfig();
-            toast('Item updated.','success');
-        } else {
-            await dbAddItem(data, photos);
-            toast('Item added!','success');
-        }
-        populateMfrList();
-        populateCaliberList();
-        resetForm();
-        showView('inventory');
-    } catch(err) {
-        toast('Error saving: '+err.message,'error');
-    } finally {
-        btn.disabled = false;
-        btn.textContent = eid ? 'Update Item' : 'Save Item';
+    function doSignOut() {
+        auth.signOut();
     }
-});
 
-function resetForm() {
-    document.getElementById('edit-id').value          = '';
-    document.getElementById('edit-doc-id').value      = '';
-    document.getElementById('item-form').reset();
-    document.getElementById('f-quantity').value        = '1';
-    document.getElementById('form-title').textContent  = '➕ Add New Item';
-    document.getElementById('form-submit-btn').textContent = 'Save Item';
-    document.getElementById('form-submit-btn').disabled    = false;
-    document.getElementById('ai-status').textContent   = '';
-    populateCatSelect(); populateMfrList(); populateCaliberList();
-    for (const slot of ['main','serial','extra']) {
-        formPhotos[slot] = { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false };
+    // ── INIT APP ──
+    let unsubbers = [];
+    function initApp() {
+        showScreen('app');
+        initLiveCounts();
+        initClock();
+        fetchWeather();
+        initQuotes();
     }
-    removePhoto('main'); removePhoto('serial'); removePhoto('extra');
-    document.getElementById('btn-identify').disabled = true;
-    document.getElementById('btn-ocr').disabled      = true;
-}
 
-function editItem(docId) {
-    const it = items.find(i=>i._docId===docId); if (!it) return;
-    // Reset form state first (clears any stale file references)
-    resetForm();
-    showView('add-item'); populateCatSelect();
-    document.getElementById('edit-id').value          = it.id;
-    document.getElementById('edit-doc-id').value      = it._docId;
-    document.getElementById('f-category').value       = it.category||'';
-    document.getElementById('f-manufacturer').value   = it.manufacturer||'';
-    document.getElementById('f-model').value          = it.model||'';
-    document.getElementById('f-serial').value         = it.serialNumber||'';
-    document.getElementById('f-caliber').value        = it.caliber||'';
-    document.getElementById('f-magnification').value  = it.magnification||'';
-    document.getElementById('f-purchase-date').value  = it.purchaseDate||'';
-    document.getElementById('f-quantity').value       = it.quantity||1;
-    document.getElementById('f-notes').value          = it.notes||'';
-    document.getElementById('form-title').textContent     = `✏️ Edit Item #${it.id}`;
-    document.getElementById('form-submit-btn').textContent = 'Update Item';
-    // Load existing photos (reset deleted flag so they are preserved on save)
-    for (const slot of ['main','serial','extra']) {
-        const ph = it.photos?.find(p=>p.slot===slot);
-        if (ph) {
-            formPhotos[slot] = { file:null, base64:null, mimeType:null, existingUrl:ph.url, deleted:false };
-            const prev = document.getElementById('prev-'+slot);
-            prev.innerHTML = `<img src="${ph.url}" alt="${slot}"><button type="button" class="remove-photo" onclick="removePhoto('${slot}')">✕</button>`;
-            if (slot==='main')   document.getElementById('btn-identify').disabled = false;
-            if (slot==='serial') document.getElementById('btn-ocr').disabled      = false;
-        }
-    }
-    window.scrollTo(0,0);
-}
+    // ── LIVE COUNTS ──
+    const counts = { armory:0, machinery:0, automotive:0, livestock:0 };
 
-async function deleteItem(docId) {
-    const it = items.find(i=>i._docId===docId); if (!it) return;
-    if (!confirm(`Delete item #${it.id} (${it.manufacturer||''} ${it.model||''})? This cannot be undone.`)) return;
-    try { await dbDeleteItem(it._docId); toast('Item deleted.'); }
-    catch(err) { toast('Error: '+err.message,'error'); }
-}
-
-// ═══════════════════════════════════════
-//  INVENTORY
-// ═══════════════════════════════════════
-function syncCatFilters() {
-    ['inv-filter-cat','rpt-filter-cat'].forEach(sid => {
-        const sel = document.getElementById(sid); if (!sel) return;
-        const cur = sel.value;
-        sel.innerHTML = '<option value="">All Categories</option>';
-        categories.forEach(c => { const o=document.createElement('option'); o.value=o.textContent=c; if(c===cur)o.selected=true; sel.appendChild(o); });
-    });
-}
-
-function filteredItems(searchId, catId) {
-    const q   = (document.getElementById(searchId)?.value||'').toLowerCase();
-    const cat = document.getElementById(catId)?.value||'';
-    return items.filter(it => {
-        const mc = !cat || it.category===cat;
-        const ms = !q   || [it.id?.toString(),it.category,it.manufacturer,it.model,
-            it.serialNumber,it.caliber,it.magnification,it.notes].some(v=>v?.toLowerCase().includes(q));
-        return mc && ms;
-    });
-}
-
-function sorted(arr, field, dir) {
-    return [...arr].sort((a,b) => {
-        let va=a[field]??'', vb=b[field]??'';
-        if (field==='id'||field==='quantity') { va=Number(va)||0; vb=Number(vb)||0; }
-        else if (field==='purchaseDate')      { va=va?new Date(va).getTime():0; vb=vb?new Date(vb).getTime():0; }
-        else                                  { va=String(va).toLowerCase(); vb=String(vb).toLowerCase(); }
-        return va<vb?(dir==='asc'?-1:1):va>vb?(dir==='asc'?1:-1):0;
-    });
-}
-
-function renderInventory() {
-    const data  = sorted(filteredItems('inv-search','inv-filter-cat'), invSortField, invSortDir);
-    document.getElementById('inv-count').textContent = `${data.length} item${data.length!==1?'s':''}`;
-    document.querySelectorAll('#inv-table thead th').forEach(th=>th.classList.remove('sort-asc','sort-desc'));
-    const thIdx = {id:1,category:2,manufacturer:3,model:4,serialNumber:5,caliber:6,magnification:7,purchaseDate:8,quantity:9};
-    const ti = thIdx[invSortField];
-    if (ti!==undefined) document.querySelectorAll('#inv-table thead th')[ti]?.classList.add(invSortDir==='asc'?'sort-asc':'sort-desc');
-    const tbody = document.getElementById('inv-tbody');
-    const empty = document.getElementById('inv-empty');
-    if (!data.length) { tbody.innerHTML=''; empty.style.display='block'; return; }
-    empty.style.display='none';
-    tbody.innerHTML = data.map(it => {
-        const mainUrl = it.photos?.find(p=>p.slot==='main')?.url;
-        const thumb   = mainUrl
-            ? `<img src="${mainUrl}" class="thumb" alt="" style="cursor:pointer" title="Click to view photo" onclick="window.open('${mainUrl}','_blank')" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb-placeholder',innerHTML:'&#128247;'}))">`
-            : `<div class="thumb-placeholder">&#128247;</div>`;
-        return `<tr>
-            <td>${thumb}</td>
-            <td class="mono">#${it.id}</td>
-            <td><span class="badge ${catClass(it.category)}">${it.category||'—'}</span></td>
-            <td>${esc(it.manufacturer)||'—'}</td>
-            <td>${esc(it.model)||'—'}</td>
-            <td class="mono">${esc(it.serialNumber)||'—'}</td>
-            <td>${esc(it.caliber)||'—'}</td>
-            <td>${esc(it.magnification)||'—'}</td>
-            <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():'—'}</td>
-            <td style="text-align:center">${it.quantity||1}</td>
-            <td style="white-space:nowrap">
-                <button class="btn btn-info btn-sm" onclick="showBarcode('${it._docId}')" title="Barcode/Photos">&#9641;</button>
-                <button class="btn btn-ghost btn-sm" onclick="editItem('${it._docId}')" title="Edit">&#9998;</button>
-                <button class="btn btn-danger btn-sm" onclick="deleteItem('${it._docId}')" title="Delete">&#10006;</button>
-            </td></tr>`;}).join('');
-}
-
-function sortBy(field) {
-    invSortDir   = invSortField===field?(invSortDir==='asc'?'desc':'asc'):'asc';
-    invSortField = field; renderInventory();
-}
-
-// ═══════════════════════════════════════
-//  REPORTS
-// ═══════════════════════════════════════
-function rptSortBy(field) {
-    const fd=document.getElementById('rpt-sort-field'), dd=document.getElementById('rpt-sort-dir');
-    if (fd.value===field) dd.value=dd.value==='asc'?'desc':'asc'; else fd.value=field;
-    renderReport();
-}
-function renderReport() {
-    const field=document.getElementById('rpt-sort-field').value, dir=document.getElementById('rpt-sort-dir').value;
-    const data=sorted(filteredItems('rpt-search','rpt-filter-cat'),field,dir);
-    document.getElementById('rpt-count').textContent=`${data.length} item${data.length!==1?'s':''}`;
-    document.getElementById('rpt-tbody').innerHTML=data.length
-        ?data.map(it=>`<tr>
-            <td class="mono">#${it.id}</td>
-            <td><span class="badge ${catClass(it.category)}">${it.category||'—'}</span></td>
-            <td>${esc(it.manufacturer)||'—'}</td><td>${esc(it.model)||'—'}</td>
-            <td class="mono">${esc(it.serialNumber)||'—'}</td>
-            <td>${esc(it.caliber)||'—'}</td><td>${esc(it.magnification)||'—'}</td>
-            <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():'—'}</td>
-            <td style="text-align:center">${it.quantity||1}</td>
-            <td style="color:var(--text-secondary);font-size:0.82rem">${esc(it.notes)||'—'}</td>
-          </tr>`).join('')
-        :'<tr><td colspan="10" style="text-align:center;color:var(--text-secondary);padding:30px">No items match filters.</td></tr>';
-}
-function printReport() {
-    const field=document.getElementById('rpt-sort-field').value, dir=document.getElementById('rpt-sort-dir').value;
-    const data=sorted(filteredItems('rpt-search','rpt-filter-cat'),field,dir);
-    document.getElementById('print-content').innerHTML=`
-        <style>body{font-family:Arial,sans-serif;font-size:10px;}h2{font-size:14px;margin-bottom:4px;}
-        p{color:#666;margin-bottom:8px;}table{width:100%;border-collapse:collapse;}
-        th,td{border:1px solid #ccc;padding:4px 6px;}th{background:#f0f0f0;}</style>
-        <h2>Farmboss Armory — Inventory Report</h2>
-        <p>Generated: ${new Date().toLocaleString()} | Items: ${data.length}</p>
-        <table><thead><tr><th>ID</th><th>Category</th><th>Manufacturer</th><th>Model</th>
-        <th>Serial #</th><th>Caliber</th><th>Magnification</th><th>Purchase Date</th><th>Qty</th><th>Notes</th>
-        </tr></thead><tbody>${data.map(it=>`<tr>
-            <td>#${it.id}</td><td>${it.category||''}</td><td>${it.manufacturer||''}</td><td>${it.model||''}</td>
-            <td>${it.serialNumber||''}</td><td>${it.caliber||''}</td><td>${it.magnification||''}</td>
-            <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():''}</td>
-            <td>${it.quantity||1}</td><td>${it.notes||''}</td></tr>`).join('')}</tbody></table>`;
-    window.print();
-}
-
-// ═══════════════════════════════════════
-//  CATEGORIES
-// ═══════════════════════════════════════
-function renderCatTags() {
-    const el = document.getElementById('cat-tags');
-    el.innerHTML = categories.length
-        ? categories.map((c,i)=>`<div class="tag"><span>${esc(c)}</span><button class="tag-remove" onclick="removeCat(${i})">&#10005;</button></div>`).join('')
-        : '<p style="color:var(--text-secondary)">No categories defined.</p>';
-}
-async function addCategory() {
-    const inp=document.getElementById('new-cat-input'), name=inp.value.trim();
-    if (!name) return;
-    if (categories.map(c=>c.toLowerCase()).includes(name.toLowerCase())) { toast('Already exists.'); return; }
-    categories.push(name); await saveConfig(); inp.value=''; renderCatTags(); syncCatFilters(); populateCatSelect();
-    toast(`"${name}" added!`,'success');
-}
-document.getElementById('new-cat-input').addEventListener('keydown', e => { if(e.key==='Enter'){e.preventDefault();addCategory();} });
-async function removeCat(i) {
-    const c=categories[i], used=items.filter(it=>it.category===c).length;
-    if (used && !confirm(`"${c}" is used by ${used} item(s). Remove anyway?`)) return;
-    categories.splice(i,1); await saveConfig(); renderCatTags();
-    toast(`"${c}" removed.`);
-}
-
-// ═══════════════════════════════════════
-//  SETTINGS
-// ═══════════════════════════════════════
-async function saveApiKey() {
-    const key = document.getElementById('api-key-input').value.trim();
-    if (!key) { toast('Enter an API key first.','error'); return; }
-    await db.collection('settings').doc('apikey').set({ key });
-    apiKey = key;
-    toast('API key saved!','success');
-}
-async function testApiKey() {
-    const key   = document.getElementById('api-key-input').value.trim();
-    const proxy = document.getElementById('api-proxy-input').value.trim();
-    if (!key) { toast('Enter an API key first.','error'); return; }
-    const el = document.getElementById('api-status');
-    el.style.display='block'; el.className='api-status'; el.textContent='Testing…';
-    try {
-        const testPayload = { model: document.getElementById('ai-model-input').value.trim()||aiModel, max_tokens:10, messages:[{role:'user',content:'Hi'}] };
-        let res;
-        if (proxy) {
-            res = await fetch(proxy, {
-                method:'POST', headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({ ...testPayload, apiKey: key })
-            });
-        } else {
-            res = await fetch('https://api.anthropic.com/v1/messages', {
-                method:'POST', mode:'cors',
-                headers:{ 'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true' },
-                body: JSON.stringify(testPayload)
-            });
-        }
-        if (res.ok) {
-            el.className='api-status ok';
-            el.textContent=`✅ Connection successful${proxy?' (via proxy)':''}! AI identification is ready.`;
-        } else {
-            const d = await res.json().catch(()=>({}));
-            el.className='api-status err';
-            el.textContent=`❌ HTTP ${res.status}: ${d.error?.message||d.error?.type||res.statusText}`;
-        }
-    } catch(err) {
-        el.className='api-status err';
-        el.textContent=`❌ Network error: ${err.message}${proxy?'':' — Add a Proxy URL below to fix CORS.'}`;
-        console.error('Anthropic API test error:', err);
-    }
-}
-
-async function saveProxyUrl() {
-    const url = document.getElementById('api-proxy-input').value.trim();
-    await db.collection('settings').doc('proxy').set({ url });
-    proxyUrl = url;
-    toast(url ? 'Proxy URL saved!' : 'Proxy URL cleared.', 'success');
-}
-async function saveModel() {
-    const name = document.getElementById('ai-model-input').value.trim();
-    if (!name) { toast('Enter a model name.','error'); return; }
-    await db.collection('settings').doc('model').set({ name });
-    aiModel = name;
-    toast('Model saved!', 'success');
-}
-
-// ═══════════════════════════════════════
-//  BARCODE + PHOTOS MODAL
-// ═══════════════════════════════════════
-function showBarcode(docId) {
-    const it = items.find(i=>i._docId===docId); if (!it) return;
-    activeBcId = docId;
-    const label = [it.manufacturer, it.model].filter(Boolean).join(' ') || `Item #${id}`;
-    document.getElementById('bc-title').textContent = label;
-    document.getElementById('bc-sub').textContent   = `${it.category||''} | SN: ${it.serialNumber||'N/A'}`;
-    const photos = it.photos||[];
-    document.getElementById('bc-photos').innerHTML = photos.length
-        ? photos.map(p=>`<img src="${p.url}" alt="${p.slot}" onclick="window.open('${p.url}','_blank')" title="Click to enlarge">`).join('')
-        : '';
-    const code = `ARM${String(it.id).padStart(6,'0')}`;
-    document.getElementById('bc-code').textContent = code;
-    try { JsBarcode('#bc-svg', code, {format:'CODE128',width:2.2,height:80,displayValue:true,fontSize:13,margin:10,background:'#ffffff',lineColor:'#000000'}); }
-    catch(e) { console.error(e); }
-    document.getElementById('barcode-modal').classList.add('show');
-}
-function closeModal() { document.getElementById('barcode-modal').classList.remove('show'); activeBcId=null; }
-document.getElementById('barcode-modal').addEventListener('click', e => { if(e.target===document.getElementById('barcode-modal'))closeModal(); });
-function printBarcode() {
-    if (!activeBcId) return;
-    const it = items.find(i=>i._docId===activeBcId); if (!it) return;
-    const label = [it.manufacturer,it.model].filter(Boolean).join(' ')||`Item #${it.id}`;
-    document.getElementById('print-content').innerHTML=`
-        <style>body{font-family:Arial,sans-serif;text-align:center;padding:30px;}
-        .lbl{display:inline-block;border:2px solid #333;padding:16px 24px;border-radius:8px;min-width:300px;}
-        h3{margin:0 0 3px;font-size:13px;}p{margin:0 0 10px;font-size:10px;color:#555;}</style>
-        <div class="lbl"><h3>${label}</h3>
-        <p>${it.category||''} | SN: ${it.serialNumber||'N/A'}</p>
-        ${document.getElementById('bc-svg').outerHTML}</div>`;
-    window.print();
-}
-
-// ═══════════════════════════════════════
-//  CSV EXPORT
-// ═══════════════════════════════════════
-function exportCSV() {
-    const hdrs=['ID','Category','Manufacturer','Model','Serial Number','Caliber','Magnification','Purchase Date','Quantity','Notes','Date Added'];
-    const rows=items.map(it=>[it.id,it.category,it.manufacturer,it.model,it.serialNumber,it.caliber,it.magnification,it.purchaseDate,it.quantity,it.notes,it.addedAt?new Date(it.addedAt).toLocaleDateString():''].map(v=>`"${String(v??'').replace(/"/g,'""')}"`));
-    const csv=[hdrs.join(','),...rows.map(r=>r.join(','))].join('\n');
-    const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(new Blob([csv],{type:'text/csv'})),download:`farmboss-armory-${new Date().toISOString().slice(0,10)}.csv`});
-    a.click(); URL.revokeObjectURL(a.href); toast('CSV exported!','success');
-}
-
-// ═══════════════════════════════════════
-//  UTILS
-// ═══════════════════════════════════════
-function catClass(cat) {
-    return {'Rifle':'cat-rifle','Shotgun':'cat-shotgun','Pistol':'cat-pistol','Revolver':'cat-revolver',
-            'Suppressor':'cat-suppressor','Magazine':'cat-magazine','Scope':'cat-scope',
-            'Binoculars':'cat-binoculars','Spotting Scope':'cat-spotting'}[cat]||'cat-default';
-}
-function esc(s) { return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'):''; }
-
-// ═══════════════════════════════════════
-//  QUOTES
-// ═══════════════════════════════════════
-let quotes = [];
-let unsubQuotes = null;
-
-function initQuotes() {
-    if (unsubQuotes) return;
-    unsubQuotes = db.collection('quotes').orderBy('addedAt', 'asc').onSnapshot(snap => {
-        quotes = snap.docs.map(doc => ({ _docId: doc.id, ...doc.data() }));
-        renderQuotes();
-    });
-}
-
-function renderQuotes() {
-    const list  = document.getElementById('quotes-list');
-    const count = document.getElementById('quote-count');
-    if (!list) return;
-    if (count) count.textContent = `${quotes.length} quote${quotes.length !== 1 ? 's' : ''}`;
-    if (!quotes.length) {
-        list.innerHTML = '<p style="color:var(--text-secondary);padding:12px 0;">No quotes yet. Add the first one above!</p>';
-        return;
-    }
-    list.innerHTML = quotes.map((q, i) => `
-        <div class="quote-entry">
-            <div class="quote-number"># ${i + 1}</div>
-            <div class="quote-body">${esc(q.text)}</div>
-            ${q.author ? `<div class="quote-attribution">${esc(q.author)}</div>` : ''}
-            <div class="quote-footer">
-                <span class="quote-date">${q.addedAt ? new Date(q.addedAt).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'}) : ''}</span>
-                <button class="quote-del" onclick="deleteQuote('${q._docId}')" title="Delete quote">&#128465; Delete</button>
-            </div>
-        </div>`).join('');
-}
-
-async function addQuote() {
-    const textEl   = document.getElementById('quote-text');
-    const authorEl = document.getElementById('quote-author');
-    const text     = textEl.value.trim();
-    if (!text) { toast('Enter a quote first.', 'error'); return; }
-    try {
-        await db.collection('quotes').add({
-            text,
-            author:  authorEl.value.trim(),
-            addedAt: new Date().toISOString()
+    function updateCounts() {
+        ['armory','machinery','automotive','livestock'].forEach(k => {
+            const v = counts[k];
+            document.getElementById('stat-' + k).textContent     = v;
+            document.getElementById('badge-' + k).textContent    = v;
+            document.getElementById('meta-' + k).textContent     = v;
         });
-        textEl.value   = '';
-        authorEl.value = '';
-        toast('Quote added!', 'success');
-    } catch(err) {
-        toast('Error saving quote: ' + err.message, 'error');
     }
-}
 
-async function deleteQuote(docId) {
-    if (!confirm('Delete this quote? This cannot be undone.')) return;
-    try {
-        await db.collection('quotes').doc(docId).delete();
-        toast('Quote deleted.');
-    } catch(err) {
-        toast('Error: ' + err.message, 'error');
+    function initLiveCounts() {
+        const collections = {
+            armory:     'items',
+            machinery:  'machinery_items',
+            automotive: 'automotive_items',
+            livestock:  'livestock_items'
+        };
+        Object.entries(collections).forEach(([key, col]) => {
+            const unsub = db.collection(col).onSnapshot(snap => {
+                counts[key] = snap.size;
+                updateCounts();
+            }, () => {});
+            unsubbers.push(unsub);
+        });
     }
-}
-function toast(msg,type='') {
-    const el=document.getElementById('toast');
-    el.textContent=msg; el.className=`toast show${type?' '+type:''}`;
-    clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),3500);
-}
 
-// ═══════════════════════════════════════
-//  DATE / TIME / WEATHER
-// ═══════════════════════════════════════
-(function initDTW() {
-    // ── Clock (updates every second) ──
+    // ── CLOCK ──
     function updateClock() {
-        const now = new Date();
+        const now  = new Date();
         const date = now.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
         const time = now.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', hour12:false });
-        const el = document.getElementById('dtw-clock');
-        if (el) el.textContent = `${date}  ·  ${time}`;
+        document.getElementById('dtw-clock').textContent = `${date}  ·  ${time}`;
     }
-    updateClock();
-    setInterval(updateClock, 1000);
+    function initClock() {
+        updateClock();
+        setInterval(updateClock, 1000);
+    }
 
-    // ── Weather (Open-Meteo, no API key needed) ──
-    // Coordinates for Chaska MN 55318
+    // ── WEATHER ──
     const LAT = 44.8247, LON = -93.6052;
-    const WX_URL = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}` +
-        `&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,relative_humidity_2m` +
-        `&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=America%2FChicago`;
-
-    // WMO weather code → label + emoji
-    function wxDesc(code) {
-        if (code === 0)              return ['Clear', '☀️'];
-        if (code <= 2)               return ['Partly Cloudy', '⛅'];
-        if (code === 3)              return ['Overcast', '☁️'];
-        if (code <= 49)              return ['Foggy', '🌫️'];
-        if (code <= 55)              return ['Drizzle', '🌦️'];
-        if (code <= 67)              return ['Rain', '🌧️'];
-        if (code <= 77)              return ['Snow', '❄️'];
-        if (code <= 82)              return ['Rain Showers', '🌦️'];
-        if (code <= 86)              return ['Snow Showers', '🌨️'];
-        if (code <= 99)              return ['Thunderstorm', '⛈️'];
-        return ['Unknown', '🌡️'];
-    }
+    const WX_CODE_MAP = {
+        0:'☀️',1:'🌤️',2:'⛅',3:'☁️',
+        45:'🌫️',48:'🌫️',
+        51:'🌦️',53:'🌦️',55:'🌧️',
+        61:'🌧️',63:'🌧️',65:'🌧️',
+        71:'🌨️',73:'🌨️',75:'❄️',77:'🌨️',
+        80:'🌦️',81:'🌧️',82:'⛈️',
+        85:'🌨️',86:'❄️',
+        95:'⛈️',96:'⛈️',99:'⛈️'
+    };
+    const WX_DESC_MAP = {
+        0:'Clear',1:'Mostly Clear',2:'Partly Cloudy',3:'Overcast',
+        45:'Fog',48:'Icy Fog',
+        51:'Light Drizzle',53:'Drizzle',55:'Heavy Drizzle',
+        61:'Light Rain',63:'Rain',65:'Heavy Rain',
+        71:'Light Snow',73:'Snow',75:'Heavy Snow',77:'Snow Grains',
+        80:'Showers',81:'Rain Showers',82:'Heavy Showers',
+        85:'Snow Showers',86:'Heavy Snow Showers',
+        95:'Thunderstorm',96:'Thunderstorm w/ Hail',99:'Severe Thunderstorm'
+    };
 
     async function fetchWeather() {
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,relative_humidity_2m&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=America%2FChicago`;
         try {
-            const res  = await fetch(WX_URL);
-            const json = await res.json();
-            const c    = json.current;
-            const temp    = Math.round(c.temperature_2m);
-            const feels   = Math.round(c.apparent_temperature);
-            const wind    = Math.round(c.wind_speed_10m);
-            const humid   = c.relative_humidity_2m;
-            const [label, emoji] = wxDesc(c.weather_code);
-            const icon = document.getElementById('dtw-wx-icon');
-            const text = document.getElementById('dtw-wx-text');
-            if (icon) icon.textContent = emoji;
-            if (text) text.textContent =
-                `${temp}°F  ·  ${label}  ·  Feels ${feels}°F  ·  Wind ${wind} mph  ·  Humidity ${humid}%`;
+            const r = await fetch(url);
+            const d = await r.json();
+            const c = d.current;
+            const code = c.weather_code;
+            document.getElementById('wx-icon').textContent    = WX_CODE_MAP[code] || '🌡️';
+            document.getElementById('wx-temp').textContent    = `${Math.round(c.temperature_2m)}°F`;
+            document.getElementById('wx-details').innerHTML   =
+                `${WX_DESC_MAP[code] || 'Unknown'}<br>` +
+                `Feels like ${Math.round(c.apparent_temperature)}°F<br>` +
+                `Wind ${Math.round(c.wind_speed_10m)} mph &nbsp;·&nbsp; Humidity ${c.relative_humidity_2m}%`;
         } catch(e) {
-            const text = document.getElementById('dtw-wx-text');
-            if (text) text.textContent = 'Weather unavailable';
+            document.getElementById('wx-details').textContent = 'Weather unavailable';
+        }
+        // refresh every 10 minutes
+        setTimeout(fetchWeather, 10 * 60 * 1000);
+    }
+
+    // ── QUOTES ──
+    let quotes = [], unsubQuotes = null;
+
+    function initQuotes() {
+        if (unsubQuotes) return;
+        unsubQuotes = db.collection('quotes').orderBy('addedAt','asc').onSnapshot(snap => {
+            quotes = snap.docs.map(doc => ({ _docId: doc.id, ...doc.data() }));
+            renderQuotes();
+        }, () => {});
+    }
+
+    function renderQuotes() {
+        const list = document.getElementById('quotes-list');
+        const countEl = document.getElementById('quotes-count');
+        countEl.textContent = quotes.length ? `(${quotes.length})` : '';
+        if (!quotes.length) {
+            list.innerHTML = '<div class="quotes-empty">No quotes yet. Add one!</div>';
+            return;
+        }
+        list.innerHTML = quotes.map((q, i) => `
+            <div class="quote-item">
+                <div class="quote-item-header">
+                    <span class="quote-num">QUOTE #${i + 1}</span>
+                    <button class="quote-del" onclick="deleteQuote('${q._docId}')" title="Delete">🗑</button>
+                </div>
+                <div class="quote-text">"${escHtml(q.text)}"</div>
+                ${q.author ? `<div class="quote-author">— ${escHtml(q.author)}</div>` : ''}
+                <div class="quote-date">${q.addedAt ? new Date(q.addedAt.toDate()).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'}) : ''}</div>
+            </div>
+        `).join('');
+    }
+
+    async function addQuote() {
+        const text   = document.getElementById('q-text').value.trim();
+        const author = document.getElementById('q-author').value.trim();
+        if (!text) { showToast('Please enter a quote.', true); return; }
+        try {
+            await db.collection('quotes').add({ text, author, addedAt: firebase.firestore.FieldValue.serverTimestamp() });
+            document.getElementById('q-text').value   = '';
+            document.getElementById('q-author').value = '';
+            showToast('Quote added!');
+        } catch(e) {
+            showToast('Error adding quote.', true);
         }
     }
-    fetchWeather();
-    setInterval(fetchWeather, 10 * 60 * 1000); // refresh every 10 min
-})();
 
-// ═══════════════════════════════════════
-//  BARCODE SCANNER
-// ═══════════════════════════════════════
-let scannerActive = false;
-let scannerReader = null;
-let scannerStream = null;
-
-async function openScanner() {
-    if (typeof ZXing === 'undefined') {
-        toast('Scanner library not loaded — check your connection.', 'error'); return;
+    async function deleteQuote(docId) {
+        try {
+            await db.collection('quotes').doc(docId).delete();
+            showToast('Quote deleted.');
+        } catch(e) {
+            showToast('Error deleting quote.', true);
+        }
     }
-    document.getElementById('scanner-modal').classList.add('show');
-    document.getElementById('scanner-result').textContent = 'Starting camera…';
-    scannerActive = true;
 
-    try {
-        const video = document.getElementById('scanner-video');
-        // Prefer back camera on mobile
-        scannerStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } }
-        });
-        video.srcObject = scannerStream;
-        await video.play();
-
-        const hints = new Map();
-        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.CODE_128]);
-        scannerReader = new ZXing.BrowserMultiFormatReader(hints);
-
-        document.getElementById('scanner-result').textContent = 'Point camera at barcode…';
-
-        scannerReader.decodeFromVideoElement(video, (result, err) => {
-            if (!scannerActive) return;
-            if (result) {
-                const code = result.getText();
-                console.log('[Scanner] Detected:', code);
-                handleScanResult(code);
-            }
-        });
-    } catch (err) {
-        console.error('[Scanner] Error:', err);
-        document.getElementById('scanner-result').textContent = '⚠️ Camera access denied or unavailable.';
+    function escHtml(str) {
+        return String(str)
+            .replace(/&/g,'&amp;')
+            .replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;')
+            .replace(/"/g,'&quot;');
     }
-}
 
-function handleScanResult(code) {
-    closeScanner();
-    // Expect format: ARM000001 (ARM + 6-digit padded numeric ID)
-    const match = code.match(/^ARM(\d+)$/i);
-    if (!match) {
-        toast(`Unrecognised barcode: ${code}`, 'error'); return;
+    // ── TOAST ──
+    let toastTimer = null;
+    function showToast(msg, isError = false) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.className   = isError ? 'error show' : 'show';
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => { t.className = isError ? 'error' : ''; }, 3000);
     }
-    const numId = parseInt(match[1], 10);
-    const it = items.find(i => i.id === numId);
-    if (!it) {
-        toast(`No item found for barcode ${code}`, 'error'); return;
-    }
-    toast(`Found: ${it.manufacturer||''} ${it.model||''}`.trim(), 'success');
-    showBarcode(it._docId);
-}
-
-function closeScanner() {
-    scannerActive = false;
-    if (scannerReader) { try { scannerReader.reset(); } catch(e){} scannerReader = null; }
-    if (scannerStream) { scannerStream.getTracks().forEach(t => t.stop()); scannerStream = null; }
-    const video = document.getElementById('scanner-video');
-    video.srcObject = null;
-    document.getElementById('scanner-modal').classList.remove('show');
-    document.getElementById('scanner-result').textContent = 'Initializing camera…';
-}
-
-document.getElementById('scanner-modal').addEventListener('click', e => {
-    if (e.target === document.getElementById('scanner-modal')) closeScanner();
-});
 </script>
 </body>
 </html>

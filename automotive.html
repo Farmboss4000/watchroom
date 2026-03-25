@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Farmboss Machinery</title>
+    <title>Farmboss Automotive</title>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -14,19 +14,19 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         :root {
-            --bg-primary:    #f2f5f2;
+            --bg-primary:    #f0f3f8;
             --bg-secondary:  #ffffff;
-            --bg-card:       #eef3ee;
-            --accent:        #d4941a;
-            --accent-hover:  #b87e14;
-            --accent-dim:    rgba(212,148,26,0.15);
-            --text-primary:  #1c2e1c;
-            --text-secondary:#5a6e5a;
-            --border:        #cddece;
+            --bg-card:       #e8edf5;
+            --accent:        #3b82f6;
+            --accent-hover:  #2563eb;
+            --accent-dim:    rgba(59,130,246,0.13);
+            --text-primary:  #1a1f2e;
+            --text-secondary:#5a6070;
+            --border:        #cdd4e0;
             --success:       #16a34a;
             --danger:        #dc2626;
             --info:          #2563eb;
-            --hdr-bg:        #1c2d1c;
+            --hdr-bg:        #1a1f2e;
         }
 
         body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; background:var(--bg-primary); color:var(--text-primary); min-height:100vh; }
@@ -44,9 +44,9 @@
         .site-link.active { background:rgba(255,255,255,0.13); color:#fff; font-weight:600; }
 
         /* ── LOGIN ── */
-        #login-screen { position:fixed; inset:0; background:linear-gradient(135deg,#1c2d1c 0%,#2d4a2d 100%);
+        #login-screen { position:fixed; inset:0; background:linear-gradient(135deg,#1a1f2e 0%,#2d3a5e 100%);
             display:flex; align-items:center; justify-content:center; z-index:9000; flex-direction:column; gap:12px; }
-        .login-site-links { display:flex; gap:8px; }
+        .login-site-links { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
         .login-site-links a { color:rgba(255,255,255,0.5); font-size:0.78rem; text-decoration:none;
             padding:4px 12px; border:1px solid rgba(255,255,255,0.2); border-radius:4px; transition:all 0.15s; }
         .login-site-links a:hover { color:#fff; border-color:rgba(255,255,255,0.5); }
@@ -55,7 +55,7 @@
             box-shadow:0 24px 64px rgba(0,0,0,0.4); }
         .login-logo { width:56px; height:56px; background:var(--accent); border-radius:12px;
             display:flex; align-items:center; justify-content:center; font-size:28px; margin:0 auto 16px; color:#fff; }
-        .login-box h2 { text-align:center; font-size:1.5rem; color:#1c2d1c; margin-bottom:4px; }
+        .login-box h2 { text-align:center; font-size:1.5rem; color:#1a1f2e; margin-bottom:4px; }
         .login-sub { text-align:center; font-size:0.85rem; color:#6b7280; margin-bottom:28px; }
         .login-error { color:var(--danger); font-size:0.82rem; margin-bottom:12px; min-height:18px; text-align:center; }
         .login-full { width:100%; justify-content:center; }
@@ -90,8 +90,8 @@
         nav::-webkit-scrollbar { display:none; }
         nav button { background:transparent; border:none; color:#9ca3af; padding:8px 13px;
             border-radius:6px; cursor:pointer; font-size:0.83rem; transition:all 0.15s; white-space:nowrap; }
-        nav button:hover { background:rgba(212,148,26,0.2); color:#fff; }
-        nav button.active { background:var(--accent); color:#1c2d1c; font-weight:600; }
+        nav button:hover { background:rgba(59,130,246,0.2); color:#fff; }
+        nav button.active { background:var(--accent); color:#fff; font-weight:600; }
         .header-right { display:flex; align-items:center; gap:10px; margin-left:auto; }
         .user-badge { font-size:0.78rem; color:#9ca3af; background:rgba(255,255,255,0.08);
             padding:4px 10px; border-radius:5px; }
@@ -100,7 +100,7 @@
         .btn-signout:hover { border-color:var(--danger); color:var(--danger); }
 
         /* ── HERO ── */
-        .hero { background:linear-gradient(135deg,#1c2d1c 0%,#2d4a2d 60%,#3a5e2a 100%);
+        .hero { background:linear-gradient(135deg,#1a1f2e 0%,#2d3a5e 60%,#1e3a7a 100%);
             border-radius:12px; padding:28px 32px; margin-bottom:20px;
             display:flex; align-items:center; justify-content:space-between; gap:16px;
             overflow:hidden; position:relative; }
@@ -109,8 +109,8 @@
         .hero-title { font-size:1.6rem; font-weight:800; color:#fff; margin-bottom:4px; position:relative; }
         .hero-title span { color:var(--accent); }
         .hero-sub { font-size:0.88rem; color:rgba(255,255,255,0.65); position:relative; }
-        .hero-tractor { height:90px; opacity:0.9; flex-shrink:0; }
-        @media(max-width:560px) { .hero-tractor { display:none; } .hero { padding:20px; } }
+        .hero-car { height:90px; opacity:0.9; flex-shrink:0; }
+        @media(max-width:560px) { .hero-car { display:none; } .hero { padding:20px; } }
 
         /* ── STATS ── */
         main { padding:20px; max-width:1400px; margin:0 auto; flex:1; }
@@ -143,7 +143,7 @@
         .btn-sm { padding:5px 10px; font-size:0.78rem; }
         .btn-ai { width:100%; justify-content:center; padding:9px 12px; border-radius:8px; font-size:0.83rem;
             font-weight:600; cursor:pointer; border:none; font-family:inherit; transition:all 0.15s;
-            background:linear-gradient(135deg,#1c2d1c,#2d4a2d); color:#fff; margin-top:8px; }
+            background:linear-gradient(135deg,#1a1f2e,#2d3a5e); color:#fff; margin-top:8px; }
         .btn-ai:hover { opacity:0.88; transform:translateY(-1px); }
         .btn-ai:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
         .btn-ai.scanning { animation:pulse 1s ease-in-out infinite; }
@@ -158,9 +158,11 @@
             color:var(--text-secondary); font-size:0.9rem; pointer-events:none; }
         .input-prefix + input { padding-left:24px; }
         .form-actions { display:flex; gap:10px; margin-top:20px; flex-wrap:wrap; }
+        .field-with-btn { display:flex; gap:6px; align-items:flex-end; }
+        .field-with-btn input { flex:1; }
 
         /* ── PHOTOS ── */
-        .photo-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; }
+        .photo-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
         .photo-slot { display:flex; flex-direction:column; gap:6px; }
         .photo-slot-label { font-size:0.78rem; font-weight:600; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.4px; }
         .photo-preview { width:100%; aspect-ratio:4/3; border:2px dashed var(--border); border-radius:8px;
@@ -202,15 +204,15 @@
         /* ── BADGES ── */
         .badge { display:inline-block; padding:3px 9px; border-radius:5px; font-size:0.72rem; font-weight:700;
             text-transform:uppercase; letter-spacing:0.4px; white-space:nowrap; }
-        .cat-tractor    { background:#dcfce7; color:#15803d; }
-        .cat-combine    { background:#fef3c7; color:#92400e; }
-        .cat-planter    { background:#dbeafe; color:#1d4ed8; }
-        .cat-sprayer    { background:#f3e8ff; color:#6d28d9; }
-        .cat-tillage    { background:#fce7f3; color:#9d174d; }
-        .cat-hay        { background:#ecfdf5; color:#065f46; }
-        .cat-grain      { background:#fff7ed; color:#c2410c; }
-        .cat-loader     { background:#e0f2fe; color:#0369a1; }
+        .cat-car        { background:#dbeafe; color:#1d4ed8; }
         .cat-truck      { background:#f1f5f9; color:#475569; }
+        .cat-suv        { background:#dcfce7; color:#15803d; }
+        .cat-van        { background:#fef3c7; color:#92400e; }
+        .cat-moto       { background:#f3e8ff; color:#6d28d9; }
+        .cat-atv        { background:#fce7f3; color:#9d174d; }
+        .cat-boat       { background:#e0f2fe; color:#0369a1; }
+        .cat-rv         { background:#fff7ed; color:#c2410c; }
+        .cat-semi       { background:#ecfdf5; color:#065f46; }
         .cat-default    { background:var(--bg-card); color:var(--text-secondary); }
 
         /* ── CATEGORY BREAKDOWN ── */
@@ -257,12 +259,12 @@
         .setup-steps li::before { content:counter(steps); position:absolute; left:10px; top:50%; transform:translateY(-50%);
             width:22px; height:22px; background:var(--accent); color:#fff; border-radius:50%;
             display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700; }
-        .code-block { background:#1a1a2e; color:#e8a020; padding:16px; border-radius:8px;
+        .code-block { background:#1a1a2e; color:#60a5fa; padding:16px; border-radius:8px;
             font-family:monospace; font-size:0.78rem; margin-top:12px; overflow-x:auto; white-space:pre; }
 
         /* ── TOAST ── */
         .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(80px);
-            background:#1c2d1c; color:#fff; padding:10px 20px; border-radius:8px; font-size:0.87rem;
+            background:#1a1f2e; color:#fff; padding:10px 20px; border-radius:8px; font-size:0.87rem;
             font-weight:500; opacity:0; transition:all 0.3s; z-index:9999; pointer-events:none; white-space:nowrap; max-width:90vw; }
         .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
         .toast.success { background:var(--success); }
@@ -319,14 +321,14 @@
     <div class="login-site-links">
         <a href="index.html">🏠 Suite</a>
         <a href="armory.html">🔫 Armory</a>
-        <a href="machinery.html" class="active">🚜 Machinery</a>
-        <a href="automotive.html">🚗 Automotive</a>
+        <a href="machinery.html">🚜 Machinery</a>
+        <a href="automotive.html" class="active">🚗 Automotive</a>
         <a href="livestock.html">🐄 Livestock</a>
     </div>
     <div class="login-box">
-        <div class="login-logo">🚜</div>
-        <h2>Farmboss Machinery</h2>
-        <p class="login-sub">Sign in to access your equipment inventory</p>
+        <div class="login-logo">🚗</div>
+        <h2>Farmboss Automotive</h2>
+        <p class="login-sub">Sign in to access your vehicle inventory</p>
         <form id="login-form">
             <div class="form-group" style="margin-bottom:14px;">
                 <label>Email</label>
@@ -345,32 +347,30 @@
 <!-- ══ LOADING ══ -->
 <div id="loading-screen">
     <div class="spinner"></div>
-    <p>Loading your equipment...</p>
-</div>
-
-<!-- ══ SITE SWITCHER (outside #app) ══ -->
-<div class="site-switcher">
-    <span class="site-switcher-label">Farmboss Suite</span>
-    <a href="index.html" class="site-link">🏠 Suite</a>
-    <a href="armory.html" class="site-link">🔫 Armory</a>
-    <a href="machinery.html" class="site-link active">🚜 Machinery</a>
-    <a href="automotive.html" class="site-link">🚗 Automotive</a>
-    <a href="livestock.html" class="site-link">🐄 Livestock</a>
+    <p>Loading your vehicles...</p>
 </div>
 
 <!-- ══ APP ══ -->
 <div id="app">
+<div class="site-switcher">
+    <span class="site-switcher-label">Farmboss Suite</span>
+    <a href="index.html" class="site-link">🏠 Suite</a>
+    <a href="armory.html" class="site-link">🔫 Armory</a>
+    <a href="machinery.html" class="site-link">🚜 Machinery</a>
+    <a href="automotive.html" class="site-link active">🚗 Automotive</a>
+    <a href="livestock.html" class="site-link">🐄 Livestock</a>
+</div>
 <header>
     <div class="logo-area">
-        <div class="logo-icon">🚜</div>
-        <h1>Farmboss <span>Machinery</span></h1>
+        <div class="logo-icon">🚗</div>
+        <h1>Farmboss <span>Automotive</span></h1>
     </div>
     <nav>
         <button class="active" onclick="showView('dashboard')">Dashboard</button>
-        <button onclick="showView('add-item')">Add Equipment</button>
+        <button onclick="showView('add-item')">Add Vehicle</button>
         <button onclick="showView('inventory')">Inventory</button>
         <button onclick="showView('reports')">Reports</button>
-        <button onclick="showView('categories')">Equipment Types</button>
+        <button onclick="showView('categories')">Vehicle Types</button>
         <button onclick="showView('settings')">⚙ Settings</button>
     </nav>
     <div class="header-right">
@@ -385,46 +385,52 @@
 <div id="view-dashboard" class="view active">
     <div class="hero">
         <div>
-            <div class="hero-title">Farmboss <span>Machinery</span></div>
-            <div class="hero-sub">Your complete farm equipment inventory</div>
+            <div class="hero-title">Farmboss <span>Automotive</span></div>
+            <div class="hero-sub">Your complete vehicle inventory</div>
         </div>
-        <!-- Tractor SVG silhouette -->
-        <svg class="hero-tractor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 155">
-          <!-- Three-point hitch -->
-          <line x1="90" y1="92" x2="42" y2="100" stroke="rgba(255,255,255,0.7)" stroke-width="3.5"/>
-          <line x1="90" y1="108" x2="42" y2="118" stroke="rgba(255,255,255,0.7)" stroke-width="3.5"/>
-          <rect x="38" y="98" width="6" height="23" rx="2" fill="rgba(255,255,255,0.7)"/>
-          <!-- Chassis -->
-          <rect x="90" y="78" width="150" height="52" rx="6" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.7)" stroke-width="2"/>
-          <!-- Hood -->
-          <rect x="232" y="86" width="55" height="38" rx="5" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.75)" stroke-width="2"/>
-          <!-- Exhaust -->
-          <rect x="251" y="22" width="8" height="46" rx="3" fill="rgba(255,255,255,0.8)"/>
-          <ellipse cx="255" cy="21" rx="7" ry="4" fill="rgba(255,255,255,0.55)"/>
-          <!-- Cab -->
-          <rect x="110" y="40" width="82" height="55" rx="5" fill="rgba(255,255,255,0.18)" stroke="rgba(255,255,255,0.8)" stroke-width="2"/>
-          <!-- Window -->
-          <rect x="118" y="48" width="66" height="35" rx="3" fill="rgba(255,255,255,0.32)" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
-          <!-- Steps -->
-          <rect x="183" y="112" width="16" height="5" rx="2" fill="rgba(255,255,255,0.5)"/>
-          <rect x="187" y="120" width="12" height="5" rx="2" fill="rgba(255,255,255,0.4)"/>
-          <!-- Rear wheel -->
-          <circle cx="100" cy="108" r="42" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="7"/>
-          <circle cx="100" cy="108" r="15" fill="rgba(255,255,255,0.28)" stroke="rgba(255,255,255,0.55)" stroke-width="3"/>
-          <line x1="100" y1="66" x2="100" y2="150" stroke="rgba(255,255,255,0.32)" stroke-width="2.5"/>
-          <line x1="58" y1="108" x2="142" y2="108" stroke="rgba(255,255,255,0.32)" stroke-width="2.5"/>
-          <line x1="70" y1="78" x2="130" y2="138" stroke="rgba(255,255,255,0.32)" stroke-width="2.5"/>
-          <line x1="130" y1="78" x2="70" y2="138" stroke="rgba(255,255,255,0.32)" stroke-width="2.5"/>
-          <!-- Front wheel -->
-          <circle cx="240" cy="117" r="22" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="5"/>
-          <circle cx="240" cy="117" r="8" fill="rgba(255,255,255,0.22)" stroke="rgba(255,255,255,0.5)" stroke-width="2"/>
-          <line x1="228" y1="117" x2="252" y2="117" stroke="rgba(255,255,255,0.35)" stroke-width="2"/>
-          <line x1="240" y1="105" x2="240" y2="129" stroke="rgba(255,255,255,0.35)" stroke-width="2"/>
+        <!-- Car SVG silhouette -->
+        <svg class="hero-car" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 120">
+            <!-- Road/ground line -->
+            <line x1="10" y1="100" x2="330" y2="100" stroke="rgba(255,255,255,0.25)" stroke-width="2"/>
+            <!-- Car body lower -->
+            <rect x="40" y="68" width="260" height="32" rx="6" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.75)" stroke-width="2"/>
+            <!-- Car roof/cabin -->
+            <path d="M100 68 L130 32 L220 32 L250 68 Z" fill="rgba(255,255,255,0.18)" stroke="rgba(255,255,255,0.8)" stroke-width="2"/>
+            <!-- Windshield -->
+            <path d="M108 68 L135 38 L210 38 L242 68 Z" fill="rgba(255,255,255,0.28)" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
+            <!-- Front bumper/hood extension -->
+            <rect x="270" y="75" width="28" height="12" rx="3" fill="rgba(255,255,255,0.18)" stroke="rgba(255,255,255,0.6)" stroke-width="1.5"/>
+            <!-- Rear bumper -->
+            <rect x="42" y="75" width="22" height="12" rx="3" fill="rgba(255,255,255,0.18)" stroke="rgba(255,255,255,0.6)" stroke-width="1.5"/>
+            <!-- Headlight -->
+            <ellipse cx="290" cy="80" rx="8" ry="5" fill="rgba(255,255,255,0.6)" stroke="rgba(255,255,255,0.8)" stroke-width="1"/>
+            <!-- Tail light -->
+            <rect x="46" y="76" width="10" height="8" rx="2" fill="rgba(255,255,255,0.55)" stroke="rgba(255,255,255,0.7)" stroke-width="1"/>
+            <!-- Door lines -->
+            <line x1="170" y1="68" x2="170" y2="95" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
+            <!-- Door handles -->
+            <rect x="140" y="79" width="18" height="4" rx="2" fill="rgba(255,255,255,0.4)"/>
+            <rect x="196" y="79" width="18" height="4" rx="2" fill="rgba(255,255,255,0.4)"/>
+            <!-- Rear wheel -->
+            <circle cx="100" cy="100" r="22" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="5"/>
+            <circle cx="100" cy="100" r="9" fill="rgba(255,255,255,0.22)" stroke="rgba(255,255,255,0.55)" stroke-width="2.5"/>
+            <line x1="100" y1="78" x2="100" y2="122" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
+            <line x1="78" y1="100" x2="122" y2="100" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
+            <line x1="84" y1="84" x2="116" y2="116" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
+            <line x1="116" y1="84" x2="84" y2="116" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
+            <!-- Front wheel -->
+            <circle cx="240" cy="100" r="22" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="5"/>
+            <circle cx="240" cy="100" r="9" fill="rgba(255,255,255,0.22)" stroke="rgba(255,255,255,0.55)" stroke-width="2.5"/>
+            <line x1="240" y1="78" x2="240" y2="122" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
+            <line x1="218" y1="100" x2="262" y2="100" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
+            <line x1="224" y1="84" x2="256" y2="116" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
+            <line x1="256" y1="84" x2="224" y2="116" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
         </svg>
     </div>
+
     <div class="stats-grid" id="stats-grid"></div>
     <div class="card">
-        <div class="card-title"><div class="card-title-left">📊 Inventory by Equipment Type</div></div>
+        <div class="card-title"><div class="card-title-left">📊 Inventory by Vehicle Type</div></div>
         <div class="cat-breakdown" id="cat-breakdown"></div>
     </div>
     <div class="card">
@@ -437,7 +443,7 @@
                 <th class="no-sort">Make</th>
                 <th class="no-sort">Model</th>
                 <th class="no-sort">Year</th>
-                <th class="no-sort">Hours</th>
+                <th class="no-sort">Mileage</th>
                 <th class="no-sort">Added</th>
             </tr></thead>
             <tbody id="recent-tbody"></tbody></table>
@@ -449,36 +455,62 @@
 <div id="view-add-item" class="view">
     <div class="card">
         <div class="card-title">
-            <div class="card-title-left" id="form-title">➕ Add New Equipment</div>
+            <div class="card-title-left" id="form-title">➕ Add New Vehicle</div>
         </div>
         <form id="item-form">
             <input type="hidden" id="edit-id">
             <input type="hidden" id="edit-doc-id">
             <div class="form-grid">
                 <div class="form-group">
-                    <label>Equipment Type *</label>
+                    <label>Vehicle Type *</label>
                     <select id="f-category" required><option value="">Select type...</option></select>
                 </div>
                 <div class="form-group">
                     <label>Make</label>
-                    <input type="text" id="f-make" list="make-list" placeholder="e.g. John Deere" autocomplete="off">
+                    <input type="text" id="f-make" list="make-list" placeholder="e.g. Ford" autocomplete="off">
                     <datalist id="make-list"></datalist>
                 </div>
                 <div class="form-group">
                     <label>Model</label>
-                    <input type="text" id="f-model" placeholder="e.g. 8370R">
+                    <input type="text" id="f-model" placeholder="e.g. F-150">
                 </div>
                 <div class="form-group">
                     <label>Year</label>
-                    <input type="number" id="f-year" placeholder="e.g. 2019" min="1900" max="2100">
+                    <input type="number" id="f-year" placeholder="e.g. 2022" min="1900" max="2100">
                 </div>
                 <div class="form-group">
-                    <label>Serial Number / PIN</label>
-                    <input type="text" id="f-serial" placeholder="e.g. 1RW8370RCJD123456">
+                    <label>VIN</label>
+                    <input type="text" id="f-serial" placeholder="e.g. 1FTEW1EP5NFC00001">
                 </div>
                 <div class="form-group">
-                    <label>Engine Hours</label>
-                    <input type="number" id="f-hours" placeholder="e.g. 4250" min="0">
+                    <label>License Plate</label>
+                    <input type="text" id="f-license" placeholder="e.g. ABC-1234">
+                </div>
+                <div class="form-group">
+                    <label>Color</label>
+                    <input type="text" id="f-color" placeholder="e.g. Oxford White">
+                </div>
+                <div class="form-group">
+                    <label>Engine</label>
+                    <input type="text" id="f-engine" placeholder="e.g. 5.0L V8">
+                </div>
+                <div class="form-group">
+                    <label>Transmission</label>
+                    <select id="f-transmission">
+                        <option value="">Select...</option>
+                        <option>Automatic</option>
+                        <option>Manual</option>
+                        <option>CVT</option>
+                        <option>Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Mileage (miles)</label>
+                    <div style="display:flex;gap:6px;align-items:center;">
+                        <input type="number" id="f-mileage" placeholder="e.g. 42500" min="0" style="flex:1;">
+                        <button type="button" onclick="document.getElementById('file-mileage').click()" class="btn btn-ghost btn-sm" title="AI Read Mileage">📷 AI Read</button>
+                        <input type="file" id="file-mileage" accept="image/*" style="display:none" onchange="onMileagePhotoSelected(this)">
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Condition</label>
@@ -495,7 +527,7 @@
                     <input type="date" id="f-purchase-date">
                 </div>
                 <div class="form-group">
-                    <label>Purchase Price</label>
+                    <label>Purchase Price ($)</label>
                     <div class="input-prefix-wrap">
                         <span class="input-prefix">$</span>
                         <input type="number" id="f-price" placeholder="0.00" min="0" step="0.01" style="padding-left:24px;">
@@ -503,11 +535,11 @@
                 </div>
                 <div class="form-group span2">
                     <label>Storage Location</label>
-                    <input type="text" id="f-location" placeholder="e.g. North machine shed, Field #3">
+                    <input type="text" id="f-location" placeholder="e.g. Garage Bay 2, North lot">
                 </div>
                 <div class="form-group full-width">
                     <label>Notes</label>
-                    <textarea id="f-notes" rows="2" placeholder="Maintenance history, repairs, accessories, attachments..."></textarea>
+                    <textarea id="f-notes" rows="2" placeholder="Service history, modifications, accessories..."></textarea>
                 </div>
             </div>
 
@@ -528,11 +560,11 @@
                         <div class="photo-file-input">
                             <input type="file" id="file-main" accept="image/*" onchange="onPhotoSelected('main',this)">
                         </div>
-                        <button type="button" class="btn-ai" id="btn-identify" onclick="identifyItem()" disabled>🤖 Identify Equipment with AI</button>
+                        <button type="button" class="btn-ai" id="btn-identify" onclick="identifyItem()" disabled>🤖 Identify Vehicle with AI</button>
                     </div>
-                    <!-- SERIAL / PIN PHOTO -->
+                    <!-- VIN PHOTO -->
                     <div class="photo-slot">
-                        <div class="photo-slot-label">📋 Serial / PIN Photo</div>
+                        <div class="photo-slot-label">📋 VIN Plate Photo</div>
                         <div class="photo-preview" id="prev-serial">
                             <span class="no-photo">📋</span>
                             <button type="button" class="remove-photo" onclick="removePhoto('serial')">✕</button>
@@ -540,7 +572,7 @@
                         <div class="photo-file-input">
                             <input type="file" id="file-serial" accept="image/*" onchange="onPhotoSelected('serial',this)">
                         </div>
-                        <button type="button" class="btn-ai" id="btn-ocr" onclick="extractSerial()" disabled>🔍 Extract Serial/PIN with AI</button>
+                        <button type="button" class="btn-ai" id="btn-ocr" onclick="extractVIN()" disabled>🔍 Extract VIN with AI</button>
                     </div>
                     <!-- ADDITIONAL PHOTO -->
                     <div class="photo-slot">
@@ -553,32 +585,12 @@
                             <input type="file" id="file-extra" accept="image/*" onchange="onPhotoSelected('extra',this)">
                         </div>
                     </div>
-                    <!-- PURCHASE PAPERWORK -->
-                    <div class="photo-slot">
-                        <div class="photo-slot-label">📄 Purchase Paperwork</div>
-                        <div class="photo-preview" id="prev-paperwork">
-                            <span class="no-photo">📄</span>
-                            <button type="button" class="remove-photo" onclick="removePhoto('paperwork')">✕</button>
-                        </div>
-                        <div class="photo-file-input">
-                            <input type="file" id="file-paperwork" accept="image/*" onchange="onPhotoSelected('paperwork',this)">
-                        </div>
-                        <button type="button" class="btn-ai" id="btn-paperwork" onclick="summarizePaperwork()" disabled>📄 Summarize Paperwork with AI</button>
-                    </div>
                 </div>
                 <p id="ai-status" style="font-size:0.82rem;color:var(--text-secondary);margin-top:10px;min-height:18px;"></p>
-                <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
-                    <div style="font-size:0.82rem;font-weight:600;color:var(--text-primary);margin-bottom:10px;">⏱ Read Engine Hours from Meter Photo</div>
-                    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-                        <input type="file" id="file-hours-meter" accept="image/*" style="font-size:0.82rem;flex:1;min-width:200px;" onchange="onHoursPhotoSelected(this)">
-                        <button type="button" class="btn-ai" id="btn-read-hours" onclick="readHoursFromPhoto()" disabled style="width:auto;padding:8px 14px;">⏱ Read Hours with AI</button>
-                    </div>
-                    <p id="hours-ai-status" style="font-size:0.82rem;color:var(--text-secondary);margin-top:8px;min-height:16px;"></p>
-                </div>
             </div>
 
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" id="form-submit-btn">Save Equipment</button>
+                <button type="submit" class="btn btn-primary" id="form-submit-btn">Save Vehicle</button>
                 <button type="button" class="btn btn-ghost" onclick="resetForm()">Clear</button>
                 <button type="button" class="btn btn-ghost" onclick="showView('inventory')">Cancel</button>
             </div>
@@ -594,7 +606,7 @@
             <span id="inv-count" style="font-size:0.8rem;color:var(--text-secondary);font-weight:400;"></span>
         </div>
         <div class="toolbar">
-            <input type="text" id="inv-search" placeholder="Search make, model, serial number, location..." oninput="renderInventory()">
+            <input type="text" id="inv-search" placeholder="Search make, model, VIN, location..." oninput="renderInventory()">
             <select id="inv-filter-cat" onchange="renderInventory()" style="min-width:180px;">
                 <option value="">All Types</option>
             </select>
@@ -602,7 +614,7 @@
                 <option value="">All Conditions</option>
                 <option>Excellent</option><option>Good</option><option>Fair</option><option>Poor</option>
             </select>
-            <button class="btn btn-primary btn-sm" onclick="showView('add-item');resetForm()">+ Add Equipment</button>
+            <button class="btn btn-primary btn-sm" onclick="showView('add-item');resetForm()">+ Add Vehicle</button>
             <button class="btn btn-ghost btn-sm" onclick="openScanner()" title="Scan barcode">📷 Scan</button>
             <button class="btn btn-ghost btn-sm" onclick="exportCSV()">↓ Export CSV</button>
         </div>
@@ -615,8 +627,8 @@
                     <th onclick="sortBy('make')">Make</th>
                     <th onclick="sortBy('model')">Model</th>
                     <th onclick="sortBy('year')">Year</th>
-                    <th onclick="sortBy('serialNumber')">Serial / PIN</th>
-                    <th onclick="sortBy('hours')">Hours</th>
+                    <th onclick="sortBy('serialNumber')">VIN</th>
+                    <th onclick="sortBy('mileage')">Mileage</th>
                     <th onclick="sortBy('condition')">Condition</th>
                     <th onclick="sortBy('location')">Location</th>
                     <th onclick="sortBy('purchaseDate')">Purchased</th>
@@ -626,8 +638,8 @@
             </table>
         </div>
         <div id="inv-empty" class="empty" style="display:none;">
-            <div class="empty-icon">🚜</div>
-            <p>No equipment found. <a href="#" onclick="showView('add-item');resetForm();return false;" style="color:var(--accent);">Add your first item</a>.</p>
+            <div class="empty-icon">🚗</div>
+            <p>No vehicles found. <a href="#" onclick="showView('add-item');resetForm();return false;" style="color:var(--accent);">Add your first vehicle</a>.</p>
         </div>
     </div>
 </div>
@@ -650,8 +662,8 @@
                 <option value="make">Sort: Make</option>
                 <option value="model">Sort: Model</option>
                 <option value="year">Sort: Year</option>
-                <option value="serialNumber">Sort: Serial #</option>
-                <option value="hours">Sort: Hours</option>
+                <option value="serialNumber">Sort: VIN</option>
+                <option value="mileage">Sort: Mileage</option>
                 <option value="condition">Sort: Condition</option>
                 <option value="purchaseDate">Sort: Purchase Date</option>
                 <option value="price">Sort: Price</option>
@@ -670,8 +682,9 @@
                 <th onclick="rptSortBy('make')">Make</th>
                 <th onclick="rptSortBy('model')">Model</th>
                 <th onclick="rptSortBy('year')">Year</th>
-                <th onclick="rptSortBy('serialNumber')">Serial / PIN</th>
-                <th onclick="rptSortBy('hours')">Hours</th>
+                <th onclick="rptSortBy('serialNumber')">VIN</th>
+                <th onclick="rptSortBy('licensePlate')">License Plate</th>
+                <th onclick="rptSortBy('mileage')">Mileage</th>
                 <th onclick="rptSortBy('condition')">Condition</th>
                 <th onclick="rptSortBy('purchaseDate')">Purchased</th>
                 <th onclick="rptSortBy('price')">Price</th>
@@ -683,12 +696,12 @@
     </div>
 </div>
 
-<!-- ══ EQUIPMENT TYPES ══ -->
+<!-- ══ VEHICLE TYPES ══ -->
 <div id="view-categories" class="view">
     <div class="card">
-        <div class="card-title"><div class="card-title-left">🏷 Manage Equipment Types</div></div>
+        <div class="card-title"><div class="card-title-left">🏷 Manage Vehicle Types</div></div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-            <input type="text" id="new-cat-input" placeholder="New equipment type name..." style="min-width:240px;max-width:340px;">
+            <input type="text" id="new-cat-input" placeholder="New vehicle type name..." style="min-width:240px;max-width:340px;">
             <button class="btn btn-primary" onclick="addCategory()">Add Type</button>
         </div>
         <div class="tags" id="cat-tags"></div>
@@ -701,7 +714,7 @@
         <div class="card-title"><div class="card-title-left">🤖 AI Identification — Anthropic API Key</div></div>
         <div>
             <p style="font-size:0.875rem;color:var(--text-secondary);margin-bottom:16px;line-height:1.6;">
-                The AI photo identification uses Claude (by Anthropic). Enter your API key below — it is stored securely in your Firebase account and shared with Farmboss Armory.
+                The AI photo identification uses Claude (by Anthropic). Enter your API key below — it is stored securely in your Firebase account and shared across the Farmboss Suite.
             </p>
             <div class="api-key-row">
                 <div class="form-group">
@@ -720,7 +733,7 @@
     <div class="card">
         <div class="card-title"><div class="card-title-left">🌐 CORS Proxy (Required for AI on GitHub Pages)</div></div>
         <p style="font-size:0.875rem;color:var(--text-secondary);margin-bottom:16px;line-height:1.6;">
-            GitHub Pages blocks direct calls to the Anthropic API (CORS policy). A free Cloudflare Worker proxy fixes this. Set up the proxy in <strong>Farmboss Armory Settings</strong> first — the same Worker URL works for both apps.
+            GitHub Pages blocks direct calls to the Anthropic API (CORS policy). A free Cloudflare Worker proxy fixes this. Set up the proxy in <strong>Farmboss Armory Settings</strong> first — the same Worker URL works for all apps.
         </p>
         <div class="api-key-row">
             <div class="form-group">
@@ -735,7 +748,7 @@
     <div class="card">
         <div class="card-title"><div class="card-title-left">📷 Firebase Storage Setup</div></div>
         <p style="font-size:0.875rem;color:var(--text-secondary);margin-bottom:16px;line-height:1.6;">
-            Photo uploads use Firebase Storage — shared with Farmboss Armory. If already set up there, photos will work here automatically.
+            Photo uploads use Firebase Storage — shared across the Farmboss Suite. If already set up in Armory, photos will work here automatically.
         </p>
         <ol class="setup-steps">
             <li>Go to <strong>console.firebase.google.com</strong> → your <strong>watchroom</strong> project</li>
@@ -755,18 +768,40 @@ service firebase.storage {
     </div>
 </div>
 
+<!-- ══ MAINTENANCE MODAL ══ -->
+<div class="modal-overlay" id="maint-modal">
+    <div class="modal" style="max-width:680px;">
+        <div class="modal-title" id="maint-modal-title">🔧 Maintenance Log</div>
+        <div class="modal-sub" id="maint-modal-sub"></div>
+        <div style="background:var(--bg-card);border-radius:8px;padding:16px;margin-bottom:16px;">
+            <div style="font-size:0.85rem;font-weight:700;margin-bottom:12px;">Add New Record</div>
+            <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+                <div class="form-group"><label>Date</label><input type="date" id="maint-date"></div>
+                <div class="form-group"><label>Type</label><input type="text" id="maint-type" list="maint-types" placeholder="Oil Change, Tire Rotation..."><datalist id="maint-types"><option>Oil Change</option><option>Tire Rotation</option><option>Brake Service</option><option>Transmission Service</option><option>Inspection</option><option>Repair</option><option>Detail</option><option>Registration</option><option>Insurance</option><option>Other</option></datalist></div>
+                <div class="form-group" style="grid-column:1/-1"><label>Description</label><textarea id="maint-desc" rows="2" placeholder="Details of service performed..."></textarea></div>
+                <div class="form-group"><label>Cost ($)</label><input type="number" id="maint-cost" min="0" step="0.01" placeholder="0.00"></div>
+                <div class="form-group"><label>Next Service Date</label><input type="date" id="maint-next-date"></div>
+                <div class="form-group"><label>Mileage at Service</label><input type="number" id="maint-miles" min="0" placeholder="Odometer reading"></div>
+            </div>
+            <button class="btn btn-primary" style="margin-top:8px;" onclick="saveMaintenance()">+ Add Record</button>
+        </div>
+        <div style="font-size:0.85rem;font-weight:700;margin-bottom:10px;">History</div>
+        <div id="maint-history" style="max-height:300px;overflow-y:auto;"></div>
+        <div class="modal-actions"><button class="btn btn-ghost" onclick="closeMaintModal()">Close</button></div>
+    </div>
+</div>
+
 </main>
 </div><!-- end #app -->
 
 <!-- ══ BARCODE MODAL ══ -->
 <div class="modal-overlay" id="barcode-modal">
     <div class="modal" style="max-width:560px;">
-        <div class="modal-title" id="bc-title">Equipment Barcode</div>
+        <div class="modal-title" id="bc-title">Vehicle Barcode</div>
         <div class="modal-sub" id="bc-sub"></div>
         <div id="bc-photos" class="photo-modal-imgs"></div>
         <svg id="bc-svg"></svg>
-        <div id="bc-item-name" style="font-size:0.82rem;font-weight:700;text-align:center;margin-top:4px;color:var(--text-primary);"></div>
-        <div class="modal-sub" id="bc-code" style="margin-top:4px;font-family:monospace;font-size:0.85rem;"></div>
+        <div class="modal-sub" id="bc-code" style="margin-top:6px;font-family:monospace;font-size:0.85rem;"></div>
         <div class="modal-actions">
             <button class="btn btn-gold" onclick="printBarcode()">🖨 Print Label</button>
             <button class="btn btn-dark" onclick="closeModal()">Close</button>
@@ -777,67 +812,11 @@ service firebase.storage {
 <div id="print-area"><div id="print-content"></div></div>
 <div class="toast" id="toast"></div>
 
-<!-- MAINTENANCE MODAL -->
-<div class="modal-overlay" id="maint-modal">
-  <div class="modal" style="max-width:640px;max-height:85vh;overflow-y:auto;">
-    <div class="modal-title" id="maint-item-name">Maintenance Log</div>
-    <div class="modal-sub" id="maint-item-sub"></div>
-    <div style="background:var(--bg-card);border-radius:8px;padding:16px;margin:14px 0;">
-      <div style="font-size:0.85rem;font-weight:600;color:var(--text-primary);margin-bottom:12px;">➕ Add Entry</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-        <div class="form-group">
-          <label>Date</label>
-          <input type="date" id="maint-date">
-        </div>
-        <div class="form-group">
-          <label>Type</label>
-          <select id="maint-type">
-            <option value="">Select type...</option>
-            <option>Oil Change</option>
-            <option>Fuel System Service</option>
-            <option>Filter Replacement</option>
-            <option>Belt / Chain Replacement</option>
-            <option>Hydraulic Service</option>
-            <option>Tire / Track Service</option>
-            <option>Electrical / Battery</option>
-            <option>Inspection / PM Service</option>
-            <option>Repair</option>
-            <option>Welding / Fabrication</option>
-            <option>Calibration</option>
-            <option>Winterization</option>
-            <option>Other</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-group" style="margin-bottom:10px;">
-        <label>Description</label>
-        <textarea id="maint-desc" rows="2" placeholder="Describe the work performed..."></textarea>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-        <div class="form-group">
-          <label>Cost (optional)</label>
-          <input type="number" id="maint-cost" placeholder="0.00" min="0" step="0.01">
-        </div>
-        <div class="form-group">
-          <label>Engine Hours at Service</label>
-          <input type="number" id="maint-hours" placeholder="e.g. 4250" min="0">
-        </div>
-      </div>
-      <button class="btn btn-primary" onclick="addMaintenanceEntry()">Save Entry</button>
-    </div>
-    <div style="font-size:0.85rem;font-weight:600;color:var(--text-primary);margin-bottom:10px;">📋 Maintenance History</div>
-    <div id="maint-history-list"></div>
-    <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeMaintModal()">Close</button>
-    </div>
-  </div>
-</div>
-
 <!-- ══ SCANNER MODAL ══ -->
 <div class="modal-overlay" id="scanner-modal">
     <div class="modal" style="max-width:480px;">
-        <div class="modal-title">📷 Scan Equipment Barcode</div>
-        <div class="modal-sub">Point your camera at a Machinery barcode to look up an item.</div>
+        <div class="modal-title">📷 Scan Vehicle Barcode</div>
+        <div class="modal-sub">Point your camera at an Automotive barcode to look up a vehicle.</div>
         <div id="scanner-video-wrap">
             <video id="scanner-video" playsinline muted autoplay></video>
             <div id="scanner-overlay"><div class="scan-aim"></div></div>
@@ -869,36 +848,18 @@ const storage = firebase.storage();
 //  STATE
 // ═══════════════════════════════════════
 let items = [];
-let categories = [
-    'Tractor - Row Crop','Tractor - 4WD','Tractor - Compact','Tractor - Utility',
-    'Combine Harvester','Cotton Picker',
-    'Row Crop Planter','Air Seeder','No-Till Drill','Grain Drill',
-    'Self-Propelled Sprayer','Pull-Type Sprayer','Anhydrous Applicator',
-    'Disc - Tandem','Disc - Offset','Chisel Plow','Subsoiler','Field Cultivator','Row Cultivator',
-    'Hay Mower','Hay Conditioner','Tedder','Hay Rake','Round Baler','Large Square Baler',
-    'Silage Chopper',
-    'Grain Cart','Gravity Wagon','Grain Auger','Grain Dryer',
-    'Front End Loader','Skid Steer','Telehandler','Backhoe',
-    'Truck - Semi','Truck - Grain','Flatbed Trailer','Grain Trailer','Livestock Trailer',
-    'ATV','UTV / Side-by-Side',
-    'Manure Spreader','Fertilizer Spreader','Lime Spreader',
-    'Post Driver','Generator',
-    'Center Pivot','Irrigation Pump',
-    'Shop Equipment','Other'
-];
-let makes = [
-    'John Deere','Case IH','New Holland','Kubota','Massey Ferguson','AGCO','Fendt','Claas',
-    'Deutz-Fahr','Challenger','Versatile','White','Oliver','Allis-Chalmers',
-    'Minneapolis-Moline','International Harvester','Gleaner','MacDon',
-    'Bobcat','Caterpillar','Komatsu','JCB',
-    'Vermeer','Hesston','Kuhn','Krone','Pottinger','Gehl',
-    'Bush Hog','Land Pride','Woods','Rhino',
-    'Great Plains','Kinze','Monosem','Horsch','Amazone',
-    'J&M','Brent','Parker','Unverferth','Brandt','Westfield','Meridian',
-    'Loftness','Haybuster','New Idea',
-    'Case','Ford'
-];
-let nextId       = 5001;
+let categories = ['Car','Truck','SUV','Van','Minivan','Pickup Truck',
+    'Motorcycle','ATV','UTV / Side-by-Side','Boat','Jet Ski',
+    'RV / Motorhome','Travel Trailer','Flatbed Trailer','Utility Trailer',
+    'Semi Truck','Box Truck','Dump Truck','Tractor (Road)','Other'];
+let makes = ['Ford','Chevrolet','GMC','Dodge','RAM','Toyota','Honda',
+    'Nissan','Jeep','Chrysler','Cadillac','Buick','Lincoln','Mercury',
+    'Pontiac','Oldsmobile','Saturn','Mazda','Subaru','Mitsubishi',
+    'Hyundai','Kia','Volkswagen','BMW','Mercedes-Benz','Audi','Porsche',
+    'Volvo','Land Rover','Jaguar','Lexus','Acura','Infiniti','Tesla',
+    'Rivian','Lucid','Polaris','Can-Am','Kawasaki','Yamaha',
+    'Harley-Davidson','Indian','Ducati','BMW Motorrad','KTM','Arctic Cat'];
+let nextId       = 7001;
 let invSortField = 'id';
 let invSortDir   = 'asc';
 let activeBcId   = null;
@@ -908,12 +869,12 @@ let proxyUrl     = '';
 let aiModel      = 'claude-sonnet-4-6';
 let scannerStream = null;
 let scannerActive = false;
+let currentMaintDocId = null;
 
 let formPhotos = {
-    main:      { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false },
-    serial:    { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false },
-    extra:     { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false },
-    paperwork: { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false }
+    main:   { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false },
+    serial: { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false },
+    extra:  { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false }
 };
 
 const VIEWS = ['dashboard','add-item','inventory','reports','categories','settings'];
@@ -962,7 +923,7 @@ async function doSignOut() {
 // ═══════════════════════════════════════
 async function initApp() {
     try {
-        const cfgDoc = await db.collection('machinery_config').doc('data').get();
+        const cfgDoc = await db.collection('automotive_config').doc('data').get();
         if (cfgDoc.exists) {
             const d = cfgDoc.data();
             if (d.categories && d.categories.length) categories = d.categories;
@@ -979,7 +940,11 @@ async function initApp() {
             proxyUrl = proxyDoc.data().url;
             document.getElementById('api-proxy-input').value = proxyUrl;
         }
-        unsubItems = db.collection('machinery_items').onSnapshot(snap => {
+        const modelDoc = await db.collection('settings').doc('model').get();
+        if (modelDoc.exists && modelDoc.data().model) {
+            aiModel = modelDoc.data().model;
+        }
+        unsubItems = db.collection('automotive_items').onSnapshot(snap => {
             items = snap.docs.map(doc => ({ _docId:doc.id, ...doc.data() }));
             renderDashboard(); renderInventory(); renderReport();
         });
@@ -999,12 +964,12 @@ async function initApp() {
 //  FIRESTORE / STORAGE
 // ═══════════════════════════════════════
 async function saveConfig() {
-    await db.collection('machinery_config').doc('data').set({ categories, makes, nextId });
+    await db.collection('automotive_config').doc('data').set({ categories, makes, nextId });
 }
 
 async function uploadPhoto(slot, file) {
     const ext  = file.name.split('.').pop();
-    const path = `machinery_photos/${Date.now()}_${slot}.${ext}`;
+    const path = `automotive_photos/${Date.now()}_${slot}.${ext}`;
     const ref  = storage.ref().child(path);
     await ref.put(file);
     return await ref.getDownloadURL();
@@ -1012,17 +977,17 @@ async function uploadPhoto(slot, file) {
 
 async function dbAddItem(data, photos) {
     const item = { id:nextId++, addedAt:new Date().toISOString(), photos, ...data };
-    const docRef = await db.collection('machinery_items').add(item);
+    const docRef = await db.collection('automotive_items').add(item);
     await saveConfig();
     return { ...item, _docId:docRef.id };
 }
 
 async function dbUpdateItem(docId, data, photos) {
-    await db.collection('machinery_items').doc(docId).update({ ...data, photos });
+    await db.collection('automotive_items').doc(docId).update({ ...data, photos });
 }
 
 async function dbDeleteItem(docId) {
-    await db.collection('machinery_items').doc(docId).delete();
+    await db.collection('automotive_items').doc(docId).delete();
 }
 
 // ═══════════════════════════════════════
@@ -1046,13 +1011,14 @@ function renderDashboard() {
     const total  = items.length;
     const ms30   = 30*24*60*60*1000;
     const recent = items.filter(i => i.addedAt && (Date.now()-new Date(i.addedAt).getTime())<ms30).length;
-    const hours  = items.filter(i=>i.hours).map(i=>Number(i.hours)||0);
-    const avgHrs = hours.length ? Math.round(hours.reduce((a,b)=>a+b,0)/hours.length).toLocaleString() : '—';
+    const miles  = items.filter(i=>i.mileage).map(i=>Number(i.mileage)||0);
+    const avgMi  = miles.length ? Math.round(miles.reduce((a,b)=>a+b,0)/miles.length).toLocaleString() : '—';
+    const catSet = new Set(items.map(i=>i.category).filter(Boolean));
     document.getElementById('stats-grid').innerHTML = `
-        <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Total Equipment</div></div>
-        <div class="stat-card"><div class="stat-value">${categories.length}</div><div class="stat-label">Equipment Types</div></div>
+        <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Total Vehicles</div></div>
+        <div class="stat-card"><div class="stat-value">${catSet.size}</div><div class="stat-label">Vehicle Types</div></div>
         <div class="stat-card"><div class="stat-value">${recent}</div><div class="stat-label">Added This Month</div></div>
-        <div class="stat-card"><div class="stat-value">${avgHrs}</div><div class="stat-label">Avg Engine Hours</div></div>`;
+        <div class="stat-card"><div class="stat-value">${avgMi}</div><div class="stat-label">Avg Mileage</div></div>`;
     const counts = {};
     items.forEach(it => { counts[it.category]=(counts[it.category]||0)+1; });
     const maxC = Math.max(...Object.values(counts),1);
@@ -1063,14 +1029,14 @@ function renderDashboard() {
                 <div class="cbi-count">${c}</div>
                 <div class="cbi-bar"><div class="cbi-bar-fill" style="width:${(c/maxC*100).toFixed(1)}%"></div></div>
             </div>`).join('')
-        : '<p style="color:var(--text-secondary);padding:16px 0;">No equipment yet.</p>';
+        : '<p style="color:var(--text-secondary);padding:16px 0;">No vehicles yet.</p>';
     const rec = [...items].sort((a,b)=>b.id-a.id).slice(0,10);
     document.getElementById('recent-tbody').innerHTML = rec.length
         ? rec.map(it => {
             const mainUrl = it.photos?.find(p=>p.slot==='main')?.url;
             const thumb = mainUrl
-                ? `<img src="${mainUrl}" class="thumb" alt="" style="cursor:pointer" onclick="window.open('${mainUrl}','_blank')" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb-placeholder',innerHTML:'📷'}))">`
-                : `<div class="thumb-placeholder">🚜</div>`;
+                ? `<img src="${mainUrl}" class="thumb" alt="" style="cursor:pointer" onclick="window.open('${mainUrl}','_blank')" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb-placeholder',innerHTML:'🚗'}))">`
+                : `<div class="thumb-placeholder">🚗</div>`;
             return `<tr>
                 <td>${thumb}</td>
                 <td class="mono">#${it.id}</td>
@@ -1078,10 +1044,10 @@ function renderDashboard() {
                 <td>${it.make||'—'}</td>
                 <td>${it.model||'—'}</td>
                 <td>${it.year||'—'}</td>
-                <td>${it.hours ? Number(it.hours).toLocaleString()+' hrs' : '—'}</td>
+                <td>${it.mileage ? Number(it.mileage).toLocaleString()+' mi' : '—'}</td>
                 <td style="color:var(--text-secondary)">${it.addedAt?new Date(it.addedAt).toLocaleDateString():'—'}</td>
             </tr>`;}).join('')
-        : '<tr><td colspan="8" style="text-align:center;color:var(--text-secondary);padding:30px;">No equipment yet.</td></tr>';
+        : '<tr><td colspan="8" style="text-align:center;color:var(--text-secondary);padding:30px;">No vehicles yet.</td></tr>';
 }
 
 // ═══════════════════════════════════════
@@ -1096,9 +1062,8 @@ function onPhotoSelected(slot, input) {
         formPhotos[slot].base64   = e.target.result.split(',')[1];
         formPhotos[slot].mimeType = file.type;
         renderPhotoPreview(slot, e.target.result);
-        if (slot==='main')      document.getElementById('btn-identify').disabled = false;
-        if (slot==='serial')    document.getElementById('btn-ocr').disabled      = false;
-        if (slot==='paperwork') document.getElementById('btn-paperwork').disabled = false;
+        if (slot==='main')   document.getElementById('btn-identify').disabled = false;
+        if (slot==='serial') document.getElementById('btn-ocr').disabled      = false;
     };
     reader.readAsDataURL(file);
 }
@@ -1110,19 +1075,18 @@ function renderPhotoPreview(slot, dataUrl) {
 
 function removePhoto(slot) {
     formPhotos[slot] = { file:null, base64:null, mimeType:null, existingUrl:null, deleted:true };
-    const icons = { main:'📷', serial:'📋', extra:'🖼', paperwork:'📄' };
+    const icons = { main:'📷', serial:'📋', extra:'🖼' };
     document.getElementById('prev-'+slot).innerHTML =
         `<span class="no-photo">${icons[slot]}</span><button type="button" class="remove-photo" onclick="removePhoto('${slot}')">✕</button>`;
     document.getElementById('file-'+slot).value = '';
-    if (slot==='main')      document.getElementById('btn-identify').disabled = true;
-    if (slot==='serial')    document.getElementById('btn-ocr').disabled      = true;
-    if (slot==='paperwork') document.getElementById('btn-paperwork').disabled = true;
+    if (slot==='main')   document.getElementById('btn-identify').disabled = true;
+    if (slot==='serial') document.getElementById('btn-ocr').disabled      = true;
 }
 
 async function callClaude(base64, mimeType, prompt) {
     if (!apiKey) { toast('Set your Anthropic API key in Settings first.','error'); return null; }
     const msgPayload = {
-        model:'claude-sonnet-4-6', max_tokens:512,
+        model: aiModel, max_tokens:512,
         messages:[{ role:'user', content:[
             { type:'image', source:{ type:'base64', media_type:mimeType, data:base64 }},
             { type:'text', text:prompt }
@@ -1165,9 +1129,8 @@ async function identifyItem() {
     btn.disabled = true; btn.classList.add('scanning'); btn.textContent = '⏳ Identifying...';
     status.textContent = 'Analyzing image with AI...';
     try {
-        const prompt = `Analyze this farm equipment image. Return ONLY valid JSON with these fields:
-{"make":"manufacturer/brand name or empty","model":"model name or empty","year":"4-digit year or empty","category":"one of: Tractor - Row Crop,Tractor - 4WD,Tractor - Compact,Tractor - Utility,Combine Harvester,Cotton Picker,Row Crop Planter,Air Seeder,No-Till Drill,Grain Drill,Self-Propelled Sprayer,Pull-Type Sprayer,Anhydrous Applicator,Disc - Tandem,Disc - Offset,Chisel Plow,Subsoiler,Field Cultivator,Row Cultivator,Hay Mower,Hay Conditioner,Tedder,Hay Rake,Round Baler,Large Square Baler,Silage Chopper,Grain Cart,Gravity Wagon,Grain Auger,Grain Dryer,Front End Loader,Skid Steer,Telehandler,Backhoe,Truck - Semi,Truck - Grain,Flatbed Trailer,Grain Trailer,Livestock Trailer,ATV,UTV / Side-by-Side,Manure Spreader,Fertilizer Spreader,Lime Spreader,Post Driver,Generator,Center Pivot,Irrigation Pump,Shop Equipment,Other or empty","condition":"Excellent,Good,Fair,Poor or empty"}
-Only include values you are reasonably confident about. Return only the JSON object, no other text.`;
+        const prompt = `Analyze this vehicle image. Return ONLY valid JSON:
+{"make":"brand or empty","model":"model name or empty","year":"4-digit year or empty","category":"Car,Truck,SUV,Van,Minivan,Pickup Truck,Motorcycle,ATV,UTV / Side-by-Side,Boat,RV / Motorhome,Other or empty","condition":"Excellent,Good,Fair,Poor or empty","color":"color or empty"}`;
         const raw = await callClaude(p.base64, p.mimeType, prompt);
         if (!raw) return;
         const jsonMatch = raw.match(/\{[\s\S]*\}/);
@@ -1179,6 +1142,7 @@ Only include values you are reasonably confident about. Return only the JSON obj
         if (result.year)      { document.getElementById('f-year').value = result.year; filled.push('Year'); }
         if (result.category)  { populateCatSelect(); document.getElementById('f-category').value = result.category; filled.push('Type'); }
         if (result.condition) { document.getElementById('f-condition').value = result.condition; filled.push('Condition'); }
+        if (result.color)     { document.getElementById('f-color').value = result.color; filled.push('Color'); }
         status.textContent = filled.length
             ? `✅ AI filled in: ${filled.join(', ')}. Review and adjust as needed.`
             : '⚠️ AI could not identify specific details. Fill in fields manually.';
@@ -1188,27 +1152,27 @@ Only include values you are reasonably confident about. Return only the JSON obj
         status.style.color  = 'var(--danger)';
     } finally {
         btn.disabled = false; btn.classList.remove('scanning');
-        btn.innerHTML = '🤖 Identify Equipment with AI';
+        btn.innerHTML = '🤖 Identify Vehicle with AI';
     }
 }
 
-async function extractSerial() {
+async function extractVIN() {
     const p = formPhotos.serial; if (!p.base64) return;
     const btn = document.getElementById('btn-ocr');
     const status = document.getElementById('ai-status');
     btn.disabled = true; btn.classList.add('scanning'); btn.textContent = '⏳ Reading...';
-    status.textContent = 'Reading serial/PIN number...';
+    status.textContent = 'Reading VIN...';
     try {
-        const prompt = `This image shows a farm equipment serial number or PIN plate. Extract ONLY the serial number or PIN exactly as it appears, character by character. Return ONLY the serial number/PIN — no explanation, no labels, no other text.`;
+        const prompt = `This image shows a vehicle VIN plate or VIN sticker. Extract ONLY the 17-character VIN exactly as it appears. Return ONLY the VIN — no explanation, no labels, no other text.`;
         const result = await callClaude(p.base64, p.mimeType, prompt);
         if (!result) return;
-        const sn = result.trim().replace(/['"]/g,'');
-        if (sn) {
-            document.getElementById('f-serial').value = sn;
-            status.textContent = `✅ Serial/PIN extracted: ${sn}`;
+        const vin = result.trim().replace(/['"]/g,'');
+        if (vin) {
+            document.getElementById('f-serial').value = vin;
+            status.textContent = `✅ VIN extracted: ${vin}`;
             status.style.color  = 'var(--success)';
         } else {
-            status.textContent = '⚠️ Could not read serial/PIN clearly.';
+            status.textContent = '⚠️ Could not read VIN clearly.';
             status.style.color  = 'var(--text-secondary)';
         }
     } catch(err) {
@@ -1216,8 +1180,38 @@ async function extractSerial() {
         status.style.color  = 'var(--danger)';
     } finally {
         btn.disabled = false; btn.classList.remove('scanning');
-        btn.innerHTML = '🔍 Extract Serial/PIN with AI';
+        btn.innerHTML = '🔍 Extract VIN with AI';
     }
+}
+
+async function onMileagePhotoSelected(input) {
+    const file = input.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async e => {
+        const base64 = e.target.result.split(',')[1];
+        const mimeType = file.type;
+        const btn = document.querySelector('[onclick*="file-mileage"]');
+        if (btn) { btn.disabled = true; btn.textContent = '⏳ Reading...'; }
+        try {
+            const prompt = `This image shows a vehicle odometer or mileage display. Extract ONLY the numeric mileage reading. Return ONLY the number with no commas, no units, no other text.`;
+            const result = await callClaude(base64, mimeType, prompt);
+            if (result) {
+                const miles = result.trim().replace(/[^0-9]/g,'');
+                if (miles) {
+                    document.getElementById('f-mileage').value = miles;
+                    document.getElementById('ai-status').textContent = `✅ Mileage read: ${Number(miles).toLocaleString()} miles`;
+                    document.getElementById('ai-status').style.color = 'var(--success)';
+                }
+            }
+        } catch(err) {
+            document.getElementById('ai-status').textContent = '❌ Could not read mileage: ' + err.message;
+            document.getElementById('ai-status').style.color = 'var(--danger)';
+        } finally {
+            if (btn) { btn.disabled = false; btn.textContent = '📷 AI Read'; }
+            input.value = '';
+        }
+    };
+    reader.readAsDataURL(file);
 }
 
 // ═══════════════════════════════════════
@@ -1256,7 +1250,11 @@ document.getElementById('item-form').addEventListener('submit', async e => {
         model:        document.getElementById('f-model').value.trim(),
         year:         document.getElementById('f-year').value.trim(),
         serialNumber: document.getElementById('f-serial').value.trim(),
-        hours:        document.getElementById('f-hours').value.trim(),
+        licensePlate: document.getElementById('f-license').value.trim(),
+        color:        document.getElementById('f-color').value.trim(),
+        engine:       document.getElementById('f-engine').value.trim(),
+        transmission: document.getElementById('f-transmission').value,
+        mileage:      document.getElementById('f-mileage').value.trim(),
         condition:    document.getElementById('f-condition').value,
         purchaseDate: document.getElementById('f-purchase-date').value,
         price:        document.getElementById('f-price').value.trim(),
@@ -1268,7 +1266,7 @@ document.getElementById('item-form').addEventListener('submit', async e => {
         addMakeIfNew(data.make);
         const existingPhotos = docId ? (items.find(i=>i._docId===docId)?.photos||[]) : [];
         const photos = [];
-        for (const slot of ['main','serial','extra','paperwork']) {
+        for (const slot of ['main','serial','extra']) {
             const p = formPhotos[slot];
             if (p.file) {
                 try {
@@ -1285,10 +1283,10 @@ document.getElementById('item-form').addEventListener('submit', async e => {
         if (eid && docId) {
             await dbUpdateItem(docId, data, photos);
             await saveConfig();
-            toast('Equipment updated.','success');
+            toast('Vehicle updated.','success');
         } else {
             await dbAddItem(data, photos);
-            toast('Equipment added!','success');
+            toast('Vehicle added!','success');
         }
         populateMakeList();
         resetForm();
@@ -1297,7 +1295,7 @@ document.getElementById('item-form').addEventListener('submit', async e => {
         toast('Error saving: '+err.message,'error');
     } finally {
         btn.disabled = false;
-        btn.textContent = eid ? 'Update Equipment' : 'Save Equipment';
+        btn.textContent = eid ? 'Update Vehicle' : 'Save Vehicle';
     }
 });
 
@@ -1305,22 +1303,17 @@ function resetForm() {
     document.getElementById('edit-id').value           = '';
     document.getElementById('edit-doc-id').value       = '';
     document.getElementById('item-form').reset();
-    document.getElementById('form-title').textContent  = '➕ Add New Equipment';
-    document.getElementById('form-submit-btn').textContent = 'Save Equipment';
+    document.getElementById('form-title').textContent  = '➕ Add New Vehicle';
+    document.getElementById('form-submit-btn').textContent = 'Save Vehicle';
     document.getElementById('form-submit-btn').disabled    = false;
     document.getElementById('ai-status').textContent   = '';
     populateCatSelect(); populateMakeList();
-    for (const slot of ['main','serial','extra','paperwork']) {
+    for (const slot of ['main','serial','extra']) {
         formPhotos[slot] = { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false };
     }
-    removePhoto('main'); removePhoto('serial'); removePhoto('extra'); removePhoto('paperwork');
-    document.getElementById('btn-identify').disabled  = true;
-    document.getElementById('btn-ocr').disabled       = true;
-    document.getElementById('btn-paperwork').disabled = true;
-    hoursPhotoData = { base64:null, mimeType:null };
-    document.getElementById('file-hours-meter').value = '';
-    document.getElementById('btn-read-hours').disabled = true;
-    document.getElementById('hours-ai-status').textContent = '';
+    removePhoto('main'); removePhoto('serial'); removePhoto('extra');
+    document.getElementById('btn-identify').disabled = true;
+    document.getElementById('btn-ocr').disabled      = true;
 }
 
 function editItem(docId) {
@@ -1334,23 +1327,26 @@ function editItem(docId) {
     document.getElementById('f-model').value           = it.model||'';
     document.getElementById('f-year').value            = it.year||'';
     document.getElementById('f-serial').value          = it.serialNumber||'';
-    document.getElementById('f-hours').value           = it.hours||'';
+    document.getElementById('f-license').value         = it.licensePlate||'';
+    document.getElementById('f-color').value           = it.color||'';
+    document.getElementById('f-engine').value          = it.engine||'';
+    document.getElementById('f-transmission').value    = it.transmission||'';
+    document.getElementById('f-mileage').value         = it.mileage||'';
     document.getElementById('f-condition').value       = it.condition||'';
     document.getElementById('f-purchase-date').value   = it.purchaseDate||'';
     document.getElementById('f-price').value           = it.price||'';
     document.getElementById('f-location').value        = it.location||'';
     document.getElementById('f-notes').value           = it.notes||'';
-    document.getElementById('form-title').textContent      = `✏️ Edit Equipment #${it.id}`;
-    document.getElementById('form-submit-btn').textContent = 'Update Equipment';
-    for (const slot of ['main','serial','extra','paperwork']) {
+    document.getElementById('form-title').textContent      = `✏️ Edit Vehicle #${it.id}`;
+    document.getElementById('form-submit-btn').textContent = 'Update Vehicle';
+    for (const slot of ['main','serial','extra']) {
         const ph = it.photos?.find(p=>p.slot===slot);
         if (ph) {
             formPhotos[slot] = { file:null, base64:null, mimeType:null, existingUrl:ph.url, deleted:false };
             document.getElementById('prev-'+slot).innerHTML =
                 `<img src="${ph.url}" alt="${slot}"><button type="button" class="remove-photo" onclick="removePhoto('${slot}')">✕</button>`;
-            if (slot==='main')      document.getElementById('btn-identify').disabled = false;
-            if (slot==='serial')    document.getElementById('btn-ocr').disabled      = false;
-            if (slot==='paperwork') document.getElementById('btn-paperwork').disabled = false;
+            if (slot==='main')   document.getElementById('btn-identify').disabled = false;
+            if (slot==='serial') document.getElementById('btn-ocr').disabled      = false;
         }
     }
     window.scrollTo(0,0);
@@ -1358,8 +1354,8 @@ function editItem(docId) {
 
 async function deleteItem(docId) {
     const it = items.find(i=>i._docId===docId); if (!it) return;
-    if (!confirm(`Delete #${it.id} (${it.make||''} ${it.model||''})? This cannot be undone.`)) return;
-    try { await dbDeleteItem(it._docId); toast('Equipment deleted.'); }
+    if (!confirm(`Delete #${it.id} (${it.year||''} ${it.make||''} ${it.model||''})? This cannot be undone.`)) return;
+    try { await dbDeleteItem(it._docId); toast('Vehicle deleted.'); }
     catch(err) { toast('Error: '+err.message,'error'); }
 }
 
@@ -1383,7 +1379,7 @@ function filteredItems(searchId, catId) {
         const mc = !cat  || it.category===cat;
         const mco= !cond || it.condition===cond;
         const ms = !q    || [it.id?.toString(),it.category,it.make,it.model,it.year,
-            it.serialNumber,it.condition,it.location,it.notes].some(v=>v?.toString().toLowerCase().includes(q));
+            it.serialNumber,it.licensePlate,it.color,it.condition,it.location,it.notes].some(v=>v?.toString().toLowerCase().includes(q));
         return mc && mco && ms;
     });
 }
@@ -1391,7 +1387,7 @@ function filteredItems(searchId, catId) {
 function sorted(arr, field, dir) {
     return [...arr].sort((a,b) => {
         let va=a[field]??'', vb=b[field]??'';
-        if (['id','hours','price'].includes(field)) { va=Number(va)||0; vb=Number(vb)||0; }
+        if (['id','mileage','price'].includes(field)) { va=Number(va)||0; vb=Number(vb)||0; }
         else if (field==='year')         { va=Number(va)||0; vb=Number(vb)||0; }
         else if (field==='purchaseDate') { va=va?new Date(va).getTime():0; vb=vb?new Date(vb).getTime():0; }
         else                             { va=String(va).toLowerCase(); vb=String(vb).toLowerCase(); }
@@ -1403,7 +1399,7 @@ function renderInventory() {
     const data  = sorted(filteredItems('inv-search','inv-filter-cat'), invSortField, invSortDir);
     document.getElementById('inv-count').textContent = `${data.length} item${data.length!==1?'s':''}`;
     document.querySelectorAll('#inv-table thead th').forEach(th=>th.classList.remove('sort-asc','sort-desc'));
-    const thIdx = {id:1,category:2,make:3,model:4,year:5,serialNumber:6,hours:7,condition:8,location:9,purchaseDate:10};
+    const thIdx = {id:1,category:2,make:3,model:4,year:5,serialNumber:6,mileage:7,condition:8,location:9,purchaseDate:10};
     const ti = thIdx[invSortField];
     if (ti!==undefined) document.querySelectorAll('#inv-table thead th')[ti]?.classList.add(invSortDir==='asc'?'sort-asc':'sort-desc');
     const tbody = document.getElementById('inv-tbody');
@@ -1413,8 +1409,8 @@ function renderInventory() {
     tbody.innerHTML = data.map(it => {
         const mainUrl = it.photos?.find(p=>p.slot==='main')?.url;
         const thumb = mainUrl
-            ? `<img src="${mainUrl}" class="thumb" alt="" style="cursor:pointer" onclick="window.open('${mainUrl}','_blank')" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb-placeholder',innerHTML:'🚜'}))">`
-            : `<div class="thumb-placeholder">🚜</div>`;
+            ? `<img src="${mainUrl}" class="thumb" alt="" style="cursor:pointer" onclick="window.open('${mainUrl}','_blank')" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb-placeholder',innerHTML:'🚗'}))">`
+            : `<div class="thumb-placeholder">🚗</div>`;
         const condBadge = it.condition ? `<span style="font-size:0.72rem;font-weight:600;color:${
             it.condition==='Excellent'?'#15803d':it.condition==='Good'?'#1d4ed8':it.condition==='Fair'?'#92400e':'#dc2626'}">${it.condition}</span>` : '—';
         return `<tr>
@@ -1424,14 +1420,14 @@ function renderInventory() {
             <td>${esc(it.make)||'—'}</td>
             <td>${esc(it.model)||'—'}</td>
             <td>${it.year||'—'}</td>
-            <td class="mono">${esc(it.serialNumber)||'—'}</td>
-            <td>${it.hours ? Number(it.hours).toLocaleString()+' hrs' : '—'}</td>
+            <td class="mono" style="font-size:0.75rem;">${esc(it.serialNumber)||'—'}</td>
+            <td>${it.mileage ? Number(it.mileage).toLocaleString()+' mi' : '—'}</td>
             <td>${condBadge}</td>
             <td style="font-size:0.82rem">${esc(it.location)||'—'}</td>
             <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():'—'}</td>
             <td style="white-space:nowrap">
+                <button class="btn btn-ghost btn-sm" onclick="showMaintenance('${it._docId}')" title="Maintenance Log">🔧</button>
                 <button class="btn btn-info btn-sm" onclick="showBarcode('${it._docId}')" title="Barcode/Photos">▣</button>
-                <button class="btn btn-ghost btn-sm" style="color:#d4941a;border-color:#d4941a;" onclick="openMaintenance('${it._docId}')" title="Maintenance Log">🔧</button>
                 <button class="btn btn-ghost btn-sm" onclick="editItem('${it._docId}')" title="Edit">✎</button>
                 <button class="btn btn-danger btn-sm" onclick="deleteItem('${it._docId}')" title="Delete">✗</button>
             </td></tr>`;}).join('');
@@ -1461,15 +1457,16 @@ function renderReport() {
             <td>${esc(it.make)||'—'}</td>
             <td>${esc(it.model)||'—'}</td>
             <td>${it.year||'—'}</td>
-            <td class="mono">${esc(it.serialNumber)||'—'}</td>
-            <td>${it.hours ? Number(it.hours).toLocaleString()+' hrs' : '—'}</td>
+            <td class="mono" style="font-size:0.75rem;">${esc(it.serialNumber)||'—'}</td>
+            <td>${esc(it.licensePlate)||'—'}</td>
+            <td>${it.mileage ? Number(it.mileage).toLocaleString()+' mi' : '—'}</td>
             <td>${it.condition||'—'}</td>
             <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():'—'}</td>
             <td>${it.price ? '$'+Number(it.price).toLocaleString() : '—'}</td>
             <td style="font-size:0.82rem">${esc(it.location)||'—'}</td>
             <td style="color:var(--text-secondary);font-size:0.82rem">${esc(it.notes)||'—'}</td>
           </tr>`).join('')
-        :'<tr><td colspan="12" style="text-align:center;color:var(--text-secondary);padding:30px">No items match filters.</td></tr>';
+        :'<tr><td colspan="13" style="text-align:center;color:var(--text-secondary);padding:30px">No items match filters.</td></tr>';
 }
 function printReport() {
     const field=document.getElementById('rpt-sort-field').value, dir=document.getElementById('rpt-sort-dir').value;
@@ -1478,14 +1475,14 @@ function printReport() {
         <style>body{font-family:Arial,sans-serif;font-size:9px;}h2{font-size:13px;margin-bottom:4px;}
         p{color:#666;margin-bottom:8px;}table{width:100%;border-collapse:collapse;}
         th,td{border:1px solid #ccc;padding:4px 5px;}th{background:#f0f0f0;}</style>
-        <h2>Farmboss Machinery — Inventory Report</h2>
+        <h2>Farmboss Automotive — Inventory Report</h2>
         <p>Generated: ${new Date().toLocaleString()} | Items: ${data.length}</p>
         <table><thead><tr><th>ID</th><th>Type</th><th>Make</th><th>Model</th><th>Year</th>
-        <th>Serial/PIN</th><th>Hours</th><th>Condition</th><th>Purchased</th><th>Price</th><th>Location</th><th>Notes</th>
+        <th>VIN</th><th>License Plate</th><th>Mileage</th><th>Condition</th><th>Purchased</th><th>Price</th><th>Location</th><th>Notes</th>
         </tr></thead><tbody>${data.map(it=>`<tr>
             <td>#${it.id}</td><td>${it.category||''}</td><td>${it.make||''}</td><td>${it.model||''}</td>
-            <td>${it.year||''}</td><td>${it.serialNumber||''}</td>
-            <td>${it.hours ? Number(it.hours).toLocaleString()+' hrs' : ''}</td>
+            <td>${it.year||''}</td><td>${it.serialNumber||''}</td><td>${it.licensePlate||''}</td>
+            <td>${it.mileage ? Number(it.mileage).toLocaleString()+' mi' : ''}</td>
             <td>${it.condition||''}</td>
             <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():''}</td>
             <td>${it.price ? '$'+Number(it.price).toLocaleString() : ''}</td>
@@ -1534,7 +1531,7 @@ async function testApiKey() {
     const el = document.getElementById('api-status');
     el.style.display='block'; el.className='api-status'; el.textContent='Testing…';
     try {
-        const testPayload = { model:'claude-sonnet-4-6', max_tokens:10, messages:[{role:'user',content:'Hi'}] };
+        const testPayload = { model:aiModel, max_tokens:10, messages:[{role:'user',content:'Hi'}] };
         let res;
         if (proxy) {
             res = await fetch(proxy, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...testPayload, apiKey:key}) });
@@ -1564,22 +1561,29 @@ async function saveProxyUrl() {
     toast(url ? 'Proxy URL saved!' : 'Proxy URL cleared.', 'success');
 }
 
+async function saveModel() {
+    const m = document.getElementById('api-model-input')?.value?.trim();
+    if (!m) return;
+    await db.collection('settings').doc('model').set({ model:m });
+    aiModel = m;
+    toast('Model saved!','success');
+}
+
 // ═══════════════════════════════════════
 //  BARCODE MODAL
 // ═══════════════════════════════════════
 function showBarcode(docId) {
     const it = items.find(i=>i._docId===docId); if (!it) return;
     activeBcId = docId;
-    const label = [it.make, it.model, it.year].filter(Boolean).join(' ') || `Equipment #${it.id}`;
+    const label = [it.year, it.make, it.model].filter(Boolean).join(' ') || `Vehicle #${it.id}`;
     document.getElementById('bc-title').textContent = label;
-    document.getElementById('bc-sub').textContent   = `${it.category||''} | SN: ${it.serialNumber||'N/A'}`;
+    document.getElementById('bc-sub').textContent   = `${it.category||''} | VIN: ${it.serialNumber||'N/A'}`;
     const photos = it.photos||[];
     document.getElementById('bc-photos').innerHTML = photos.length
         ? photos.map(p=>`<img src="${p.url}" alt="${p.slot}" onclick="window.open('${p.url}','_blank')" title="Click to enlarge">`).join('')
         : '';
-    const code = `MCH${String(it.id).padStart(6,'0')}`;
+    const code = `AUT${String(it.id).padStart(6,'0')}`;
     document.getElementById('bc-code').textContent = code;
-    document.getElementById('bc-item-name').textContent = label;
     try { JsBarcode('#bc-svg', code, {format:'CODE128',width:2.2,height:80,displayValue:true,fontSize:13,margin:10,background:'#ffffff',lineColor:'#000000'}); }
     catch(e) { console.error(e); }
     document.getElementById('barcode-modal').classList.add('show');
@@ -1589,20 +1593,23 @@ document.getElementById('barcode-modal').addEventListener('click', e => { if(e.t
 function printBarcode() {
     if (!activeBcId) return;
     const it = items.find(i=>i._docId===activeBcId); if (!it) return;
-    const label = [it.make,it.model,it.year].filter(Boolean).join(' ')||`Equipment #${it.id}`;
+    const label = [it.year, it.make, it.model].filter(Boolean).join(' ')||`Vehicle #${it.id}`;
+    const code = `AUT${String(it.id).padStart(6,'0')}`;
     document.getElementById('print-content').innerHTML=`
         <style>
-            @page { size: 2in 0.75in landscape; margin: 0; }
-            body { margin:0; padding:2px 4px; font-family:Arial,sans-serif;
-                   display:flex; flex-direction:column; align-items:center;
-                   justify-content:center; height:0.75in; width:2in; overflow:hidden; }
-            .item-name { font-size:7pt; font-weight:bold; text-align:center;
-                         white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-                         max-width:1.9in; line-height:1.1; }
-            svg { max-width:1.9in; height:auto; }
+        body{font-family:Arial,sans-serif;text-align:center;padding:10px;}
+        .brady-label{display:inline-flex;flex-direction:column;align-items:center;border:2px solid #333;padding:8px 16px;border-radius:4px;min-width:2in;max-width:3in;}
+        .brady-label h3{margin:0 0 2px;font-size:11px;font-weight:bold;}
+        .brady-label p{margin:0 0 6px;font-size:9px;color:#555;}
+        .brady-label .item-name{font-size:10px;font-weight:bold;margin-top:4px;text-align:center;}
+        @media print{@page{size:3in 0.75in landscape;margin:0;}}
         </style>
-        <div class="item-name">${label}</div>
-        ${document.getElementById('bc-svg').outerHTML}`;
+        <div class="brady-label">
+          <h3>${label}</h3>
+          <p>${it.category||''} | VIN: ${it.serialNumber||'N/A'}</p>
+          ${document.getElementById('bc-svg').outerHTML}
+          <div class="item-name">${code}</div>
+        </div>`;
     window.print();
 }
 
@@ -1610,11 +1617,11 @@ function printBarcode() {
 //  CSV EXPORT
 // ═══════════════════════════════════════
 function exportCSV() {
-    const hdrs=['ID','Type','Make','Model','Year','Serial/PIN','Hours','Condition','Purchase Date','Price','Location','Notes','Date Added'];
-    const rows=items.map(it=>[it.id,it.category,it.make,it.model,it.year,it.serialNumber,it.hours,it.condition,it.purchaseDate,it.price,it.location,it.notes,
+    const hdrs=['ID','Type','Make','Model','Year','VIN','License Plate','Color','Engine','Transmission','Mileage','Condition','Purchase Date','Price','Location','Notes','Date Added'];
+    const rows=items.map(it=>[it.id,it.category,it.make,it.model,it.year,it.serialNumber,it.licensePlate,it.color,it.engine,it.transmission,it.mileage,it.condition,it.purchaseDate,it.price,it.location,it.notes,
         it.addedAt?new Date(it.addedAt).toLocaleDateString():''].map(v=>`"${String(v??'').replace(/"/g,'""')}"`));
     const csv=[hdrs.join(','),...rows.map(r=>r.join(','))].join('\n');
-    const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(new Blob([csv],{type:'text/csv'})),download:`farmboss-machinery-${new Date().toISOString().slice(0,10)}.csv`});
+    const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(new Blob([csv],{type:'text/csv'})),download:`farmboss-automotive-${new Date().toISOString().slice(0,10)}.csv`});
     a.click(); URL.revokeObjectURL(a.href); toast('CSV exported!','success');
 }
 
@@ -1649,11 +1656,11 @@ async function openScanner() {
                 if (result) {
                     const code = result.getText();
                     document.getElementById('scanner-result').textContent = `Scanned: ${code}`;
-                    const match = items.find(i=>`MCH${String(i.id).padStart(6,'0')}`===code);
+                    const match = items.find(i=>`AUT${String(i.id).padStart(6,'0')}`===code);
                     if (match) {
                         closeScanner();
                         editItem(match._docId);
-                        toast(`Found: ${match.make||''} ${match.model||''} #${match.id}`,'success');
+                        toast(`Found: ${match.year||''} ${match.make||''} ${match.model||''} #${match.id}`,'success');
                     } else {
                         document.getElementById('scanner-result').textContent = `Code "${code}" not found in inventory.`;
                         setTimeout(() => { if(scannerActive) requestAnimationFrame(scan); }, 2000);
@@ -1676,20 +1683,78 @@ function closeScanner() {
 document.getElementById('scanner-modal').addEventListener('click', e => { if(e.target===document.getElementById('scanner-modal'))closeScanner(); });
 
 // ═══════════════════════════════════════
+//  MAINTENANCE
+// ═══════════════════════════════════════
+function showMaintenance(docId) {
+    const it = items.find(i=>i._docId===docId); if (!it) return;
+    currentMaintDocId = docId;
+    document.getElementById('maint-modal-title').textContent = `🔧 ${it.make||''} ${it.model||''} — Maintenance Log`;
+    document.getElementById('maint-modal-sub').textContent = `${it.year||''} ${it.category||''} | VIN: ${it.serialNumber||'N/A'}`;
+    document.getElementById('maint-date').value = new Date().toISOString().split('T')[0];
+    renderMaintenanceHistory(it.maintenance||[]);
+    document.getElementById('maint-modal').classList.add('show');
+}
+
+function renderMaintenanceHistory(records) {
+    const el = document.getElementById('maint-history');
+    if (!records.length) { el.innerHTML = '<p style="color:var(--text-secondary);padding:12px 0;">No maintenance records yet.</p>'; return; }
+    el.innerHTML = [...records].reverse().map((r,i)=>`
+        <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg-secondary);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                <span style="font-weight:700;font-size:0.9rem;">${esc(r.type||'Service')}</span>
+                <span style="font-size:0.78rem;color:var(--text-secondary);">${r.date?new Date(r.date+'T00:00:00').toLocaleDateString():''}</span>
+            </div>
+            ${r.description?`<p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:4px;">${esc(r.description)}</p>`:''}
+            <div style="display:flex;gap:16px;font-size:0.78rem;color:var(--text-secondary);">
+                ${r.cost?`<span>💰 $${Number(r.cost).toLocaleString()}</span>`:''}
+                ${r.miles?`<span>🚗 ${Number(r.miles).toLocaleString()} mi</span>`:''}
+                ${r.nextDate?`<span>📅 Next: ${new Date(r.nextDate+'T00:00:00').toLocaleDateString()}</span>`:''}
+            </div>
+        </div>`).join('');
+}
+
+async function saveMaintenance() {
+    const record = {
+        date: document.getElementById('maint-date').value,
+        type: document.getElementById('maint-type').value.trim(),
+        description: document.getElementById('maint-desc').value.trim(),
+        cost: document.getElementById('maint-cost').value,
+        nextDate: document.getElementById('maint-next-date').value,
+        miles: document.getElementById('maint-miles').value,
+        addedAt: new Date().toISOString()
+    };
+    if (!record.type) { toast('Enter a service type.','error'); return; }
+    const it = items.find(i=>i._docId===currentMaintDocId); if (!it) return;
+    const maintenance = [...(it.maintenance||[]), record];
+    try {
+        await db.collection('automotive_items').doc(currentMaintDocId).update({ maintenance });
+        document.getElementById('maint-type').value='';
+        document.getElementById('maint-desc').value='';
+        document.getElementById('maint-cost').value='';
+        document.getElementById('maint-next-date').value='';
+        document.getElementById('maint-miles').value='';
+        toast('Record added!','success');
+    } catch(err) { toast('Error: '+err.message,'error'); }
+}
+
+function closeMaintModal() { document.getElementById('maint-modal').classList.remove('show'); currentMaintDocId=null; }
+document.getElementById('maint-modal').addEventListener('click', e => { if(e.target===document.getElementById('maint-modal'))closeMaintModal(); });
+
+// ═══════════════════════════════════════
 //  UTILS
 // ═══════════════════════════════════════
 function catClass(cat) {
     if (!cat) return 'cat-default';
     const c = cat.toLowerCase();
-    if (c.includes('tractor'))   return 'cat-tractor';
-    if (c.includes('combine') || c.includes('cotton')) return 'cat-combine';
-    if (c.includes('plant') || c.includes('drill') || c.includes('seeder')) return 'cat-planter';
-    if (c.includes('spray') || c.includes('anhydrous')) return 'cat-sprayer';
-    if (c.includes('disc') || c.includes('chisel') || c.includes('cultiv') || c.includes('ripper') || c.includes('subsoil')) return 'cat-tillage';
-    if (c.includes('hay') || c.includes('baler') || c.includes('mower') || c.includes('tedder') || c.includes('rake') || c.includes('silage')) return 'cat-hay';
-    if (c.includes('grain') || c.includes('wagon') || c.includes('auger') || c.includes('dryer')) return 'cat-grain';
-    if (c.includes('loader') || c.includes('skid') || c.includes('telehandler') || c.includes('backhoe')) return 'cat-loader';
-    if (c.includes('truck') || c.includes('trailer') || c.includes('atv') || c.includes('utv')) return 'cat-truck';
+    if (c==='car')                                        return 'cat-car';
+    if (c.includes('truck') || c.includes('semi') || c.includes('box') || c.includes('dump')) return 'cat-truck';
+    if (c==='suv')                                        return 'cat-suv';
+    if (c.includes('van') || c.includes('minivan'))       return 'cat-van';
+    if (c.includes('motorcycle') || c.includes('harley')) return 'cat-moto';
+    if (c.includes('atv') || c.includes('utv') || c.includes('side-by-side')) return 'cat-atv';
+    if (c.includes('boat') || c.includes('jet ski'))      return 'cat-boat';
+    if (c.includes('rv') || c.includes('motorhome') || c.includes('trailer')) return 'cat-rv';
+    if (c.includes('pickup'))                             return 'cat-truck';
     return 'cat-default';
 }
 function esc(s) { return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'):''; }
@@ -1697,163 +1762,6 @@ function toast(msg, type='') {
     const el = document.getElementById('toast');
     el.textContent=msg; el.className=`toast show${type?' '+type:''}`;
     clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),3500);
-}
-
-// ═══════════════════════════════════════
-//  MAINTENANCE
-// ═══════════════════════════════════════
-let activeMaintDocId = null;
-
-function openMaintenance(docId) {
-    const it = items.find(i => i._docId === docId); if (!it) return;
-    activeMaintDocId = docId;
-    const label = [it.make, it.model, it.year].filter(Boolean).join(' ') || `Equipment #${it.id}`;
-    document.getElementById('maint-item-name').textContent = '🔧 ' + label;
-    document.getElementById('maint-item-sub').textContent = `${it.category||''} | SN: ${it.serialNumber||'N/A'} | ${it.hours?Number(it.hours).toLocaleString()+' hrs':''}`;
-    document.getElementById('maint-date').value = new Date().toISOString().slice(0,10);
-    document.getElementById('maint-type').value = '';
-    document.getElementById('maint-desc').value = '';
-    document.getElementById('maint-cost').value = '';
-    document.getElementById('maint-hours').value = it.hours || '';
-    renderMaintenanceHistory(it);
-    document.getElementById('maint-modal').classList.add('show');
-}
-
-function closeMaintModal() {
-    document.getElementById('maint-modal').classList.remove('show');
-    activeMaintDocId = null;
-}
-
-function renderMaintenanceHistory(it) {
-    const list = document.getElementById('maint-history-list');
-    const entries = (it.maintenance || []).sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
-    if (!entries.length) {
-        list.innerHTML = '<p style="color:var(--text-secondary);padding:8px 0;">No maintenance records yet.</p>';
-        return;
-    }
-    list.innerHTML = entries.map((e,i) => `
-        <div style="border-left:3px solid var(--accent);padding:10px 14px;margin-bottom:10px;background:var(--bg-card);border-radius:0 8px 8px 0;">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                <div>
-                    <div style="font-size:0.82rem;font-weight:600;color:var(--accent);">${esc(e.type||'Maintenance')} — ${e.date?new Date(e.date+'T00:00:00').toLocaleDateString():''}</div>
-                    <div style="font-size:0.88rem;color:var(--text-primary);margin-top:4px;">${esc(e.desc||'')}</div>
-                    <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:3px;">
-                        ${e.hours ? `<span>Hours: ${Number(e.hours).toLocaleString()}</span>  ` : ''}
-                        ${e.cost ? `<span>Cost: $${Number(e.cost).toFixed(2)}</span>` : ''}
-                    </div>
-                </div>
-                <button class="btn btn-danger btn-sm" onclick="deleteMaintenanceEntry(${i})" style="flex-shrink:0;margin-left:8px;">✗</button>
-            </div>
-        </div>`).join('');
-}
-
-async function addMaintenanceEntry() {
-    if (!activeMaintDocId) return;
-    const it = items.find(i => i._docId === activeMaintDocId); if (!it) return;
-    const entry = {
-        date: document.getElementById('maint-date').value,
-        type: document.getElementById('maint-type').value,
-        desc: document.getElementById('maint-desc').value.trim(),
-        cost: document.getElementById('maint-cost').value.trim(),
-        hours: document.getElementById('maint-hours').value.trim(),
-        addedAt: new Date().toISOString()
-    };
-    if (!entry.date && !entry.desc) { toast('Enter at least a date or description.','error'); return; }
-    const maintenance = [...(it.maintenance||[]), entry];
-    try {
-        await db.collection('machinery_items').doc(activeMaintDocId).update({ maintenance });
-        toast('Maintenance entry saved!','success');
-        document.getElementById('maint-type').value = '';
-        document.getElementById('maint-desc').value = '';
-        document.getElementById('maint-cost').value = '';
-        document.getElementById('maint-hours').value = '';
-        renderMaintenanceHistory({...it, maintenance});
-    } catch(err) { toast('Error saving: '+err.message,'error'); }
-}
-
-async function deleteMaintenanceEntry(index) {
-    if (!activeMaintDocId) return;
-    if (!confirm('Delete this maintenance entry?')) return;
-    const it = items.find(i => i._docId === activeMaintDocId); if (!it) return;
-    const maintenance = [...(it.maintenance||[])];
-    maintenance.splice(index, 1);
-    try {
-        await db.collection('machinery_items').doc(activeMaintDocId).update({ maintenance });
-        toast('Entry deleted.');
-        renderMaintenanceHistory({...it, maintenance});
-    } catch(err) { toast('Error: '+err.message,'error'); }
-}
-
-document.getElementById('maint-modal').addEventListener('click', e => { if(e.target===document.getElementById('maint-modal'))closeMaintModal(); });
-
-async function summarizePaperwork() {
-    const p = formPhotos.paperwork;
-    if (!p.base64) return;
-    const btn = document.getElementById('btn-paperwork');
-    const status = document.getElementById('ai-status');
-    btn.disabled = true; btn.classList.add('scanning'); btn.textContent = '⏳ Reading...';
-    status.textContent = 'Analyzing purchase paperwork...';
-    try {
-        const prompt = `This is a purchase document, receipt, or invoice for farm equipment.
-Summarize the key details in 2-4 concise sentences: seller, buyer, price, date, item description, and any important notes.
-Return plain text only, no headers or bullet points.`;
-        const result = await callClaude(p.base64, p.mimeType, prompt);
-        if (!result) return;
-        const summary = result.trim();
-        const notesEl = document.getElementById('f-notes');
-        const existing = notesEl.value.trim();
-        notesEl.value = `📄 Paperwork: ${summary}${existing ? '\n\n' + existing : ''}`;
-        status.textContent = '✅ Paperwork summarized and added to Notes.';
-        status.style.color = 'var(--success)';
-    } catch(err) {
-        status.textContent = '❌ Error: ' + err.message;
-        status.style.color = 'var(--danger)';
-    } finally {
-        btn.disabled = false; btn.classList.remove('scanning');
-        btn.innerHTML = '📄 Summarize Paperwork with AI';
-    }
-}
-
-let hoursPhotoData = { base64:null, mimeType:null };
-
-function onHoursPhotoSelected(input) {
-    const file = input.files[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = e => {
-        hoursPhotoData.base64   = e.target.result.split(',')[1];
-        hoursPhotoData.mimeType = file.type;
-        document.getElementById('btn-read-hours').disabled = false;
-    };
-    reader.readAsDataURL(file);
-}
-
-async function readHoursFromPhoto() {
-    if (!hoursPhotoData.base64) return;
-    const btn    = document.getElementById('btn-read-hours');
-    const status = document.getElementById('hours-ai-status');
-    btn.disabled = true; btn.textContent = '⏳ Reading...';
-    status.textContent = 'Reading engine hours from photo...';
-    try {
-        const prompt = `This image shows an engine hour meter or tachometer hour display on farm equipment.
-Extract ONLY the numeric hours reading. Return ONLY the number — no units, no decimal unless clearly shown, no explanation. Just the digits.`;
-        const result = await callClaude(hoursPhotoData.base64, hoursPhotoData.mimeType, prompt);
-        if (!result) return;
-        const hours = result.trim().replace(/[^0-9.]/g,'');
-        if (hours) {
-            document.getElementById('f-hours').value = hours;
-            status.textContent = `✅ Hours read: ${hours}`;
-            status.style.color = 'var(--success)';
-        } else {
-            status.textContent = '⚠️ Could not read hours clearly.';
-            status.style.color = 'var(--text-secondary)';
-        }
-    } catch(err) {
-        status.textContent = '❌ Error: ' + err.message;
-        status.style.color = 'var(--danger)';
-    } finally {
-        btn.disabled = false;
-        btn.textContent = '⏱ Read Hours with AI';
-    }
 }
 </script>
 </body>

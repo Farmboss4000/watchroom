@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Farmboss Armory</title>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
@@ -364,6 +365,28 @@
             border:2px solid transparent; transition:border-color 0.15s;
         }
         .photo-modal-imgs img:hover { border-color:var(--accent); }
+
+        /* ── BARCODE SCANNER ── */
+        #scanner-modal .modal { max-width:480px; padding:20px; }
+        #scanner-video-wrap {
+            position:relative; width:100%; background:#000;
+            border-radius:10px; overflow:hidden; margin:14px 0;
+        }
+        #scanner-video { width:100%; display:block; max-height:300px; object-fit:cover; }
+        #scanner-overlay {
+            position:absolute; inset:0; pointer-events:none;
+            display:flex; align-items:center; justify-content:center;
+        }
+        .scan-aim {
+            width:200px; height:80px;
+            border:3px solid var(--accent);
+            border-radius:8px;
+            box-shadow:0 0 0 2000px rgba(0,0,0,0.35);
+        }
+        #scanner-result {
+            font-size:0.85rem; min-height:20px;
+            color:var(--text-secondary); margin-bottom:8px;
+        }
 
         /* ── SETTINGS ── */
         .settings-section { margin-bottom:24px; }
@@ -758,6 +781,7 @@
                 <option value="">All Categories</option>
             </select>
             <button class="btn btn-primary btn-sm" onclick="showView('add-item'); resetForm()">+ Add Item</button>
+            <button class="btn btn-ghost btn-sm" onclick="openScanner()" title="Scan barcode with camera">&#128247; Scan</button>
             <button class="btn btn-ghost btn-sm" onclick="exportCSV()">&#8595; Export CSV</button>
         </div>
         <div class="table-wrapper">
@@ -930,6 +954,22 @@ service cloud.firestore {
 <div id="print-area"><div id="print-content"></div></div>
 <div class="toast" id="toast"></div>
 
+<!-- ══ SCANNER MODAL ══ -->
+<div class="modal-overlay" id="scanner-modal">
+    <div class="modal" style="max-width:480px;">
+        <div class="modal-title">&#128247; Scan Item Barcode</div>
+        <div class="modal-sub">Point your camera at an Armory barcode to look up an item.</div>
+        <div id="scanner-video-wrap">
+            <video id="scanner-video" playsinline muted autoplay></video>
+            <div id="scanner-overlay"><div class="scan-aim"></div></div>
+        </div>
+        <div id="scanner-result">Initializing camera…</div>
+        <div class="modal-actions">
+            <button class="btn btn-dark" onclick="closeScanner()">Cancel</button>
+        </div>
+    </div>
+</div>
+
 <script>
 // ═══════════════════════════════════════
 //  FIREBASE
@@ -1087,8 +1127,11 @@ async function uploadPhoto(slot, file) {
     const ext  = file.name.split('.').pop();
     const path = `photos/${Date.now()}_${slot}.${ext}`;
     const ref  = storage.ref().child(path);
+    console.log(`[Photo] Uploading ${slot} → ${path}`);
     await ref.put(file);
-    return await ref.getDownloadURL();
+    const url = await ref.getDownloadURL();
+    console.log(`[Photo] Upload OK ${slot}:`, url);
+    return url;
 }
 
 async function dbAddItem(data, photos) {
@@ -1145,11 +1188,12 @@ function renderDashboard() {
             </div>`).join('')
         : '<p style="color:var(--text-secondary);padding:16px 0;">No items yet.</p>';
     const rec = [...items].sort((a,b)=>b.id-a.id).slice(0,10);
+    console.log('[Dashboard] Recent items:', rec.map(i=>({id:i.id, photos:i.photos})));
     document.getElementById('recent-tbody').innerHTML = rec.length
         ? rec.map(it => {
             const mainUrl = it.photos?.find(p=>p.slot==='main')?.url;
             const thumb   = mainUrl
-                ? `<img src="${mainUrl}" class="thumb" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb-placeholder',innerHTML:'&#128247;'}))">`
+                ? `<img src="${mainUrl}" class="thumb" alt="" style="cursor:pointer" title="Click to view photo" onclick="window.open('${mainUrl}','_blank')" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb-placeholder',innerHTML:'&#128247;'}))">`
                 : `<div class="thumb-placeholder">&#128247;</div>`;
             return `<tr>
                 <td>${thumb}</td>
@@ -1199,26 +1243,37 @@ function removePhoto(slot) {
 
 async function callClaude(base64, mimeType, prompt) {
     if (!apiKey) { toast('Set your Anthropic API key in Settings first.','error'); return null; }
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
-            'anthropic-dangerous-direct-browser-calls': 'true'
-        },
-        body: JSON.stringify({
-            model: 'claude-3-5-sonnet-20241022',
-            max_tokens: 512,
-            messages: [{ role:'user', content:[
-                { type:'image', source:{ type:'base64', media_type:mimeType, data:base64 }},
-                { type:'text',  text: prompt }
-            ]}]
-        })
-    });
+    let res;
+    try {
+        res = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': apiKey,
+                'anthropic-version': '2023-06-01',
+                'anthropic-dangerous-direct-browser-calls': 'true'
+            },
+            body: JSON.stringify({
+                model: 'claude-3-7-sonnet-20250219',
+                max_tokens: 512,
+                messages: [{ role:'user', content:[
+                    { type:'image', source:{ type:'base64', media_type:mimeType, data:base64 }},
+                    { type:'text',  text: prompt }
+                ]}]
+            })
+        });
+    } catch(networkErr) {
+        throw new Error('Network error — check your internet connection.');
+    }
     if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error?.message || `API error ${res.status}`);
+        let errMsg = `API error ${res.status}`;
+        try {
+            const errData = await res.json();
+            errMsg = errData.error?.message || errMsg;
+            if (res.status === 401) errMsg = 'Invalid API key — re-enter your key in Settings.';
+            if (res.status === 429) errMsg = 'Rate limit reached — please wait a moment.';
+        } catch(e) {}
+        throw new Error(errMsg);
     }
     const data = await res.json();
     return data.content[0].text;
@@ -1366,6 +1421,7 @@ document.getElementById('item-form').addEventListener('submit', async e => {
             }
         }
 
+        console.log('[Save] photos array being saved:', JSON.stringify(photos));
         if (eid && docId) {
             await dbUpdateItem(docId, data, photos);
             await saveConfig();
@@ -1406,6 +1462,8 @@ function resetForm() {
 
 function editItem(docId) {
     const it = items.find(i=>i._docId===docId); if (!it) return;
+    // Reset form state first (clears any stale file references)
+    resetForm();
     showView('add-item'); populateCatSelect();
     document.getElementById('edit-id').value          = it.id;
     document.getElementById('edit-doc-id').value      = it._docId;
@@ -1420,11 +1478,11 @@ function editItem(docId) {
     document.getElementById('f-notes').value          = it.notes||'';
     document.getElementById('form-title').textContent     = `✏️ Edit Item #${it.id}`;
     document.getElementById('form-submit-btn').textContent = 'Update Item';
-    // Show existing photos
+    // Load existing photos (reset deleted flag so they are preserved on save)
     for (const slot of ['main','serial','extra']) {
         const ph = it.photos?.find(p=>p.slot===slot);
         if (ph) {
-            formPhotos[slot].existingUrl = ph.url;
+            formPhotos[slot] = { file:null, base64:null, mimeType:null, existingUrl:ph.url, deleted:false };
             const prev = document.getElementById('prev-'+slot);
             prev.innerHTML = `<img src="${ph.url}" alt="${slot}"><button type="button" class="remove-photo" onclick="removePhoto('${slot}')">✕</button>`;
             if (slot==='main')   document.getElementById('btn-identify').disabled = false;
@@ -1488,7 +1546,7 @@ function renderInventory() {
     tbody.innerHTML = data.map(it => {
         const mainUrl = it.photos?.find(p=>p.slot==='main')?.url;
         const thumb   = mainUrl
-            ? `<img src="${mainUrl}" class="thumb" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb-placeholder',innerHTML:'&#128247;'}))">`
+            ? `<img src="${mainUrl}" class="thumb" alt="" style="cursor:pointer" title="Click to view photo" onclick="window.open('${mainUrl}','_blank')" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb-placeholder',innerHTML:'&#128247;'}))">`
             : `<div class="thumb-placeholder">&#128247;</div>`;
         return `<tr>
             <td>${thumb}</td>
@@ -1600,7 +1658,7 @@ async function testApiKey() {
         const res = await fetch('https://api.anthropic.com/v1/messages', {
             method:'POST',
             headers:{ 'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true' },
-            body: JSON.stringify({ model:'claude-3-5-sonnet-20241022', max_tokens:10, messages:[{role:'user',content:'Hi'}] })
+            body: JSON.stringify({ model:'claude-3-7-sonnet-20250219', max_tokens:10, messages:[{role:'user',content:'Hi'}] })
         });
         if (res.ok) { el.className='api-status ok'; el.textContent='✅ Connection successful! AI identification is ready.'; }
         else        { const d=await res.json(); el.className='api-status err'; el.textContent='❌ Error: '+(d.error?.message||res.status); }
@@ -1667,6 +1725,80 @@ function toast(msg,type='') {
     el.textContent=msg; el.className=`toast show${type?' '+type:''}`;
     clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),3500);
 }
+
+// ═══════════════════════════════════════
+//  BARCODE SCANNER
+// ═══════════════════════════════════════
+let scannerActive = false;
+let scannerReader = null;
+let scannerStream = null;
+
+async function openScanner() {
+    if (typeof ZXing === 'undefined') {
+        toast('Scanner library not loaded — check your connection.', 'error'); return;
+    }
+    document.getElementById('scanner-modal').classList.add('show');
+    document.getElementById('scanner-result').textContent = 'Starting camera…';
+    scannerActive = true;
+
+    try {
+        const video = document.getElementById('scanner-video');
+        // Prefer back camera on mobile
+        scannerStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } }
+        });
+        video.srcObject = scannerStream;
+        await video.play();
+
+        const hints = new Map();
+        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.CODE_128]);
+        scannerReader = new ZXing.BrowserMultiFormatReader(hints);
+
+        document.getElementById('scanner-result').textContent = 'Point camera at barcode…';
+
+        scannerReader.decodeFromVideoElement(video, (result, err) => {
+            if (!scannerActive) return;
+            if (result) {
+                const code = result.getText();
+                console.log('[Scanner] Detected:', code);
+                handleScanResult(code);
+            }
+        });
+    } catch (err) {
+        console.error('[Scanner] Error:', err);
+        document.getElementById('scanner-result').textContent = '⚠️ Camera access denied or unavailable.';
+    }
+}
+
+function handleScanResult(code) {
+    closeScanner();
+    // Expect format: ARM000001 (ARM + 6-digit padded numeric ID)
+    const match = code.match(/^ARM(\d+)$/i);
+    if (!match) {
+        toast(`Unrecognised barcode: ${code}`, 'error'); return;
+    }
+    const numId = parseInt(match[1], 10);
+    const it = items.find(i => i.id === numId);
+    if (!it) {
+        toast(`No item found for barcode ${code}`, 'error'); return;
+    }
+    toast(`Found: ${it.manufacturer||''} ${it.model||''}`.trim(), 'success');
+    showBarcode(it._docId);
+}
+
+function closeScanner() {
+    scannerActive = false;
+    if (scannerReader) { try { scannerReader.reset(); } catch(e){} scannerReader = null; }
+    if (scannerStream) { scannerStream.getTracks().forEach(t => t.stop()); scannerStream = null; }
+    const video = document.getElementById('scanner-video');
+    video.srcObject = null;
+    document.getElementById('scanner-modal').classList.remove('show');
+    document.getElementById('scanner-result').textContent = 'Initializing camera…';
+}
+
+document.getElementById('scanner-modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('scanner-modal')) closeScanner();
+});
 </script>
 </body>
 </html>

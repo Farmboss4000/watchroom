@@ -232,6 +232,37 @@
             font-size:0.8rem; padding:0 2px; line-height:1; transition:color 0.15s; }
         .tag-remove:hover { color:var(--danger); }
 
+        /* ── VIN SCAN HERO BUTTON ── */
+        .hero-actions { display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; }
+        .btn-vin-scan { display:inline-flex; align-items:center; gap:8px; padding:10px 20px;
+            background:var(--accent); color:#fff; border:none; border-radius:8px; font-size:0.9rem;
+            font-weight:600; cursor:pointer; transition:all 0.18s; }
+        .btn-vin-scan:hover { background:var(--accent-hover); transform:translateY(-1px); box-shadow:0 4px 14px rgba(59,130,246,0.4); }
+
+        /* ── VIN MODAL ── */
+        .vin-drop-zone { border:2px dashed var(--border); border-radius:10px; padding:32px 16px;
+            text-align:center; cursor:pointer; transition:all 0.18s; background:var(--bg-card); }
+        .vin-drop-zone:hover { border-color:var(--accent); background:var(--accent-dim); }
+        .vin-drop-zone.has-photo { border-color:var(--accent); background:var(--accent-dim); }
+        .vin-preview-img { max-width:100%; max-height:180px; border-radius:8px; margin-top:10px; display:none; }
+        .vin-step { display:flex; align-items:flex-start; gap:10px; padding:10px 0; border-bottom:1px solid var(--border); }
+        .vin-step:last-child { border-bottom:none; }
+        .vin-step-num { width:24px; height:24px; background:var(--accent); color:#fff; border-radius:50%;
+            display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700; flex-shrink:0; margin-top:1px; }
+        .vin-step-text { font-size:0.875rem; color:var(--text-secondary); line-height:1.45; }
+        .vin-step-text strong { color:var(--text-primary); }
+        .vin-result-box { background:var(--bg-card); border:1px solid var(--border); border-radius:8px;
+            padding:14px; margin-top:12px; display:none; }
+        .vin-result-row { display:flex; justify-content:space-between; align-items:center;
+            padding:4px 0; font-size:0.85rem; border-bottom:1px solid var(--border); }
+        .vin-result-row:last-child { border-bottom:none; }
+        .vin-result-label { color:var(--text-secondary); }
+        .vin-result-value { font-weight:600; color:var(--text-primary); }
+        .vin-status { font-size:0.85rem; margin-top:10px; padding:8px 12px; border-radius:6px; display:none; }
+        .vin-status.ok  { background:#dcfce7; color:#15803d; display:block; }
+        .vin-status.err { background:#fee2e2; color:#b91c1c; display:block; }
+        .vin-status.info { background:#dbeafe; color:#1d4ed8; display:block; }
+
         /* ── MODAL ── */
         .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); display:flex;
             align-items:center; justify-content:center; z-index:1000; opacity:0; pointer-events:none; transition:opacity 0.2s; }
@@ -387,6 +418,9 @@
         <div>
             <div class="hero-title">Farmboss <span>Automotive</span></div>
             <div class="hero-sub">Your complete vehicle inventory</div>
+            <div class="hero-actions">
+                <button class="btn-vin-scan" onclick="openVINScanModal()">📷 Add Vehicle by VIN</button>
+            </div>
         </div>
         <!-- Car SVG silhouette -->
         <svg class="hero-car" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 120">
@@ -769,6 +803,48 @@ service firebase.storage {
 </div>
 
 <!-- ══ MAINTENANCE MODAL ══ -->
+<!-- ══ VIN SCAN MODAL ══ -->
+<div class="modal-overlay" id="vin-scan-modal">
+    <div class="modal" style="max-width:560px;">
+        <div class="modal-title">📷 Add Vehicle by VIN Photo</div>
+        <div class="modal-sub">Take or upload a photo of the VIN plate — AI reads the VIN, then NHTSA decodes all vehicle details automatically.</div>
+
+        <div class="vin-step">
+            <div class="vin-step-num">1</div>
+            <div class="vin-step-text"><strong>Photo the VIN</strong> — found on the dashboard (driver side), door jamb, or title document.</div>
+        </div>
+        <div class="vin-step">
+            <div class="vin-step-num">2</div>
+            <div class="vin-step-text"><strong>AI extracts the VIN</strong> — Claude reads the 17-character code from the image.</div>
+        </div>
+        <div class="vin-step">
+            <div class="vin-step-num">3</div>
+            <div class="vin-step-text"><strong>NHTSA decodes it</strong> — Make, Model, Year, Engine, Transmission filled in automatically.</div>
+        </div>
+
+        <div class="vin-drop-zone" id="vin-drop-zone" onclick="document.getElementById('file-vin-scan').click()">
+            <div style="font-size:2rem;margin-bottom:8px;">📋</div>
+            <div style="font-size:0.9rem;font-weight:600;color:var(--text-primary);">Click to take / upload VIN photo</div>
+            <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:4px;">Supports JPG, PNG, HEIC</div>
+            <img id="vin-preview-img" class="vin-preview-img" alt="VIN preview">
+        </div>
+        <input type="file" id="file-vin-scan" accept="image/*" capture="environment" style="display:none" onchange="onVINPhotoSelected(this)">
+
+        <div class="vin-status" id="vin-status"></div>
+
+        <div class="vin-result-box" id="vin-result-box">
+            <div style="font-size:0.82rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Decoded Vehicle Details</div>
+            <div id="vin-result-rows"></div>
+        </div>
+
+        <div class="modal-actions">
+            <button class="btn btn-primary" id="btn-vin-fill" style="display:none" onclick="fillFormFromVIN()">✅ Add Vehicle with These Details</button>
+            <button class="btn btn-ghost" id="btn-vin-retry" style="display:none" onclick="document.getElementById('file-vin-scan').click()">🔄 Retry Photo</button>
+            <button class="btn btn-ghost" onclick="closeVINModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+
 <div class="modal-overlay" id="maint-modal">
     <div class="modal" style="max-width:680px;">
         <div class="modal-title" id="maint-modal-title">🔧 Maintenance Log</div>
@@ -1212,6 +1288,180 @@ async function onMileagePhotoSelected(input) {
         }
     };
     reader.readAsDataURL(file);
+}
+
+// ═══════════════════════════════════════
+//  VIN SCAN FROM DASHBOARD
+// ═══════════════════════════════════════
+let vinScanData = null; // holds decoded VIN results for form fill
+
+function openVINScanModal() {
+    vinScanData = null;
+    document.getElementById('vin-status').className = 'vin-status';
+    document.getElementById('vin-status').textContent = '';
+    document.getElementById('vin-result-box').style.display = 'none';
+    document.getElementById('vin-result-rows').innerHTML = '';
+    document.getElementById('btn-vin-fill').style.display = 'none';
+    document.getElementById('btn-vin-retry').style.display = 'none';
+    document.getElementById('vin-preview-img').style.display = 'none';
+    document.getElementById('vin-preview-img').src = '';
+    document.getElementById('vin-drop-zone').classList.remove('has-photo');
+    document.getElementById('file-vin-scan').value = '';
+    document.getElementById('vin-scan-modal').classList.add('show');
+}
+function closeVINModal() { document.getElementById('vin-scan-modal').classList.remove('show'); }
+document.getElementById('vin-scan-modal').addEventListener('click', e => { if(e.target===document.getElementById('vin-scan-modal'))closeVINModal(); });
+
+async function onVINPhotoSelected(input) {
+    const file = input.files[0]; if (!file) return;
+    const st = document.getElementById('vin-status');
+    const reader = new FileReader();
+    reader.onload = async e => {
+        const dataUrl = e.target.result;
+        const base64 = dataUrl.split(',')[1];
+        const mimeType = file.type;
+        // Show preview
+        const prev = document.getElementById('vin-preview-img');
+        prev.src = dataUrl; prev.style.display = 'block';
+        document.getElementById('vin-drop-zone').classList.add('has-photo');
+        document.getElementById('vin-result-box').style.display = 'none';
+        document.getElementById('btn-vin-fill').style.display = 'none';
+        document.getElementById('btn-vin-retry').style.display = 'none';
+        vinScanData = null;
+
+        // Step 1: AI reads VIN
+        st.className = 'vin-status info'; st.textContent = '🤖 Step 1/2 — AI reading VIN from photo…';
+        if (!apiKey) { st.className='vin-status err'; st.textContent='❌ Set your Anthropic API key in Settings first.'; return; }
+        let vin;
+        try {
+            const raw = await callClaude(base64, mimeType,
+                `This image shows a vehicle VIN plate, VIN sticker, or window sticker. Extract ONLY the 17-character VIN exactly as printed. Return ONLY the 17-character VIN — no spaces, no dashes, no labels, no other text.`);
+            if (!raw) { st.className='vin-status err'; st.textContent='❌ AI did not return a result.'; return; }
+            vin = raw.trim().replace(/[^A-HJ-NPR-Z0-9]/gi,'').toUpperCase();
+            if (vin.length !== 17) {
+                st.className='vin-status err';
+                st.textContent=`❌ AI returned "${raw.trim()}" — not a valid 17-character VIN. Try a clearer photo.`;
+                document.getElementById('btn-vin-retry').style.display='';
+                return;
+            }
+        } catch(err) {
+            st.className='vin-status err'; st.textContent='❌ AI error: '+err.message;
+            document.getElementById('btn-vin-retry').style.display='';
+            return;
+        }
+
+        // Step 2: NHTSA decode
+        st.className = 'vin-status info'; st.textContent = `✅ VIN detected: ${vin} — Step 2/2: Decoding with NHTSA…`;
+        try {
+            const nhtsaRes = await fetch(`https://vpic.nhtsa.dot.gov/api/vehicles/decodevin/${encodeURIComponent(vin)}?format=json`);
+            if (!nhtsaRes.ok) throw new Error('NHTSA API returned '+nhtsaRes.status);
+            const nhtsaData = await nhtsaRes.json();
+            const results = nhtsaData.Results || [];
+            const get = (variable) => {
+                const r = results.find(x => x.Variable === variable);
+                return (r && r.Value && r.Value !== 'Not Applicable' && r.Value !== 'null' && r.Value !== null) ? r.Value : '';
+            };
+            // Map NHTSA body class to our categories
+            const bodyClass = get('Body Class');
+            let category = '';
+            if (/pickup/i.test(bodyClass))         category = 'Pickup Truck';
+            else if (/sport utility/i.test(bodyClass)) category = 'SUV';
+            else if (/sedan|coupe|convert|hatch|wagon/i.test(bodyClass)) category = 'Car';
+            else if (/van|minivan/i.test(bodyClass)) category = 'Van';
+            else if (/truck/i.test(bodyClass))     category = 'Truck';
+            else if (/motorcycle/i.test(bodyClass)) category = 'Motorcycle';
+            else if (/bus/i.test(bodyClass))        category = 'Bus';
+            else if (/low speed/i.test(bodyClass))  category = 'Low Speed Vehicle';
+
+            const engineDisp = get('Displacement (L)');
+            const engineCyl  = get('Engine Number of Cylinders');
+            const engineKw   = get('Engine Brake (kW) From');
+            const fuelType   = get('Fuel Type - Primary');
+            let engineStr = '';
+            if (engineDisp) engineStr += parseFloat(engineDisp).toFixed(1)+'L ';
+            if (engineCyl)  engineStr += 'V'+engineCyl+' ';
+            if (fuelType && fuelType !== 'Gasoline') engineStr += fuelType+' ';
+            engineStr = engineStr.trim();
+
+            const transStyle = get('Transmission Style');
+            let trans = '';
+            if (/automatic/i.test(transStyle))       trans = 'Automatic';
+            else if (/manual|standard/i.test(transStyle)) trans = 'Manual';
+            else if (/cvt/i.test(transStyle))         trans = 'CVT';
+            else if (/dual.?clutch/i.test(transStyle))trans = 'Dual Clutch';
+
+            vinScanData = {
+                vin,
+                make:     get('Make'),
+                model:    get('Model'),
+                year:     get('Model Year'),
+                category,
+                engine:   engineStr,
+                trans,
+                plant:    get('Plant City') + (get('Plant State') ? ', '+get('Plant State') : '') + (get('Plant Country') ? ' '+get('Plant Country') : ''),
+                driveType:get('Drive Type'),
+                doors:    get('Doors'),
+                bodyClass: bodyClass
+            };
+
+            // Render result rows
+            const rows = [
+                ['VIN',          vin],
+                ['Make',         vinScanData.make],
+                ['Model',        vinScanData.model],
+                ['Year',         vinScanData.year],
+                ['Type',         category || bodyClass],
+                ['Engine',       engineStr],
+                ['Transmission', trans],
+                ['Drive Type',   vinScanData.driveType],
+                ['Doors',        vinScanData.doors],
+            ].filter(r => r[1]);
+            document.getElementById('vin-result-rows').innerHTML = rows.map(r =>
+                `<div class="vin-result-row"><span class="vin-result-label">${r[0]}</span><span class="vin-result-value">${r[1]}</span></div>`
+            ).join('');
+            document.getElementById('vin-result-box').style.display = 'block';
+            document.getElementById('btn-vin-fill').style.display = '';
+            document.getElementById('btn-vin-retry').style.display = '';
+            st.className = 'vin-status ok'; st.textContent = `✅ VIN decoded! Review details below, then click "Add Vehicle".`;
+        } catch(err) {
+            st.className='vin-status err'; st.textContent='❌ NHTSA decode failed: '+err.message;
+            // Still allow manual proceed with just VIN
+            vinScanData = { vin };
+            document.getElementById('btn-vin-fill').style.display='';
+            document.getElementById('btn-vin-retry').style.display='';
+        }
+    };
+    reader.readAsDataURL(file);
+}
+
+function fillFormFromVIN() {
+    if (!vinScanData) return;
+    closeVINModal();
+    showView('add-item');
+    resetForm();
+    const d = vinScanData;
+    if (d.vin)      document.getElementById('f-serial').value   = d.vin;
+    if (d.make)     document.getElementById('f-make').value     = d.make;
+    if (d.model)    document.getElementById('f-model').value    = d.model;
+    if (d.year)     document.getElementById('f-year').value     = d.year;
+    if (d.engine)   document.getElementById('f-engine').value   = d.engine;
+    if (d.trans)    document.getElementById('f-transmission').value = d.trans;
+    if (d.category) {
+        populateCatSelect();
+        document.getElementById('f-category').value = d.category;
+    }
+    // Build a notes snippet with extra decoded info
+    const extras = [];
+    if (d.driveType) extras.push('Drive: '+d.driveType);
+    if (d.doors)     extras.push('Doors: '+d.doors);
+    if (d.bodyClass) extras.push('Body: '+d.bodyClass);
+    if (d.plant)     extras.push('Plant: '+d.plant);
+    if (extras.length) {
+        document.getElementById('f-notes').value = 'VIN Decoded: ' + extras.join(' | ');
+    }
+    document.getElementById('ai-status').textContent = `✅ Form filled from VIN ${d.vin}. Review and complete any remaining fields.`;
+    document.getElementById('ai-status').style.color = 'var(--success)';
+    toast('Vehicle details loaded from VIN!');
 }
 
 // ═══════════════════════════════════════

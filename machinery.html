@@ -1,0 +1,1641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Farmboss Machinery</title>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg-primary:    #f2f5f2;
+            --bg-secondary:  #ffffff;
+            --bg-card:       #eef3ee;
+            --accent:        #d4941a;
+            --accent-hover:  #b87e14;
+            --accent-dim:    rgba(212,148,26,0.15);
+            --text-primary:  #1c2e1c;
+            --text-secondary:#5a6e5a;
+            --border:        #cddece;
+            --success:       #16a34a;
+            --danger:        #dc2626;
+            --info:          #2563eb;
+            --hdr-bg:        #1c2d1c;
+        }
+
+        body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; background:var(--bg-primary); color:var(--text-primary); min-height:100vh; }
+
+        /* ── SITE SWITCHER ── */
+        .site-switcher {
+            background:#111827; display:flex; align-items:center; padding:5px 18px;
+            gap:4px; font-size:0.77rem; border-bottom:1px solid rgba(255,255,255,0.07);
+        }
+        .site-switcher-label { color:#4b5563; font-size:0.69rem; font-weight:600;
+            text-transform:uppercase; letter-spacing:0.6px; margin-right:8px; }
+        .site-link { text-decoration:none; color:#9ca3af; padding:4px 12px; border-radius:4px;
+            display:flex; align-items:center; gap:6px; font-weight:500; transition:all 0.15s; white-space:nowrap; }
+        .site-link:hover { background:rgba(255,255,255,0.1); color:#e5e7eb; }
+        .site-link.active { background:rgba(255,255,255,0.13); color:#fff; font-weight:600; }
+
+        /* ── LOGIN ── */
+        #login-screen { position:fixed; inset:0; background:linear-gradient(135deg,#1c2d1c 0%,#2d4a2d 100%);
+            display:flex; align-items:center; justify-content:center; z-index:9000; flex-direction:column; gap:12px; }
+        .login-site-links { display:flex; gap:8px; }
+        .login-site-links a { color:rgba(255,255,255,0.5); font-size:0.78rem; text-decoration:none;
+            padding:4px 12px; border:1px solid rgba(255,255,255,0.2); border-radius:4px; transition:all 0.15s; }
+        .login-site-links a:hover { color:#fff; border-color:rgba(255,255,255,0.5); }
+        .login-site-links a.active { color:var(--accent); border-color:var(--accent); }
+        .login-box { background:#fff; border-radius:14px; padding:44px 40px; width:100%; max-width:400px;
+            box-shadow:0 24px 64px rgba(0,0,0,0.4); }
+        .login-logo { width:56px; height:56px; background:var(--accent); border-radius:12px;
+            display:flex; align-items:center; justify-content:center; font-size:28px; margin:0 auto 16px; color:#fff; }
+        .login-box h2 { text-align:center; font-size:1.5rem; color:#1c2d1c; margin-bottom:4px; }
+        .login-sub { text-align:center; font-size:0.85rem; color:#6b7280; margin-bottom:28px; }
+        .login-error { color:var(--danger); font-size:0.82rem; margin-bottom:12px; min-height:18px; text-align:center; }
+        .login-full { width:100%; justify-content:center; }
+        .form-group { margin-bottom:14px; }
+        .form-group label { display:block; font-size:0.8rem; font-weight:600; color:#374151; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.4px; }
+        .form-group input, .form-group select, .form-group textarea {
+            width:100%; padding:9px 12px; border:1px solid var(--border); border-radius:7px;
+            font-size:0.9rem; font-family:inherit; color:var(--text-primary); background:var(--bg-secondary);
+            transition:border-color 0.15s; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline:none; border-color:var(--accent); }
+
+        /* ── LOADING ── */
+        #loading-screen { display:none; position:fixed; inset:0; background:var(--bg-primary);
+            flex-direction:column; align-items:center; justify-content:center; gap:16px; z-index:8000; }
+        .spinner { width:44px; height:44px; border:4px solid var(--border); border-top-color:var(--accent);
+            border-radius:50%; animation:spin 0.8s linear infinite; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        #loading-screen p { color:var(--text-secondary); font-size:0.9rem; }
+
+        /* ── APP ── */
+        #app { display:none; min-height:100vh; flex-direction:column; }
+
+        header { background:var(--hdr-bg); padding:0 20px; display:flex; align-items:center;
+            gap:16px; min-height:56px; position:sticky; top:0; z-index:100;
+            box-shadow:0 2px 12px rgba(0,0,0,0.25); flex-wrap:wrap; }
+        .logo-area { display:flex; align-items:center; gap:10px; flex-shrink:0; }
+        .logo-icon { width:32px; height:32px; background:var(--accent); border-radius:7px;
+            display:flex; align-items:center; justify-content:center; font-size:17px; color:#fff; flex-shrink:0; }
+        header h1 { font-size:1.15rem; font-weight:700; color:#fff; white-space:nowrap; }
+        header h1 span { color:var(--accent); }
+        nav { display:flex; gap:2px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+        nav::-webkit-scrollbar { display:none; }
+        nav button { background:transparent; border:none; color:#9ca3af; padding:8px 13px;
+            border-radius:6px; cursor:pointer; font-size:0.83rem; transition:all 0.15s; white-space:nowrap; }
+        nav button:hover { background:rgba(212,148,26,0.2); color:#fff; }
+        nav button.active { background:var(--accent); color:#1c2d1c; font-weight:600; }
+        .header-right { display:flex; align-items:center; gap:10px; margin-left:auto; }
+        .user-badge { font-size:0.78rem; color:#9ca3af; background:rgba(255,255,255,0.08);
+            padding:4px 10px; border-radius:5px; }
+        .btn-signout { background:transparent; border:1px solid rgba(255,255,255,0.2); color:#9ca3af;
+            padding:5px 12px; border-radius:5px; cursor:pointer; font-size:0.78rem; transition:all 0.15s; }
+        .btn-signout:hover { border-color:var(--danger); color:var(--danger); }
+
+        /* ── HERO ── */
+        .hero { background:linear-gradient(135deg,#1c2d1c 0%,#2d4a2d 60%,#3a5e2a 100%);
+            border-radius:12px; padding:28px 32px; margin-bottom:20px;
+            display:flex; align-items:center; justify-content:space-between; gap:16px;
+            overflow:hidden; position:relative; }
+        .hero::before { content:''; position:absolute; inset:0;
+            background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E"); }
+        .hero-title { font-size:1.6rem; font-weight:800; color:#fff; margin-bottom:4px; position:relative; }
+        .hero-title span { color:var(--accent); }
+        .hero-sub { font-size:0.88rem; color:rgba(255,255,255,0.65); position:relative; }
+        .hero-tractor { height:90px; opacity:0.9; flex-shrink:0; }
+        @media(max-width:560px) { .hero-tractor { display:none; } .hero { padding:20px; } }
+
+        /* ── STATS ── */
+        main { padding:20px; max-width:1400px; margin:0 auto; flex:1; }
+        .stats-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:20px; }
+        .stat-card { background:var(--bg-secondary); border:1px solid var(--border); border-radius:10px;
+            padding:18px 16px; text-align:center; }
+        .stat-value { font-size:2rem; font-weight:800; color:var(--accent); line-height:1; margin-bottom:4px; }
+        .stat-label { font-size:0.77rem; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; font-weight:600; }
+
+        /* ── CARDS ── */
+        .card { background:var(--bg-secondary); border:1px solid var(--border); border-radius:12px; padding:22px; margin-bottom:20px; }
+        .card-title { display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; gap:10px; flex-wrap:wrap; }
+        .card-title-left { font-size:1rem; font-weight:700; color:var(--text-primary); }
+
+        /* ── VIEWS ── */
+        .view { display:none; }
+        .view.active { display:block; }
+
+        /* ── BUTTONS ── */
+        .btn { display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:7px;
+            font-size:0.85rem; font-weight:600; cursor:pointer; border:none; transition:all 0.15s; font-family:inherit; }
+        .btn-primary { background:var(--accent); color:#fff; }
+        .btn-primary:hover { background:var(--accent-hover); }
+        .btn-ghost { background:transparent; border:1px solid var(--border); color:var(--text-primary); }
+        .btn-ghost:hover { background:var(--bg-card); }
+        .btn-danger { background:var(--danger); color:#fff; }
+        .btn-danger:hover { opacity:0.85; }
+        .btn-info { background:var(--info); color:#fff; }
+        .btn-info:hover { opacity:0.85; }
+        .btn-sm { padding:5px 10px; font-size:0.78rem; }
+        .btn-ai { width:100%; justify-content:center; padding:9px 12px; border-radius:8px; font-size:0.83rem;
+            font-weight:600; cursor:pointer; border:none; font-family:inherit; transition:all 0.15s;
+            background:linear-gradient(135deg,#1c2d1c,#2d4a2d); color:#fff; margin-top:8px; }
+        .btn-ai:hover { opacity:0.88; transform:translateY(-1px); }
+        .btn-ai:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
+        .btn-ai.scanning { animation:pulse 1s ease-in-out infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+
+        /* ── FORM ── */
+        .form-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+        .form-group.full-width { grid-column:1/-1; }
+        .form-group.span2 { grid-column:span 2; }
+        .input-prefix-wrap { position:relative; }
+        .input-prefix { position:absolute; left:10px; top:50%; transform:translateY(-50%);
+            color:var(--text-secondary); font-size:0.9rem; pointer-events:none; }
+        .input-prefix + input { padding-left:24px; }
+        .form-actions { display:flex; gap:10px; margin-top:20px; flex-wrap:wrap; }
+
+        /* ── PHOTOS ── */
+        .photo-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+        .photo-slot { display:flex; flex-direction:column; gap:6px; }
+        .photo-slot-label { font-size:0.78rem; font-weight:600; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.4px; }
+        .photo-preview { width:100%; aspect-ratio:4/3; border:2px dashed var(--border); border-radius:8px;
+            display:flex; align-items:center; justify-content:center; background:var(--bg-card);
+            overflow:hidden; position:relative; cursor:default; }
+        .photo-preview img { width:100%; height:100%; object-fit:cover; border-radius:6px; }
+        .no-photo { font-size:2rem; color:var(--border); }
+        .remove-photo { position:absolute; top:5px; right:5px; background:rgba(0,0,0,0.55); border:none;
+            color:#fff; width:22px; height:22px; border-radius:50%; cursor:pointer; font-size:12px;
+            display:flex; align-items:center; justify-content:center; }
+        .photo-file-input input { font-size:0.78rem; color:var(--text-secondary); width:100%; }
+
+        /* ── TABLE ── */
+        .toolbar { display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; align-items:center; }
+        .toolbar input[type="text"] { flex:1; min-width:200px; padding:8px 12px; border:1px solid var(--border);
+            border-radius:7px; font-size:0.87rem; font-family:inherit; background:var(--bg-secondary); color:var(--text-primary); }
+        .toolbar input:focus { outline:none; border-color:var(--accent); }
+        .toolbar select { padding:8px 12px; border:1px solid var(--border); border-radius:7px;
+            font-size:0.87rem; font-family:inherit; background:var(--bg-secondary); color:var(--text-primary); cursor:pointer; }
+        .table-wrapper { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+        table { width:100%; border-collapse:collapse; font-size:0.85rem; }
+        thead th { background:var(--bg-card); padding:10px 12px; text-align:left; font-size:0.74rem;
+            font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-secondary);
+            border-bottom:2px solid var(--border); cursor:pointer; white-space:nowrap; user-select:none; }
+        thead th.no-sort { cursor:default; }
+        thead th:hover:not(.no-sort) { color:var(--accent); }
+        thead th.sort-asc::after { content:' ↑'; color:var(--accent); }
+        thead th.sort-desc::after { content:' ↓'; color:var(--accent); }
+        tbody tr { border-bottom:1px solid var(--border); transition:background 0.1s; }
+        tbody tr:hover { background:var(--accent-dim); }
+        tbody td { padding:10px 12px; vertical-align:middle; }
+        .mono { font-family:monospace; font-size:0.83rem; }
+        .thumb { width:40px; height:40px; object-fit:cover; border-radius:5px; border:1px solid var(--border); display:block; }
+        .thumb-placeholder { width:40px; height:40px; border-radius:5px; border:1px solid var(--border);
+            display:flex; align-items:center; justify-content:center; color:var(--border); font-size:1.1rem; background:var(--bg-card); }
+        .empty { text-align:center; padding:40px 20px; color:var(--text-secondary); }
+        .empty-icon { font-size:3rem; margin-bottom:12px; }
+
+        /* ── BADGES ── */
+        .badge { display:inline-block; padding:3px 9px; border-radius:5px; font-size:0.72rem; font-weight:700;
+            text-transform:uppercase; letter-spacing:0.4px; white-space:nowrap; }
+        .cat-tractor    { background:#dcfce7; color:#15803d; }
+        .cat-combine    { background:#fef3c7; color:#92400e; }
+        .cat-planter    { background:#dbeafe; color:#1d4ed8; }
+        .cat-sprayer    { background:#f3e8ff; color:#6d28d9; }
+        .cat-tillage    { background:#fce7f3; color:#9d174d; }
+        .cat-hay        { background:#ecfdf5; color:#065f46; }
+        .cat-grain      { background:#fff7ed; color:#c2410c; }
+        .cat-loader     { background:#e0f2fe; color:#0369a1; }
+        .cat-truck      { background:#f1f5f9; color:#475569; }
+        .cat-default    { background:var(--bg-card); color:var(--text-secondary); }
+
+        /* ── CATEGORY BREAKDOWN ── */
+        .cat-breakdown { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+        .cat-breakdown-item { display:flex; align-items:center; gap:10px; padding:8px 10px;
+            background:var(--bg-card); border-radius:7px; }
+        .cbi-name { font-size:0.82rem; color:var(--text-primary); min-width:140px; font-weight:500; }
+        .cbi-count { font-size:0.82rem; font-weight:700; color:var(--accent); min-width:28px; text-align:right; }
+        .cbi-bar { flex:1; height:6px; background:var(--border); border-radius:3px; overflow:hidden; }
+        .cbi-bar-fill { height:100%; background:var(--accent); border-radius:3px; transition:width 0.3s; }
+
+        /* ── TAGS ── */
+        .tags { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+        .tag { display:inline-flex; align-items:center; gap:6px; background:var(--bg-card);
+            border:1px solid var(--border); border-radius:6px; padding:5px 10px; font-size:0.82rem; }
+        .tag-remove { background:none; border:none; cursor:pointer; color:var(--text-secondary);
+            font-size:0.8rem; padding:0 2px; line-height:1; transition:color 0.15s; }
+        .tag-remove:hover { color:var(--danger); }
+
+        /* ── MODAL ── */
+        .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); display:flex;
+            align-items:center; justify-content:center; z-index:1000; opacity:0; pointer-events:none; transition:opacity 0.2s; }
+        .modal-overlay.show { opacity:1; pointer-events:all; }
+        .modal { background:#fff; border-radius:14px; padding:28px 24px; width:100%; max-width:520px;
+            margin:16px; max-height:90vh; overflow-y:auto; transform:scale(0.95); transition:transform 0.2s; }
+        .modal-overlay.show .modal { transform:scale(1); }
+        .modal-title { font-size:1.1rem; font-weight:700; color:var(--text-primary); margin-bottom:4px; }
+        .modal-sub { font-size:0.85rem; color:var(--text-secondary); margin-bottom:16px; }
+        .modal-actions { display:flex; gap:10px; margin-top:20px; flex-wrap:wrap; }
+        .photo-modal-imgs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+        .photo-modal-imgs img { height:80px; border-radius:6px; cursor:pointer; border:1px solid var(--border); object-fit:cover; }
+        .btn-gold { background:var(--accent); color:#fff; }
+        .btn-dark { background:var(--text-primary); color:#fff; }
+
+        /* ── SETTINGS ── */
+        .api-key-row { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; }
+        .api-key-row .form-group { flex:1; min-width:260px; }
+        .api-status { font-size:0.82rem; margin-top:8px; padding:8px 12px; border-radius:6px; }
+        .api-status.ok  { background:#dcfce7; color:#15803d; }
+        .api-status.err { background:#fee2e2; color:#b91c1c; }
+        .setup-steps { list-style:none; counter-reset:steps; }
+        .setup-steps li { counter-increment:steps; padding:10px 12px 10px 44px; position:relative;
+            border-bottom:1px solid var(--border); font-size:0.875rem; color:var(--text-secondary); }
+        .setup-steps li::before { content:counter(steps); position:absolute; left:10px; top:50%; transform:translateY(-50%);
+            width:22px; height:22px; background:var(--accent); color:#fff; border-radius:50%;
+            display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700; }
+        .code-block { background:#1a1a2e; color:#e8a020; padding:16px; border-radius:8px;
+            font-family:monospace; font-size:0.78rem; margin-top:12px; overflow-x:auto; white-space:pre; }
+
+        /* ── TOAST ── */
+        .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(80px);
+            background:#1c2d1c; color:#fff; padding:10px 20px; border-radius:8px; font-size:0.87rem;
+            font-weight:500; opacity:0; transition:all 0.3s; z-index:9999; pointer-events:none; white-space:nowrap; max-width:90vw; }
+        .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+        .toast.success { background:var(--success); }
+        .toast.error   { background:var(--danger); }
+
+        /* ── PRINT ── */
+        #print-area { display:none; }
+        @media print { #print-area { display:block; } body > *:not(#print-area) { display:none !important; } }
+
+        /* ── DATE/TIME/WEATHER ── */
+        #dtw-bar { display:flex; align-items:center; background:var(--bg-secondary); border:1px solid var(--border);
+            border-radius:10px; padding:10px 18px; margin-bottom:20px; flex-wrap:wrap; gap:6px 0; }
+        .dtw-item { display:flex; align-items:center; gap:8px; padding:0 14px; font-size:0.9rem; color:var(--text-primary); }
+        .dtw-item:first-child { padding-left:0; }
+        .dtw-divider { width:1px; height:28px; background:var(--border); flex-shrink:0; }
+        .dtw-icon { font-size:1.15rem; }
+        .dtw-location { margin-left:auto; }
+        #dtw-clock { font-weight:600; letter-spacing:0.3px; }
+
+        /* ── SCANNER ── */
+        #scanner-video-wrap { position:relative; width:100%; aspect-ratio:4/3; background:#000; border-radius:8px; overflow:hidden; margin:12px 0; }
+        #scanner-video { width:100%; height:100%; object-fit:cover; }
+        #scanner-overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+        .scan-aim { width:200px; height:200px; border:3px solid var(--accent); border-radius:8px; box-shadow:0 0 0 9999px rgba(0,0,0,0.35); }
+        #scanner-result { padding:10px; background:var(--bg-card); border-radius:6px; font-size:0.85rem; margin-top:8px; min-height:36px; text-align:center; }
+
+        /* ── RESPONSIVE ── */
+        @media (max-width:720px) {
+            main { padding:12px; }
+            .stats-grid { grid-template-columns:1fr 1fr; gap:10px; }
+            .form-grid { grid-template-columns:1fr; gap:12px; }
+            .form-group.full-width, .form-group.span2 { grid-column:1; }
+            .photo-grid { grid-template-columns:1fr; }
+            .toolbar { flex-direction:column; align-items:stretch; }
+            .toolbar input[type="text"], .toolbar select { width:100%; }
+            .toolbar .btn { width:100%; justify-content:center; }
+            table { font-size:0.8rem; }
+            thead th, tbody td { padding:8px 10px; }
+            .btn { min-height:40px; }
+            .btn-sm { min-height:34px; }
+            .btn-ai { min-height:38px; }
+            .form-actions { flex-direction:column; }
+            .form-actions .btn { width:100%; justify-content:center; }
+            .modal { padding:20px 18px; }
+            .login-box { padding:30px 22px; margin:16px; }
+            .card-title { flex-direction:column; align-items:flex-start; gap:6px; }
+            .cat-breakdown { grid-template-columns:1fr; }
+            .api-key-row { flex-direction:column; }
+            .api-key-row .btn { width:100%; justify-content:center; }
+            nav button { padding:7px 11px; font-size:0.78rem; flex-shrink:0; }
+            #dtw-bar { flex-direction:column; align-items:flex-start; padding:12px 14px; gap:6px; }
+            .dtw-divider { display:none; }
+            .dtw-item { padding:0; }
+            .dtw-location { margin-left:0; }
+        }
+        @media (max-width:400px) {
+            .stats-grid { grid-template-columns:1fr 1fr; gap:8px; }
+            .stat-value  { font-size:1.5rem; }
+            .hero-title  { font-size:1.2rem; }
+            nav button   { padding:6px 9px; font-size:0.74rem; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ══ LOGIN ══ -->
+<div id="login-screen">
+    <div class="login-site-links">
+        <a href="index.html">🔫 Farmboss Armory</a>
+        <a href="machinery.html" class="active">🚜 Farmboss Machinery</a>
+    </div>
+    <div class="login-box">
+        <div class="login-logo">🚜</div>
+        <h2>Farmboss Machinery</h2>
+        <p class="login-sub">Sign in to access your equipment inventory</p>
+        <form id="login-form">
+            <div class="form-group" style="margin-bottom:14px;">
+                <label>Email</label>
+                <input type="email" id="login-email" placeholder="your@email.com" required autocomplete="username">
+            </div>
+            <div class="form-group" style="margin-bottom:20px;">
+                <label>Password</label>
+                <input type="password" id="login-password" placeholder="••••••••" required autocomplete="current-password">
+            </div>
+            <div class="login-error" id="login-error"></div>
+            <button type="submit" class="btn btn-primary login-full" id="login-btn">Sign In</button>
+        </form>
+    </div>
+</div>
+
+<!-- ══ LOADING ══ -->
+<div id="loading-screen">
+    <div class="spinner"></div>
+    <p>Loading your equipment...</p>
+</div>
+
+<!-- ══ APP ══ -->
+<div id="app">
+<div class="site-switcher">
+    <span class="site-switcher-label">Farmboss Suite</span>
+    <a href="index.html" class="site-link">🔫 Armory</a>
+    <a href="machinery.html" class="site-link active">🚜 Machinery</a>
+</div>
+<header>
+    <div class="logo-area">
+        <div class="logo-icon">🚜</div>
+        <h1>Farmboss <span>Machinery</span></h1>
+    </div>
+    <nav>
+        <button class="active" onclick="showView('dashboard')">Dashboard</button>
+        <button onclick="showView('add-item')">Add Equipment</button>
+        <button onclick="showView('inventory')">Inventory</button>
+        <button onclick="showView('reports')">Reports</button>
+        <button onclick="showView('categories')">Equipment Types</button>
+        <button onclick="showView('settings')">⚙ Settings</button>
+    </nav>
+    <div class="header-right">
+        <span class="user-badge" id="user-email"></span>
+        <button class="btn-signout" onclick="doSignOut()">Sign Out</button>
+    </div>
+</header>
+
+<main>
+
+<!-- ══ DASHBOARD ══ -->
+<div id="view-dashboard" class="view active">
+    <div class="hero">
+        <div>
+            <div class="hero-title">Farmboss <span>Machinery</span></div>
+            <div class="hero-sub">Your complete farm equipment inventory</div>
+        </div>
+        <!-- Tractor SVG silhouette -->
+        <svg class="hero-tractor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 155">
+          <!-- Three-point hitch -->
+          <line x1="90" y1="92" x2="42" y2="100" stroke="rgba(255,255,255,0.7)" stroke-width="3.5"/>
+          <line x1="90" y1="108" x2="42" y2="118" stroke="rgba(255,255,255,0.7)" stroke-width="3.5"/>
+          <rect x="38" y="98" width="6" height="23" rx="2" fill="rgba(255,255,255,0.7)"/>
+          <!-- Chassis -->
+          <rect x="90" y="78" width="150" height="52" rx="6" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.7)" stroke-width="2"/>
+          <!-- Hood -->
+          <rect x="232" y="86" width="55" height="38" rx="5" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.75)" stroke-width="2"/>
+          <!-- Exhaust -->
+          <rect x="251" y="22" width="8" height="46" rx="3" fill="rgba(255,255,255,0.8)"/>
+          <ellipse cx="255" cy="21" rx="7" ry="4" fill="rgba(255,255,255,0.55)"/>
+          <!-- Cab -->
+          <rect x="110" y="40" width="82" height="55" rx="5" fill="rgba(255,255,255,0.18)" stroke="rgba(255,255,255,0.8)" stroke-width="2"/>
+          <!-- Window -->
+          <rect x="118" y="48" width="66" height="35" rx="3" fill="rgba(255,255,255,0.32)" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
+          <!-- Steps -->
+          <rect x="183" y="112" width="16" height="5" rx="2" fill="rgba(255,255,255,0.5)"/>
+          <rect x="187" y="120" width="12" height="5" rx="2" fill="rgba(255,255,255,0.4)"/>
+          <!-- Rear wheel -->
+          <circle cx="100" cy="108" r="42" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="7"/>
+          <circle cx="100" cy="108" r="15" fill="rgba(255,255,255,0.28)" stroke="rgba(255,255,255,0.55)" stroke-width="3"/>
+          <line x1="100" y1="66" x2="100" y2="150" stroke="rgba(255,255,255,0.32)" stroke-width="2.5"/>
+          <line x1="58" y1="108" x2="142" y2="108" stroke="rgba(255,255,255,0.32)" stroke-width="2.5"/>
+          <line x1="70" y1="78" x2="130" y2="138" stroke="rgba(255,255,255,0.32)" stroke-width="2.5"/>
+          <line x1="130" y1="78" x2="70" y2="138" stroke="rgba(255,255,255,0.32)" stroke-width="2.5"/>
+          <!-- Front wheel -->
+          <circle cx="240" cy="117" r="22" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="5"/>
+          <circle cx="240" cy="117" r="8" fill="rgba(255,255,255,0.22)" stroke="rgba(255,255,255,0.5)" stroke-width="2"/>
+          <line x1="228" y1="117" x2="252" y2="117" stroke="rgba(255,255,255,0.35)" stroke-width="2"/>
+          <line x1="240" y1="105" x2="240" y2="129" stroke="rgba(255,255,255,0.35)" stroke-width="2"/>
+        </svg>
+    </div>
+    <!-- Date / Time / Weather -->
+    <div id="dtw-bar">
+        <div class="dtw-item">
+            <span class="dtw-icon">🕐</span>
+            <span id="dtw-clock">—</span>
+        </div>
+        <div class="dtw-divider"></div>
+        <div class="dtw-item">
+            <span class="dtw-icon" id="dtw-wx-icon">🌡️</span>
+            <span id="dtw-wx-text">Loading weather…</span>
+        </div>
+        <div class="dtw-item dtw-location">
+            <span style="font-size:0.72rem;color:var(--text-secondary);">Chaska, MN 55318</span>
+        </div>
+    </div>
+
+    <div class="stats-grid" id="stats-grid"></div>
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">📊 Inventory by Equipment Type</div></div>
+        <div class="cat-breakdown" id="cat-breakdown"></div>
+    </div>
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">🕐 Recently Added</div></div>
+        <div class="table-wrapper">
+            <table><thead><tr>
+                <th class="no-sort" style="width:52px;">Photo</th>
+                <th class="no-sort">ID</th>
+                <th class="no-sort">Type</th>
+                <th class="no-sort">Make</th>
+                <th class="no-sort">Model</th>
+                <th class="no-sort">Year</th>
+                <th class="no-sort">Hours</th>
+                <th class="no-sort">Added</th>
+            </tr></thead>
+            <tbody id="recent-tbody"></tbody></table>
+        </div>
+    </div>
+</div>
+
+<!-- ══ ADD / EDIT ══ -->
+<div id="view-add-item" class="view">
+    <div class="card">
+        <div class="card-title">
+            <div class="card-title-left" id="form-title">➕ Add New Equipment</div>
+        </div>
+        <form id="item-form">
+            <input type="hidden" id="edit-id">
+            <input type="hidden" id="edit-doc-id">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Equipment Type *</label>
+                    <select id="f-category" required><option value="">Select type...</option></select>
+                </div>
+                <div class="form-group">
+                    <label>Make</label>
+                    <input type="text" id="f-make" list="make-list" placeholder="e.g. John Deere" autocomplete="off">
+                    <datalist id="make-list"></datalist>
+                </div>
+                <div class="form-group">
+                    <label>Model</label>
+                    <input type="text" id="f-model" placeholder="e.g. 8370R">
+                </div>
+                <div class="form-group">
+                    <label>Year</label>
+                    <input type="number" id="f-year" placeholder="e.g. 2019" min="1900" max="2100">
+                </div>
+                <div class="form-group">
+                    <label>Serial Number / PIN</label>
+                    <input type="text" id="f-serial" placeholder="e.g. 1RW8370RCJD123456">
+                </div>
+                <div class="form-group">
+                    <label>Engine Hours</label>
+                    <input type="number" id="f-hours" placeholder="e.g. 4250" min="0">
+                </div>
+                <div class="form-group">
+                    <label>Condition</label>
+                    <select id="f-condition">
+                        <option value="">Select condition...</option>
+                        <option>Excellent</option>
+                        <option>Good</option>
+                        <option>Fair</option>
+                        <option>Poor</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Purchase Date</label>
+                    <input type="date" id="f-purchase-date">
+                </div>
+                <div class="form-group">
+                    <label>Purchase Price</label>
+                    <div class="input-prefix-wrap">
+                        <span class="input-prefix">$</span>
+                        <input type="number" id="f-price" placeholder="0.00" min="0" step="0.01" style="padding-left:24px;">
+                    </div>
+                </div>
+                <div class="form-group span2">
+                    <label>Storage Location</label>
+                    <input type="text" id="f-location" placeholder="e.g. North machine shed, Field #3">
+                </div>
+                <div class="form-group full-width">
+                    <label>Notes</label>
+                    <textarea id="f-notes" rows="2" placeholder="Maintenance history, repairs, accessories, attachments..."></textarea>
+                </div>
+            </div>
+
+            <!-- PHOTOS & AI -->
+            <div style="margin-top:22px;padding-top:18px;border-top:1px solid var(--border);">
+                <div style="font-size:0.85rem;font-weight:600;color:var(--text-primary);margin-bottom:14px;">
+                    📷 Photos &amp; AI Identification
+                    <span style="font-size:0.75rem;font-weight:400;color:var(--text-secondary);margin-left:8px;">Upload photos — AI will auto-fill fields</span>
+                </div>
+                <div class="photo-grid">
+                    <!-- MAIN PHOTO -->
+                    <div class="photo-slot">
+                        <div class="photo-slot-label">⭐ Main Photo</div>
+                        <div class="photo-preview" id="prev-main">
+                            <span class="no-photo">📷</span>
+                            <button type="button" class="remove-photo" onclick="removePhoto('main')">✕</button>
+                        </div>
+                        <div class="photo-file-input">
+                            <input type="file" id="file-main" accept="image/*" onchange="onPhotoSelected('main',this)">
+                        </div>
+                        <button type="button" class="btn-ai" id="btn-identify" onclick="identifyItem()" disabled>🤖 Identify Equipment with AI</button>
+                    </div>
+                    <!-- SERIAL / PIN PHOTO -->
+                    <div class="photo-slot">
+                        <div class="photo-slot-label">📋 Serial / PIN Photo</div>
+                        <div class="photo-preview" id="prev-serial">
+                            <span class="no-photo">📋</span>
+                            <button type="button" class="remove-photo" onclick="removePhoto('serial')">✕</button>
+                        </div>
+                        <div class="photo-file-input">
+                            <input type="file" id="file-serial" accept="image/*" onchange="onPhotoSelected('serial',this)">
+                        </div>
+                        <button type="button" class="btn-ai" id="btn-ocr" onclick="extractSerial()" disabled>🔍 Extract Serial/PIN with AI</button>
+                    </div>
+                    <!-- ADDITIONAL PHOTO -->
+                    <div class="photo-slot">
+                        <div class="photo-slot-label">🖼 Additional Photo</div>
+                        <div class="photo-preview" id="prev-extra">
+                            <span class="no-photo">🖼</span>
+                            <button type="button" class="remove-photo" onclick="removePhoto('extra')">✕</button>
+                        </div>
+                        <div class="photo-file-input">
+                            <input type="file" id="file-extra" accept="image/*" onchange="onPhotoSelected('extra',this)">
+                        </div>
+                    </div>
+                </div>
+                <p id="ai-status" style="font-size:0.82rem;color:var(--text-secondary);margin-top:10px;min-height:18px;"></p>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" id="form-submit-btn">Save Equipment</button>
+                <button type="button" class="btn btn-ghost" onclick="resetForm()">Clear</button>
+                <button type="button" class="btn btn-ghost" onclick="showView('inventory')">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ══ INVENTORY ══ -->
+<div id="view-inventory" class="view">
+    <div class="card">
+        <div class="card-title">
+            <div class="card-title-left">📦 Inventory</div>
+            <span id="inv-count" style="font-size:0.8rem;color:var(--text-secondary);font-weight:400;"></span>
+        </div>
+        <div class="toolbar">
+            <input type="text" id="inv-search" placeholder="Search make, model, serial number, location..." oninput="renderInventory()">
+            <select id="inv-filter-cat" onchange="renderInventory()" style="min-width:180px;">
+                <option value="">All Types</option>
+            </select>
+            <select id="inv-filter-cond" onchange="renderInventory()" style="min-width:140px;">
+                <option value="">All Conditions</option>
+                <option>Excellent</option><option>Good</option><option>Fair</option><option>Poor</option>
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="showView('add-item');resetForm()">+ Add Equipment</button>
+            <button class="btn btn-ghost btn-sm" onclick="openScanner()" title="Scan barcode">📷 Scan</button>
+            <button class="btn btn-ghost btn-sm" onclick="exportCSV()">↓ Export CSV</button>
+        </div>
+        <div class="table-wrapper">
+            <table id="inv-table">
+                <thead><tr>
+                    <th class="no-sort" style="width:52px;">Photo</th>
+                    <th onclick="sortBy('id')">ID</th>
+                    <th onclick="sortBy('category')">Type</th>
+                    <th onclick="sortBy('make')">Make</th>
+                    <th onclick="sortBy('model')">Model</th>
+                    <th onclick="sortBy('year')">Year</th>
+                    <th onclick="sortBy('serialNumber')">Serial / PIN</th>
+                    <th onclick="sortBy('hours')">Hours</th>
+                    <th onclick="sortBy('condition')">Condition</th>
+                    <th onclick="sortBy('location')">Location</th>
+                    <th onclick="sortBy('purchaseDate')">Purchased</th>
+                    <th class="no-sort">Actions</th>
+                </tr></thead>
+                <tbody id="inv-tbody"></tbody>
+            </table>
+        </div>
+        <div id="inv-empty" class="empty" style="display:none;">
+            <div class="empty-icon">🚜</div>
+            <p>No equipment found. <a href="#" onclick="showView('add-item');resetForm();return false;" style="color:var(--accent);">Add your first item</a>.</p>
+        </div>
+    </div>
+</div>
+
+<!-- ══ REPORTS ══ -->
+<div id="view-reports" class="view">
+    <div class="card">
+        <div class="card-title">
+            <div class="card-title-left">📋 Reports</div>
+            <span id="rpt-count" style="font-size:0.8rem;color:var(--text-secondary);font-weight:400;"></span>
+        </div>
+        <div class="toolbar">
+            <input type="text" id="rpt-search" placeholder="Search all fields..." oninput="renderReport()">
+            <select id="rpt-filter-cat" onchange="renderReport()" style="min-width:180px;">
+                <option value="">All Types</option>
+            </select>
+            <select id="rpt-sort-field" onchange="renderReport()" style="min-width:180px;">
+                <option value="id">Sort: ID</option>
+                <option value="category">Sort: Type</option>
+                <option value="make">Sort: Make</option>
+                <option value="model">Sort: Model</option>
+                <option value="year">Sort: Year</option>
+                <option value="serialNumber">Sort: Serial #</option>
+                <option value="hours">Sort: Hours</option>
+                <option value="condition">Sort: Condition</option>
+                <option value="purchaseDate">Sort: Purchase Date</option>
+                <option value="price">Sort: Price</option>
+            </select>
+            <select id="rpt-sort-dir" onchange="renderReport()" style="min-width:120px;">
+                <option value="asc">Ascending</option>
+                <option value="desc">Descending</option>
+            </select>
+            <button class="btn btn-ghost btn-sm" onclick="printReport()">🖨 Print</button>
+            <button class="btn btn-ghost btn-sm" onclick="exportCSV()">↓ Export CSV</button>
+        </div>
+        <div class="table-wrapper">
+            <table><thead><tr>
+                <th onclick="rptSortBy('id')">ID</th>
+                <th onclick="rptSortBy('category')">Type</th>
+                <th onclick="rptSortBy('make')">Make</th>
+                <th onclick="rptSortBy('model')">Model</th>
+                <th onclick="rptSortBy('year')">Year</th>
+                <th onclick="rptSortBy('serialNumber')">Serial / PIN</th>
+                <th onclick="rptSortBy('hours')">Hours</th>
+                <th onclick="rptSortBy('condition')">Condition</th>
+                <th onclick="rptSortBy('purchaseDate')">Purchased</th>
+                <th onclick="rptSortBy('price')">Price</th>
+                <th onclick="rptSortBy('location')">Location</th>
+                <th class="no-sort">Notes</th>
+            </tr></thead>
+            <tbody id="rpt-tbody"></tbody></table>
+        </div>
+    </div>
+</div>
+
+<!-- ══ EQUIPMENT TYPES ══ -->
+<div id="view-categories" class="view">
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">🏷 Manage Equipment Types</div></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+            <input type="text" id="new-cat-input" placeholder="New equipment type name..." style="min-width:240px;max-width:340px;">
+            <button class="btn btn-primary" onclick="addCategory()">Add Type</button>
+        </div>
+        <div class="tags" id="cat-tags"></div>
+    </div>
+</div>
+
+<!-- ══ SETTINGS ══ -->
+<div id="view-settings" class="view">
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">🤖 AI Identification — Anthropic API Key</div></div>
+        <div>
+            <p style="font-size:0.875rem;color:var(--text-secondary);margin-bottom:16px;line-height:1.6;">
+                The AI photo identification uses Claude (by Anthropic). Enter your API key below — it is stored securely in your Firebase account and shared with Farmboss Armory.
+            </p>
+            <div class="api-key-row">
+                <div class="form-group">
+                    <label>Anthropic API Key</label>
+                    <input type="password" id="api-key-input" placeholder="sk-ant-api03-...">
+                </div>
+                <button class="btn btn-primary" onclick="saveApiKey()" style="height:38px;align-self:flex-end;">Save Key</button>
+                <button class="btn btn-ghost" onclick="testApiKey()" style="height:38px;align-self:flex-end;">Test Connection</button>
+            </div>
+            <div id="api-status" class="api-status" style="display:none;margin-top:10px;"></div>
+            <p style="font-size:0.78rem;color:var(--text-secondary);margin-top:10px;">
+                Get your API key at <strong>console.anthropic.com</strong> → API Keys → Create Key
+            </p>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">📷 Firebase Storage Setup</div></div>
+        <p style="font-size:0.875rem;color:var(--text-secondary);margin-bottom:16px;line-height:1.6;">
+            Photo uploads use Firebase Storage — shared with Farmboss Armory. If already set up there, photos will work here automatically.
+        </p>
+        <ol class="setup-steps">
+            <li>Go to <strong>console.firebase.google.com</strong> → your <strong>watchroom</strong> project</li>
+            <li>Click <strong>Storage</strong> in the left sidebar → <strong>Get started</strong></li>
+            <li>Choose <strong>Start in production mode</strong> → Next → pick your region → Done</li>
+            <li>Click the <strong>Rules</strong> tab and replace all content with:
+                <div class="code-block">rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}</div>
+            </li>
+        </ol>
+    </div>
+</div>
+
+</main>
+</div><!-- end #app -->
+
+<!-- ══ BARCODE MODAL ══ -->
+<div class="modal-overlay" id="barcode-modal">
+    <div class="modal" style="max-width:560px;">
+        <div class="modal-title" id="bc-title">Equipment Barcode</div>
+        <div class="modal-sub" id="bc-sub"></div>
+        <div id="bc-photos" class="photo-modal-imgs"></div>
+        <svg id="bc-svg"></svg>
+        <div class="modal-sub" id="bc-code" style="margin-top:6px;font-family:monospace;font-size:0.85rem;"></div>
+        <div class="modal-actions">
+            <button class="btn btn-gold" onclick="printBarcode()">🖨 Print Label</button>
+            <button class="btn btn-dark" onclick="closeModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<div id="print-area"><div id="print-content"></div></div>
+<div class="toast" id="toast"></div>
+
+<!-- ══ SCANNER MODAL ══ -->
+<div class="modal-overlay" id="scanner-modal">
+    <div class="modal" style="max-width:480px;">
+        <div class="modal-title">📷 Scan Equipment Barcode</div>
+        <div class="modal-sub">Point your camera at a Machinery barcode to look up an item.</div>
+        <div id="scanner-video-wrap">
+            <video id="scanner-video" playsinline muted autoplay></video>
+            <div id="scanner-overlay"><div class="scan-aim"></div></div>
+        </div>
+        <div id="scanner-result">Waiting for scan...</div>
+        <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="closeScanner()">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+//  FIREBASE
+// ═══════════════════════════════════════
+firebase.initializeApp({
+    apiKey: "AIzaSyB7c4urD9tJO80S7nADItxjwhSYVqlrkEU",
+    authDomain: "watchroom-714a0.firebaseapp.com",
+    projectId: "watchroom-714a0",
+    storageBucket: "watchroom-714a0.firebasestorage.app",
+    messagingSenderId: "911514107783",
+    appId: "1:911514107783:web:20e8a729fd66577c28dd22"
+});
+const auth    = firebase.auth();
+const db      = firebase.firestore();
+const storage = firebase.storage();
+
+// ═══════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════
+let items = [];
+let categories = [
+    'Tractor - Row Crop','Tractor - 4WD','Tractor - Compact','Tractor - Utility',
+    'Combine Harvester','Cotton Picker',
+    'Row Crop Planter','Air Seeder','No-Till Drill','Grain Drill',
+    'Self-Propelled Sprayer','Pull-Type Sprayer','Anhydrous Applicator',
+    'Disc - Tandem','Disc - Offset','Chisel Plow','Subsoiler','Field Cultivator','Row Cultivator',
+    'Hay Mower','Hay Conditioner','Tedder','Hay Rake','Round Baler','Large Square Baler',
+    'Silage Chopper',
+    'Grain Cart','Gravity Wagon','Grain Auger','Grain Dryer',
+    'Front End Loader','Skid Steer','Telehandler','Backhoe',
+    'Truck - Semi','Truck - Grain','Flatbed Trailer','Grain Trailer','Livestock Trailer',
+    'ATV','UTV / Side-by-Side',
+    'Manure Spreader','Fertilizer Spreader','Lime Spreader',
+    'Post Driver','Generator',
+    'Center Pivot','Irrigation Pump',
+    'Shop Equipment','Other'
+];
+let makes = [
+    'John Deere','Case IH','New Holland','Kubota','Massey Ferguson','AGCO','Fendt','Claas',
+    'Deutz-Fahr','Challenger','Versatile','White','Oliver','Allis-Chalmers',
+    'Minneapolis-Moline','International Harvester','Gleaner','MacDon',
+    'Bobcat','Caterpillar','Komatsu','JCB',
+    'Vermeer','Hesston','Kuhn','Krone','Pottinger','Gehl',
+    'Bush Hog','Land Pride','Woods','Rhino',
+    'Great Plains','Kinze','Monosem','Horsch','Amazone',
+    'J&M','Brent','Parker','Unverferth','Brandt','Westfield','Meridian',
+    'Loftness','Haybuster','New Idea',
+    'Case','Ford'
+];
+let nextId       = 5001;
+let invSortField = 'id';
+let invSortDir   = 'asc';
+let activeBcId   = null;
+let unsubItems   = null;
+let apiKey       = '';
+let scannerStream = null;
+let scannerActive = false;
+
+let formPhotos = {
+    main:   { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false },
+    serial: { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false },
+    extra:  { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false }
+};
+
+const VIEWS = ['dashboard','add-item','inventory','reports','categories','settings'];
+
+// ═══════════════════════════════════════
+//  AUTH
+// ═══════════════════════════════════════
+auth.onAuthStateChanged(user => {
+    if (user) {
+        document.getElementById('login-screen').style.display   = 'none';
+        document.getElementById('loading-screen').style.display = 'flex';
+        document.getElementById('app').style.display            = 'none';
+        document.getElementById('user-email').textContent       = user.email;
+        initApp();
+    } else {
+        document.getElementById('login-screen').style.display   = 'flex';
+        document.getElementById('loading-screen').style.display = 'none';
+        document.getElementById('app').style.display            = 'none';
+        if (unsubItems) { unsubItems(); unsubItems = null; }
+        items = [];
+    }
+});
+
+document.getElementById('login-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const email = document.getElementById('login-email').value.trim();
+    const pass  = document.getElementById('login-password').value;
+    const errEl = document.getElementById('login-error');
+    const btn   = document.getElementById('login-btn');
+    errEl.textContent = ''; btn.textContent = 'Signing in...'; btn.disabled = true;
+    try {
+        await auth.signInWithEmailAndPassword(email, pass);
+    } catch(err) {
+        errEl.textContent = 'Invalid email or password.';
+        btn.textContent = 'Sign In'; btn.disabled = false;
+    }
+});
+
+async function doSignOut() {
+    if (!confirm('Sign out?')) return;
+    await auth.signOut();
+}
+
+// ═══════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════
+async function initApp() {
+    try {
+        const cfgDoc = await db.collection('machinery_config').doc('data').get();
+        if (cfgDoc.exists) {
+            const d = cfgDoc.data();
+            if (d.categories && d.categories.length) categories = d.categories;
+            if (d.makes      && d.makes.length)      makes      = d.makes;
+            if (d.nextId)                             nextId     = d.nextId;
+        }
+        const keyDoc = await db.collection('settings').doc('apikey').get();
+        if (keyDoc.exists && keyDoc.data().key) {
+            apiKey = keyDoc.data().key;
+            document.getElementById('api-key-input').value = apiKey;
+        }
+        unsubItems = db.collection('machinery_items').onSnapshot(snap => {
+            items = snap.docs.map(doc => ({ _docId:doc.id, ...doc.data() }));
+            renderDashboard(); renderInventory(); renderReport();
+        });
+        document.getElementById('loading-screen').style.display = 'none';
+        document.getElementById('app').style.display            = 'block';
+        populateCatSelect(); populateMakeList(); syncCatFilters();
+        showView('dashboard');
+    } catch(err) {
+        document.getElementById('loading-screen').innerHTML =
+            `<p style="color:var(--danger);padding:20px;text-align:center;">
+             Error: ${err.message}<br><br>
+             <button class="btn btn-ghost" onclick="doSignOut()">Sign Out</button></p>`;
+    }
+}
+
+// ═══════════════════════════════════════
+//  FIRESTORE / STORAGE
+// ═══════════════════════════════════════
+async function saveConfig() {
+    await db.collection('machinery_config').doc('data').set({ categories, makes, nextId });
+}
+
+async function uploadPhoto(slot, file) {
+    const ext  = file.name.split('.').pop();
+    const path = `machinery_photos/${Date.now()}_${slot}.${ext}`;
+    const ref  = storage.ref().child(path);
+    await ref.put(file);
+    return await ref.getDownloadURL();
+}
+
+async function dbAddItem(data, photos) {
+    const item = { id:nextId++, addedAt:new Date().toISOString(), photos, ...data };
+    const docRef = await db.collection('machinery_items').add(item);
+    await saveConfig();
+    return { ...item, _docId:docRef.id };
+}
+
+async function dbUpdateItem(docId, data, photos) {
+    await db.collection('machinery_items').doc(docId).update({ ...data, photos });
+}
+
+async function dbDeleteItem(docId) {
+    await db.collection('machinery_items').doc(docId).delete();
+}
+
+// ═══════════════════════════════════════
+//  NAVIGATION
+// ═══════════════════════════════════════
+function showView(v) {
+    VIEWS.forEach(id => document.getElementById('view-'+id).classList.remove('active'));
+    document.getElementById('view-'+v).classList.add('active');
+    document.querySelectorAll('nav button').forEach((btn,i) => btn.classList.toggle('active', VIEWS[i]===v));
+    if (v==='dashboard')  renderDashboard();
+    if (v==='inventory')  { syncCatFilters(); renderInventory(); }
+    if (v==='reports')    { syncCatFilters(); renderReport(); }
+    if (v==='categories') renderCatTags();
+    if (v==='add-item')   populateCatSelect();
+}
+
+// ═══════════════════════════════════════
+//  DASHBOARD
+// ═══════════════════════════════════════
+function renderDashboard() {
+    const total  = items.length;
+    const ms30   = 30*24*60*60*1000;
+    const recent = items.filter(i => i.addedAt && (Date.now()-new Date(i.addedAt).getTime())<ms30).length;
+    const hours  = items.filter(i=>i.hours).map(i=>Number(i.hours)||0);
+    const avgHrs = hours.length ? Math.round(hours.reduce((a,b)=>a+b,0)/hours.length).toLocaleString() : '—';
+    document.getElementById('stats-grid').innerHTML = `
+        <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Total Equipment</div></div>
+        <div class="stat-card"><div class="stat-value">${categories.length}</div><div class="stat-label">Equipment Types</div></div>
+        <div class="stat-card"><div class="stat-value">${recent}</div><div class="stat-label">Added This Month</div></div>
+        <div class="stat-card"><div class="stat-value">${avgHrs}</div><div class="stat-label">Avg Engine Hours</div></div>`;
+    const counts = {};
+    items.forEach(it => { counts[it.category]=(counts[it.category]||0)+1; });
+    const maxC = Math.max(...Object.values(counts),1);
+    document.getElementById('cat-breakdown').innerHTML = Object.keys(counts).length
+        ? Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([cat,c])=>`
+            <div class="cat-breakdown-item">
+                <div class="cbi-name">${cat}</div>
+                <div class="cbi-count">${c}</div>
+                <div class="cbi-bar"><div class="cbi-bar-fill" style="width:${(c/maxC*100).toFixed(1)}%"></div></div>
+            </div>`).join('')
+        : '<p style="color:var(--text-secondary);padding:16px 0;">No equipment yet.</p>';
+    const rec = [...items].sort((a,b)=>b.id-a.id).slice(0,10);
+    document.getElementById('recent-tbody').innerHTML = rec.length
+        ? rec.map(it => {
+            const mainUrl = it.photos?.find(p=>p.slot==='main')?.url;
+            const thumb = mainUrl
+                ? `<img src="${mainUrl}" class="thumb" alt="" style="cursor:pointer" onclick="window.open('${mainUrl}','_blank')" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb-placeholder',innerHTML:'📷'}))">`
+                : `<div class="thumb-placeholder">🚜</div>`;
+            return `<tr>
+                <td>${thumb}</td>
+                <td class="mono">#${it.id}</td>
+                <td><span class="badge ${catClass(it.category)}">${it.category||'—'}</span></td>
+                <td>${it.make||'—'}</td>
+                <td>${it.model||'—'}</td>
+                <td>${it.year||'—'}</td>
+                <td>${it.hours ? Number(it.hours).toLocaleString()+' hrs' : '—'}</td>
+                <td style="color:var(--text-secondary)">${it.addedAt?new Date(it.addedAt).toLocaleDateString():'—'}</td>
+            </tr>`;}).join('')
+        : '<tr><td colspan="8" style="text-align:center;color:var(--text-secondary);padding:30px;">No equipment yet.</td></tr>';
+}
+
+// ═══════════════════════════════════════
+//  PHOTOS & AI
+// ═══════════════════════════════════════
+function onPhotoSelected(slot, input) {
+    const file = input.files[0]; if (!file) return;
+    formPhotos[slot].file = file;
+    formPhotos[slot].deleted = false;
+    const reader = new FileReader();
+    reader.onload = e => {
+        formPhotos[slot].base64   = e.target.result.split(',')[1];
+        formPhotos[slot].mimeType = file.type;
+        renderPhotoPreview(slot, e.target.result);
+        if (slot==='main')   document.getElementById('btn-identify').disabled = false;
+        if (slot==='serial') document.getElementById('btn-ocr').disabled      = false;
+    };
+    reader.readAsDataURL(file);
+}
+
+function renderPhotoPreview(slot, dataUrl) {
+    const prev = document.getElementById('prev-'+slot);
+    prev.innerHTML = `<img src="${dataUrl}" alt="${slot} photo"><button type="button" class="remove-photo" onclick="removePhoto('${slot}')">✕</button>`;
+}
+
+function removePhoto(slot) {
+    formPhotos[slot] = { file:null, base64:null, mimeType:null, existingUrl:null, deleted:true };
+    const icons = { main:'📷', serial:'📋', extra:'🖼' };
+    document.getElementById('prev-'+slot).innerHTML =
+        `<span class="no-photo">${icons[slot]}</span><button type="button" class="remove-photo" onclick="removePhoto('${slot}')">✕</button>`;
+    document.getElementById('file-'+slot).value = '';
+    if (slot==='main')   document.getElementById('btn-identify').disabled = true;
+    if (slot==='serial') document.getElementById('btn-ocr').disabled      = true;
+}
+
+async function callClaude(base64, mimeType, prompt) {
+    if (!apiKey) { toast('Set your Anthropic API key in Settings first.','error'); return null; }
+    let res;
+    try {
+        res = await fetch('https://api.anthropic.com/v1/messages', {
+            method:'POST', mode:'cors',
+            headers:{
+                'Content-Type':'application/json',
+                'x-api-key':apiKey,
+                'anthropic-version':'2023-06-01',
+                'anthropic-dangerous-direct-browser-calls':'true'
+            },
+            body: JSON.stringify({
+                model:'claude-3-5-sonnet-20241022', max_tokens:512,
+                messages:[{ role:'user', content:[
+                    { type:'image', source:{ type:'base64', media_type:mimeType, data:base64 }},
+                    { type:'text',  text:prompt }
+                ]}]
+            })
+        });
+    } catch(networkErr) { throw new Error('Network error — check your internet connection.'); }
+    if (!res.ok) {
+        let errMsg = `API error ${res.status}`;
+        try {
+            const d = await res.json();
+            errMsg = d.error?.message || errMsg;
+            if (res.status===401) errMsg = 'Invalid API key — re-enter your key in Settings.';
+            if (res.status===429) errMsg = 'Rate limit reached — please wait a moment.';
+        } catch(e) {}
+        throw new Error(errMsg);
+    }
+    const data = await res.json();
+    return data.content[0].text;
+}
+
+async function identifyItem() {
+    const p = formPhotos.main; if (!p.base64) return;
+    const btn = document.getElementById('btn-identify');
+    const status = document.getElementById('ai-status');
+    btn.disabled = true; btn.classList.add('scanning'); btn.textContent = '⏳ Identifying...';
+    status.textContent = 'Analyzing image with AI...';
+    try {
+        const prompt = `Analyze this farm equipment image. Return ONLY valid JSON with these fields:
+{"make":"manufacturer/brand name or empty","model":"model name or empty","year":"4-digit year or empty","category":"one of: Tractor - Row Crop,Tractor - 4WD,Tractor - Compact,Tractor - Utility,Combine Harvester,Cotton Picker,Row Crop Planter,Air Seeder,No-Till Drill,Grain Drill,Self-Propelled Sprayer,Pull-Type Sprayer,Anhydrous Applicator,Disc - Tandem,Disc - Offset,Chisel Plow,Subsoiler,Field Cultivator,Row Cultivator,Hay Mower,Hay Conditioner,Tedder,Hay Rake,Round Baler,Large Square Baler,Silage Chopper,Grain Cart,Gravity Wagon,Grain Auger,Grain Dryer,Front End Loader,Skid Steer,Telehandler,Backhoe,Truck - Semi,Truck - Grain,Flatbed Trailer,Grain Trailer,Livestock Trailer,ATV,UTV / Side-by-Side,Manure Spreader,Fertilizer Spreader,Lime Spreader,Post Driver,Generator,Center Pivot,Irrigation Pump,Shop Equipment,Other or empty","condition":"Excellent,Good,Fair,Poor or empty"}
+Only include values you are reasonably confident about. Return only the JSON object, no other text.`;
+        const raw = await callClaude(p.base64, p.mimeType, prompt);
+        if (!raw) return;
+        const jsonMatch = raw.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error('Could not parse AI response');
+        const result = JSON.parse(jsonMatch[0]);
+        let filled = [];
+        if (result.make)      { document.getElementById('f-make').value = result.make; filled.push('Make'); }
+        if (result.model)     { document.getElementById('f-model').value = result.model; filled.push('Model'); }
+        if (result.year)      { document.getElementById('f-year').value = result.year; filled.push('Year'); }
+        if (result.category)  { populateCatSelect(); document.getElementById('f-category').value = result.category; filled.push('Type'); }
+        if (result.condition) { document.getElementById('f-condition').value = result.condition; filled.push('Condition'); }
+        status.textContent = filled.length
+            ? `✅ AI filled in: ${filled.join(', ')}. Review and adjust as needed.`
+            : '⚠️ AI could not identify specific details. Fill in fields manually.';
+        status.style.color = filled.length ? 'var(--success)' : 'var(--text-secondary)';
+    } catch(err) {
+        status.textContent = '❌ Error: '+err.message;
+        status.style.color  = 'var(--danger)';
+    } finally {
+        btn.disabled = false; btn.classList.remove('scanning');
+        btn.innerHTML = '🤖 Identify Equipment with AI';
+    }
+}
+
+async function extractSerial() {
+    const p = formPhotos.serial; if (!p.base64) return;
+    const btn = document.getElementById('btn-ocr');
+    const status = document.getElementById('ai-status');
+    btn.disabled = true; btn.classList.add('scanning'); btn.textContent = '⏳ Reading...';
+    status.textContent = 'Reading serial/PIN number...';
+    try {
+        const prompt = `This image shows a farm equipment serial number or PIN plate. Extract ONLY the serial number or PIN exactly as it appears, character by character. Return ONLY the serial number/PIN — no explanation, no labels, no other text.`;
+        const result = await callClaude(p.base64, p.mimeType, prompt);
+        if (!result) return;
+        const sn = result.trim().replace(/['"]/g,'');
+        if (sn) {
+            document.getElementById('f-serial').value = sn;
+            status.textContent = `✅ Serial/PIN extracted: ${sn}`;
+            status.style.color  = 'var(--success)';
+        } else {
+            status.textContent = '⚠️ Could not read serial/PIN clearly.';
+            status.style.color  = 'var(--text-secondary)';
+        }
+    } catch(err) {
+        status.textContent = '❌ Error: '+err.message;
+        status.style.color  = 'var(--danger)';
+    } finally {
+        btn.disabled = false; btn.classList.remove('scanning');
+        btn.innerHTML = '🔍 Extract Serial/PIN with AI';
+    }
+}
+
+// ═══════════════════════════════════════
+//  FORM
+// ═══════════════════════════════════════
+function populateCatSelect() {
+    const sel = document.getElementById('f-category');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Select type...</option>';
+    categories.forEach(c => {
+        const o = document.createElement('option');
+        o.value = o.textContent = c;
+        if (c===cur) o.selected = true;
+        sel.appendChild(o);
+    });
+}
+
+function populateMakeList() {
+    const dl = document.getElementById('make-list'); if (!dl) return;
+    dl.innerHTML = makes.slice().sort((a,b)=>a.localeCompare(b)).map(m=>`<option value="${esc(m)}">`).join('');
+}
+
+function addMakeIfNew(name) {
+    if (!name) return;
+    if (!makes.some(m=>m.toLowerCase()===name.toLowerCase())) makes.push(name);
+}
+
+document.getElementById('item-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const eid   = document.getElementById('edit-id').value;
+    const docId = document.getElementById('edit-doc-id').value;
+    const btn   = document.getElementById('form-submit-btn');
+    const data  = {
+        category:     document.getElementById('f-category').value,
+        make:         document.getElementById('f-make').value.trim(),
+        model:        document.getElementById('f-model').value.trim(),
+        year:         document.getElementById('f-year').value.trim(),
+        serialNumber: document.getElementById('f-serial').value.trim(),
+        hours:        document.getElementById('f-hours').value.trim(),
+        condition:    document.getElementById('f-condition').value,
+        purchaseDate: document.getElementById('f-purchase-date').value,
+        price:        document.getElementById('f-price').value.trim(),
+        location:     document.getElementById('f-location').value.trim(),
+        notes:        document.getElementById('f-notes').value.trim(),
+    };
+    btn.disabled = true; btn.textContent = 'Saving...';
+    try {
+        addMakeIfNew(data.make);
+        const existingPhotos = docId ? (items.find(i=>i._docId===docId)?.photos||[]) : [];
+        const photos = [];
+        for (const slot of ['main','serial','extra']) {
+            const p = formPhotos[slot];
+            if (p.file) {
+                try {
+                    const url = await uploadPhoto(slot, p.file);
+                    photos.push({ slot, url });
+                } catch(uploadErr) {
+                    toast(`Photo upload failed (${slot}): check Firebase Storage in Settings.`, 'error');
+                }
+            } else if (!p.deleted) {
+                const existing = existingPhotos.find(ph=>ph.slot===slot);
+                if (existing) photos.push(existing);
+            }
+        }
+        if (eid && docId) {
+            await dbUpdateItem(docId, data, photos);
+            await saveConfig();
+            toast('Equipment updated.','success');
+        } else {
+            await dbAddItem(data, photos);
+            toast('Equipment added!','success');
+        }
+        populateMakeList();
+        resetForm();
+        showView('inventory');
+    } catch(err) {
+        toast('Error saving: '+err.message,'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = eid ? 'Update Equipment' : 'Save Equipment';
+    }
+});
+
+function resetForm() {
+    document.getElementById('edit-id').value           = '';
+    document.getElementById('edit-doc-id').value       = '';
+    document.getElementById('item-form').reset();
+    document.getElementById('form-title').textContent  = '➕ Add New Equipment';
+    document.getElementById('form-submit-btn').textContent = 'Save Equipment';
+    document.getElementById('form-submit-btn').disabled    = false;
+    document.getElementById('ai-status').textContent   = '';
+    populateCatSelect(); populateMakeList();
+    for (const slot of ['main','serial','extra']) {
+        formPhotos[slot] = { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false };
+    }
+    removePhoto('main'); removePhoto('serial'); removePhoto('extra');
+    document.getElementById('btn-identify').disabled = true;
+    document.getElementById('btn-ocr').disabled      = true;
+}
+
+function editItem(docId) {
+    const it = items.find(i=>i._docId===docId); if (!it) return;
+    resetForm();
+    showView('add-item'); populateCatSelect();
+    document.getElementById('edit-id').value           = it.id;
+    document.getElementById('edit-doc-id').value       = it._docId;
+    document.getElementById('f-category').value        = it.category||'';
+    document.getElementById('f-make').value            = it.make||'';
+    document.getElementById('f-model').value           = it.model||'';
+    document.getElementById('f-year').value            = it.year||'';
+    document.getElementById('f-serial').value          = it.serialNumber||'';
+    document.getElementById('f-hours').value           = it.hours||'';
+    document.getElementById('f-condition').value       = it.condition||'';
+    document.getElementById('f-purchase-date').value   = it.purchaseDate||'';
+    document.getElementById('f-price').value           = it.price||'';
+    document.getElementById('f-location').value        = it.location||'';
+    document.getElementById('f-notes').value           = it.notes||'';
+    document.getElementById('form-title').textContent      = `✏️ Edit Equipment #${it.id}`;
+    document.getElementById('form-submit-btn').textContent = 'Update Equipment';
+    for (const slot of ['main','serial','extra']) {
+        const ph = it.photos?.find(p=>p.slot===slot);
+        if (ph) {
+            formPhotos[slot] = { file:null, base64:null, mimeType:null, existingUrl:ph.url, deleted:false };
+            document.getElementById('prev-'+slot).innerHTML =
+                `<img src="${ph.url}" alt="${slot}"><button type="button" class="remove-photo" onclick="removePhoto('${slot}')">✕</button>`;
+            if (slot==='main')   document.getElementById('btn-identify').disabled = false;
+            if (slot==='serial') document.getElementById('btn-ocr').disabled      = false;
+        }
+    }
+    window.scrollTo(0,0);
+}
+
+async function deleteItem(docId) {
+    const it = items.find(i=>i._docId===docId); if (!it) return;
+    if (!confirm(`Delete #${it.id} (${it.make||''} ${it.model||''})? This cannot be undone.`)) return;
+    try { await dbDeleteItem(it._docId); toast('Equipment deleted.'); }
+    catch(err) { toast('Error: '+err.message,'error'); }
+}
+
+// ═══════════════════════════════════════
+//  INVENTORY
+// ═══════════════════════════════════════
+function syncCatFilters() {
+    ['inv-filter-cat','rpt-filter-cat'].forEach(sid => {
+        const sel = document.getElementById(sid); if (!sel) return;
+        const cur = sel.value;
+        sel.innerHTML = '<option value="">All Types</option>';
+        categories.forEach(c => { const o=document.createElement('option'); o.value=o.textContent=c; if(c===cur)o.selected=true; sel.appendChild(o); });
+    });
+}
+
+function filteredItems(searchId, catId) {
+    const q    = (document.getElementById(searchId)?.value||'').toLowerCase();
+    const cat  = document.getElementById(catId)?.value||'';
+    const cond = document.getElementById('inv-filter-cond')?.value||'';
+    return items.filter(it => {
+        const mc = !cat  || it.category===cat;
+        const mco= !cond || it.condition===cond;
+        const ms = !q    || [it.id?.toString(),it.category,it.make,it.model,it.year,
+            it.serialNumber,it.condition,it.location,it.notes].some(v=>v?.toString().toLowerCase().includes(q));
+        return mc && mco && ms;
+    });
+}
+
+function sorted(arr, field, dir) {
+    return [...arr].sort((a,b) => {
+        let va=a[field]??'', vb=b[field]??'';
+        if (['id','hours','price'].includes(field)) { va=Number(va)||0; vb=Number(vb)||0; }
+        else if (field==='year')         { va=Number(va)||0; vb=Number(vb)||0; }
+        else if (field==='purchaseDate') { va=va?new Date(va).getTime():0; vb=vb?new Date(vb).getTime():0; }
+        else                             { va=String(va).toLowerCase(); vb=String(vb).toLowerCase(); }
+        return va<vb?(dir==='asc'?-1:1):va>vb?(dir==='asc'?1:-1):0;
+    });
+}
+
+function renderInventory() {
+    const data  = sorted(filteredItems('inv-search','inv-filter-cat'), invSortField, invSortDir);
+    document.getElementById('inv-count').textContent = `${data.length} item${data.length!==1?'s':''}`;
+    document.querySelectorAll('#inv-table thead th').forEach(th=>th.classList.remove('sort-asc','sort-desc'));
+    const thIdx = {id:1,category:2,make:3,model:4,year:5,serialNumber:6,hours:7,condition:8,location:9,purchaseDate:10};
+    const ti = thIdx[invSortField];
+    if (ti!==undefined) document.querySelectorAll('#inv-table thead th')[ti]?.classList.add(invSortDir==='asc'?'sort-asc':'sort-desc');
+    const tbody = document.getElementById('inv-tbody');
+    const empty = document.getElementById('inv-empty');
+    if (!data.length) { tbody.innerHTML=''; empty.style.display='block'; return; }
+    empty.style.display='none';
+    tbody.innerHTML = data.map(it => {
+        const mainUrl = it.photos?.find(p=>p.slot==='main')?.url;
+        const thumb = mainUrl
+            ? `<img src="${mainUrl}" class="thumb" alt="" style="cursor:pointer" onclick="window.open('${mainUrl}','_blank')" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb-placeholder',innerHTML:'🚜'}))">`
+            : `<div class="thumb-placeholder">🚜</div>`;
+        const condBadge = it.condition ? `<span style="font-size:0.72rem;font-weight:600;color:${
+            it.condition==='Excellent'?'#15803d':it.condition==='Good'?'#1d4ed8':it.condition==='Fair'?'#92400e':'#dc2626'}">${it.condition}</span>` : '—';
+        return `<tr>
+            <td>${thumb}</td>
+            <td class="mono">#${it.id}</td>
+            <td><span class="badge ${catClass(it.category)}">${it.category||'—'}</span></td>
+            <td>${esc(it.make)||'—'}</td>
+            <td>${esc(it.model)||'—'}</td>
+            <td>${it.year||'—'}</td>
+            <td class="mono">${esc(it.serialNumber)||'—'}</td>
+            <td>${it.hours ? Number(it.hours).toLocaleString()+' hrs' : '—'}</td>
+            <td>${condBadge}</td>
+            <td style="font-size:0.82rem">${esc(it.location)||'—'}</td>
+            <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():'—'}</td>
+            <td style="white-space:nowrap">
+                <button class="btn btn-info btn-sm" onclick="showBarcode('${it._docId}')" title="Barcode/Photos">▣</button>
+                <button class="btn btn-ghost btn-sm" onclick="editItem('${it._docId}')" title="Edit">✎</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteItem('${it._docId}')" title="Delete">✗</button>
+            </td></tr>`;}).join('');
+}
+
+function sortBy(field) {
+    invSortDir   = invSortField===field?(invSortDir==='asc'?'desc':'asc'):'asc';
+    invSortField = field; renderInventory();
+}
+
+// ═══════════════════════════════════════
+//  REPORTS
+// ═══════════════════════════════════════
+function rptSortBy(field) {
+    const fd=document.getElementById('rpt-sort-field'), dd=document.getElementById('rpt-sort-dir');
+    if (fd.value===field) dd.value=dd.value==='asc'?'desc':'asc'; else fd.value=field;
+    renderReport();
+}
+function renderReport() {
+    const field=document.getElementById('rpt-sort-field').value, dir=document.getElementById('rpt-sort-dir').value;
+    const data=sorted(filteredItems('rpt-search','rpt-filter-cat'),field,dir);
+    document.getElementById('rpt-count').textContent=`${data.length} item${data.length!==1?'s':''}`;
+    document.getElementById('rpt-tbody').innerHTML=data.length
+        ?data.map(it=>`<tr>
+            <td class="mono">#${it.id}</td>
+            <td><span class="badge ${catClass(it.category)}">${it.category||'—'}</span></td>
+            <td>${esc(it.make)||'—'}</td>
+            <td>${esc(it.model)||'—'}</td>
+            <td>${it.year||'—'}</td>
+            <td class="mono">${esc(it.serialNumber)||'—'}</td>
+            <td>${it.hours ? Number(it.hours).toLocaleString()+' hrs' : '—'}</td>
+            <td>${it.condition||'—'}</td>
+            <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():'—'}</td>
+            <td>${it.price ? '$'+Number(it.price).toLocaleString() : '—'}</td>
+            <td style="font-size:0.82rem">${esc(it.location)||'—'}</td>
+            <td style="color:var(--text-secondary);font-size:0.82rem">${esc(it.notes)||'—'}</td>
+          </tr>`).join('')
+        :'<tr><td colspan="12" style="text-align:center;color:var(--text-secondary);padding:30px">No items match filters.</td></tr>';
+}
+function printReport() {
+    const field=document.getElementById('rpt-sort-field').value, dir=document.getElementById('rpt-sort-dir').value;
+    const data=sorted(filteredItems('rpt-search','rpt-filter-cat'),field,dir);
+    document.getElementById('print-content').innerHTML=`
+        <style>body{font-family:Arial,sans-serif;font-size:9px;}h2{font-size:13px;margin-bottom:4px;}
+        p{color:#666;margin-bottom:8px;}table{width:100%;border-collapse:collapse;}
+        th,td{border:1px solid #ccc;padding:4px 5px;}th{background:#f0f0f0;}</style>
+        <h2>Farmboss Machinery — Inventory Report</h2>
+        <p>Generated: ${new Date().toLocaleString()} | Items: ${data.length}</p>
+        <table><thead><tr><th>ID</th><th>Type</th><th>Make</th><th>Model</th><th>Year</th>
+        <th>Serial/PIN</th><th>Hours</th><th>Condition</th><th>Purchased</th><th>Price</th><th>Location</th><th>Notes</th>
+        </tr></thead><tbody>${data.map(it=>`<tr>
+            <td>#${it.id}</td><td>${it.category||''}</td><td>${it.make||''}</td><td>${it.model||''}</td>
+            <td>${it.year||''}</td><td>${it.serialNumber||''}</td>
+            <td>${it.hours ? Number(it.hours).toLocaleString()+' hrs' : ''}</td>
+            <td>${it.condition||''}</td>
+            <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():''}</td>
+            <td>${it.price ? '$'+Number(it.price).toLocaleString() : ''}</td>
+            <td>${it.location||''}</td><td>${it.notes||''}</td></tr>`).join('')}</tbody></table>`;
+    window.print();
+}
+
+// ═══════════════════════════════════════
+//  CATEGORIES
+// ═══════════════════════════════════════
+function renderCatTags() {
+    const el = document.getElementById('cat-tags');
+    el.innerHTML = categories.length
+        ? categories.map((c,i)=>`<div class="tag"><span>${esc(c)}</span><button class="tag-remove" onclick="removeCat(${i})">✕</button></div>`).join('')
+        : '<p style="color:var(--text-secondary)">No types defined.</p>';
+}
+async function addCategory() {
+    const inp=document.getElementById('new-cat-input'), name=inp.value.trim();
+    if (!name) return;
+    if (categories.map(c=>c.toLowerCase()).includes(name.toLowerCase())) { toast('Already exists.'); return; }
+    categories.push(name); await saveConfig(); inp.value=''; renderCatTags(); syncCatFilters(); populateCatSelect();
+    toast(`"${name}" added!`,'success');
+}
+document.getElementById('new-cat-input').addEventListener('keydown', e => { if(e.key==='Enter'){e.preventDefault();addCategory();} });
+async function removeCat(i) {
+    const c=categories[i], used=items.filter(it=>it.category===c).length;
+    if (used && !confirm(`"${c}" is used by ${used} item(s). Remove anyway?`)) return;
+    categories.splice(i,1); await saveConfig(); renderCatTags();
+    toast(`"${c}" removed.`);
+}
+
+// ═══════════════════════════════════════
+//  SETTINGS
+// ═══════════════════════════════════════
+async function saveApiKey() {
+    const key = document.getElementById('api-key-input').value.trim();
+    if (!key) { toast('Enter an API key first.','error'); return; }
+    await db.collection('settings').doc('apikey').set({ key });
+    apiKey = key;
+    toast('API key saved!','success');
+}
+async function testApiKey() {
+    const key = document.getElementById('api-key-input').value.trim();
+    if (!key) { toast('Enter an API key first.','error'); return; }
+    const el = document.getElementById('api-status');
+    el.style.display='block'; el.className='api-status'; el.textContent='Testing…';
+    try {
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+            method:'POST', mode:'cors',
+            headers:{ 'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true' },
+            body: JSON.stringify({ model:'claude-3-5-sonnet-20241022', max_tokens:10, messages:[{role:'user',content:'Hi'}] })
+        });
+        if (res.ok) { el.className='api-status ok'; el.textContent='✅ Connection successful! AI identification is ready.'; }
+        else {
+            const d = await res.json().catch(()=>({}));
+            el.className='api-status err';
+            el.textContent=`❌ HTTP ${res.status}: ${d.error?.message||d.error?.type||res.statusText}`;
+        }
+    } catch(err) {
+        el.className='api-status err';
+        const isSafari = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
+        el.textContent=`❌ Network error: ${err.message}${isSafari?' — Safari detected: try Chrome or Firefox':''}`;
+    }
+}
+
+// ═══════════════════════════════════════
+//  BARCODE MODAL
+// ═══════════════════════════════════════
+function showBarcode(docId) {
+    const it = items.find(i=>i._docId===docId); if (!it) return;
+    activeBcId = docId;
+    const label = [it.make, it.model, it.year].filter(Boolean).join(' ') || `Equipment #${it.id}`;
+    document.getElementById('bc-title').textContent = label;
+    document.getElementById('bc-sub').textContent   = `${it.category||''} | SN: ${it.serialNumber||'N/A'}`;
+    const photos = it.photos||[];
+    document.getElementById('bc-photos').innerHTML = photos.length
+        ? photos.map(p=>`<img src="${p.url}" alt="${p.slot}" onclick="window.open('${p.url}','_blank')" title="Click to enlarge">`).join('')
+        : '';
+    const code = `MCH${String(it.id).padStart(6,'0')}`;
+    document.getElementById('bc-code').textContent = code;
+    try { JsBarcode('#bc-svg', code, {format:'CODE128',width:2.2,height:80,displayValue:true,fontSize:13,margin:10,background:'#ffffff',lineColor:'#000000'}); }
+    catch(e) { console.error(e); }
+    document.getElementById('barcode-modal').classList.add('show');
+}
+function closeModal() { document.getElementById('barcode-modal').classList.remove('show'); activeBcId=null; }
+document.getElementById('barcode-modal').addEventListener('click', e => { if(e.target===document.getElementById('barcode-modal'))closeModal(); });
+function printBarcode() {
+    if (!activeBcId) return;
+    const it = items.find(i=>i._docId===activeBcId); if (!it) return;
+    const label = [it.make,it.model,it.year].filter(Boolean).join(' ')||`Equipment #${it.id}`;
+    document.getElementById('print-content').innerHTML=`
+        <style>body{font-family:Arial,sans-serif;text-align:center;padding:30px;}
+        .lbl{display:inline-block;border:2px solid #333;padding:16px 24px;border-radius:8px;min-width:300px;}
+        h3{margin:0 0 3px;font-size:13px;}p{margin:0 0 10px;font-size:10px;color:#555;}</style>
+        <div class="lbl"><h3>${label}</h3>
+        <p>${it.category||''} | SN: ${it.serialNumber||'N/A'}</p>
+        ${document.getElementById('bc-svg').outerHTML}</div>`;
+    window.print();
+}
+
+// ═══════════════════════════════════════
+//  CSV EXPORT
+// ═══════════════════════════════════════
+function exportCSV() {
+    const hdrs=['ID','Type','Make','Model','Year','Serial/PIN','Hours','Condition','Purchase Date','Price','Location','Notes','Date Added'];
+    const rows=items.map(it=>[it.id,it.category,it.make,it.model,it.year,it.serialNumber,it.hours,it.condition,it.purchaseDate,it.price,it.location,it.notes,
+        it.addedAt?new Date(it.addedAt).toLocaleDateString():''].map(v=>`"${String(v??'').replace(/"/g,'""')}"`));
+    const csv=[hdrs.join(','),...rows.map(r=>r.join(','))].join('\n');
+    const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(new Blob([csv],{type:'text/csv'})),download:`farmboss-machinery-${new Date().toISOString().slice(0,10)}.csv`});
+    a.click(); URL.revokeObjectURL(a.href); toast('CSV exported!','success');
+}
+
+// ═══════════════════════════════════════
+//  BARCODE SCANNER
+// ═══════════════════════════════════════
+async function openScanner() {
+    document.getElementById('scanner-modal').classList.add('show');
+    document.getElementById('scanner-result').textContent = 'Starting camera...';
+    scannerActive = true;
+    try {
+        scannerStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode:'environment' } });
+        const video = document.getElementById('scanner-video');
+        video.srcObject = scannerStream;
+        await video.play();
+        document.getElementById('scanner-result').textContent = 'Point camera at barcode...';
+        const hints = new Map();
+        const formats = [ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.QR_CODE];
+        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+        const reader = new ZXing.MultiFormatReader();
+        reader.setHints(hints);
+        function scan() {
+            if (!scannerActive) return;
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+                canvas.getContext('2d').drawImage(video, 0, 0);
+                const luminance = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+                const binary = new ZXing.HybridBinarizer(luminance);
+                const bitmap = new ZXing.BinaryBitmap(binary);
+                const result = reader.decode(bitmap);
+                if (result) {
+                    const code = result.getText();
+                    document.getElementById('scanner-result').textContent = `Scanned: ${code}`;
+                    const match = items.find(i=>`MCH${String(i.id).padStart(6,'0')}`===code);
+                    if (match) {
+                        closeScanner();
+                        editItem(match._docId);
+                        toast(`Found: ${match.make||''} ${match.model||''} #${match.id}`,'success');
+                    } else {
+                        document.getElementById('scanner-result').textContent = `Code "${code}" not found in inventory.`;
+                        setTimeout(() => { if(scannerActive) requestAnimationFrame(scan); }, 2000);
+                    }
+                    return;
+                }
+            } catch(e) {}
+            if (scannerActive) requestAnimationFrame(scan);
+        }
+        requestAnimationFrame(scan);
+    } catch(err) {
+        document.getElementById('scanner-result').textContent = 'Camera error: ' + err.message;
+    }
+}
+function closeScanner() {
+    scannerActive = false;
+    if (scannerStream) { scannerStream.getTracks().forEach(t=>t.stop()); scannerStream=null; }
+    document.getElementById('scanner-modal').classList.remove('show');
+}
+document.getElementById('scanner-modal').addEventListener('click', e => { if(e.target===document.getElementById('scanner-modal'))closeScanner(); });
+
+// ═══════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════
+function catClass(cat) {
+    if (!cat) return 'cat-default';
+    const c = cat.toLowerCase();
+    if (c.includes('tractor'))   return 'cat-tractor';
+    if (c.includes('combine') || c.includes('cotton')) return 'cat-combine';
+    if (c.includes('plant') || c.includes('drill') || c.includes('seeder')) return 'cat-planter';
+    if (c.includes('spray') || c.includes('anhydrous')) return 'cat-sprayer';
+    if (c.includes('disc') || c.includes('chisel') || c.includes('cultiv') || c.includes('ripper') || c.includes('subsoil')) return 'cat-tillage';
+    if (c.includes('hay') || c.includes('baler') || c.includes('mower') || c.includes('tedder') || c.includes('rake') || c.includes('silage')) return 'cat-hay';
+    if (c.includes('grain') || c.includes('wagon') || c.includes('auger') || c.includes('dryer')) return 'cat-grain';
+    if (c.includes('loader') || c.includes('skid') || c.includes('telehandler') || c.includes('backhoe')) return 'cat-loader';
+    if (c.includes('truck') || c.includes('trailer') || c.includes('atv') || c.includes('utv')) return 'cat-truck';
+    return 'cat-default';
+}
+function esc(s) { return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'):''; }
+function toast(msg, type='') {
+    const el = document.getElementById('toast');
+    el.textContent=msg; el.className=`toast show${type?' '+type:''}`;
+    clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),3500);
+}
+
+// ═══════════════════════════════════════
+//  CLOCK + WEATHER
+// ═══════════════════════════════════════
+(function() {
+    function updateClock() {
+        const now  = new Date();
+        const date = now.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+        const time = now.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', hour12:false });
+        const el   = document.getElementById('dtw-clock');
+        if (el) el.textContent = `${date}  ·  ${time}`;
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
+
+    const LAT=44.8247, LON=-93.6052;
+    const WX_URL=`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}`+
+        `&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,relative_humidity_2m`+
+        `&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=America%2FChicago`;
+    function wxDesc(code) {
+        if (code===0)            return ['Clear Sky','☀️'];
+        if (code<=2)             return ['Partly Cloudy','⛅'];
+        if (code===3)            return ['Overcast','☁️'];
+        if (code<=49)            return ['Fog','🌫️'];
+        if (code<=57)            return ['Drizzle','🌦️'];
+        if (code<=67)            return ['Rain','🌧️'];
+        if (code<=77)            return ['Snow','❄️'];
+        if (code<=82)            return ['Rain Showers','🌧️'];
+        if (code<=86)            return ['Snow Showers','🌨️'];
+        if (code<=99)            return ['Thunderstorm','⛈️'];
+        return ['Unknown','🌡️'];
+    }
+    async function fetchWeather() {
+        try {
+            const res=await fetch(WX_URL), json=await res.json(), c=json.current;
+            const temp=Math.round(c.temperature_2m), feels=Math.round(c.apparent_temperature);
+            const wind=Math.round(c.wind_speed_10m), humid=c.relative_humidity_2m;
+            const [label,emoji]=wxDesc(c.weather_code);
+            const icon=document.getElementById('dtw-wx-icon'), text=document.getElementById('dtw-wx-text');
+            if (icon) icon.textContent=emoji;
+            if (text) text.textContent=`${temp}°F  ·  ${label}  ·  Feels ${feels}°F  ·  Wind ${wind} mph  ·  Humidity ${humid}%`;
+        } catch(e) {
+            const text=document.getElementById('dtw-wx-text');
+            if (text) text.textContent='Weather unavailable';
+        }
+    }
+    fetchWeather();
+    setInterval(fetchWeather, 10*60*1000);
+})();
+</script>
+</body>
+</html>

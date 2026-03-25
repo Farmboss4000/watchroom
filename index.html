@@ -35,6 +35,18 @@
             min-height: 100vh;
         }
 
+        /* ── SITE SWITCHER ── */
+        .site-switcher {
+            background:#111827; display:flex; align-items:center; padding:5px 18px;
+            gap:4px; font-size:0.77rem; border-bottom:1px solid rgba(255,255,255,0.07);
+        }
+        .site-switcher-label { color:#4b5563; font-size:0.69rem; font-weight:600;
+            text-transform:uppercase; letter-spacing:0.6px; margin-right:8px; }
+        .site-link { text-decoration:none; color:#9ca3af; padding:4px 12px; border-radius:4px;
+            display:inline-flex; align-items:center; gap:6px; font-weight:500; transition:all 0.15s; white-space:nowrap; }
+        .site-link:hover { background:rgba(255,255,255,0.1); color:#e5e7eb; }
+        .site-link.active { background:rgba(255,255,255,0.13); color:#fff; font-weight:600; }
+
         /* ── LOGIN ── */
         #login-screen {
             position: fixed; inset: 0;
@@ -617,6 +629,10 @@
 
 <!-- ══ LOGIN ══ -->
 <div id="login-screen">
+    <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <a href="index.html" style="color:var(--accent);font-size:0.78rem;text-decoration:none;padding:4px 12px;border:1px solid var(--accent);border-radius:4px;">🔫 Armory</a>
+        <a href="machinery.html" style="color:rgba(255,255,255,0.5);font-size:0.78rem;text-decoration:none;padding:4px 12px;border:1px solid rgba(255,255,255,0.2);border-radius:4px;transition:all 0.15s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,0.5)'">🚜 Machinery</a>
+    </div>
     <div class="login-box">
         <div class="login-logo">&#9881;</div>
         <h2>Farmboss Armory</h2>
@@ -644,6 +660,11 @@
 
 <!-- ══ APP ══ -->
 <div id="app">
+<div class="site-switcher">
+    <span class="site-switcher-label">Farmboss Suite</span>
+    <a href="index.html" class="site-link active">🔫 Armory</a>
+    <a href="machinery.html" class="site-link">🚜 Machinery</a>
+</div>
 <header>
     <div class="logo-area">
         <div class="logo-icon">&#9881;</div>

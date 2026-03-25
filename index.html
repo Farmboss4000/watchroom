@@ -1014,6 +1014,18 @@
             <p style="font-size:0.78rem;color:var(--text-secondary);margin-top:10px;">
                 Get your API key at <strong>console.anthropic.com</strong> → API Keys → Create Key
             </p>
+            <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border);">
+                <div class="api-key-row">
+                    <div class="form-group">
+                        <label>Claude Model Name</label>
+                        <input type="text" id="ai-model-input" placeholder="e.g. claude-3-5-haiku-20241022">
+                    </div>
+                    <button class="btn btn-primary" onclick="saveModel()" style="height:38px;align-self:flex-end;">Save Model</button>
+                </div>
+                <p style="font-size:0.78rem;color:var(--text-secondary);margin-top:6px;">
+                    Find available model names at <strong>console.anthropic.com → Models</strong>. If Test Connection shows "404: model", update this name.
+                </p>
+            </div>
         </div>
     </div>
 
@@ -1240,6 +1252,7 @@ let activeBcId    = null;
 let unsubItems    = null;
 let apiKey        = '';
 let proxyUrl      = '';
+let aiModel       = 'claude-3-5-haiku-20241022';
 
 // per-form photo state
 let formPhotos = {
@@ -1311,6 +1324,13 @@ async function initApp() {
         if (proxyDoc.exists && proxyDoc.data().url) {
             proxyUrl = proxyDoc.data().url;
             document.getElementById('api-proxy-input').value = proxyUrl;
+        }
+        const modelDoc = await db.collection('settings').doc('model').get();
+        if (modelDoc.exists && modelDoc.data().name) {
+            aiModel = modelDoc.data().name;
+            document.getElementById('ai-model-input').value = aiModel;
+        } else {
+            document.getElementById('ai-model-input').value = aiModel;
         }
         unsubItems = db.collection('items').onSnapshot(snap => {
             items = snap.docs.map(doc => ({ _docId:doc.id, ...doc.data() }));
@@ -1457,7 +1477,7 @@ function removePhoto(slot) {
 async function callClaude(base64, mimeType, prompt) {
     if (!apiKey) { toast('Set your Anthropic API key in Settings first.','error'); return null; }
     const msgPayload = {
-        model: 'claude-3-5-haiku-20241022',
+        model: aiModel,
         max_tokens: 512,
         messages: [{ role:'user', content:[
             { type:'image', source:{ type:'base64', media_type:mimeType, data:base64 }},
@@ -1878,7 +1898,7 @@ async function testApiKey() {
     const el = document.getElementById('api-status');
     el.style.display='block'; el.className='api-status'; el.textContent='Testing…';
     try {
-        const testPayload = { model:'claude-3-5-haiku-20241022', max_tokens:10, messages:[{role:'user',content:'Hi'}] };
+        const testPayload = { model: document.getElementById('ai-model-input').value.trim()||aiModel, max_tokens:10, messages:[{role:'user',content:'Hi'}] };
         let res;
         if (proxy) {
             res = await fetch(proxy, {
@@ -1912,6 +1932,13 @@ async function saveProxyUrl() {
     await db.collection('settings').doc('proxy').set({ url });
     proxyUrl = url;
     toast(url ? 'Proxy URL saved!' : 'Proxy URL cleared.', 'success');
+}
+async function saveModel() {
+    const name = document.getElementById('ai-model-input').value.trim();
+    if (!name) { toast('Enter a model name.','error'); return; }
+    await db.collection('settings').doc('model').set({ name });
+    aiModel = name;
+    toast('Model saved!', 'success');
 }
 
 // ═══════════════════════════════════════

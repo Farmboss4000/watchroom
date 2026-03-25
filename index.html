@@ -1149,7 +1149,7 @@ function renderDashboard() {
         ? rec.map(it => {
             const mainUrl = it.photos?.find(p=>p.slot==='main')?.url;
             const thumb   = mainUrl
-                ? `<img src="${mainUrl}" class="thumb" alt="">`
+                ? `<img src="${mainUrl}" class="thumb" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb-placeholder',innerHTML:'&#128247;'}))">`
                 : `<div class="thumb-placeholder">&#128247;</div>`;
             return `<tr>
                 <td>${thumb}</td>
@@ -1348,13 +1348,18 @@ document.getElementById('item-form').addEventListener('submit', async e => {
         addCaliberIfNew(data.caliber);
 
         // Build photos array — upload new files, keep existing URLs
-        const existingPhotos = eid ? (items.find(i=>i.id==eid)?.photos||[]) : [];
+        const existingPhotos = docId ? (items.find(i=>i._docId===docId)?.photos||[]) : [];
         const photos = [];
         for (const slot of ['main','serial','extra']) {
             const p = formPhotos[slot];
             if (p.file) {
-                const url = await uploadPhoto(slot, p.file);
-                photos.push({ slot, url });
+                try {
+                    const url = await uploadPhoto(slot, p.file);
+                    photos.push({ slot, url });
+                } catch(uploadErr) {
+                    toast(`Photo upload failed (${slot}): check Firebase Storage setup in Settings.`, 'error');
+                    console.warn('Photo upload error:', uploadErr);
+                }
             } else if (!p.deleted) {
                 const existing = existingPhotos.find(ph=>ph.slot===slot);
                 if (existing) photos.push(existing);
@@ -1483,7 +1488,7 @@ function renderInventory() {
     tbody.innerHTML = data.map(it => {
         const mainUrl = it.photos?.find(p=>p.slot==='main')?.url;
         const thumb   = mainUrl
-            ? `<img src="${mainUrl}" class="thumb" alt="">`
+            ? `<img src="${mainUrl}" class="thumb" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb-placeholder',innerHTML:'&#128247;'}))">`
             : `<div class="thumb-placeholder">&#128247;</div>`;
         return `<tr>
             <td>${thumb}</td>

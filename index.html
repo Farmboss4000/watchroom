@@ -688,7 +688,7 @@
 <!-- SITE SWITCHER -->
 <div class="site-switcher">
     <span class="site-switcher-label">Farmboss Headquarters</span>
-    <a href="index.html" class="site-link active">🏠 HQ</a>
+    <a href="index.html" class="site-link active">🏠 Headquarters</a>
     <a href="armory.html" class="site-link">🔫 Armory</a>
     <a href="machinery.html" class="site-link">🚜 Machinery</a>
     <a href="automotive.html" class="site-link">🚗 Automotive</a>
@@ -714,7 +714,7 @@
         <div class="login-error" id="login-error"></div>
     </div>
     <div class="login-links">
-        <a href="index.html">🏠 HQ</a>
+        <a href="index.html">🏠 Headquarters</a>
         <a href="armory.html">🔫 Armory</a>
         <a href="machinery.html">🚜 Machinery</a>
         <a href="automotive.html">🚗 Automotive</a>
@@ -876,8 +876,8 @@
 
             <!-- Count bar -->
             <div class="quotes-count-bar">
-                <span class="quotes-count-label">All saved quotes</span>
-                <span class="quotes-count-num" id="quotes-count"></span>
+                <span class="quotes-count-label">All saved quotes &nbsp;<span class="quotes-count-num" id="quotes-count"></span></span>
+                <button id="btn-dedupe" onclick="dedupeQuotes()" style="background:none;border:1px solid rgba(255,255,255,0.15);color:var(--text-secondary);padding:4px 12px;border-radius:6px;font-size:0.78rem;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='var(--text-secondary)'">🔍 Remove Duplicates</button>
             </div>
 
             <!-- Quote Cards Grid -->
@@ -1138,6 +1138,40 @@
             showToast('Quote deleted.');
         } catch(e) {
             showToast('Error deleting quote.', true);
+        }
+    }
+
+    async function dedupeQuotes() {
+        const btn = document.getElementById('btn-dedupe');
+        btn.disabled = true; btn.textContent = 'Scanning…';
+        try {
+            const snap = await db.collection('quotes').get();
+            const all = snap.docs.map(doc => ({ _docId: doc.id, ...doc.data() }));
+            const seen = new Map();
+            const toDelete = [];
+            all.forEach(q => {
+                const key = (q.text || q.quote || '').trim().toLowerCase();
+                if (!key) return;
+                if (seen.has(key)) {
+                    toDelete.push(q._docId); // duplicate — mark for deletion
+                } else {
+                    seen.set(key, q._docId); // first occurrence — keep
+                }
+            });
+            if (!toDelete.length) {
+                showToast('No duplicates found!');
+                btn.disabled = false; btn.textContent = '🔍 Remove Duplicates';
+                return;
+            }
+            const batch = db.batch();
+            toDelete.forEach(id => batch.delete(db.collection('quotes').doc(id)));
+            await batch.commit();
+            showToast(`Removed ${toDelete.length} duplicate${toDelete.length > 1 ? 's' : ''}.`);
+            initQuotes(); // reload
+        } catch(e) {
+            showToast('Dedupe failed: ' + e.message, true);
+        } finally {
+            btn.disabled = false; btn.textContent = '🔍 Remove Duplicates';
         }
     }
 

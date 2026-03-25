@@ -1356,8 +1356,8 @@ function resetForm() {
     document.getElementById('btn-ocr').disabled      = true;
 }
 
-function editItem(id) {
-    const it = items.find(i=>i.id==id); if (!it) return;
+function editItem(docId) {
+    const it = items.find(i=>i._docId===docId); if (!it) return;
     showView('add-item'); populateCatSelect();
     document.getElementById('edit-id').value          = it.id;
     document.getElementById('edit-doc-id').value      = it._docId;
@@ -1386,9 +1386,9 @@ function editItem(id) {
     window.scrollTo(0,0);
 }
 
-async function deleteItem(id) {
-    if (!confirm(`Delete item #${id}? This cannot be undone.`)) return;
-    const it = items.find(i=>i.id==id); if (!it) return;
+async function deleteItem(docId) {
+    const it = items.find(i=>i._docId===docId); if (!it) return;
+    if (!confirm(`Delete item #${it.id} (${it.manufacturer||''} ${it.model||''})? This cannot be undone.`)) return;
     try { await dbDeleteItem(it._docId); toast('Item deleted.'); }
     catch(err) { toast('Error: '+err.message,'error'); }
 }
@@ -1454,9 +1454,9 @@ function renderInventory() {
             <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():'—'}</td>
             <td style="text-align:center">${it.quantity||1}</td>
             <td style="white-space:nowrap">
-                <button class="btn btn-info btn-sm" onclick="showBarcode(${it.id})" title="Barcode/Photos">&#9641;</button>
-                <button class="btn btn-ghost btn-sm" onclick="editItem(${it.id})" title="Edit">&#9998;</button>
-                <button class="btn btn-danger btn-sm" onclick="deleteItem(${it.id})" title="Delete">&#10006;</button>
+                <button class="btn btn-info btn-sm" onclick="showBarcode('${it._docId}')" title="Barcode/Photos">&#9641;</button>
+                <button class="btn btn-ghost btn-sm" onclick="editItem('${it._docId}')" title="Edit">&#9998;</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteItem('${it._docId}')" title="Delete">&#10006;</button>
             </td></tr>`;}).join('');
 }
 
@@ -1562,9 +1562,9 @@ async function testApiKey() {
 // ═══════════════════════════════════════
 //  BARCODE + PHOTOS MODAL
 // ═══════════════════════════════════════
-function showBarcode(id) {
-    const it = items.find(i=>i.id==id); if (!it) return;
-    activeBcId = id;
+function showBarcode(docId) {
+    const it = items.find(i=>i._docId===docId); if (!it) return;
+    activeBcId = docId;
     const label = [it.manufacturer, it.model].filter(Boolean).join(' ') || `Item #${id}`;
     document.getElementById('bc-title').textContent = label;
     document.getElementById('bc-sub').textContent   = `${it.category||''} | SN: ${it.serialNumber||'N/A'}`;
@@ -1582,7 +1582,7 @@ function closeModal() { document.getElementById('barcode-modal').classList.remov
 document.getElementById('barcode-modal').addEventListener('click', e => { if(e.target===document.getElementById('barcode-modal'))closeModal(); });
 function printBarcode() {
     if (!activeBcId) return;
-    const it = items.find(i=>i.id==activeBcId); if (!it) return;
+    const it = items.find(i=>i._docId===activeBcId); if (!it) return;
     const label = [it.manufacturer,it.model].filter(Boolean).join(' ')||`Item #${it.id}`;
     document.getElementById('print-content').innerHTML=`
         <style>body{font-family:Arial,sans-serif;text-align:center;padding:30px;}

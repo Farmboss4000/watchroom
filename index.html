@@ -1054,9 +1054,14 @@
 
     function sortQuotes(arr) {
         return arr.sort((a, b) => {
-            const ta = a.addedAt ? a.addedAt.toMillis() : 0;
-            const tb = b.addedAt ? b.addedAt.toMillis() : 0;
-            return ta - tb;
+            const toMs = v => {
+                if (!v) return 0;
+                if (typeof v.toMillis === 'function') return v.toMillis();  // Firestore Timestamp
+                if (typeof v.toDate  === 'function') return v.toDate().getTime(); // alternate Timestamp
+                if (v instanceof Date) return v.getTime();
+                return 0;
+            };
+            return toMs(a.addedAt) - toMs(b.addedAt);
         });
     }
 
@@ -1108,7 +1113,7 @@
                 </div>
                 <div class="quote-text">"${escHtml(text)}"</div>
                 ${author ? `<div class="quote-author">— ${escHtml(author)}</div>` : ''}
-                ${q.addedAt ? `<div class="quote-date">${new Date(q.addedAt.toDate()).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'})}</div>` : ''}
+                ${q.addedAt && typeof q.addedAt.toDate === 'function' ? `<div class="quote-date">${q.addedAt.toDate().toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'})}</div>` : ''}
             </div>`;
         }).join('');
     }

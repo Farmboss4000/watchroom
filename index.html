@@ -244,16 +244,48 @@
 
         /* ── HERO ── */
         .hero {
-            background: linear-gradient(135deg, #0f172a, #1e3a5f 60%, #0f2a4a);
-            padding: 48px 28px;
+            position: relative;
+            min-height: 260px;
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            gap: 24px;
             overflow: hidden;
-            position: relative;
         }
-        .hero-text { flex: 1; }
+        /* Photo fills the right half */
+        .hero-photo {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            justify-content: flex-end;
+        }
+        .hero-photo img {
+            height: 100%;
+            width: 55%;
+            object-fit: cover;
+            object-position: center top;
+            display: block;
+        }
+        /* Dark gradient fades photo into left background */
+        .hero-photo::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(
+                to right,
+                #0f172a 0%,
+                #0f172a 30%,
+                rgba(15,23,42,0.85) 52%,
+                rgba(15,23,42,0.3) 75%,
+                rgba(15,23,42,0.55) 100%
+            );
+        }
+        /* Text sits on top of everything */
+        .hero-text {
+            position: relative;
+            z-index: 2;
+            padding: 48px 36px;
+            flex: 1;
+            max-width: 560px;
+        }
         .hero-title {
             font-size: 2.5rem;
             font-weight: 900;
@@ -266,11 +298,13 @@
         .hero-subtitle {
             color: #94a3b8;
             font-size: 1rem;
-            max-width: 480px;
+            max-width: 440px;
         }
-        .hero-art {
-            opacity: 0.08;
-            flex-shrink: 0;
+        @media (max-width: 600px) {
+            .hero-photo img { width: 100%; opacity: 0.35; }
+            .hero-photo::after { background: linear-gradient(to right, #0f172a 0%, rgba(15,23,42,0.7) 100%); }
+            .hero-text { padding: 36px 20px; }
+            .hero-title { font-size: 1.8rem; }
         }
 
         /* ── MAIN CONTENT ── */
@@ -682,30 +716,12 @@
 
     <!-- HERO -->
     <div class="hero">
+        <div class="hero-photo">
+            <img src="farmboss.jpeg" alt="Farmboss">
+        </div>
         <div class="hero-text">
             <div class="hero-title">FARMBOSS<br><span>SUITE</span></div>
             <div class="hero-subtitle">Your complete farm &amp; property management system</div>
-        </div>
-        <div class="hero-art">
-            <svg width="220" height="160" viewBox="0 0 220 160" fill="white">
-                <!-- Barn silhouette -->
-                <polygon points="110,10 180,60 180,150 40,150 40,60" />
-                <rect x="85" y="90" width="50" height="60" fill="#0f172a"/>
-                <!-- Barn roof peak lines -->
-                <line x1="110" y1="10" x2="40" y2="60" stroke="white" stroke-width="3"/>
-                <line x1="110" y1="10" x2="180" y2="60" stroke="white" stroke-width="3"/>
-                <!-- Silo -->
-                <rect x="175" y="75" width="30" height="75" fill="white"/>
-                <ellipse cx="190" cy="75" rx="15" ry="8" fill="white"/>
-                <rect x="180" y="40" width="20" height="40" rx="10" fill="white"/>
-                <!-- Ground line -->
-                <line x1="0" y1="150" x2="220" y2="150" stroke="white" stroke-width="3"/>
-                <!-- Fence posts -->
-                <rect x="5" y="130" width="5" height="22" rx="2" fill="white"/>
-                <rect x="22" y="135" width="5" height="17" rx="2" fill="white"/>
-                <line x1="5" y1="133" x2="27" y2="138" stroke="white" stroke-width="2"/>
-                <line x1="5" y1="140" x2="27" y2="145" stroke="white" stroke-width="2"/>
-            </svg>
         </div>
     </div>
 
@@ -848,6 +864,16 @@
         </div>
 
     </div><!-- /main-content -->
+
+    <!-- FOOTER -->
+    <div style="text-align:center; padding:24px 20px 40px; border-top:1px solid rgba(255,255,255,0.06); margin-top:8px;">
+        <a href="#" onclick="window.scrollTo({top:0,behavior:'smooth'});return false;"
+           style="font-style:italic; color:#475569; font-size:0.85rem; text-decoration:none; transition:color 0.2s;"
+           onmouseover="this.style.color='#94a3b8'" onmouseout="this.style.color='#475569'">
+            stop scrolling dumbshit
+        </a>
+    </div>
+
 </div><!-- /app-screen -->
 
 <div id="toast"></div>

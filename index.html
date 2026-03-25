@@ -1,0 +1,1226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Armory Database II</title>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg-primary: #12141a;
+            --bg-secondary: #1c1f2b;
+            --bg-card: #232638;
+            --accent: #c8a96e;
+            --accent-hover: #b8955a;
+            --accent-dim: rgba(200, 169, 110, 0.15);
+            --text-primary: #e8e8e8;
+            --text-secondary: #8a8fa8;
+            --border: #2e3148;
+            --success: #4caf50;
+            --danger: #e05555;
+            --info: #4a9eff;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        /* ── HEADER ── */
+        header {
+            background: var(--bg-secondary);
+            border-bottom: 2px solid var(--accent);
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 16px rgba(0,0,0,0.6);
+            height: 60px;
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: var(--accent);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        header h1 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            color: var(--text-primary);
+        }
+
+        header h1 span {
+            color: var(--accent);
+        }
+
+        nav {
+            display: flex;
+            gap: 2px;
+        }
+
+        nav button {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            padding: 8px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+
+        nav button:hover {
+            background: var(--accent-dim);
+            color: var(--text-primary);
+        }
+
+        nav button.active {
+            background: var(--accent);
+            color: #1a1a1a;
+            font-weight: 600;
+        }
+
+        /* ── MAIN ── */
+        main {
+            padding: 24px;
+            max-width: 1440px;
+            margin: 0 auto;
+        }
+
+        .view { display: none; }
+        .view.active { display: block; }
+
+        /* ── CARD ── */
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 22px 24px;
+            margin-bottom: 20px;
+        }
+
+        .card-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 18px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .card-title-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* ── STATS ── */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 14px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 18px 20px;
+            border-left: 3px solid var(--accent);
+        }
+
+        .stat-value {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: var(--accent);
+            line-height: 1;
+        }
+
+        .stat-label {
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            margin-top: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+        }
+
+        /* ── CATEGORY BREAKDOWN ── */
+        .cat-breakdown {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+        }
+
+        .cat-breakdown-item {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px 14px;
+        }
+
+        .cat-breakdown-item .cbi-name {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .cat-breakdown-item .cbi-count {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .cbi-bar {
+            height: 3px;
+            background: var(--border);
+            border-radius: 2px;
+            margin-top: 8px;
+        }
+
+        .cbi-bar-fill {
+            height: 100%;
+            background: var(--accent);
+            border-radius: 2px;
+        }
+
+        /* ── FORM ── */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+            gap: 16px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .form-group.full-width {
+            grid-column: 1 / -1;
+        }
+
+        label {
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        input[type="date"],
+        select,
+        textarea {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 9px 12px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-family: inherit;
+            transition: border-color 0.15s;
+            width: 100%;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        select option {
+            background: var(--bg-secondary);
+        }
+
+        textarea {
+            resize: vertical;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        /* ── BUTTONS ── */
+        .btn {
+            padding: 9px 18px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            border: none;
+            font-family: inherit;
+            transition: all 0.15s;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            white-space: nowrap;
+        }
+
+        .btn-primary { background: var(--accent); color: #1a1a1a; }
+        .btn-primary:hover { background: var(--accent-hover); }
+
+        .btn-ghost {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+        .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-danger:hover { background: #c44; }
+
+        .btn-info { background: var(--info); color: white; }
+        .btn-info:hover { filter: brightness(1.1); }
+
+        .btn-sm { padding: 5px 10px; font-size: 0.8rem; }
+
+        /* ── TOOLBAR ── */
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .toolbar input[type="text"] {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        /* ── TABLE ── */
+        .table-wrapper {
+            overflow-x: auto;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+
+        thead th {
+            background: var(--bg-card);
+            padding: 11px 14px;
+            text-align: left;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            cursor: pointer;
+            user-select: none;
+            transition: color 0.15s;
+        }
+
+        thead th:hover { color: var(--accent); }
+        thead th.sort-asc::after { content: ' \2191'; color: var(--accent); }
+        thead th.sort-desc::after { content: ' \2193'; color: var(--accent); }
+
+        thead th.no-sort { cursor: default; }
+        thead th.no-sort:hover { color: var(--text-secondary); }
+
+        tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+        tbody tr:last-child { border-bottom: none; }
+        tbody tr:hover { background: rgba(200,169,110,0.04); }
+        tbody td { padding: 11px 14px; }
+
+        .mono { font-family: 'Courier New', monospace; color: var(--text-secondary); }
+
+        /* ── BADGES ── */
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .cat-rifle       { background: rgba(220,50,50,.2);   color: #f08080; }
+        .cat-shotgun     { background: rgba(220,130,50,.2);  color: #f0b070; }
+        .cat-pistol      { background: rgba(80,180,80,.2);   color: #90e090; }
+        .cat-revolver    { background: rgba(60,140,220,.2);  color: #80b8f0; }
+        .cat-suppressor  { background: rgba(150,80,200,.2);  color: #d090f0; }
+        .cat-magazine    { background: rgba(40,180,200,.2);  color: #70d8e8; }
+        .cat-scope       { background: rgba(220,200,50,.2);  color: #f0e070; }
+        .cat-binoculars  { background: rgba(220,100,50,.2);  color: #f0a080; }
+        .cat-spotting    { background: rgba(80,200,150,.2);  color: #80e8c0; }
+        .cat-default     { background: rgba(120,120,140,.2); color: #b0b0c0; }
+
+        /* ── EMPTY STATE ── */
+        .empty {
+            text-align: center;
+            padding: 50px 20px;
+            color: var(--text-secondary);
+        }
+        .empty-icon { font-size: 3rem; margin-bottom: 12px; }
+
+        /* ── TAGS ── */
+        .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.83rem;
+        }
+
+        .tag-remove {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 0;
+            font-size: 0.9rem;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+        }
+        .tag-remove:hover { color: var(--danger); }
+
+        /* ── MODAL ── */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.75);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.show { display: flex; }
+
+        .modal {
+            background: #fff;
+            color: #222;
+            border-radius: 10px;
+            padding: 28px 32px;
+            max-width: 480px;
+            width: 92%;
+            text-align: center;
+        }
+
+        .modal-title {
+            font-size: 1rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+            color: #222;
+        }
+
+        .modal-sub {
+            font-size: 0.8rem;
+            color: #777;
+            margin-bottom: 18px;
+        }
+
+        .modal svg { max-width: 100%; }
+
+        .modal-actions {
+            margin-top: 18px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-dark { background: #222; color: #fff; }
+        .btn-dark:hover { background: #333; }
+        .btn-gold { background: #c8a96e; color: #1a1a1a; }
+        .btn-gold:hover { background: #b8955a; }
+
+        /* ── NOTIFICATION ── */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--accent);
+            padding: 13px 18px;
+            border-radius: 8px;
+            z-index: 2000;
+            transform: translateY(80px);
+            opacity: 0;
+            transition: all 0.3s;
+            font-size: 0.875rem;
+            max-width: 280px;
+        }
+        .toast.show { transform: translateY(0); opacity: 1; }
+        .toast.success { border-left-color: var(--success); }
+
+        /* ── PRINT ── */
+        #print-area { display: none; }
+
+        @media print {
+            body * { visibility: hidden; }
+            #print-area, #print-area * { visibility: visible; }
+            #print-area { position: fixed; left: 0; top: 0; width: 100%; }
+        }
+
+        /* ── RESPONSIVE ── */
+        @media (max-width: 720px) {
+            header { height: auto; padding: 12px 16px; flex-direction: column; gap: 10px; }
+            nav { flex-wrap: wrap; justify-content: center; }
+            main { padding: 14px; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="logo-area">
+        <div class="logo-icon">&#9881;</div>
+        <h1>Armory <span>Database II</span></h1>
+    </div>
+    <nav>
+        <button class="active" onclick="showView('dashboard')">Dashboard</button>
+        <button onclick="showView('add-item')">Add Item</button>
+        <button onclick="showView('inventory')">Inventory</button>
+        <button onclick="showView('reports')">Reports</button>
+        <button onclick="showView('categories')">Categories</button>
+    </nav>
+</header>
+
+<main>
+
+    <!-- ═══════════════════════ DASHBOARD ═══════════════════════ -->
+    <div id="view-dashboard" class="view active">
+        <div class="stats-grid" id="stats-grid"></div>
+        <div class="card">
+            <div class="card-title"><div class="card-title-left">&#128202; Inventory by Category</div></div>
+            <div class="cat-breakdown" id="cat-breakdown"></div>
+        </div>
+        <div class="card">
+            <div class="card-title"><div class="card-title-left">&#128336; Recently Added</div></div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="no-sort">ID</th>
+                            <th class="no-sort">Category</th>
+                            <th class="no-sort">Manufacturer</th>
+                            <th class="no-sort">Model</th>
+                            <th class="no-sort">Serial #</th>
+                            <th class="no-sort">Added</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recent-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════ ADD / EDIT ITEM ═══════════════════════ -->
+    <div id="view-add-item" class="view">
+        <div class="card">
+            <div class="card-title">
+                <div class="card-title-left" id="form-title">&#10133; Add New Item</div>
+            </div>
+            <form id="item-form">
+                <input type="hidden" id="edit-id">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Category *</label>
+                        <select id="f-category" required>
+                            <option value="">Select category...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Manufacturer</label>
+                        <input type="text" id="f-manufacturer" list="manufacturer-list" placeholder="Type or select a manufacturer..." autocomplete="off">
+                        <datalist id="manufacturer-list"></datalist>
+                    </div>
+                    <div class="form-group">
+                        <label>Model</label>
+                        <input type="text" id="f-model" placeholder="e.g. Model 686">
+                    </div>
+                    <div class="form-group">
+                        <label>Serial Number</label>
+                        <input type="text" id="f-serial" placeholder="e.g. SN-123456">
+                    </div>
+                    <div class="form-group">
+                        <label>Caliber / Gauge</label>
+                        <input type="text" id="f-caliber" placeholder="e.g. .357 Magnum">
+                    </div>
+                    <div class="form-group">
+                        <label>Magnification</label>
+                        <input type="text" id="f-magnification" placeholder="e.g. 3-9x40">
+                    </div>
+                    <div class="form-group">
+                        <label>Purchase Date</label>
+                        <input type="date" id="f-purchase-date">
+                    </div>
+                    <div class="form-group">
+                        <label>Quantity</label>
+                        <input type="number" id="f-quantity" min="1" value="1">
+                    </div>
+                    <div class="form-group full-width">
+                        <label>Notes</label>
+                        <textarea id="f-notes" rows="3" placeholder="Additional details, condition, storage location..."></textarea>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" id="form-submit-btn">Save Item</button>
+                    <button type="button" class="btn btn-ghost" onclick="resetForm()">Clear</button>
+                    <button type="button" class="btn btn-ghost" onclick="showView('inventory')">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════ INVENTORY ═══════════════════════ -->
+    <div id="view-inventory" class="view">
+        <div class="card">
+            <div class="card-title">
+                <div class="card-title-left">&#128230; Inventory</div>
+                <span id="inv-count" style="font-size:0.8rem; color:var(--text-secondary); font-weight:400;"></span>
+            </div>
+            <div class="toolbar">
+                <input type="text" id="inv-search" placeholder="Search manufacturer, model, serial number..." oninput="renderInventory()">
+                <select id="inv-filter-cat" onchange="renderInventory()" style="min-width:160px;">
+                    <option value="">All Categories</option>
+                </select>
+                <button class="btn btn-primary btn-sm" onclick="showView('add-item'); resetForm()">+ Add Item</button>
+                <button class="btn btn-ghost btn-sm" onclick="exportCSV()">&#8595; Export CSV</button>
+            </div>
+            <div class="table-wrapper">
+                <table id="inv-table">
+                    <thead>
+                        <tr>
+                            <th onclick="sortBy('id')">ID</th>
+                            <th onclick="sortBy('category')">Category</th>
+                            <th onclick="sortBy('manufacturer')">Manufacturer</th>
+                            <th onclick="sortBy('model')">Model</th>
+                            <th onclick="sortBy('serialNumber')">Serial #</th>
+                            <th onclick="sortBy('caliber')">Caliber</th>
+                            <th onclick="sortBy('magnification')">Magnification</th>
+                            <th onclick="sortBy('purchaseDate')">Purchase Date</th>
+                            <th onclick="sortBy('quantity')">Qty</th>
+                            <th class="no-sort">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="inv-tbody"></tbody>
+                </table>
+            </div>
+            <div id="inv-empty" class="empty" style="display:none;">
+                <div class="empty-icon">&#128452;</div>
+                <p>No items found. <a href="#" onclick="showView('add-item'); resetForm(); return false;" style="color:var(--accent);">Add your first item</a>.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════ REPORTS ═══════════════════════ -->
+    <div id="view-reports" class="view">
+        <div class="card">
+            <div class="card-title">
+                <div class="card-title-left">&#128203; Reports</div>
+                <span id="rpt-count" style="font-size:0.8rem; color:var(--text-secondary); font-weight:400;"></span>
+            </div>
+            <div class="toolbar">
+                <input type="text" id="rpt-search" placeholder="Search all fields..." oninput="renderReport()">
+                <select id="rpt-filter-cat" onchange="renderReport()" style="min-width:160px;">
+                    <option value="">All Categories</option>
+                </select>
+                <select id="rpt-sort-field" onchange="renderReport()" style="min-width:180px;">
+                    <option value="id">Sort: ID</option>
+                    <option value="category">Sort: Category</option>
+                    <option value="manufacturer">Sort: Manufacturer</option>
+                    <option value="model">Sort: Model</option>
+                    <option value="serialNumber">Sort: Serial #</option>
+                    <option value="caliber">Sort: Caliber</option>
+                    <option value="magnification">Sort: Magnification</option>
+                    <option value="purchaseDate">Sort: Purchase Date</option>
+                    <option value="quantity">Sort: Quantity</option>
+                </select>
+                <select id="rpt-sort-dir" onchange="renderReport()" style="min-width:120px;">
+                    <option value="asc">Ascending</option>
+                    <option value="desc">Descending</option>
+                </select>
+                <button class="btn btn-ghost btn-sm" onclick="printReport()">&#128424; Print</button>
+                <button class="btn btn-ghost btn-sm" onclick="exportCSV()">&#8595; Export CSV</button>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th onclick="rptSortBy('id')">ID</th>
+                            <th onclick="rptSortBy('category')">Category</th>
+                            <th onclick="rptSortBy('manufacturer')">Manufacturer</th>
+                            <th onclick="rptSortBy('model')">Model</th>
+                            <th onclick="rptSortBy('serialNumber')">Serial #</th>
+                            <th onclick="rptSortBy('caliber')">Caliber</th>
+                            <th onclick="rptSortBy('magnification')">Magnification</th>
+                            <th onclick="rptSortBy('purchaseDate')">Purchase Date</th>
+                            <th onclick="rptSortBy('quantity')">Qty</th>
+                            <th class="no-sort">Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rpt-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════ CATEGORIES ═══════════════════════ -->
+    <div id="view-categories" class="view">
+        <div class="card">
+            <div class="card-title"><div class="card-title-left">&#127991; Manage Categories</div></div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                <input type="text" id="new-cat-input" placeholder="New category name..." style="min-width:240px; max-width:340px;">
+                <button class="btn btn-primary" onclick="addCategory()">Add Category</button>
+            </div>
+            <div class="tags" id="cat-tags"></div>
+        </div>
+        <div class="card">
+            <div class="card-title"><div class="card-title-left">&#8505; About Categories</div></div>
+            <p style="font-size:0.875rem; color:var(--text-secondary); line-height:1.6;">
+                Categories are used to classify items in your inventory. You can add as many custom categories as needed.
+                Removing a category will not delete items that use it — those items will simply show their category name without a color badge.
+                Categories are saved locally in your browser and persist between sessions.
+            </p>
+        </div>
+    </div>
+
+</main>
+
+<!-- ═══════════════════════ BARCODE MODAL ═══════════════════════ -->
+<div class="modal-overlay" id="barcode-modal">
+    <div class="modal">
+        <div class="modal-title" id="bc-title">Item Barcode</div>
+        <div class="modal-sub" id="bc-sub"></div>
+        <svg id="bc-svg"></svg>
+        <div class="modal-sub" id="bc-code" style="margin-top:6px; font-family:monospace; font-size:0.85rem;"></div>
+        <div class="modal-actions">
+            <button class="btn btn-gold" onclick="printBarcode()">&#128424; Print Label</button>
+            <button class="btn btn-dark" onclick="closeModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden print area -->
+<div id="print-area"><div id="print-content"></div></div>
+
+<!-- Toast notification -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════
+//  DATA
+// ════════════════════════════════════════════
+let items = JSON.parse(localStorage.getItem('armory-items') || '[]');
+let manufacturers = JSON.parse(localStorage.getItem('armory-mfrs') || JSON.stringify([
+    'Barrett','Benelli','Beretta','Browning','Bushmaster','CMMG','Colt',
+    'Daniel Defense','FN America','Glock','H&K','Kimber','Leupold','Nightforce',
+    'Nikon','Remington','Ruger','Savage','Sig Sauer','Smith & Wesson',
+    'Springfield Armory','Steyr','Taurus','Tikka','Vortex','Weatherby','Winchester'
+]));
+let categories = JSON.parse(localStorage.getItem('armory-cats') || JSON.stringify([
+    'Rifle','Shotgun','Pistol','Revolver','Suppressor',
+    'Magazine','Scope','Binoculars','Spotting Scope',
+    'Ammunition','Handgun Accessory','Rifle Accessory','Other'
+]));
+let nextId = parseInt(localStorage.getItem('armory-next-id') || '1001');
+
+// inventory sort state
+let invSortField = 'id';
+let invSortDir = 'asc';
+
+function save() {
+    localStorage.setItem('armory-items', JSON.stringify(items));
+    localStorage.setItem('armory-cats', JSON.stringify(categories));
+    localStorage.setItem('armory-mfrs', JSON.stringify(manufacturers));
+    localStorage.setItem('armory-next-id', String(nextId));
+}
+
+function populateMfrList() {
+    const dl = document.getElementById('manufacturer-list');
+    if (!dl) return;
+    dl.innerHTML = manufacturers.slice().sort((a,b)=>a.localeCompare(b))
+        .map(m=>`<option value="${esc(m)}">`).join('');
+}
+
+function addMfrIfNew(name) {
+    if (!name) return;
+    if (!manufacturers.some(m=>m.toLowerCase()===name.toLowerCase())) {
+        manufacturers.push(name);
+    }
+}
+
+// ════════════════════════════════════════════
+//  NAVIGATION
+// ════════════════════════════════════════════
+const VIEWS = ['dashboard','add-item','inventory','reports','categories'];
+
+function showView(v) {
+    VIEWS.forEach(id => document.getElementById('view-'+id).classList.remove('active'));
+    document.getElementById('view-'+v).classList.add('active');
+    document.querySelectorAll('nav button').forEach((btn, i) => {
+        btn.classList.toggle('active', VIEWS[i] === v);
+    });
+    if (v === 'dashboard')  renderDashboard();
+    if (v === 'inventory')  { syncCatFilters(); renderInventory(); }
+    if (v === 'reports')    { syncCatFilters(); renderReport(); }
+    if (v === 'categories') renderCatTags();
+    if (v === 'add-item')   populateCatSelect();
+}
+
+// ════════════════════════════════════════════
+//  DASHBOARD
+// ════════════════════════════════════════════
+function renderDashboard() {
+    const total = items.length;
+    const qty = items.reduce((s,i) => s + (parseInt(i.quantity)||1), 0);
+    const ms30 = 30*24*60*60*1000;
+    const recent = items.filter(i => i.addedAt && (Date.now()-new Date(i.addedAt).getTime()) < ms30).length;
+
+    document.getElementById('stats-grid').innerHTML = `
+        <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Total Line Items</div></div>
+        <div class="stat-card"><div class="stat-value">${qty}</div><div class="stat-label">Total Quantity</div></div>
+        <div class="stat-card"><div class="stat-value">${categories.length}</div><div class="stat-label">Categories</div></div>
+        <div class="stat-card"><div class="stat-value">${recent}</div><div class="stat-label">Added This Month</div></div>
+    `;
+
+    // Category breakdown
+    const counts = {};
+    items.forEach(it => { counts[it.category] = (counts[it.category]||0) + (parseInt(it.quantity)||1); });
+    const maxC = Math.max(...Object.values(counts), 1);
+    const el = document.getElementById('cat-breakdown');
+    if (!Object.keys(counts).length) {
+        el.innerHTML = '<p style="color:var(--text-secondary);padding:16px 0;">No items yet.</p>';
+    } else {
+        el.innerHTML = Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([cat,c])=>`
+            <div class="cat-breakdown-item">
+                <div class="cbi-name">${cat}</div>
+                <div class="cbi-count">${c}</div>
+                <div class="cbi-bar"><div class="cbi-bar-fill" style="width:${(c/maxC*100).toFixed(1)}%"></div></div>
+            </div>`).join('');
+    }
+
+    // Recent 10
+    const recItems = [...items].sort((a,b)=>b.id-a.id).slice(0,10);
+    document.getElementById('recent-tbody').innerHTML = recItems.length
+        ? recItems.map(it=>`<tr>
+            <td class="mono">#${it.id}</td>
+            <td><span class="badge ${catClass(it.category)}">${it.category||'—'}</span></td>
+            <td>${it.manufacturer||'—'}</td>
+            <td>${it.model||'—'}</td>
+            <td class="mono">${it.serialNumber||'—'}</td>
+            <td style="color:var(--text-secondary)">${it.addedAt?new Date(it.addedAt).toLocaleDateString():'—'}</td>
+          </tr>`).join('')
+        : '<tr><td colspan="6" style="text-align:center;color:var(--text-secondary);padding:30px;">No items yet.</td></tr>';
+}
+
+// ════════════════════════════════════════════
+//  FORM
+// ════════════════════════════════════════════
+function populateCatSelect() {
+    const sel = document.getElementById('f-category');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Select category...</option>';
+    categories.forEach(c => {
+        const o = document.createElement('option');
+        o.value = o.textContent = c;
+        if (c===cur) o.selected=true;
+        sel.appendChild(o);
+    });
+}
+
+document.getElementById('item-form').addEventListener('submit', e => {
+    e.preventDefault();
+    const eid = document.getElementById('edit-id').value;
+    const data = {
+        category:      document.getElementById('f-category').value,
+        manufacturer:  document.getElementById('f-manufacturer').value.trim(),
+        model:         document.getElementById('f-model').value.trim(),
+        serialNumber:  document.getElementById('f-serial').value.trim(),
+        caliber:       document.getElementById('f-caliber').value.trim(),
+        magnification: document.getElementById('f-magnification').value.trim(),
+        purchaseDate:  document.getElementById('f-purchase-date').value,
+        quantity:      parseInt(document.getElementById('f-quantity').value)||1,
+        notes:         document.getElementById('f-notes').value.trim(),
+    };
+    addMfrIfNew(data.manufacturer);
+    if (eid) {
+        const idx = items.findIndex(i=>i.id==eid);
+        if (idx>-1) { items[idx]={...items[idx],...data}; toast('Item updated.','success'); }
+    } else {
+        const item = {id:nextId++, addedAt:new Date().toISOString(), ...data};
+        items.push(item);
+        toast(`Item #${item.id} added!`,'success');
+    }
+    save();
+    populateMfrList();
+    resetForm();
+    showView('inventory');
+});
+
+function resetForm() {
+    document.getElementById('edit-id').value = '';
+    document.getElementById('item-form').reset();
+    document.getElementById('f-quantity').value = '1';
+    document.getElementById('form-title').textContent = '➕ Add New Item';
+    document.getElementById('form-submit-btn').textContent = 'Save Item';
+    populateCatSelect();
+    populateMfrList();
+}
+
+function editItem(id) {
+    const it = items.find(i=>i.id==id); if (!it) return;
+    showView('add-item');
+    populateCatSelect();
+    document.getElementById('edit-id').value = it.id;
+    document.getElementById('f-category').value     = it.category||'';
+    document.getElementById('f-manufacturer').value = it.manufacturer||'';
+    document.getElementById('f-model').value        = it.model||'';
+    document.getElementById('f-serial').value       = it.serialNumber||'';
+    document.getElementById('f-caliber').value      = it.caliber||'';
+    document.getElementById('f-magnification').value= it.magnification||'';
+    document.getElementById('f-purchase-date').value= it.purchaseDate||'';
+    document.getElementById('f-quantity').value     = it.quantity||1;
+    document.getElementById('f-notes').value        = it.notes||'';
+    document.getElementById('form-title').textContent    = `✏️ Edit Item #${it.id}`;
+    document.getElementById('form-submit-btn').textContent = 'Update Item';
+    window.scrollTo(0,0);
+}
+
+function deleteItem(id) {
+    if (!confirm(`Delete item #${id}? This cannot be undone.`)) return;
+    items = items.filter(i=>i.id!=id);
+    save(); renderInventory(); toast('Item deleted.');
+}
+
+// ════════════════════════════════════════════
+//  INVENTORY TABLE
+// ════════════════════════════════════════════
+function syncCatFilters() {
+    ['inv-filter-cat','rpt-filter-cat'].forEach(sid => {
+        const sel = document.getElementById(sid); if (!sel) return;
+        const cur = sel.value;
+        sel.innerHTML = '<option value="">All Categories</option>';
+        categories.forEach(c=>{
+            const o=document.createElement('option');
+            o.value=o.textContent=c;
+            if(c===cur) o.selected=true;
+            sel.appendChild(o);
+        });
+    });
+}
+
+function filteredItems(searchId, catId) {
+    const q = (document.getElementById(searchId)?.value||'').toLowerCase();
+    const cat = document.getElementById(catId)?.value||'';
+    return items.filter(it => {
+        const mc = !cat || it.category===cat;
+        const ms = !q || [it.id?.toString(),it.category,it.manufacturer,it.model,
+            it.serialNumber,it.caliber,it.magnification,it.notes].some(v=>v?.toLowerCase().includes(q));
+        return mc && ms;
+    });
+}
+
+function sorted(arr, field, dir) {
+    return [...arr].sort((a,b) => {
+        let va=a[field]??'', vb=b[field]??'';
+        if (field==='id'||field==='quantity') { va=Number(va)||0; vb=Number(vb)||0; }
+        else if (field==='purchaseDate') { va=va?new Date(va).getTime():0; vb=vb?new Date(vb).getTime():0; }
+        else { va=String(va).toLowerCase(); vb=String(vb).toLowerCase(); }
+        return va<vb ? (dir==='asc'?-1:1) : va>vb ? (dir==='asc'?1:-1) : 0;
+    });
+}
+
+function renderInventory() {
+    const data = sorted(filteredItems('inv-search','inv-filter-cat'), invSortField, invSortDir);
+    document.getElementById('inv-count').textContent = `${data.length} item${data.length!==1?'s':''}`;
+
+    // Update sort indicators
+    document.querySelectorAll('#inv-table thead th').forEach(th => {
+        th.classList.remove('sort-asc','sort-desc');
+    });
+    const thIndex = {id:0,category:1,manufacturer:2,model:3,serialNumber:4,caliber:5,magnification:6,purchaseDate:7,quantity:8};
+    const ti = thIndex[invSortField];
+    if (ti !== undefined) {
+        const ths = document.querySelectorAll('#inv-table thead th');
+        ths[ti]?.classList.add(invSortDir==='asc'?'sort-asc':'sort-desc');
+    }
+
+    const tbody = document.getElementById('inv-tbody');
+    const empty = document.getElementById('inv-empty');
+    if (!data.length) {
+        tbody.innerHTML=''; empty.style.display='block'; return;
+    }
+    empty.style.display='none';
+    tbody.innerHTML = data.map(it=>`<tr>
+        <td class="mono">#${it.id}</td>
+        <td><span class="badge ${catClass(it.category)}">${it.category||'—'}</span></td>
+        <td>${esc(it.manufacturer)||'—'}</td>
+        <td>${esc(it.model)||'—'}</td>
+        <td class="mono">${esc(it.serialNumber)||'—'}</td>
+        <td>${esc(it.caliber)||'—'}</td>
+        <td>${esc(it.magnification)||'—'}</td>
+        <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():'—'}</td>
+        <td style="text-align:center">${it.quantity||1}</td>
+        <td style="white-space:nowrap">
+            <button class="btn btn-info btn-sm" onclick="showBarcode(${it.id})" title="Barcode">&#9641;</button>
+            <button class="btn btn-ghost btn-sm" onclick="editItem(${it.id})" title="Edit">&#9998;</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteItem(${it.id})" title="Delete">&#10006;</button>
+        </td></tr>`).join('');
+}
+
+function sortBy(field) {
+    invSortDir = invSortField===field ? (invSortDir==='asc'?'desc':'asc') : 'asc';
+    invSortField = field;
+    renderInventory();
+}
+
+// ════════════════════════════════════════════
+//  REPORTS
+// ════════════════════════════════════════════
+function rptSortBy(field) {
+    const fd = document.getElementById('rpt-sort-field');
+    const dd = document.getElementById('rpt-sort-dir');
+    if (fd.value===field) dd.value = dd.value==='asc'?'desc':'asc';
+    else fd.value=field;
+    renderReport();
+}
+
+function renderReport() {
+    const field = document.getElementById('rpt-sort-field').value;
+    const dir   = document.getElementById('rpt-sort-dir').value;
+    const data  = sorted(filteredItems('rpt-search','rpt-filter-cat'), field, dir);
+    document.getElementById('rpt-count').textContent = `${data.length} item${data.length!==1?'s':''}`;
+    document.getElementById('rpt-tbody').innerHTML = data.length
+        ? data.map(it=>`<tr>
+            <td class="mono">#${it.id}</td>
+            <td><span class="badge ${catClass(it.category)}">${it.category||'—'}</span></td>
+            <td>${esc(it.manufacturer)||'—'}</td>
+            <td>${esc(it.model)||'—'}</td>
+            <td class="mono">${esc(it.serialNumber)||'—'}</td>
+            <td>${esc(it.caliber)||'—'}</td>
+            <td>${esc(it.magnification)||'—'}</td>
+            <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():'—'}</td>
+            <td style="text-align:center">${it.quantity||1}</td>
+            <td style="color:var(--text-secondary);font-size:0.82rem">${esc(it.notes)||'—'}</td>
+          </tr>`).join('')
+        : '<tr><td colspan="10" style="text-align:center;color:var(--text-secondary);padding:30px">No items match the current filters.</td></tr>';
+}
+
+function printReport() {
+    const field = document.getElementById('rpt-sort-field').value;
+    const dir   = document.getElementById('rpt-sort-dir').value;
+    const data  = sorted(filteredItems('rpt-search','rpt-filter-cat'), field, dir);
+    document.getElementById('print-content').innerHTML = `
+        <style>
+            body{font-family:Arial,sans-serif;font-size:10px;}
+            h2{font-size:14px;margin-bottom:4px;}
+            p{color:#666;margin-bottom:8px;font-size:9px;}
+            table{width:100%;border-collapse:collapse;}
+            th,td{border:1px solid #ccc;padding:4px 6px;text-align:left;}
+            th{background:#f0f0f0;font-weight:700;}
+            tr:nth-child(even){background:#f9f9f9;}
+        </style>
+        <h2>Armory Database II — Inventory Report</h2>
+        <p>Generated: ${new Date().toLocaleString()} &nbsp;|&nbsp; Items: ${data.length}</p>
+        <table>
+            <thead><tr>
+                <th>ID</th><th>Category</th><th>Manufacturer</th><th>Model</th>
+                <th>Serial #</th><th>Caliber</th><th>Magnification</th>
+                <th>Purchase Date</th><th>Qty</th><th>Notes</th>
+            </tr></thead>
+            <tbody>${data.map(it=>`<tr>
+                <td>#${it.id}</td><td>${it.category||''}</td><td>${it.manufacturer||''}</td><td>${it.model||''}</td>
+                <td>${it.serialNumber||''}</td><td>${it.caliber||''}</td><td>${it.magnification||''}</td>
+                <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():''}</td>
+                <td>${it.quantity||1}</td><td>${it.notes||''}</td>
+            </tr>`).join('')}</tbody>
+        </table>`;
+    window.print();
+}
+
+// ════════════════════════════════════════════
+//  CATEGORIES
+// ════════════════════════════════════════════
+function renderCatTags() {
+    const el = document.getElementById('cat-tags');
+    el.innerHTML = categories.length
+        ? categories.map((c,i)=>`
+            <div class="tag">
+                <span>${esc(c)}</span>
+                <button class="tag-remove" onclick="removeCat(${i})" title="Remove">&#10005;</button>
+            </div>`).join('')
+        : '<p style="color:var(--text-secondary)">No categories defined.</p>';
+}
+
+function addCategory() {
+    const inp = document.getElementById('new-cat-input');
+    const name = inp.value.trim();
+    if (!name) return;
+    if (categories.map(c=>c.toLowerCase()).includes(name.toLowerCase())) {
+        toast('Category already exists.'); return;
+    }
+    categories.push(name); save(); inp.value=''; renderCatTags();
+    toast(`"${name}" added!`,'success');
+}
+
+document.getElementById('new-cat-input').addEventListener('keydown', e => {
+    if (e.key==='Enter') { e.preventDefault(); addCategory(); }
+});
+
+function removeCat(i) {
+    const c = categories[i];
+    const used = items.filter(it=>it.category===c).length;
+    if (used && !confirm(`"${c}" is used by ${used} item(s). Remove anyway?`)) return;
+    categories.splice(i,1); save(); renderCatTags();
+    toast(`"${c}" removed.`);
+}
+
+// ════════════════════════════════════════════
+//  BARCODE
+// ════════════════════════════════════════════
+let activeBcId = null;
+
+function showBarcode(id) {
+    const it = items.find(i=>i.id==id); if (!it) return;
+    activeBcId = id;
+    const label = [it.manufacturer, it.model].filter(Boolean).join(' ') || `Item #${id}`;
+    document.getElementById('bc-title').textContent = label;
+    document.getElementById('bc-sub').textContent =
+        `${it.category||''}  |  SN: ${it.serialNumber||'N/A'}`;
+    const code = `ARM${String(it.id).padStart(6,'0')}`;
+    document.getElementById('bc-code').textContent = code;
+    try {
+        JsBarcode('#bc-svg', code, {
+            format: 'CODE128', width:2.2, height:80,
+            displayValue:true, fontSize:13, margin:10,
+            background:'#ffffff', lineColor:'#000000'
+        });
+    } catch(e) { console.error(e); }
+    document.getElementById('barcode-modal').classList.add('show');
+}
+
+function closeModal() {
+    document.getElementById('barcode-modal').classList.remove('show');
+    activeBcId = null;
+}
+
+document.getElementById('barcode-modal').addEventListener('click', e => {
+    if (e.target===document.getElementById('barcode-modal')) closeModal();
+});
+
+function printBarcode() {
+    if (!activeBcId) return;
+    const it = items.find(i=>i.id==activeBcId); if (!it) return;
+    const svgHtml = document.getElementById('bc-svg').outerHTML;
+    const label = [it.manufacturer, it.model].filter(Boolean).join(' ') || `Item #${it.id}`;
+    document.getElementById('print-content').innerHTML = `
+        <style>
+            body{font-family:Arial,sans-serif;text-align:center;padding:30px;}
+            .lbl{display:inline-block;border:2px solid #333;padding:16px 24px;border-radius:8px;min-width:300px;}
+            h3{margin:0 0 3px;font-size:13px;}
+            p{margin:0 0 10px;font-size:10px;color:#555;}
+        </style>
+        <div class="lbl">
+            <h3>${label}</h3>
+            <p>${it.category||''} &nbsp;|&nbsp; SN: ${it.serialNumber||'N/A'}</p>
+            ${svgHtml}
+        </div>`;
+    window.print();
+}
+
+// ════════════════════════════════════════════
+//  EXPORT CSV
+// ════════════════════════════════════════════
+function exportCSV() {
+    const hdrs = ['ID','Category','Manufacturer','Model','Serial Number',
+                  'Caliber','Magnification','Purchase Date','Quantity','Notes','Date Added'];
+    const rows = items.map(it=>[
+        it.id, it.category, it.manufacturer, it.model, it.serialNumber,
+        it.caliber, it.magnification, it.purchaseDate, it.quantity, it.notes,
+        it.addedAt?new Date(it.addedAt).toLocaleDateString():''
+    ].map(v=>`"${String(v??'').replace(/"/g,'""')}"`));
+    const csv = [hdrs.join(','), ...rows.map(r=>r.join(','))].join('\n');
+    const a = Object.assign(document.createElement('a'), {
+        href: URL.createObjectURL(new Blob([csv],{type:'text/csv'})),
+        download: `armory-${new Date().toISOString().slice(0,10)}.csv`
+    });
+    a.click(); URL.revokeObjectURL(a.href);
+    toast('CSV exported!','success');
+}
+
+// ════════════════════════════════════════════
+//  UTILITIES
+// ════════════════════════════════════════════
+function catClass(cat) {
+    const map = {
+        'Rifle':'cat-rifle','Shotgun':'cat-shotgun','Pistol':'cat-pistol',
+        'Revolver':'cat-revolver','Suppressor':'cat-suppressor',
+        'Magazine':'cat-magazine','Scope':'cat-scope',
+        'Binoculars':'cat-binoculars','Spotting Scope':'cat-spotting'
+    };
+    return map[cat]||'cat-default';
+}
+
+function esc(s) {
+    if (!s) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function toast(msg, type='') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = `toast show${type?' '+type:''}`;
+    clearTimeout(el._t);
+    el._t = setTimeout(()=>el.classList.remove('show'), 3000);
+}
+
+// ════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════
+renderDashboard();
+populateCatSelect();
+populateMfrList();
+syncCatFilters();
+</script>
+</body>
+</html>

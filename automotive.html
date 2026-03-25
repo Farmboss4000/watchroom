@@ -12,6 +12,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        html { overflow-x: hidden; }
 
         :root {
             --bg-primary:    #f0f3f8;
@@ -29,13 +30,16 @@
             --hdr-bg:        #1a1f2e;
         }
 
-        body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; background:var(--bg-primary); color:var(--text-primary); min-height:100vh; }
+        body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; background:var(--bg-primary); color:var(--text-primary); min-height:100vh; overflow-x:hidden; max-width:100%; }
 
         /* ── SITE SWITCHER ── */
         .site-switcher {
             background:#111827; display:flex; align-items:center; padding:5px 18px;
             gap:4px; font-size:0.77rem; border-bottom:1px solid rgba(255,255,255,0.07);
+            overflow-x:auto; -webkit-overflow-scrolling:touch; flex-wrap:nowrap;
+            scrollbar-width:none;
         }
+        .site-switcher::-webkit-scrollbar { display:none; }
         .site-switcher-label { color:#4b5563; font-size:0.69rem; font-weight:600;
             text-transform:uppercase; letter-spacing:0.6px; margin-right:8px; }
         .site-link { text-decoration:none; color:#9ca3af; padding:4px 12px; border-radius:4px;
@@ -86,7 +90,7 @@
             display:flex; align-items:center; justify-content:center; font-size:17px; color:#fff; flex-shrink:0; }
         header h1 { font-size:1.15rem; font-weight:700; color:#fff; white-space:nowrap; }
         header h1 span { color:var(--accent); }
-        nav { display:flex; gap:2px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+        nav { display:flex; gap:2px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; flex-shrink:0; max-width:100%; }
         nav::-webkit-scrollbar { display:none; }
         nav button { background:transparent; border:none; color:#9ca3af; padding:8px 13px;
             border-radius:6px; cursor:pointer; font-size:0.83rem; transition:all 0.15s; white-space:nowrap; }
@@ -182,7 +186,7 @@
         .toolbar input:focus { outline:none; border-color:var(--accent); }
         .toolbar select { padding:8px 12px; border:1px solid var(--border); border-radius:7px;
             font-size:0.87rem; font-family:inherit; background:var(--bg-secondary); color:var(--text-primary); cursor:pointer; }
-        .table-wrapper { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+        .table-wrapper { overflow-x:auto; -webkit-overflow-scrolling:touch; max-width:100%; }
         table { width:100%; border-collapse:collapse; font-size:0.85rem; }
         thead th { background:var(--bg-card); padding:10px 12px; text-align:left; font-size:0.74rem;
             font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-secondary);
@@ -315,6 +319,11 @@
 
         /* ── RESPONSIVE ── */
         @media (max-width:720px) {
+            header { flex-wrap: wrap; padding: 8px 12px; gap: 6px; }
+            .logo-area { flex: 1; min-width: 0; }
+            .header-right { flex-shrink: 0; }
+            nav { order: 3; width: 100%; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 6px; margin-top: 2px; }
+            nav button { padding: 7px 10px; font-size: 0.78rem; }
             main { padding:12px; }
             .stats-grid { grid-template-columns:1fr 1fr; gap:10px; }
             .form-grid { grid-template-columns:1fr; gap:12px; }
@@ -336,11 +345,13 @@
             .cat-breakdown { grid-template-columns:1fr; }
             .api-key-row { flex-direction:column; }
             .api-key-row .btn { width:100%; justify-content:center; }
-            nav button { padding:7px 11px; font-size:0.78rem; flex-shrink:0; }
+        }
+        @media (max-width:600px) {
+            .site-switcher { padding: 5px 10px; gap: 2px; }
+            .site-switcher-label { display: none; }
+            .site-link { padding: 5px 9px; font-size: 0.73rem; }
         }
         @media (max-width:480px) {
-            .site-switcher { overflow-x:auto; flex-wrap:nowrap; padding:5px 10px; }
-            .site-link { padding:4px 8px; font-size:0.72rem; }
             main { padding:10px; }
             /* Hide less-important inventory columns: VIN (7th), Purchased (11th), Market Value (12th) */
             #inv-table thead th:nth-child(7),

@@ -9,6 +9,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        html { overflow-x: hidden; }
 
         :root {
             --bg-primary:   #0f172a;
@@ -26,6 +27,8 @@
             background: var(--bg-primary);
             color: var(--text-primary);
             min-height: 100vh;
+            overflow-x: hidden;
+            max-width: 100%;
         }
 
         /* ── SITE SWITCHER ── */
@@ -37,7 +40,12 @@
             gap: 4px;
             font-size: 0.77rem;
             border-bottom: 1px solid rgba(255,255,255,0.06);
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            flex-wrap: nowrap;
+            scrollbar-width: none;
         }
+        .site-switcher::-webkit-scrollbar { display: none; }
         .site-switcher-label {
             color: #4b5563;
             font-size: 0.69rem;
@@ -684,11 +692,11 @@
 
         /* ── MOBILE RESPONSIVE ADDITIONS ── */
 
-        /* Site switcher: horizontal scroll on small screens */
-        @media (max-width: 480px) {
-            .site-switcher { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; padding: 5px 10px; scrollbar-width: none; }
-            .site-switcher::-webkit-scrollbar { display: none; }
-            .site-link { padding: 4px 8px; font-size: 0.72rem; white-space: nowrap; flex-shrink: 0; }
+        /* Site switcher: compact links on small screens */
+        @media (max-width: 600px) {
+            .site-switcher { padding: 5px 10px; gap: 2px; }
+            .site-switcher-label { display: none; }
+            .site-link { padding: 5px 9px; font-size: 0.73rem; }
         }
 
         /* Hero photo: constrain height and cover-fit on mobile */

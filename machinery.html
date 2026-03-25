@@ -286,8 +286,10 @@
         /* ── RESPONSIVE ── */
         @media (max-width:720px) {
             header { flex-wrap: wrap; padding: 8px 12px; gap: 6px; }
-            .logo-area { flex: 1; min-width: 0; }
+            .logo-area { flex: 1; min-width: 0; overflow: hidden; }
+            header h1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
             .header-right { flex-shrink: 0; }
+            .user-badge { display: none; }
             nav { order: 3; width: 100%; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 6px; margin-top: 2px; }
             nav button { padding: 7px 10px; font-size: 0.78rem; }
             main { padding:12px; }

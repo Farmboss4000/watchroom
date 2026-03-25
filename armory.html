@@ -342,8 +342,10 @@
         }
         @media (max-width:720px) {
             header { flex-wrap: wrap; padding: 8px 12px; gap: 6px; }
-            .logo-area { flex: 1; min-width: 0; }
+            .logo-area { flex: 1; min-width: 0; overflow: hidden; }
+            header h1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
             .header-right { flex-shrink: 0; }
+            .user-badge { display: none; }
             nav { order: 3; width: 100%; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 6px; margin-top: 2px; }
             nav button { padding: 7px 10px; font-size: 0.78rem; }
             main { padding:12px; }
@@ -2136,16 +2138,17 @@ function printBarcode() {
     document.getElementById('print-content').innerHTML = `
         <style>
             @page { size: 2in 0.75in landscape; margin: 0; }
-            body { margin: 0; padding: 2px 4px; font-family: Arial, sans-serif;
+            body { margin: 0; padding: 1px 3px 0; font-family: Arial, sans-serif;
                    display: flex; flex-direction: column; align-items: center;
-                   justify-content: center; height: 0.75in; width: 2in; overflow: hidden; }
-            .item-name { font-size: 7pt; font-weight: bold; text-align: center;
+                   justify-content: flex-start; height: 0.75in; width: 2in;
+                   overflow: hidden; gap: 0; }
+            svg { max-width: 1.95in; height: auto; flex-shrink: 1; display: block; }
+            .item-name { font-size: 7.5pt; font-weight: bold; text-align: center;
                          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-                         max-width: 1.9in; line-height: 1.1; }
-            svg { max-width: 1.9in; height: auto; }
+                         max-width: 1.9in; line-height: 1.1; margin: 0; padding: 0; }
         </style>
-        <div class="item-name">${label}</div>
-        ${document.getElementById('bc-svg').outerHTML}`;
+        ${document.getElementById('bc-svg').outerHTML}
+        <div class="item-name">${label}</div>`;
     window.print();
 }
 

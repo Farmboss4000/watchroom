@@ -319,8 +319,10 @@
         /* ── RESPONSIVE ── */
         @media (max-width:720px) {
             header { flex-wrap: wrap; padding: 8px 12px; gap: 6px; }
-            .logo-area { flex: 1; min-width: 0; }
+            .logo-area { flex: 1; min-width: 0; overflow: hidden; }
+            header h1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
             .header-right { flex-shrink: 0; }
+            .user-badge { display: none; }
             nav { order: 3; width: 100%; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 6px; margin-top: 2px; }
             nav button { padding: 7px 10px; font-size: 0.78rem; }
             main { padding:12px; }
@@ -537,8 +539,12 @@
                     <input type="number" id="f-year" placeholder="e.g. 2022" min="1900" max="2100">
                 </div>
                 <div class="form-group">
-                    <label>VIN</label>
-                    <input type="text" id="f-serial" placeholder="e.g. 1FTEW1EP5NFC00001">
+                    <label>VIN <span id="vin-decode-spinner" style="display:none;font-size:0.75rem;color:var(--accent);font-weight:400;">⏳ Decoding…</span></label>
+                    <input type="text" id="f-serial" placeholder="e.g. 1FTEW1EP5NFC00001"
+                        maxlength="17"
+                        oninput="this.value=this.value.toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g,'');onVINFieldInput(this)"
+                        style="font-family:monospace;letter-spacing:1px;">
+                    <div id="vin-field-status" style="font-size:0.76rem;margin-top:4px;display:none;"></div>
                 </div>
                 <div class="form-group">
                     <label>License Plate</label>
@@ -1402,6 +1408,97 @@ async function onMileagePhotoSelected(input) {
     } finally {
         if (btn) { btn.disabled = false; btn.textContent = '📷 AI Read'; }
         input.value = '';
+    }
+}
+
+// ── AUTO-DECODE VIN WHEN TYPED INTO FORM FIELD ──
+let _vinFieldTimer = null;
+function onVINFieldInput(input) {
+    const vin = (input.value || '').trim().toUpperCase();
+    const status = document.getElementById('vin-field-status');
+    const spinner = document.getElementById('vin-decode-spinner');
+    clearTimeout(_vinFieldTimer);
+    if (vin.length < 17) {
+        if (status) { status.style.display = 'none'; status.textContent = ''; }
+        if (spinner) spinner.style.display = 'none';
+        return;
+    }
+    if (vin.length === 17) {
+        if (status) { status.style.display = 'block'; status.style.color = 'var(--accent)'; status.textContent = '🔍 Decoding VIN…'; }
+        if (spinner) spinner.style.display = '';
+        _vinFieldTimer = setTimeout(() => autoFillFromVIN(vin, status, spinner), 600);
+    }
+}
+
+async function autoFillFromVIN(vin, statusEl, spinnerEl) {
+    try {
+        const res = await fetch(`https://vpic.nhtsa.dot.gov/api/vehicles/decodevin/${encodeURIComponent(vin)}?format=json`);
+        if (!res.ok) throw new Error('NHTSA error ' + res.status);
+        const data = await res.json();
+        const results = data.Results || [];
+        const get = (v) => {
+            const r = results.find(x => x.Variable === v);
+            return (r && r.Value && r.Value !== 'Not Applicable' && r.Value !== 'null' && r.Value !== null) ? r.Value : '';
+        };
+
+        const make  = get('Make');
+        const model = get('Model');
+        const year  = get('Model Year');
+        if (!make && !model && !year) throw new Error('No vehicle data found for this VIN');
+
+        // Fill all available fields
+        if (make  && !document.getElementById('f-make').value)  document.getElementById('f-make').value  = make;
+        if (model && !document.getElementById('f-model').value) document.getElementById('f-model').value = model;
+        if (year  && !document.getElementById('f-year').value)  document.getElementById('f-year').value  = year;
+
+        const bodyClass = get('Body Class');
+        let category = '';
+        if (/pickup/i.test(bodyClass))                        category = 'Pickup Truck';
+        else if (/sport utility/i.test(bodyClass))            category = 'SUV';
+        else if (/sedan|coupe|convert|hatch|wagon/i.test(bodyClass)) category = 'Car';
+        else if (/van|minivan/i.test(bodyClass))              category = 'Van';
+        else if (/truck/i.test(bodyClass))                    category = 'Truck';
+        else if (/motorcycle/i.test(bodyClass))               category = 'Motorcycle';
+        if (category && !document.getElementById('f-category').value) {
+            populateCatSelect();
+            document.getElementById('f-category').value = category;
+        }
+
+        const engineDisp = get('Displacement (L)');
+        const engineCyl  = get('Engine Number of Cylinders');
+        const fuelType   = get('Fuel Type - Primary');
+        let engineStr = '';
+        if (engineDisp) engineStr += parseFloat(engineDisp).toFixed(1) + 'L ';
+        if (engineCyl)  engineStr += 'V' + engineCyl + ' ';
+        if (fuelType && fuelType !== 'Gasoline') engineStr += fuelType;
+        engineStr = engineStr.trim();
+        if (engineStr && !document.getElementById('f-engine').value) document.getElementById('f-engine').value = engineStr;
+
+        const transStyle = get('Transmission Style');
+        let trans = '';
+        if (/automatic/i.test(transStyle))            trans = 'Automatic';
+        else if (/manual|standard/i.test(transStyle)) trans = 'Manual';
+        else if (/cvt/i.test(transStyle))             trans = 'CVT';
+        if (trans && !document.getElementById('f-transmission').value) document.getElementById('f-transmission').value = trans;
+
+        const extras = [];
+        const driveType = get('Drive Type');
+        const doors = get('Doors');
+        const plant = get('Plant City');
+        if (driveType) extras.push('Drive: ' + driveType);
+        if (doors)     extras.push('Doors: ' + doors);
+        if (bodyClass) extras.push('Body: ' + bodyClass);
+        if (plant)     extras.push('Plant: ' + plant);
+        if (extras.length && !document.getElementById('f-notes').value) {
+            document.getElementById('f-notes').value = 'VIN Decoded: ' + extras.join(' | ');
+        }
+
+        const filled = [make, model, year].filter(Boolean).join(' ');
+        if (statusEl) { statusEl.style.display = 'block'; statusEl.style.color = 'var(--success)'; statusEl.textContent = `✅ Decoded: ${filled}`; }
+    } catch(e) {
+        if (statusEl) { statusEl.style.display = 'block'; statusEl.style.color = 'var(--danger)'; statusEl.textContent = '⚠️ Could not decode VIN: ' + e.message; }
+    } finally {
+        if (spinnerEl) spinnerEl.style.display = 'none';
     }
 }
 

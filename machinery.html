@@ -317,7 +317,7 @@
 <!-- ══ LOGIN ══ -->
 <div id="login-screen">
     <div class="login-site-links">
-        <a href="index.html">🏠 HQ</a>
+        <a href="index.html">🏠 Headquarters</a>
         <a href="armory.html">🔫 Armory</a>
         <a href="machinery.html" class="active">🚜 Machinery</a>
         <a href="automotive.html">🚗 Automotive</a>
@@ -351,7 +351,7 @@
 <!-- ══ SITE SWITCHER (outside #app) ══ -->
 <div class="site-switcher">
     <span class="site-switcher-label">Farmboss Headquarters</span>
-    <a href="index.html" class="site-link">🏠 HQ</a>
+    <a href="index.html" class="site-link">🏠 Headquarters</a>
     <a href="armory.html" class="site-link">🔫 Armory</a>
     <a href="machinery.html" class="site-link active">🚜 Machinery</a>
     <a href="automotive.html" class="site-link">🚗 Automotive</a>
@@ -372,6 +372,7 @@
         <button onclick="showView('reports')">Reports</button>
         <button onclick="showView('categories')">Equipment Types</button>
         <button onclick="showView('settings')">⚙ Settings</button>
+        <button onclick="showView('recycle-bin')">🗑 Recycle Bin</button>
     </nav>
     <div class="header-right">
         <span class="user-badge" id="user-email"></span>
@@ -755,6 +756,22 @@ service firebase.storage {
     </div>
 </div>
 
+<!-- ══ RECYCLE BIN ══ -->
+<div id="view-recycle-bin" class="view">
+    <div class="toolbar">
+        <div class="toolbar-left">
+            <h2 style="font-size:1.1rem;font-weight:700;">🗑 Recycle Bin</h2>
+            <span style="font-size:0.82rem;color:var(--text-secondary);">Items deleted from Machinery — restore or permanently delete</span>
+        </div>
+        <div style="display:flex;gap:8px;">
+            <button class="btn btn-ghost btn-sm" onclick="loadRecycleBin()">🔄 Refresh</button>
+        </div>
+    </div>
+    <div class="card">
+        <div id="recycle-bin-list"><div class="empty"><div class="empty-icon">🗑</div><p>Recycle bin is empty</p></div></div>
+    </div>
+</div>
+
 </main>
 </div><!-- end #app -->
 
@@ -916,7 +933,7 @@ let formPhotos = {
     paperwork: { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false }
 };
 
-const VIEWS = ['dashboard','add-item','inventory','reports','categories','settings'];
+const VIEWS = ['dashboard','add-item','inventory','reports','categories','settings','recycle-bin'];
 
 // ═══════════════════════════════════════
 //  AUTH
@@ -1037,6 +1054,7 @@ function showView(v) {
     if (v==='reports')    { syncCatFilters(); renderReport(); }
     if (v==='categories') renderCatTags();
     if (v==='add-item')   populateCatSelect();
+    if (v==='recycle-bin') loadRecycleBin();
 }
 
 // ═══════════════════════════════════════
@@ -1356,11 +1374,28 @@ function editItem(docId) {
     window.scrollTo(0,0);
 }
 
+async function softDelete(docId) {
+    try {
+        const ref = db.collection('machinery_items').doc(docId);
+        const snap = await ref.get();
+        if (!snap.exists) return;
+        await db.collection('recycle_bin').add({
+            originalCollection: 'machinery_items',
+            originalDocId: docId,
+            site: 'machinery',
+            deletedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            data: snap.data()
+        });
+        await ref.delete();
+        toast('Item moved to Recycle Bin.');
+    } catch(e) {
+        toast('Delete failed: ' + e.message, true);
+    }
+}
+
 async function deleteItem(docId) {
-    const it = items.find(i=>i._docId===docId); if (!it) return;
-    if (!confirm(`Delete #${it.id} (${it.make||''} ${it.model||''})? This cannot be undone.`)) return;
-    try { await dbDeleteItem(it._docId); toast('Equipment deleted.'); }
-    catch(err) { toast('Error: '+err.message,'error'); }
+    if (!confirm('Move this item to the Recycle Bin?')) return;
+    await softDelete(docId);
 }
 
 // ═══════════════════════════════════════
@@ -1853,6 +1888,91 @@ Extract ONLY the numeric hours reading. Return ONLY the number — no units, no 
     } finally {
         btn.disabled = false;
         btn.textContent = '⏱ Read Hours with AI';
+    }
+}
+
+// ── RECYCLE BIN ──
+let recycleBinItems = [];
+
+async function loadRecycleBin() {
+    const list = document.getElementById('recycle-bin-list');
+    list.innerHTML = '<div class="empty"><div class="empty-icon">⏳</div><p>Loading...</p></div>';
+    try {
+        const snap = await db.collection('recycle_bin')
+            .where('site', '==', 'machinery')
+            .get();
+        recycleBinItems = snap.docs.map(doc => ({ _binId: doc.id, ...doc.data() }));
+        recycleBinItems.sort((a, b) => {
+            const ta = a.deletedAt && typeof a.deletedAt.toMillis === 'function' ? a.deletedAt.toMillis() : 0;
+            const tb = b.deletedAt && typeof b.deletedAt.toMillis === 'function' ? b.deletedAt.toMillis() : 0;
+            return tb - ta;
+        });
+        renderRecycleBin();
+    } catch(e) {
+        list.innerHTML = `<div class="empty"><p style="color:var(--danger);">Error: ${e.message}</p></div>`;
+    }
+}
+
+function renderRecycleBin() {
+    const list = document.getElementById('recycle-bin-list');
+    if (!recycleBinItems.length) {
+        list.innerHTML = '<div class="empty"><div class="empty-icon">🗑</div><p>Recycle bin is empty</p></div>';
+        return;
+    }
+    list.innerHTML = `
+        <div class="table-wrapper">
+        <table>
+            <thead><tr>
+                <th>Equipment</th>
+                <th>Type</th>
+                <th>Serial / PIN</th>
+                <th>Deleted</th>
+                <th>Actions</th>
+            </tr></thead>
+            <tbody>
+            ${recycleBinItems.map(item => {
+                const d = item.data || {};
+                const deletedDate = item.deletedAt && typeof item.deletedAt.toDate === 'function'
+                    ? item.deletedAt.toDate().toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'})
+                    : 'Unknown';
+                const name = [d.make, d.model].filter(Boolean).join(' ') || 'Unnamed Item';
+                return `<tr>
+                    <td><strong>${name}</strong>${d.year ? ' ('+d.year+')' : ''}</td>
+                    <td>${d.category || '—'}</td>
+                    <td style="font-family:monospace;font-size:0.8rem;">${d.serialNumber || d.serial || '—'}</td>
+                    <td style="font-size:0.82rem;color:var(--text-secondary);">${deletedDate}</td>
+                    <td>
+                        <button class="btn btn-primary btn-sm" onclick="restoreBinItem('${item._binId}')">↩ Restore</button>
+                        <button class="btn btn-danger btn-sm" onclick="permanentDeleteBinItem('${item._binId}')" style="margin-left:4px;">✕ Delete Forever</button>
+                    </td>
+                </tr>`;
+            }).join('')}
+            </tbody>
+        </table>
+        </div>`;
+}
+
+async function restoreBinItem(binId) {
+    const item = recycleBinItems.find(i => i._binId === binId);
+    if (!item) return;
+    try {
+        await db.collection(item.originalCollection).add(item.data);
+        await db.collection('recycle_bin').doc(binId).delete();
+        toast('Item restored!');
+        loadRecycleBin();
+    } catch(e) {
+        toast('Restore failed: ' + e.message, true);
+    }
+}
+
+async function permanentDeleteBinItem(binId) {
+    if (!confirm('Permanently delete this item? This cannot be undone.')) return;
+    try {
+        await db.collection('recycle_bin').doc(binId).delete();
+        toast('Permanently deleted.');
+        loadRecycleBin();
+    } catch(e) {
+        toast('Error: ' + e.message, true);
     }
 }
 </script>

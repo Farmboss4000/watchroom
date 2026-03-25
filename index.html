@@ -616,7 +616,8 @@
                 </div>
                 <div class="form-group">
                     <label>Caliber / Gauge</label>
-                    <input type="text" id="f-caliber" placeholder="e.g. .357 Magnum">
+                    <input type="text" id="f-caliber" list="caliber-list" placeholder="Type or select a caliber..." autocomplete="off">
+                    <datalist id="caliber-list"></datalist>
                 </div>
                 <div class="form-group">
                     <label>Magnification</label>
@@ -914,6 +915,35 @@ let manufacturers = ['Barrett','Benelli','Beretta','Browning','Bushmaster','CMMG
                      'Nightforce','Nikon','Remington','Ruger','Savage','Sig Sauer',
                      'Smith & Wesson','Springfield Armory','Steyr','Taurus','Tikka',
                      'Vortex','Weatherby','Winchester'];
+let calibers      = [
+    // Pistol / Revolver
+    '.22 LR','.22 WMR','.25 ACP','.32 ACP','.380 ACP',
+    '9mm Luger','9x18mm Makarov',
+    '.357 SIG','.357 Magnum','.38 Special','.38 Super',
+    '.40 S&W','.41 Magnum','.44 Special','.44 Magnum',
+    '.45 ACP','.45 Colt','.45 GAP',
+    '10mm Auto','.50 AE','.454 Casull','.460 S&W','.500 S&W',
+    // Rifle
+    '.17 HMR','.17 WSM',
+    '.223 Remington','5.56x45mm NATO',
+    '.224 Valkyrie','.22-250 Remington',
+    '.243 Winchester','6mm Creedmoor',
+    '6.5 Creedmoor','6.5 Grendel','6.5 PRC','6.5x55mm Swedish',
+    '.260 Remington','6.8 SPC',
+    '.270 Winchester','.270 WSM',
+    '7mm-08 Remington','7mm Remington Magnum','7mm PRC',
+    '7.62x39mm','7.62x51mm NATO','.308 Winchester',
+    '.30-06 Springfield','.30-30 Winchester','.300 Blackout',
+    '.300 Winchester Magnum','.300 WSM','.300 PRC','.300 Norma Magnum',
+    '.338 Lapua Magnum','.338 Federal',
+    '.350 Legend','.35 Whelen',
+    '.375 H&H Magnum','.375 Ruger',
+    '.416 Rigby','.416 Barrett',
+    '.45-70 Government','.450 Bushmaster','.458 SOCOM','.458 Win Mag',
+    '.50 BMG','5.45x39mm',
+    // Shotgun
+    '10 Gauge','12 Gauge','16 Gauge','20 Gauge','28 Gauge','.410 Bore'
+];
 let nextId        = 1001;
 let invSortField  = 'id';
 let invSortDir    = 'asc';
@@ -979,6 +1009,7 @@ async function initApp() {
             const d = cfgDoc.data();
             if (d.categories    && d.categories.length)    categories    = d.categories;
             if (d.manufacturers && d.manufacturers.length) manufacturers = d.manufacturers;
+            if (d.calibers      && d.calibers.length)      calibers      = d.calibers;
             if (d.nextId)                                   nextId        = d.nextId;
         }
         const keyDoc = await db.collection('settings').doc('apikey').get();
@@ -992,7 +1023,7 @@ async function initApp() {
         });
         document.getElementById('loading-screen').style.display = 'none';
         document.getElementById('app').style.display            = 'block';
-        populateCatSelect(); populateMfrList(); syncCatFilters();
+        populateCatSelect(); populateMfrList(); populateCaliberList(); syncCatFilters();
         showView('dashboard');
     } catch(err) {
         document.getElementById('loading-screen').innerHTML =
@@ -1006,7 +1037,7 @@ async function initApp() {
 //  FIRESTORE / STORAGE
 // ═══════════════════════════════════════
 async function saveConfig() {
-    await db.collection('config').doc('data').set({ categories, manufacturers, nextId });
+    await db.collection('config').doc('data').set({ categories, manufacturers, calibers, nextId });
 }
 
 async function uploadPhoto(slot, file) {
@@ -1241,6 +1272,17 @@ function addMfrIfNew(name) {
     if (!manufacturers.some(m=>m.toLowerCase()===name.toLowerCase())) manufacturers.push(name);
 }
 
+function populateCaliberList() {
+    const dl = document.getElementById('caliber-list'); if (!dl) return;
+    dl.innerHTML = calibers.slice().sort((a,b)=>a.localeCompare(b))
+        .map(c=>`<option value="${esc(c)}">`).join('');
+}
+
+function addCaliberIfNew(name) {
+    if (!name) return;
+    if (!calibers.some(c=>c.toLowerCase()===name.toLowerCase())) calibers.push(name);
+}
+
 document.getElementById('item-form').addEventListener('submit', async e => {
     e.preventDefault();
     const eid   = document.getElementById('edit-id').value;
@@ -1260,6 +1302,7 @@ document.getElementById('item-form').addEventListener('submit', async e => {
     btn.disabled = true; btn.textContent = 'Saving...';
     try {
         addMfrIfNew(data.manufacturer);
+        addCaliberIfNew(data.caliber);
 
         // Build photos array — upload new files, keep existing URLs
         const existingPhotos = eid ? (items.find(i=>i.id==eid)?.photos||[]) : [];
@@ -1284,6 +1327,7 @@ document.getElementById('item-form').addEventListener('submit', async e => {
             toast('Item added!','success');
         }
         populateMfrList();
+        populateCaliberList();
         resetForm();
         showView('inventory');
     } catch(err) {
@@ -1303,7 +1347,7 @@ function resetForm() {
     document.getElementById('form-submit-btn').textContent = 'Save Item';
     document.getElementById('form-submit-btn').disabled    = false;
     document.getElementById('ai-status').textContent   = '';
-    populateCatSelect(); populateMfrList();
+    populateCatSelect(); populateMfrList(); populateCaliberList();
     for (const slot of ['main','serial','extra']) {
         formPhotos[slot] = { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false };
     }

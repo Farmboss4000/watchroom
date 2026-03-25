@@ -245,46 +245,56 @@
         /* ── HERO ── */
         .hero {
             position: relative;
-            min-height: 260px;
+            background: #0f172a;
             display: flex;
-            align-items: center;
+            align-items: stretch;
             overflow: hidden;
         }
-        /* Photo fills the right half */
+        /* Right side: full photo, no cropping */
         .hero-photo {
-            position: absolute;
-            inset: 0;
+            flex-shrink: 0;
+            width: 340px;
+            position: relative;
             display: flex;
-            justify-content: flex-end;
+            align-items: flex-end;
         }
         .hero-photo img {
-            height: 100%;
-            width: 55%;
-            object-fit: cover;
-            object-position: center top;
+            width: 100%;
+            height: auto;
             display: block;
+            object-fit: contain;
         }
-        /* Dark gradient fades photo into left background */
-        .hero-photo::after {
+        /* Fade left edge of photo into dark background */
+        .hero-photo::before {
             content: '';
             position: absolute;
             inset: 0;
             background: linear-gradient(
                 to right,
                 #0f172a 0%,
-                #0f172a 30%,
-                rgba(15,23,42,0.85) 52%,
-                rgba(15,23,42,0.3) 75%,
-                rgba(15,23,42,0.55) 100%
+                rgba(15,23,42,0.5) 30%,
+                transparent 65%
             );
+            z-index: 1;
+            pointer-events: none;
         }
-        /* Text sits on top of everything */
+        /* Fade bottom edge */
+        .hero-photo::after {
+            content: '';
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            height: 60px;
+            background: linear-gradient(to top, #0f172a, transparent);
+            z-index: 1;
+            pointer-events: none;
+        }
+        /* Text on the left */
         .hero-text {
-            position: relative;
-            z-index: 2;
-            padding: 48px 36px;
             flex: 1;
-            max-width: 560px;
+            padding: 52px 36px 52px 40px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
         .hero-title {
             font-size: 2.5rem;
@@ -298,13 +308,13 @@
         .hero-subtitle {
             color: #94a3b8;
             font-size: 1rem;
-            max-width: 440px;
+            max-width: 400px;
         }
-        @media (max-width: 600px) {
-            .hero-photo img { width: 100%; opacity: 0.35; }
-            .hero-photo::after { background: linear-gradient(to right, #0f172a 0%, rgba(15,23,42,0.7) 100%); }
-            .hero-text { padding: 36px 20px; }
-            .hero-title { font-size: 1.8rem; }
+        @media (max-width: 640px) {
+            .hero { flex-direction: column-reverse; }
+            .hero-photo { width: 100%; max-width: 300px; margin: 0 auto; }
+            .hero-text { padding: 28px 20px 8px; text-align: center; }
+            .hero-title { font-size: 2rem; }
         }
 
         /* ── MAIN CONTENT ── */

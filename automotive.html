@@ -691,6 +691,7 @@
             </select>
             <button class="btn btn-primary btn-sm" onclick="showView('add-item');resetForm()">+ Add Vehicle</button>
             <button class="btn btn-ghost btn-sm" onclick="openScanner()" title="Scan barcode">📷 Scan</button>
+            <button class="btn btn-ghost btn-sm" id="btn-refresh-all-mv" onclick="refreshAllMarketValues()" title="Re-estimate market value for every vehicle">💲 Refresh All Values</button>
             <button class="btn btn-ghost btn-sm" onclick="exportCSV()">↓ Export CSV</button>
         </div>
         <div class="table-wrapper">
@@ -744,6 +745,7 @@
                 <option value="condition">Sort: Condition</option>
                 <option value="purchaseDate">Sort: Purchase Date</option>
                 <option value="price">Sort: Price</option>
+                <option value="marketValue">Sort: Market Value</option>
             </select>
             <select id="rpt-sort-dir" onchange="renderReport()" style="min-width:120px;">
                 <option value="asc">Ascending</option>
@@ -765,6 +767,7 @@
                 <th onclick="rptSortBy('condition')">Condition</th>
                 <th onclick="rptSortBy('purchaseDate')">Purchased</th>
                 <th onclick="rptSortBy('price')">Price</th>
+                <th onclick="rptSortBy('marketValue')">Market Value</th>
                 <th onclick="rptSortBy('location')">Location</th>
                 <th class="no-sort">Notes</th>
             </tr></thead>
@@ -2072,10 +2075,11 @@ function renderReport() {
             <td>${it.condition||'—'}</td>
             <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():'—'}</td>
             <td>${it.price ? '$'+Number(it.price).toLocaleString() : '—'}</td>
+            <td>${it.marketValue && Number(it.marketValue)>0 ? `<span style="font-weight:700;color:#22c55e;">$${Number(it.marketValue).toLocaleString()}</span>` : '—'}</td>
             <td style="font-size:0.82rem">${esc(it.location)||'—'}</td>
             <td style="color:var(--text-secondary);font-size:0.82rem">${esc(it.notes)||'—'}</td>
           </tr>`).join('')
-        :'<tr><td colspan="13" style="text-align:center;color:var(--text-secondary);padding:30px">No items match filters.</td></tr>';
+        :'<tr><td colspan="14" style="text-align:center;color:var(--text-secondary);padding:30px">No items match filters.</td></tr>';
 }
 function printReport() {
     const field=document.getElementById('rpt-sort-field').value, dir=document.getElementById('rpt-sort-dir').value;
@@ -2087,7 +2091,7 @@ function printReport() {
         <h2>Farmboss Automotive — Inventory Report</h2>
         <p>Generated: ${new Date().toLocaleString()} | Items: ${data.length}</p>
         <table><thead><tr><th>ID</th><th>Type</th><th>Make</th><th>Model</th><th>Year</th>
-        <th>VIN</th><th>License Plate</th><th>Mileage</th><th>Condition</th><th>Purchased</th><th>Price</th><th>Location</th><th>Notes</th>
+        <th>VIN</th><th>License Plate</th><th>Mileage</th><th>Condition</th><th>Purchased</th><th>Price</th><th>Market Value</th><th>Location</th><th>Notes</th>
         </tr></thead><tbody>${data.map(it=>`<tr>
             <td>#${it.id}</td><td>${it.category||''}</td><td>${it.make||''}</td><td>${it.model||''}</td>
             <td>${it.year||''}</td><td>${it.serialNumber||''}</td><td>${it.licensePlate||''}</td>
@@ -2095,6 +2099,7 @@ function printReport() {
             <td>${it.condition||''}</td>
             <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():''}</td>
             <td>${it.price ? '$'+Number(it.price).toLocaleString() : ''}</td>
+            <td>${it.marketValue && Number(it.marketValue)>0 ? '$'+Number(it.marketValue).toLocaleString() : ''}</td>
             <td>${it.location||''}</td><td>${it.notes||''}</td></tr>`).join('')}</tbody></table>`;
     window.print();
 }
@@ -2552,6 +2557,25 @@ ${it.transmission ? 'Transmission: ' + it.transmission : ''}`;
         const cell2 = document.getElementById('mv-cell-' + docId);
         if (cell2 && it2) cell2.innerHTML = marketValueCell(it2);
     }
+}
+
+// ── REFRESH ALL MARKET VALUES ──
+async function refreshAllMarketValues() {
+    if (!apiKey) { toast('Set your API key in Settings first.', true); return; }
+    const eligible = items.filter(it => it.make && it.model && it.year);
+    if (!eligible.length) { toast('No vehicles with Make, Model & Year to value.', true); return; }
+
+    const btn = document.getElementById('btn-refresh-all-mv');
+    if (btn) { btn.disabled = true; btn.textContent = `⏳ 0 / ${eligible.length}`; }
+
+    for (let i = 0; i < eligible.length; i++) {
+        if (btn) btn.textContent = `⏳ ${i + 1} / ${eligible.length}`;
+        await refreshMarketValue(eligible[i]._docId);
+        if (i < eligible.length - 1) await new Promise(r => setTimeout(r, 1500));
+    }
+
+    if (btn) { btn.disabled = false; btn.textContent = '💲 Refresh All Values'; }
+    toast(`✅ Market values updated for ${eligible.length} vehicle${eligible.length !== 1 ? 's' : ''}`);
 }
 
 // Auto-refresh stale or missing values on page load (if API key is set)

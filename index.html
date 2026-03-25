@@ -943,10 +943,16 @@
 
     function initQuotes() {
         if (unsubQuotes) return;
-        unsubQuotes = db.collection('quotes').orderBy('addedAt','asc').onSnapshot(snap => {
+        unsubQuotes = db.collection('quotes').onSnapshot(snap => {
             quotes = snap.docs.map(doc => ({ _docId: doc.id, ...doc.data() }));
+            // Sort client-side so quotes without addedAt still appear
+            quotes.sort((a, b) => {
+                const ta = a.addedAt ? a.addedAt.toMillis() : 0;
+                const tb = b.addedAt ? b.addedAt.toMillis() : 0;
+                return ta - tb;
+            });
             renderQuotes();
-        }, () => {});
+        }, err => { console.error('Quotes error:', err); });
     }
 
     function renderQuotes() {

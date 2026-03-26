@@ -1710,6 +1710,14 @@ async function uploadDoc(file, idx) {
     return await ref.getDownloadURL();
 }
 
+function openDoc(tempId) {
+    const d = formDocs.find(x => x._tempId === tempId);
+    if (!d) return;
+    if (d.existingUrl) { window.open(d.existingUrl, '_blank'); return; }
+    if (d.file)        { window.open(URL.createObjectURL(d.file), '_blank'); return; }
+    if (d.base64)      { window.open('data:' + (d.mimeType||'image/jpeg') + ';base64,' + d.base64, '_blank'); return; }
+}
+
 function renderDocsList() {
     const list  = document.getElementById('docs-list');
     const empty = document.getElementById('docs-empty');
@@ -1717,6 +1725,7 @@ function renderDocsList() {
     if (!active.length) { list.innerHTML=''; if(empty) empty.style.display=''; return; }
     if(empty) empty.style.display='none';
     list.innerHTML = active.map(d => {
+        const hasPreview = d.existingUrl || d.file || d.base64;
         const previewHtml = d.mimeType==='application/pdf'
             ? `<span style="font-size:2rem;">📄</span>`
             : (d.base64
@@ -1726,14 +1735,17 @@ function renderDocsList() {
                     : `<span style="font-size:2rem;">📷</span>`));
         const summaryHtml = d.summary ? `<div class="doc-summary-text">${esc(d.summary)}</div>` : '';
         return `<div class="doc-card">
-            <div class="doc-thumb">${previewHtml}</div>
+            <div class="doc-thumb" ${hasPreview ? `onclick="openDoc('${d._tempId}')" title="Click to preview / download" style="cursor:pointer;"` : ''}>${previewHtml}</div>
             <div class="doc-body">
                 <input type="text" placeholder="Document label (optional)" value="${esc(d.name||'')}"
                     oninput="setDocName('${d._tempId}',this.value)"
                     style="width:100%;box-sizing:border-box;margin-bottom:6px;font-size:0.82rem;">
                 ${summaryHtml}
-                <button type="button" class="btn btn-ghost btn-sm" id="sum-btn-${d._tempId}"
-                    onclick="summarizeDoc('${d._tempId}')">🤖 Summarize with AI</button>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                    ${hasPreview ? `<button type="button" class="btn btn-ghost btn-sm" onclick="openDoc('${d._tempId}')">👁 View</button>` : ''}
+                    <button type="button" class="btn btn-ghost btn-sm" id="sum-btn-${d._tempId}"
+                        onclick="summarizeDoc('${d._tempId}')">🤖 Summarize with AI</button>
+                </div>
             </div>
             <button type="button" class="btn btn-danger btn-sm" onclick="removeDoc('${d._tempId}')"
                 style="flex-shrink:0;" title="Remove">✗</button>

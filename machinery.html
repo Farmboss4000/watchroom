@@ -170,6 +170,11 @@
             display:flex; align-items:center; justify-content:center; background:var(--bg-card);
             overflow:hidden; position:relative; cursor:default; }
         .photo-preview img { width:100%; height:100%; object-fit:cover; border-radius:6px; }
+        .doc-card { display:flex; gap:10px; align-items:flex-start; padding:10px 12px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px; margin-bottom:8px; }
+        .doc-thumb { flex-shrink:0; width:60px; height:60px; border-radius:6px; overflow:hidden; border:1px solid var(--border); display:flex; align-items:center; justify-content:center; background:var(--bg-card); }
+        .doc-thumb img { width:100%; height:100%; object-fit:cover; }
+        .doc-body { flex:1; min-width:0; }
+        .doc-summary-text { font-size:0.75rem; color:var(--text-secondary); line-height:1.45; margin:4px 0 6px; word-break:break-word; }
         .no-photo { font-size:2rem; color:var(--border); }
         .remove-photo { position:absolute; top:5px; right:5px; background:rgba(0,0,0,0.55); border:none;
             color:#fff; width:22px; height:22px; border-radius:50%; cursor:pointer; font-size:12px;
@@ -580,7 +585,7 @@
                             <button type="button" class="remove-photo" onclick="removePhoto('paperwork')">✕</button>
                         </div>
                         <div class="photo-file-input">
-                            <input type="file" id="file-paperwork" accept="image/*" onchange="onPhotoSelected('paperwork',this)">
+                            <input type="file" id="file-paperwork" accept="image/*,application/pdf" onchange="onPhotoSelected('paperwork',this)">
                         </div>
                         <button type="button" class="btn-ai" id="btn-paperwork" onclick="summarizePaperwork()" disabled>📄 Summarize Paperwork with AI</button>
                     </div>
@@ -594,6 +599,22 @@
                     </div>
                     <p id="hours-ai-status" style="font-size:0.82rem;color:var(--text-secondary);margin-top:8px;min-height:16px;"></p>
                 </div>
+            </div>
+
+            <!-- ══ DOCUMENTATION ══ -->
+            <div style="margin-top:22px;padding-top:18px;border-top:1px solid var(--border);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+                    <div>
+                        <span style="font-size:0.85rem;font-weight:600;color:var(--text-primary);">📂 Documentation</span>
+                        <span style="font-size:0.75rem;font-weight:400;color:var(--text-secondary);margin-left:8px;">Pictures or PDFs — manuals, receipts, warranties, service records</span>
+                    </div>
+                    <label class="btn btn-ghost btn-sm" style="cursor:pointer;white-space:nowrap;">
+                        + Add Document
+                        <input type="file" id="docs-file-input" accept="image/*,application/pdf" multiple style="display:none" onchange="addDocFiles(this)">
+                    </label>
+                </div>
+                <div id="docs-list"></div>
+                <div id="docs-empty" style="font-size:0.8rem;color:var(--text-secondary);padding:8px 0;display:none;">No documents yet. Click + Add Document to upload pictures or PDFs.</div>
             </div>
 
             <div class="form-actions">
@@ -937,6 +958,7 @@ let nextId       = 5001;
 let invSortField = 'id';
 let invSortDir   = 'asc';
 let activeBcId   = null;
+let formDocs = [];  // multi-document documentation array
 let unsubItems   = null;
 let apiKey       = '';
 let proxyUrl     = '';
@@ -1157,12 +1179,23 @@ async function onPhotoSelected(slot, input) {
     const file = input.files[0]; if (!file) return;
     formPhotos[slot].file    = file;
     formPhotos[slot].deleted = false;
-    const dataUrl = await compressImage(file) || await new Promise(r => {
-        const fr = new FileReader(); fr.onload = e => r(e.target.result); fr.readAsDataURL(file);
-    });
-    formPhotos[slot].base64   = dataUrl.split(',')[1];
-    formPhotos[slot].mimeType = 'image/jpeg';
-    renderPhotoPreview(slot, dataUrl);
+    if (file.type === 'application/pdf') {
+        const dataUrl = await new Promise(r => { const fr=new FileReader(); fr.onload=e=>r(e.target.result); fr.readAsDataURL(file); });
+        formPhotos[slot].base64   = dataUrl.split(',')[1];
+        formPhotos[slot].mimeType = 'application/pdf';
+        const prev = document.getElementById('prev-'+slot);
+        prev.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:6px;padding:8px;">
+            <span style="font-size:2.2rem;">📄</span>
+            <span style="font-size:0.68rem;color:var(--text-secondary);text-align:center;word-break:break-all;">${esc(file.name)}</span>
+        </div><button type="button" class="remove-photo" onclick="removePhoto('${slot}')">✕</button>`;
+    } else {
+        const dataUrl = await compressImage(file) || await new Promise(r => {
+            const fr = new FileReader(); fr.onload = e => r(e.target.result); fr.readAsDataURL(file);
+        });
+        formPhotos[slot].base64   = dataUrl.split(',')[1];
+        formPhotos[slot].mimeType = 'image/jpeg';
+        renderPhotoPreview(slot, dataUrl);
+    }
     if (slot==='main')      document.getElementById('btn-identify').disabled = false;
     if (slot==='serial')    document.getElementById('btn-ocr').disabled      = false;
     if (slot==='paperwork') document.getElementById('btn-paperwork').disabled = false;
@@ -1186,12 +1219,12 @@ function removePhoto(slot) {
 
 async function callClaude(base64, mimeType, prompt) {
     if (!apiKey) { toast('Set your Anthropic API key in Settings first.','error'); return null; }
+    const mediaBlock = mimeType === 'application/pdf'
+        ? { type:'document', source:{ type:'base64', media_type:'application/pdf', data:base64 } }
+        : { type:'image',    source:{ type:'base64', media_type:mimeType,           data:base64 } };
     const msgPayload = {
         model:'claude-sonnet-4-6', max_tokens:512,
-        messages:[{ role:'user', content:[
-            { type:'image', source:{ type:'base64', media_type:mimeType, data:base64 }},
-            { type:'text', text:prompt }
-        ]}]
+        messages:[{ role:'user', content:[ mediaBlock, { type:'text', text:prompt } ]}]
     };
     let res;
     try {
@@ -1286,6 +1319,107 @@ async function extractSerial() {
 }
 
 // ═══════════════════════════════════════
+//  DOCUMENTATION (multi-file)
+// ═══════════════════════════════════════
+async function addDocFiles(input) {
+    const files = Array.from(input.files);
+    for (const file of files) {
+        const tempId = `doc_${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
+        const entry = { _tempId:tempId, name:file.name.replace(/\.[^.]+$/,''), file, base64:null, mimeType:'', summary:'', existingUrl:null, addedAt:new Date().toISOString(), deleted:false };
+        if (file.type === 'application/pdf') {
+            entry.mimeType = 'application/pdf';
+            entry.base64 = await new Promise(r => { const fr=new FileReader(); fr.onload=e=>r(e.target.result.split(',')[1]); fr.readAsDataURL(file); });
+        } else {
+            entry.mimeType = 'image/jpeg';
+            const dataUrl = await compressImage(file) || await new Promise(r => { const fr=new FileReader(); fr.onload=e=>r(e.target.result); fr.readAsDataURL(file); });
+            entry.base64 = dataUrl.split(',')[1];
+        }
+        formDocs.push(entry);
+    }
+    input.value = '';
+    renderDocsList();
+    document.getElementById('docs-empty').style.display = 'none';
+}
+
+function setDocName(tempId, val) {
+    const d = formDocs.find(d=>d._tempId===tempId);
+    if (d) d.name = val;
+}
+
+function removeDoc(tempId) {
+    const d = formDocs.find(d=>d._tempId===tempId);
+    if (d) d.deleted = true;
+    renderDocsList();
+}
+
+async function summarizeDoc(tempId) {
+    if (!apiKey) { toast('Set your API key in Settings first.', 'error'); return; }
+    const d = formDocs.find(d=>d._tempId===tempId);
+    if (!d) return;
+    const btn = document.getElementById('sum-btn-'+tempId);
+    if (btn) { btn.disabled=true; btn.textContent='⏳ Analyzing…'; }
+    try {
+        let base64 = d.base64, mimeType = d.mimeType;
+        if (!base64 && d.existingUrl) {
+            const resp = await fetch(d.existingUrl);
+            const blob = await resp.blob();
+            mimeType = blob.type || d.mimeType || 'image/jpeg';
+            base64 = await new Promise(r => { const fr=new FileReader(); fr.onload=e=>r(e.target.result.split(',')[1]); fr.readAsDataURL(blob); });
+            d.base64=base64; d.mimeType=mimeType;
+        }
+        const prompt = `This is a document related to farm equipment or machinery. It may be a purchase receipt, warranty card, operator manual, service record, or other documentation.
+Summarize the key details in 2–4 concise sentences. Include: document type, relevant names/parties, dates, item description, prices or serial numbers, and any important notes.
+Return plain text only — no headers, no bullet points.`;
+        const result = await callClaude(base64, mimeType, prompt);
+        if (!result) return;
+        d.summary = result.trim();
+        renderDocsList();
+    } catch(err) {
+        toast('AI summary failed: ' + err.message, 'error');
+        if (btn) { btn.disabled=false; btn.textContent='🤖 Summarize with AI'; }
+    }
+}
+
+async function uploadDoc(file, idx) {
+    const ext = file.name ? file.name.split('.').pop() : (file.type==='application/pdf'?'pdf':'jpg');
+    const path = `machinery_docs/${Date.now()}_doc${idx}.${ext}`;
+    const ref = storage.ref().child(path);
+    await ref.put(file);
+    return await ref.getDownloadURL();
+}
+
+function renderDocsList() {
+    const list  = document.getElementById('docs-list');
+    const empty = document.getElementById('docs-empty');
+    const active = formDocs.filter(d=>!d.deleted);
+    if (!active.length) { list.innerHTML=''; if(empty) empty.style.display=''; return; }
+    if(empty) empty.style.display='none';
+    list.innerHTML = active.map(d => {
+        const previewHtml = d.mimeType==='application/pdf'
+            ? `<span style="font-size:2rem;">📄</span>`
+            : (d.base64
+                ? `<img src="data:image/jpeg;base64,${d.base64}">`
+                : (d.existingUrl
+                    ? `<img src="${d.existingUrl}" onerror="this.parentNode.innerHTML='<span style=font-size:2rem>📷</span>'">`
+                    : `<span style="font-size:2rem;">📷</span>`));
+        const summaryHtml = d.summary ? `<div class="doc-summary-text">${esc(d.summary)}</div>` : '';
+        return `<div class="doc-card">
+            <div class="doc-thumb">${previewHtml}</div>
+            <div class="doc-body">
+                <input type="text" placeholder="Document label (optional)" value="${esc(d.name||'')}"
+                    oninput="setDocName('${d._tempId}',this.value)"
+                    style="width:100%;box-sizing:border-box;margin-bottom:6px;font-size:0.82rem;">
+                ${summaryHtml}
+                <button type="button" class="btn btn-ghost btn-sm" id="sum-btn-${d._tempId}"
+                    onclick="summarizeDoc('${d._tempId}')">🤖 Summarize with AI</button>
+            </div>
+            <button type="button" class="btn btn-danger btn-sm" onclick="removeDoc('${d._tempId}')"
+                style="flex-shrink:0;" title="Remove">✗</button>
+        </div>`;
+    }).join('');
+}
+
+// ═══════════════════════════════════════
 //  FORM
 // ═══════════════════════════════════════
 function populateCatSelect() {
@@ -1350,6 +1484,19 @@ document.getElementById('item-form').addEventListener('submit', async e => {
                 if (existing) photos.push(existing);
             }
         }
+        // Build and upload documents
+        const docsToSave = [];
+        for (let di = 0; di < formDocs.length; di++) {
+            const d = formDocs[di]; if (d.deleted) continue;
+            if (d.file) {
+                try { const url = await uploadDoc(d.file, di); docsToSave.push({ name:d.name||'', url, mimeType:d.mimeType, summary:d.summary||'', addedAt:d.addedAt }); }
+                catch(ue) { toast(`Doc upload failed: ${ue.message}`, 'error'); }
+            } else if (d.existingUrl) {
+                docsToSave.push({ name:d.name||'', url:d.existingUrl, mimeType:d.mimeType||'', summary:d.summary||'', addedAt:d.addedAt||'' });
+            }
+        }
+        data.documents = docsToSave;
+
         if (eid && docId) {
             await dbUpdateItem(docId, data, photos);
             await saveConfig();
@@ -1385,6 +1532,9 @@ function resetForm() {
     document.getElementById('btn-identify').disabled  = true;
     document.getElementById('btn-ocr').disabled       = true;
     document.getElementById('btn-paperwork').disabled = true;
+    // Clear documentation
+    formDocs = [];
+    renderDocsList();
     hoursPhotoData = { base64:null, mimeType:null };
     document.getElementById('file-hours-meter').value = '';
     document.getElementById('btn-read-hours').disabled = true;
@@ -1421,6 +1571,15 @@ function editItem(docId) {
             if (slot==='paperwork') document.getElementById('btn-paperwork').disabled = false;
         }
     }
+    // Load existing documents
+    formDocs = (it.documents||[]).map(d => ({
+        _tempId: `doc_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,
+        name: d.name||'', file:null, base64:null, mimeType:d.mimeType||'',
+        summary: d.summary||'', existingUrl: d.url||null,
+        addedAt: d.addedAt||'', deleted:false
+    }));
+    renderDocsList();
+    document.getElementById('docs-empty').style.display = formDocs.length ? 'none' : '';
     window.scrollTo(0,0);
 }
 

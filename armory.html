@@ -769,10 +769,12 @@
                     <th onclick="sortBy('caliber')">Caliber</th>
                     <th onclick="sortBy('quantity')">Qty</th>
                     <th onclick="sortBy('purchaseDate')">Purchased</th>
+                    <th onclick="sortBy('price')">Purchase Price</th>
                     <th onclick="sortBy('marketValue')">Market Value</th>
                     <th class="no-sort">Actions</th>
                 </tr></thead>
                 <tbody id="inv-tbody"></tbody>
+                <tfoot id="inv-tfoot"></tfoot>
             </table>
         </div>
         <div id="inv-empty" class="empty" style="display:none;">
@@ -2086,13 +2088,13 @@ function renderInventory() {
     const data  = sorted(filteredItems('inv-search','inv-filter-cat'), invSortField, invSortDir);
     document.getElementById('inv-count').textContent = `${data.length} item${data.length!==1?'s':''}`;
     document.querySelectorAll('#inv-table thead th').forEach(th=>th.classList.remove('sort-asc','sort-desc'));
-    // col indices: 0=checkbox, 1=photo, 2=id, 3=category, 4=manufacturer, 5=model, 6=serial, 7=caliber, 8=qty, 9=purchased, 10=marketValue
-    const thIdx = {id:2,category:3,manufacturer:4,model:5,serialNumber:6,caliber:7,quantity:8,purchaseDate:9,marketValue:10};
+    // col indices: 0=checkbox, 1=photo, 2=id, 3=category, 4=manufacturer, 5=model, 6=serial, 7=caliber, 8=qty, 9=purchased, 10=price, 11=marketValue
+    const thIdx = {id:2,category:3,manufacturer:4,model:5,serialNumber:6,caliber:7,quantity:8,purchaseDate:9,price:10,marketValue:11};
     const ti = thIdx[invSortField];
     if (ti!==undefined) document.querySelectorAll('#inv-table thead th')[ti]?.classList.add(invSortDir==='asc'?'sort-asc':'sort-desc');
     const tbody = document.getElementById('inv-tbody');
     const empty = document.getElementById('inv-empty');
-    if (!data.length) { tbody.innerHTML=''; empty.style.display='block'; return; }
+    if (!data.length) { tbody.innerHTML=''; document.getElementById('inv-tfoot').innerHTML=''; empty.style.display='block'; return; }
     empty.style.display='none';
     tbody.innerHTML = data.map(it => {
         const mainUrl = it.photos?.find(p=>p.slot==='main')?.url;
@@ -2124,6 +2126,7 @@ function renderInventory() {
             <td>${esc(it.caliber)||'—'}</td>
             <td style="text-align:center">${it.quantity||1}</td>
             <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():'—'}</td>
+            <td style="white-space:nowrap;">${it.price ? '$'+Number(it.price).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—'}</td>
             <td id="mv-cell-${it._docId}" style="white-space:nowrap;min-width:90px;">${marketValueCell(it)}</td>
             <td style="white-space:nowrap">
                 ${(it.magazines&&it.magazines.length) ? `<span style="display:inline-flex;align-items:center;gap:3px;background:var(--accent-dim);color:var(--accent);padding:2px 7px;border-radius:10px;font-size:0.72rem;font-weight:600;margin-right:4px;" title="${it.magazines.length} magazine${it.magazines.length!==1?'s':''} logged">📦 ${it.magazines.length}</span>` : ''}
@@ -2133,6 +2136,19 @@ function renderInventory() {
                 <button class="btn btn-ghost btn-sm" onclick="editItem('${it._docId}')" title="Edit">✎</button>
                 <button class="btn btn-danger btn-sm" onclick="deleteItem('${it._docId}')" title="Delete">✗</button>
             </td></tr>`;}).join('');
+
+    // ── Totals footer ──
+    const totalPrice = data.reduce((s, it) => s + (Number(it.price)||0), 0);
+    const totalMV    = data.reduce((s, it) => s + (Number(it.marketValue)||0), 0);
+    const priceStr   = totalPrice > 0 ? '$'+totalPrice.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
+    const mvStr      = totalMV   > 0 ? '$'+totalMV.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
+    const colCount   = 13; // checkbox, photo, id, cat, mfr, model, serial, caliber, qty, purchased, price, mv, actions
+    document.getElementById('inv-tfoot').innerHTML = `<tr style="font-weight:700;border-top:2px solid var(--border);background:var(--bg-secondary);">
+        <td colspan="10" style="text-align:right;padding:8px 12px;color:var(--text-secondary);font-size:0.82rem;">TOTALS (${data.length} item${data.length!==1?'s':''})</td>
+        <td style="padding:8px 12px;white-space:nowrap;color:#60a5fa;">${priceStr}</td>
+        <td style="padding:8px 12px;white-space:nowrap;color:#22c55e;">${mvStr}</td>
+        <td></td>
+    </tr>`;
 }
 
 function sortBy(field) {

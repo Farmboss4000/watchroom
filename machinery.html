@@ -926,7 +926,7 @@ const storage = firebase.storage();
 //  STATE
 // ═══════════════════════════════════════
 let items = [];
-let categories = [
+const DEFAULT_CATEGORIES = [
     'Air Seeder','Anhydrous Applicator','ATV',
     'Backhoe',
     'Center Pivot','Chisel Plow','Combine Harvester','Cotton Picker',
@@ -945,6 +945,10 @@ let categories = [
     'UTV / Side-by-Side',
     'Other'
 ];
+function sortCategories(arr) {
+    return arr.slice().sort((a,b) => a==='Other'?1 : b==='Other'?-1 : a.localeCompare(b));
+}
+let categories = sortCategories(DEFAULT_CATEGORIES);
 let makes = [
     'John Deere','Case IH','New Holland','Kubota','Massey Ferguson','AGCO','Fendt','Claas',
     'Deutz-Fahr','Challenger','Versatile','White','Oliver','Allis-Chalmers',
@@ -1025,7 +1029,7 @@ async function initApp() {
         const cfgDoc = await db.collection('machinery_config').doc('data').get();
         if (cfgDoc.exists) {
             const d = cfgDoc.data();
-            if (d.categories && d.categories.length) categories = d.categories;
+            if (d.categories && d.categories.length) categories = sortCategories([...new Set([...DEFAULT_CATEGORIES, ...d.categories])]);
             if (d.makes      && d.makes.length)      makes      = d.makes;
             if (d.nextId)                             nextId     = d.nextId;
         }
@@ -1440,7 +1444,7 @@ function renderDocsList() {
 function populateCatSelect() {
     const dl = document.getElementById('cat-list');
     if (!dl) return;
-    dl.innerHTML = categories.map(c => `<option value="${esc(c)}">`).join('');
+    dl.innerHTML = sortCategories(categories).map(c => `<option value="${esc(c)}">`).join('');
 }
 
 function populateMakeList() {

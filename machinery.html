@@ -481,7 +481,8 @@
             <div class="form-grid">
                 <div class="form-group">
                     <label>Equipment Type *</label>
-                    <select id="f-category" required><option value="">Select type...</option></select>
+                    <input type="text" id="f-category" list="cat-list" placeholder="Type to search..." autocomplete="off" required>
+                    <datalist id="cat-list"></datalist>
                 </div>
                 <div class="form-group">
                     <label>Make</label>
@@ -1425,15 +1426,9 @@ function renderDocsList() {
 //  FORM
 // ═══════════════════════════════════════
 function populateCatSelect() {
-    const sel = document.getElementById('f-category');
-    const cur = sel.value;
-    sel.innerHTML = '<option value="">Select type...</option>';
-    categories.forEach(c => {
-        const o = document.createElement('option');
-        o.value = o.textContent = c;
-        if (c===cur) o.selected = true;
-        sel.appendChild(o);
-    });
+    const dl = document.getElementById('cat-list');
+    if (!dl) return;
+    dl.innerHTML = categories.map(c => `<option value="${esc(c)}">`).join('');
 }
 
 function populateMakeList() {
@@ -1451,8 +1446,11 @@ document.getElementById('item-form').addEventListener('submit', async e => {
     const eid   = document.getElementById('edit-id').value;
     const docId = document.getElementById('edit-doc-id').value;
     const btn   = document.getElementById('form-submit-btn');
+    const catVal = document.getElementById('f-category').value.trim();
+    if (!catVal) { alert('Please select an Equipment Type.'); return; }
+    if (!categories.includes(catVal)) { categories.push(catVal); populateCatSelect(); }
     const data  = {
-        category:     document.getElementById('f-category').value,
+        category:     catVal,
         make:         document.getElementById('f-make').value.trim(),
         model:        document.getElementById('f-model').value.trim(),
         year:         document.getElementById('f-year').value.trim(),

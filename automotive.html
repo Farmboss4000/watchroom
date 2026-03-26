@@ -117,7 +117,7 @@
 
         /* ── STATS ── */
         main { padding:20px; max-width:1400px; margin:0 auto; flex:1; }
-        .stats-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-bottom:20px; }
+        .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; margin-bottom:20px; }
         .stat-card { background:var(--bg-secondary); border:1px solid var(--border); border-radius:10px;
             padding:18px 16px; text-align:center; }
         .stat-value { font-size:2rem; font-weight:800; color:var(--accent); line-height:1; margin-bottom:4px; }
@@ -782,10 +782,12 @@
                     <th onclick="sortBy('location')">Location</th>
                     <th onclick="sortBy('defaultDriver')">Driver</th>
                     <th onclick="sortBy('purchaseDate')">Purchased</th>
+                    <th onclick="sortBy('price')">Purchase Price</th>
                     <th onclick="sortBy('marketValue')">Market Value</th>
                     <th class="no-sort">Actions</th>
                 </tr></thead>
                 <tbody id="inv-tbody"></tbody>
+                <tfoot id="inv-tfoot"></tfoot>
             </table>
         </div>
         <div id="inv-empty" class="empty" style="display:none;">
@@ -1265,11 +1267,17 @@ function renderDashboard() {
         ? '$' + valued.reduce((s,i)=>s+(Number(i.marketValue)||0),0).toLocaleString()
         : '—';
     const valLabel = valued.length ? `Fleet Value <span style="font-size:0.65rem;opacity:0.6;">(${valued.length}/${total} valued)</span>` : 'Fleet Value';
+    const priced = items.filter(i=>i.price && Number(i.price)>0);
+    const totalPurchase = priced.length
+        ? '$' + priced.reduce((s,i)=>s+(Number(i.price)||0),0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})
+        : '—';
+    const priceLabel = priced.length ? `Total Paid <span style="font-size:0.65rem;opacity:0.6;">(${priced.length}/${total})</span>` : 'Total Paid';
     document.getElementById('stats-grid').innerHTML = `
         <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Total Vehicles</div></div>
         <div class="stat-card"><div class="stat-value">${catSet.size}</div><div class="stat-label">Vehicle Types</div></div>
         <div class="stat-card"><div class="stat-value">${recent}</div><div class="stat-label">Added This Month</div></div>
         <div class="stat-card"><div class="stat-value">${avgMi}</div><div class="stat-label">Avg Mileage</div></div>
+        <div class="stat-card" style="border-color:#60a5fa;"><div class="stat-value" style="color:#60a5fa;font-size:1.5rem;">${totalPurchase}</div><div class="stat-label">${priceLabel}</div></div>
         <div class="stat-card" style="border-color:#22c55e;"><div class="stat-value" style="color:#22c55e;">${totalVal}</div><div class="stat-label">${valLabel}</div></div>`;
     const counts = {};
     items.forEach(it => { counts[it.category]=(counts[it.category]||0)+1; });
@@ -2299,12 +2307,12 @@ function renderInventory() {
     const data  = sorted(filteredItems('inv-search','inv-filter-cat'), invSortField, invSortDir);
     document.getElementById('inv-count').textContent = `${data.length} item${data.length!==1?'s':''}`;
     document.querySelectorAll('#inv-table thead th').forEach(th=>th.classList.remove('sort-asc','sort-desc'));
-    const thIdx = {id:1,category:2,make:3,model:4,year:5,serialNumber:6,licensePlate:7,mileage:8,condition:9,location:10,defaultDriver:11,purchaseDate:12,marketValue:13};
+    const thIdx = {id:1,category:2,make:3,model:4,year:5,serialNumber:6,licensePlate:7,mileage:8,condition:9,location:10,defaultDriver:11,purchaseDate:12,price:13,marketValue:14};
     const ti = thIdx[invSortField];
     if (ti!==undefined) document.querySelectorAll('#inv-table thead th')[ti]?.classList.add(invSortDir==='asc'?'sort-asc':'sort-desc');
     const tbody = document.getElementById('inv-tbody');
     const empty = document.getElementById('inv-empty');
-    if (!data.length) { tbody.innerHTML=''; empty.style.display='block'; return; }
+    if (!data.length) { tbody.innerHTML=''; document.getElementById('inv-tfoot').innerHTML=''; empty.style.display='block'; return; }
     empty.style.display='none';
     tbody.innerHTML = data.map(it => {
         const mainUrl = it.photos?.find(p=>p.slot==='main')?.url;
@@ -2344,6 +2352,7 @@ function renderInventory() {
             <td style="font-size:0.82rem">${esc(it.location)||'—'}</td>
             <td>${it.defaultDriver ? `<span style="display:inline-flex;align-items:center;gap:5px;background:var(--accent-dim);color:var(--accent);padding:2px 9px;border-radius:12px;font-size:0.78rem;font-weight:600;">👤 ${esc(it.defaultDriver)}</span>` : '<span style="color:var(--text-secondary);font-size:0.8rem;">—</span>'}</td>
             <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():'—'}</td>
+            <td style="white-space:nowrap;">${it.price ? '$'+Number(it.price).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—'}</td>
             <td style="white-space:nowrap;min-width:120px;" id="mv-cell-${it._docId}">
                 ${marketValueCell(it)}
             </td>
@@ -2353,6 +2362,18 @@ function renderInventory() {
                 <button class="btn btn-ghost btn-sm" onclick="editItem('${it._docId}')" title="Edit">✎</button>
                 <button class="btn btn-danger btn-sm" onclick="deleteItem('${it._docId}')" title="Delete">✗</button>
             </td></tr>`;}).join('');
+
+    // ── Totals footer ──
+    const totalPrice = data.reduce((s,it) => s + (Number(it.price)||0), 0);
+    const totalMV    = data.reduce((s,it) => s + (Number(it.marketValue)||0), 0);
+    const priceStr   = totalPrice > 0 ? '$'+totalPrice.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
+    const mvStr      = totalMV   > 0 ? '$'+totalMV.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
+    document.getElementById('inv-tfoot').innerHTML = `<tr style="font-weight:700;border-top:2px solid var(--border);background:var(--bg-secondary);">
+        <td colspan="12" style="text-align:right;padding:8px 12px;color:var(--text-secondary);font-size:0.82rem;">TOTALS (${data.length} vehicle${data.length!==1?'s':''})</td>
+        <td style="padding:8px 12px;white-space:nowrap;color:#60a5fa;">${priceStr}</td>
+        <td style="padding:8px 12px;white-space:nowrap;color:#22c55e;">${mvStr}</td>
+        <td></td>
+    </tr>`;
 }
 
 function sortBy(field) {

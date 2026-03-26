@@ -782,6 +782,7 @@
                     <th onclick="sortBy('location')">Location</th>
                     <th onclick="sortBy('defaultDriver')">Driver</th>
                     <th onclick="sortBy('purchaseDate')">Purchased</th>
+                    <th onclick="sortBy('vendor')">Source</th>
                     <th onclick="sortBy('price')">Purchase Price</th>
                     <th onclick="sortBy('marketValue')">Market Value</th>
                     <th class="no-sort">Actions</th>
@@ -2307,7 +2308,7 @@ function renderInventory() {
     const data  = sorted(filteredItems('inv-search','inv-filter-cat'), invSortField, invSortDir);
     document.getElementById('inv-count').textContent = `${data.length} item${data.length!==1?'s':''}`;
     document.querySelectorAll('#inv-table thead th').forEach(th=>th.classList.remove('sort-asc','sort-desc'));
-    const thIdx = {id:1,category:2,make:3,model:4,year:5,serialNumber:6,licensePlate:7,mileage:8,condition:9,location:10,defaultDriver:11,purchaseDate:12,price:13,marketValue:14};
+    const thIdx = {id:1,category:2,make:3,model:4,year:5,serialNumber:6,licensePlate:7,mileage:8,condition:9,location:10,defaultDriver:11,purchaseDate:12,vendor:13,price:14,marketValue:15};
     const ti = thIdx[invSortField];
     if (ti!==undefined) document.querySelectorAll('#inv-table thead th')[ti]?.classList.add(invSortDir==='asc'?'sort-asc':'sort-desc');
     const tbody = document.getElementById('inv-tbody');
@@ -2352,6 +2353,7 @@ function renderInventory() {
             <td style="font-size:0.82rem">${esc(it.location)||'—'}</td>
             <td>${it.defaultDriver ? `<span style="display:inline-flex;align-items:center;gap:5px;background:var(--accent-dim);color:var(--accent);padding:2px 9px;border-radius:12px;font-size:0.78rem;font-weight:600;">👤 ${esc(it.defaultDriver)}</span>` : '<span style="color:var(--text-secondary);font-size:0.8rem;">—</span>'}</td>
             <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():'—'}</td>
+            <td style="font-size:0.82rem;">${esc(it.vendor)||'—'}</td>
             <td style="white-space:nowrap;">${it.price ? '$'+Number(it.price).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—'}</td>
             <td style="white-space:nowrap;min-width:120px;" id="mv-cell-${it._docId}">
                 ${marketValueCell(it)}
@@ -2369,7 +2371,7 @@ function renderInventory() {
     const priceStr   = totalPrice > 0 ? '$'+totalPrice.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
     const mvStr      = totalMV   > 0 ? '$'+totalMV.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
     document.getElementById('inv-tfoot').innerHTML = `<tr style="font-weight:700;border-top:2px solid var(--border);background:var(--bg-secondary);">
-        <td colspan="12" style="text-align:right;padding:8px 12px;color:var(--text-secondary);font-size:0.82rem;">TOTALS (${data.length} vehicle${data.length!==1?'s':''})</td>
+        <td colspan="13" style="text-align:right;padding:8px 12px;color:var(--text-secondary);font-size:0.82rem;">TOTALS (${data.length} vehicle${data.length!==1?'s':''})</td>
         <td style="padding:8px 12px;white-space:nowrap;color:#60a5fa;">${priceStr}</td>
         <td style="padding:8px 12px;white-space:nowrap;color:#22c55e;">${mvStr}</td>
         <td></td>

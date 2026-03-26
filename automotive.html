@@ -165,7 +165,7 @@
         .field-with-btn input { flex:1; }
 
         /* ── PHOTOS ── */
-        .photo-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+        .photo-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:16px; }
         .photo-slot { display:flex; flex-direction:column; gap:6px; }
         .photo-slot-label { font-size:0.78rem; font-weight:600; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.4px; }
         .photo-preview { width:100%; aspect-ratio:4/3; border:2px dashed var(--border); border-radius:8px;
@@ -551,7 +551,37 @@
                 </div>
                 <div class="form-group">
                     <label>License Plate</label>
-                    <input type="text" id="f-license" placeholder="e.g. ABC-1234">
+                    <div style="display:flex;gap:6px;align-items:center;">
+                        <input type="text" id="f-license" placeholder="e.g. ABC-1234" style="flex:1;min-width:0;text-transform:uppercase;">
+                        <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('file-plate').click()" style="white-space:nowrap;flex-shrink:0;" title="Scan plate with AI">📷 Scan</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Tabs Expiration</label>
+                    <div style="display:flex;gap:6px;">
+                        <select id="f-tabs-month" style="flex:1;">
+                            <option value="">Month</option>
+                            <option value="01">January (01)</option>
+                            <option value="02">February (02)</option>
+                            <option value="03">March (03)</option>
+                            <option value="04">April (04)</option>
+                            <option value="05">May (05)</option>
+                            <option value="06">June (06)</option>
+                            <option value="07">July (07)</option>
+                            <option value="08">August (08)</option>
+                            <option value="09">September (09)</option>
+                            <option value="10">October (10)</option>
+                            <option value="11">November (11)</option>
+                            <option value="12">December (12)</option>
+                        </select>
+                        <select id="f-tabs-year" style="flex:0 0 90px;">
+                            <option value="">Year</option>
+                            <option>2024</option><option>2025</option><option>2026</option>
+                            <option>2027</option><option>2028</option><option>2029</option>
+                            <option>2030</option><option>2031</option><option>2032</option>
+                            <option>2033</option><option>2034</option><option>2035</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Color</label>
@@ -657,6 +687,18 @@
                             <input type="file" id="file-extra" accept="image/*" onchange="onPhotoSelected('extra',this)">
                         </div>
                     </div>
+                    <!-- LICENSE PLATE PHOTO -->
+                    <div class="photo-slot">
+                        <div class="photo-slot-label">🔖 License Plate Photo</div>
+                        <div class="photo-preview" id="prev-plate">
+                            <span class="no-photo">🔖</span>
+                            <button type="button" class="remove-photo" onclick="removePhoto('plate')">✕</button>
+                        </div>
+                        <div class="photo-file-input">
+                            <input type="file" id="file-plate" accept="image/*" onchange="onPhotoSelected('plate',this)">
+                        </div>
+                        <button type="button" class="btn-ai" id="btn-plate-ocr" onclick="extractLicensePlate()" disabled>🔍 Read Plate with AI</button>
+                    </div>
                 </div>
                 <p id="ai-status" style="font-size:0.82rem;color:var(--text-secondary);margin-top:10px;min-height:18px;"></p>
             </div>
@@ -704,6 +746,7 @@
                     <th onclick="sortBy('model')">Model</th>
                     <th onclick="sortBy('year')">Year</th>
                     <th onclick="sortBy('serialNumber')">VIN</th>
+                    <th onclick="sortBy('licensePlate')">Plate / Tabs</th>
                     <th onclick="sortBy('mileage')">Mileage</th>
                     <th onclick="sortBy('condition')">Condition</th>
                     <th onclick="sortBy('location')">Location</th>
@@ -763,6 +806,7 @@
                 <th onclick="rptSortBy('year')">Year</th>
                 <th onclick="rptSortBy('serialNumber')">VIN</th>
                 <th onclick="rptSortBy('licensePlate')">License Plate</th>
+                <th onclick="rptSortBy('tabsExpiration')">Tabs Exp.</th>
                 <th onclick="rptSortBy('mileage')">Mileage</th>
                 <th onclick="rptSortBy('condition')">Condition</th>
                 <th onclick="rptSortBy('purchaseDate')">Purchased</th>
@@ -1039,7 +1083,8 @@ let currentMaintDocId = null;
 let formPhotos = {
     main:   { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false },
     serial: { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false },
-    extra:  { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false }
+    extra:  { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false },
+    plate:  { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false }
 };
 
 const VIEWS = ['dashboard','add-item','inventory','reports','categories','settings','recycle-bin'];
@@ -1268,8 +1313,9 @@ async function onPhotoSelected(slot, input) {
     formPhotos[slot].base64   = dataUrl.split(',')[1];
     formPhotos[slot].mimeType = 'image/jpeg';
     renderPhotoPreview(slot, dataUrl);
-    if (slot==='main')   document.getElementById('btn-identify').disabled = false;
-    if (slot==='serial') document.getElementById('btn-ocr').disabled      = false;
+    if (slot==='main')   document.getElementById('btn-identify').disabled  = false;
+    if (slot==='serial') document.getElementById('btn-ocr').disabled       = false;
+    if (slot==='plate')  document.getElementById('btn-plate-ocr').disabled = false;
 }
 
 function renderPhotoPreview(slot, dataUrl) {
@@ -1279,12 +1325,13 @@ function renderPhotoPreview(slot, dataUrl) {
 
 function removePhoto(slot) {
     formPhotos[slot] = { file:null, base64:null, mimeType:null, existingUrl:null, deleted:true };
-    const icons = { main:'📷', serial:'📋', extra:'🖼' };
+    const icons = { main:'📷', serial:'📋', extra:'🖼', plate:'🔖' };
     document.getElementById('prev-'+slot).innerHTML =
-        `<span class="no-photo">${icons[slot]}</span><button type="button" class="remove-photo" onclick="removePhoto('${slot}')">✕</button>`;
+        `<span class="no-photo">${icons[slot]||'📷'}</span><button type="button" class="remove-photo" onclick="removePhoto('${slot}')">✕</button>`;
     document.getElementById('file-'+slot).value = '';
-    if (slot==='main')   document.getElementById('btn-identify').disabled = true;
-    if (slot==='serial') document.getElementById('btn-ocr').disabled      = true;
+    if (slot==='main')   document.getElementById('btn-identify').disabled  = true;
+    if (slot==='serial') document.getElementById('btn-ocr').disabled       = true;
+    if (slot==='plate')  document.getElementById('btn-plate-ocr').disabled = true;
 }
 
 async function callClaude(base64, mimeType, prompt) {
@@ -1385,6 +1432,54 @@ async function extractVIN() {
     } finally {
         btn.disabled = false; btn.classList.remove('scanning');
         btn.innerHTML = '🔍 Extract VIN with AI';
+    }
+}
+
+async function extractLicensePlate() {
+    const p = formPhotos.plate; if (!p.base64) return;
+    const btn    = document.getElementById('btn-plate-ocr');
+    const status = document.getElementById('ai-status');
+    btn.disabled = true; btn.classList.add('scanning'); btn.textContent = '⏳ Reading...';
+    status.textContent = 'Reading license plate...';
+    try {
+        const prompt = `This is a photo of a vehicle license plate. Extract:
+1. The license plate number (alphanumeric characters exactly as displayed).
+2. The registration tab sticker — the small colored sticker on a corner of the plate showing the expiration month and year.
+
+Return ONLY valid JSON in this exact format:
+{"plate": "ABC1234", "tabMonth": "03", "tabYear": "2026"}
+
+Rules: plate is uppercase no spaces; tabMonth is two-digit "01"–"12"; tabYear is four-digit.
+Omit any field that is not clearly readable. Return only the JSON object, no other text.`;
+
+        const result = await callClaude(p.base64, p.mimeType, prompt);
+        if (!result) return;
+        const jsonMatch = result.match(/\{[\s\S]*?\}/);
+        if (!jsonMatch) throw new Error('Could not parse AI response');
+        const data = JSON.parse(jsonMatch[0]);
+        const filled = [];
+        if (data.plate) {
+            document.getElementById('f-license').value = data.plate.toUpperCase().replace(/[^A-Z0-9]/g,'');
+            filled.push('Plate #');
+        }
+        if (data.tabMonth) {
+            document.getElementById('f-tabs-month').value = data.tabMonth.padStart(2,'0');
+            filled.push('Tab month');
+        }
+        if (data.tabYear) {
+            document.getElementById('f-tabs-year').value = data.tabYear;
+            filled.push('Tab year');
+        }
+        status.textContent = filled.length
+            ? `✅ AI read: ${filled.join(', ')}. Review and adjust if needed.`
+            : '⚠️ Could not read plate details clearly — fill in manually.';
+        status.style.color = filled.length ? 'var(--success)' : 'var(--text-secondary)';
+    } catch(err) {
+        status.textContent = '❌ Error: ' + err.message;
+        status.style.color  = 'var(--danger)';
+    } finally {
+        btn.disabled = false; btn.classList.remove('scanning');
+        btn.innerHTML = '🔍 Read Plate with AI';
     }
 }
 
@@ -1824,8 +1919,9 @@ document.getElementById('item-form').addEventListener('submit', async e => {
         model:        document.getElementById('f-model').value.trim(),
         year:         document.getElementById('f-year').value.trim(),
         serialNumber: document.getElementById('f-serial').value.trim(),
-        licensePlate: document.getElementById('f-license').value.trim(),
-        color:        document.getElementById('f-color').value.trim(),
+        licensePlate:    document.getElementById('f-license').value.trim().toUpperCase(),
+        tabsExpiration:  (() => { const m=document.getElementById('f-tabs-month').value, y=document.getElementById('f-tabs-year').value; return (m&&y)?m+'/'+y:''; })(),
+        color:           document.getElementById('f-color').value.trim(),
         engine:       document.getElementById('f-engine').value.trim(),
         transmission: document.getElementById('f-transmission').value,
         mileage:      document.getElementById('f-mileage').value.trim(),
@@ -1841,7 +1937,7 @@ document.getElementById('item-form').addEventListener('submit', async e => {
         addMakeIfNew(data.make);
         const existingPhotos = docId ? (items.find(i=>i._docId===docId)?.photos||[]) : [];
         const photos = [];
-        for (const slot of ['main','serial','extra']) {
+        for (const slot of ['main','serial','extra','plate']) {
             const p = formPhotos[slot];
             if (p.file) {
                 try {
@@ -1886,12 +1982,15 @@ function resetForm() {
     document.getElementById('form-submit-btn').disabled    = false;
     document.getElementById('ai-status').textContent   = '';
     populateCatSelect(); populateMakeList(); populateDriverList();
-    for (const slot of ['main','serial','extra']) {
+    document.getElementById('f-tabs-month').value = '';
+    document.getElementById('f-tabs-year').value  = '';
+    for (const slot of ['main','serial','extra','plate']) {
         formPhotos[slot] = { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false };
     }
-    removePhoto('main'); removePhoto('serial'); removePhoto('extra');
-    document.getElementById('btn-identify').disabled = true;
-    document.getElementById('btn-ocr').disabled      = true;
+    removePhoto('main'); removePhoto('serial'); removePhoto('extra'); removePhoto('plate');
+    document.getElementById('btn-identify').disabled  = true;
+    document.getElementById('btn-ocr').disabled       = true;
+    document.getElementById('btn-plate-ocr').disabled = true;
 }
 
 function editItem(docId) {
@@ -1906,6 +2005,11 @@ function editItem(docId) {
     document.getElementById('f-year').value            = it.year||'';
     document.getElementById('f-serial').value          = it.serialNumber||'';
     document.getElementById('f-license').value         = it.licensePlate||'';
+    if (it.tabsExpiration) {
+        const [m,y] = it.tabsExpiration.split('/');
+        document.getElementById('f-tabs-month').value = m||'';
+        document.getElementById('f-tabs-year').value  = y||'';
+    }
     document.getElementById('f-color').value           = it.color||'';
     document.getElementById('f-engine').value          = it.engine||'';
     document.getElementById('f-transmission').value    = it.transmission||'';
@@ -1918,14 +2022,15 @@ function editItem(docId) {
     document.getElementById('f-notes').value           = it.notes||'';
     document.getElementById('form-title').textContent      = `✏️ Edit Vehicle #${it.id}`;
     document.getElementById('form-submit-btn').textContent = 'Update Vehicle';
-    for (const slot of ['main','serial','extra']) {
+    for (const slot of ['main','serial','extra','plate']) {
         const ph = it.photos?.find(p=>p.slot===slot);
         if (ph) {
             formPhotos[slot] = { file:null, base64:null, mimeType:null, existingUrl:ph.url, deleted:false };
             document.getElementById('prev-'+slot).innerHTML =
                 `<img src="${ph.url}" alt="${slot}"><button type="button" class="remove-photo" onclick="removePhoto('${slot}')">✕</button>`;
-            if (slot==='main')   document.getElementById('btn-identify').disabled = false;
-            if (slot==='serial') document.getElementById('btn-ocr').disabled      = false;
+            if (slot==='main')   document.getElementById('btn-identify').disabled  = false;
+            if (slot==='serial') document.getElementById('btn-ocr').disabled       = false;
+            if (slot==='plate')  document.getElementById('btn-plate-ocr').disabled = false;
         }
     }
     window.scrollTo(0,0);
@@ -1987,7 +2092,7 @@ function filteredItems(searchId, catId) {
         const mco = !cond   || it.condition===cond;
         const mdr = !driver || it.defaultDriver===driver;
         const ms  = !q      || [it.id?.toString(),it.category,it.make,it.model,it.year,
-            it.serialNumber,it.licensePlate,it.color,it.condition,it.location,it.defaultDriver,it.notes].some(v=>v?.toString().toLowerCase().includes(q));
+            it.serialNumber,it.licensePlate,it.tabsExpiration,it.color,it.condition,it.location,it.defaultDriver,it.notes].some(v=>v?.toString().toLowerCase().includes(q));
         return mc && mco && mdr && ms;
     });
 }
@@ -2007,7 +2112,7 @@ function renderInventory() {
     const data  = sorted(filteredItems('inv-search','inv-filter-cat'), invSortField, invSortDir);
     document.getElementById('inv-count').textContent = `${data.length} item${data.length!==1?'s':''}`;
     document.querySelectorAll('#inv-table thead th').forEach(th=>th.classList.remove('sort-asc','sort-desc'));
-    const thIdx = {id:1,category:2,make:3,model:4,year:5,serialNumber:6,mileage:7,condition:8,location:9,defaultDriver:10,purchaseDate:11};
+    const thIdx = {id:1,category:2,make:3,model:4,year:5,serialNumber:6,licensePlate:7,mileage:8,condition:9,location:10,defaultDriver:11,purchaseDate:12,marketValue:13};
     const ti = thIdx[invSortField];
     if (ti!==undefined) document.querySelectorAll('#inv-table thead th')[ti]?.classList.add(invSortDir==='asc'?'sort-asc':'sort-desc');
     const tbody = document.getElementById('inv-tbody');
@@ -2029,6 +2134,24 @@ function renderInventory() {
             <td>${esc(it.model)||'—'}</td>
             <td>${it.year||'—'}</td>
             <td class="mono" style="font-size:0.75rem;">${esc(it.serialNumber)||'—'}</td>
+            <td style="white-space:nowrap;">${(() => {
+                const plate = esc(it.licensePlate)||'';
+                if (!plate && !it.tabsExpiration) return '—';
+                let html = plate ? `<div style="font-weight:600;letter-spacing:1px;">${plate}</div>` : '';
+                if (it.tabsExpiration) {
+                    const [m,y] = it.tabsExpiration.split('/');
+                    const expDate = new Date(parseInt(y), parseInt(m)-1, 1);
+                    const now = new Date(); now.setDate(1);
+                    const diffMs = expDate - now;
+                    const diffDays = Math.round(diffMs / 86400000);
+                    const isExp  = diffDays < 0;
+                    const isSoon = !isExp && diffDays <= 60;
+                    const color  = isExp ? '#dc2626' : isSoon ? '#f59e0b' : 'var(--text-secondary)';
+                    const label  = isExp ? '⚠ EXPIRED' : isSoon ? '⚠ Exp soon' : '';
+                    html += `<div style="font-size:0.7rem;color:${color};">${label ? label+' · ' : ''}Tabs: ${it.tabsExpiration}</div>`;
+                }
+                return html;
+            })()}</td>
             <td>${it.mileage ? Number(it.mileage).toLocaleString()+' mi' : '—'}</td>
             <td>${condBadge}</td>
             <td style="font-size:0.82rem">${esc(it.location)||'—'}</td>
@@ -2071,6 +2194,12 @@ function renderReport() {
             <td>${it.year||'—'}</td>
             <td class="mono" style="font-size:0.75rem;">${esc(it.serialNumber)||'—'}</td>
             <td>${esc(it.licensePlate)||'—'}</td>
+            <td>${it.tabsExpiration ? (() => {
+                const [m,y] = it.tabsExpiration.split('/');
+                const diffDays = Math.round((new Date(parseInt(y),parseInt(m)-1,1) - new Date()) / 86400000);
+                const color = diffDays < 0 ? '#dc2626' : diffDays <= 60 ? '#f59e0b' : 'inherit';
+                return `<span style="color:${color};font-weight:${diffDays<=60?'700':'400'};">${it.tabsExpiration}${diffDays<0?' ⚠':diffDays<=60?' ⏰':''}</span>`;
+            })() : '—'}</td>
             <td>${it.mileage ? Number(it.mileage).toLocaleString()+' mi' : '—'}</td>
             <td>${it.condition||'—'}</td>
             <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():'—'}</td>
@@ -2079,7 +2208,7 @@ function renderReport() {
             <td style="font-size:0.82rem">${esc(it.location)||'—'}</td>
             <td style="color:var(--text-secondary);font-size:0.82rem">${esc(it.notes)||'—'}</td>
           </tr>`).join('')
-        :'<tr><td colspan="14" style="text-align:center;color:var(--text-secondary);padding:30px">No items match filters.</td></tr>';
+        :'<tr><td colspan="15" style="text-align:center;color:var(--text-secondary);padding:30px">No items match filters.</td></tr>';
 }
 function printReport() {
     const field=document.getElementById('rpt-sort-field').value, dir=document.getElementById('rpt-sort-dir').value;
@@ -2091,10 +2220,11 @@ function printReport() {
         <h2>Farmboss Automotive — Inventory Report</h2>
         <p>Generated: ${new Date().toLocaleString()} | Items: ${data.length}</p>
         <table><thead><tr><th>ID</th><th>Type</th><th>Make</th><th>Model</th><th>Year</th>
-        <th>VIN</th><th>License Plate</th><th>Mileage</th><th>Condition</th><th>Purchased</th><th>Price</th><th>Market Value</th><th>Location</th><th>Notes</th>
+        <th>VIN</th><th>License Plate</th><th>Tabs Exp.</th><th>Mileage</th><th>Condition</th><th>Purchased</th><th>Price</th><th>Market Value</th><th>Location</th><th>Notes</th>
         </tr></thead><tbody>${data.map(it=>`<tr>
             <td>#${it.id}</td><td>${it.category||''}</td><td>${it.make||''}</td><td>${it.model||''}</td>
             <td>${it.year||''}</td><td>${it.serialNumber||''}</td><td>${it.licensePlate||''}</td>
+            <td>${it.tabsExpiration||''}</td>
             <td>${it.mileage ? Number(it.mileage).toLocaleString()+' mi' : ''}</td>
             <td>${it.condition||''}</td>
             <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():''}</td>
@@ -2231,8 +2361,8 @@ function printBarcode() {
 //  CSV EXPORT
 // ═══════════════════════════════════════
 function exportCSV() {
-    const hdrs=['ID','Type','Make','Model','Year','VIN','License Plate','Color','Engine','Transmission','Mileage','Condition','Purchase Date','Price','Location','Notes','Date Added'];
-    const rows=items.map(it=>[it.id,it.category,it.make,it.model,it.year,it.serialNumber,it.licensePlate,it.color,it.engine,it.transmission,it.mileage,it.condition,it.purchaseDate,it.price,it.location,it.notes,
+    const hdrs=['ID','Type','Make','Model','Year','VIN','License Plate','Tabs Expiration','Color','Engine','Transmission','Mileage','Condition','Purchase Date','Price','Location','Notes','Date Added'];
+    const rows=items.map(it=>[it.id,it.category,it.make,it.model,it.year,it.serialNumber,it.licensePlate,it.tabsExpiration||'',it.color,it.engine,it.transmission,it.mileage,it.condition,it.purchaseDate,it.price,it.location,it.notes,
         it.addedAt?new Date(it.addedAt).toLocaleDateString():''].map(v=>`"${String(v??'').replace(/"/g,'""')}"`));
     const csv=[hdrs.join(','),...rows.map(r=>r.join(','))].join('\n');
     const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(new Blob([csv],{type:'text/csv'})),download:`farmboss-automotive-${new Date().toISOString().slice(0,10)}.csv`});

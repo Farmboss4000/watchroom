@@ -565,7 +565,7 @@
             <div class="form-grid">
                 <div class="form-group">
                     <label>Category *</label>
-                    <select id="f-category" required><option value="">Select category...</option></select>
+                    <select id="f-category" required onchange="updateMagSection()" ><option value="">Select category...</option></select>
                 </div>
                 <div class="form-group">
                     <label>Manufacturer</label>
@@ -601,6 +601,19 @@
                     <label>Notes</label>
                     <textarea id="f-notes" rows="3" placeholder="Condition, accessories, storage location, modifications..."></textarea>
                 </div>
+            </div>
+
+            <!-- ══ MAGAZINES ══ -->
+            <div id="mag-section" style="display:none;margin-top:22px;padding-top:18px;border-top:1px solid var(--border);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+                    <div>
+                        <span style="font-size:0.85rem;font-weight:600;color:var(--text-primary);">📦 Magazines</span>
+                        <span style="font-size:0.75rem;font-weight:400;color:var(--text-secondary);margin-left:8px;">Each magazine gets its own scannable barcode</span>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="addMagazine()">+ Add Magazine</button>
+                </div>
+                <div id="mag-list"></div>
+                <div id="mag-empty" style="font-size:0.8rem;color:var(--text-secondary);padding:10px 0;display:none;">No magazines logged yet. Click + Add Magazine to start.</div>
             </div>
 
             <!-- PHOTOS & AI -->
@@ -976,15 +989,20 @@ service cloud.firestore {
 
 <!-- ══ BARCODE MODAL ══ -->
 <div class="modal-overlay" id="barcode-modal">
-    <div class="modal" style="max-width:560px;">
+    <div class="modal" style="max-width:580px;max-height:90vh;overflow-y:auto;">
         <div class="modal-title" id="bc-title">Item Barcode</div>
         <div class="modal-sub" id="bc-sub"></div>
         <div id="bc-photos" class="photo-modal-imgs"></div>
         <svg id="bc-svg"></svg>
         <div id="bc-item-name" style="font-size:0.88rem;font-weight:600;text-align:center;margin-top:6px;color:var(--text-primary);"></div>
         <div class="modal-sub" id="bc-code" style="margin-top:4px;font-family:monospace;font-size:0.85rem;text-align:center;"></div>
+        <!-- Magazine barcodes -->
+        <div id="bc-magazines" style="display:none;margin-top:18px;padding-top:14px;border-top:1px solid var(--border);width:100%;text-align:left;">
+            <div style="font-size:0.78rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">📦 Magazine Barcodes</div>
+            <div id="bc-mag-list"></div>
+        </div>
         <div class="modal-actions">
-            <button class="btn btn-gold" onclick="printBarcode()">🖨 Print Label</button>
+            <button class="btn btn-gold" onclick="printBarcode()">🖨 Print Firearm Label</button>
             <button class="btn btn-dark" onclick="closeModal()">Close</button>
         </div>
     </div>
@@ -1120,6 +1138,7 @@ let nextId       = 1001;
 let invSortField = 'id';
 let invSortDir   = 'asc';
 let activeBcId   = null;
+let formMagazines = [];  // magazines being edited in the current form
 let unsubItems   = null;
 let apiKey       = '';
 let proxyUrl     = '';
@@ -1535,6 +1554,65 @@ Return plain text only, no headers or bullet points.`;
 }
 
 // ═══════════════════════════════════════
+//  MAGAZINES
+// ═══════════════════════════════════════
+const MAG_CATS = new Set(['Pistol','Rifle','Revolver','Shotgun']);
+
+function updateMagSection() {
+    const cat = document.getElementById('f-category').value;
+    document.getElementById('mag-section').style.display = MAG_CATS.has(cat) ? '' : 'none';
+}
+
+function addMagazine() {
+    formMagazines.push({ name:'', capacity:null, notes:'' });
+    renderMagazineForm();
+}
+
+function removeMagazine(idx) {
+    formMagazines.splice(idx, 1);
+    renderMagazineForm();
+}
+
+function renderMagazineForm() {
+    const list  = document.getElementById('mag-list');
+    const empty = document.getElementById('mag-empty');
+    if (!formMagazines.length) {
+        list.innerHTML = '';
+        empty.style.display = '';
+        return;
+    }
+    empty.style.display = 'none';
+    list.innerHTML = formMagazines.map((mag, i) => `
+        <div style="display:grid;grid-template-columns:1fr 90px 1fr auto;gap:8px;align-items:center;
+                    margin-bottom:8px;padding:10px 12px;background:var(--bg-secondary);
+                    border-radius:8px;border:1px solid var(--border);">
+            <div>
+                <div style="font-size:0.7rem;color:var(--text-secondary);margin-bottom:3px;">Name / Description</div>
+                <input type="text" placeholder="e.g. Magpul PMAG 30, Glock OEM, Hexmag…"
+                    value="${esc(mag.name||'')}"
+                    oninput="formMagazines[${i}].name=this.value"
+                    style="width:100%;box-sizing:border-box;">
+            </div>
+            <div>
+                <div style="font-size:0.7rem;color:var(--text-secondary);margin-bottom:3px;">Capacity</div>
+                <input type="number" placeholder="rds" min="1" max="999"
+                    value="${mag.capacity||''}"
+                    oninput="formMagazines[${i}].capacity=parseInt(this.value)||null"
+                    style="width:100%;box-sizing:border-box;text-align:center;">
+            </div>
+            <div>
+                <div style="font-size:0.7rem;color:var(--text-secondary);margin-bottom:3px;">Notes (optional)</div>
+                <input type="text" placeholder="Color, condition, marking…"
+                    value="${esc(mag.notes||'')}"
+                    oninput="formMagazines[${i}].notes=this.value"
+                    style="width:100%;box-sizing:border-box;">
+            </div>
+            <button type="button" class="btn btn-danger btn-sm" onclick="removeMagazine(${i})"
+                    style="margin-top:16px;" title="Remove magazine">✗</button>
+        </div>`).join('');
+}
+
+// ═══════════════════════════════════════
 //  FORM
 // ═══════════════════════════════════════
 function populateCatSelect() {
@@ -1579,6 +1657,7 @@ document.getElementById('item-form').addEventListener('submit', async e => {
         purchaseDate: document.getElementById('f-purchase-date').value,
         quantity:     document.getElementById('f-quantity').value.trim() || '1',
         notes:        document.getElementById('f-notes').value.trim(),
+        magazines:    formMagazines.filter(m => m.capacity || m.name).map((m,i) => ({ id:i+1, name:m.name||'', capacity:m.capacity||null, notes:m.notes||'' })),
     };
     btn.disabled = true; btn.textContent = 'Saving...';
     try {
@@ -1638,6 +1717,11 @@ function resetForm() {
     document.getElementById('btn-identify').disabled  = true;
     document.getElementById('btn-ocr').disabled       = true;
     document.getElementById('btn-paperwork').disabled = true;
+    // Clear magazines
+    formMagazines = [];
+    renderMagazineForm();
+    document.getElementById('mag-section').style.display = 'none';
+    document.getElementById('mag-empty').style.display = 'none';
 }
 
 function editItem(docId) {
@@ -1657,6 +1741,14 @@ function editItem(docId) {
     document.getElementById('f-notes').value              = it.notes||'';
     document.getElementById('form-title').textContent         = `✏️ Edit Item #${it.id}`;
     document.getElementById('form-submit-btn').textContent    = 'Update Item';
+    // Load magazines
+    formMagazines = (it.magazines || []).map(m => ({ name:m.name||'', capacity:m.capacity||null, notes:m.notes||'' }));
+    if (MAG_CATS.has(it.category)) {
+        document.getElementById('mag-section').style.display = '';
+        renderMagazineForm();
+        if (formMagazines.length) document.getElementById('mag-empty').style.display = 'none';
+        else document.getElementById('mag-empty').style.display = '';
+    }
     for (const slot of ['main','serial','extra','paperwork']) {
         const ph = it.photos?.find(p=>p.slot===slot);
         if (ph) {
@@ -1768,6 +1860,7 @@ function renderInventory() {
             <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():'—'}</td>
             <td id="mv-cell-${it._docId}" style="white-space:nowrap;min-width:90px;">${marketValueCell(it)}</td>
             <td style="white-space:nowrap">
+                ${(it.magazines&&it.magazines.length) ? `<span style="display:inline-flex;align-items:center;gap:3px;background:var(--accent-dim);color:var(--accent);padding:2px 7px;border-radius:10px;font-size:0.72rem;font-weight:600;margin-right:4px;" title="${it.magazines.length} magazine${it.magazines.length!==1?'s':''} logged">📦 ${it.magazines.length}</span>` : ''}
                 <button class="btn btn-info btn-sm" onclick="showBarcode('${it._docId}')" title="Barcode/Photos">▣</button>
                 <button class="btn btn-ghost btn-sm" onclick="openMaintenance('${it._docId}')" title="Maintenance Log">🔧</button>
                 <button class="btn btn-ghost btn-sm" onclick="editItem('${it._docId}')" title="Edit">✎</button>
@@ -2255,8 +2348,8 @@ function showBarcode(docId) {
     const it = items.find(i=>i._docId===docId); if (!it) return;
     activeBcId = docId;
     const label = [it.manufacturer, it.model].filter(Boolean).join(' ') || `Item #${it.id}`;
-    document.getElementById('bc-title').textContent    = label;
-    document.getElementById('bc-sub').textContent      = `${it.category||''} | SN: ${it.serialNumber||'N/A'}`;
+    document.getElementById('bc-title').textContent     = label;
+    document.getElementById('bc-sub').textContent       = `${it.category||''} | SN: ${it.serialNumber||'N/A'}`;
     document.getElementById('bc-item-name').textContent = label;
     const photos = it.photos||[];
     document.getElementById('bc-photos').innerHTML = photos.length
@@ -2266,6 +2359,39 @@ function showBarcode(docId) {
     document.getElementById('bc-code').textContent = code;
     try { JsBarcode('#bc-svg', code, {format:'CODE128',width:2.2,height:80,displayValue:true,fontSize:13,margin:10,background:'#ffffff',lineColor:'#000000'}); }
     catch(e) { console.error(e); }
+
+    // Magazine barcodes
+    const mags = it.magazines || [];
+    const magSection = document.getElementById('bc-magazines');
+    if (mags.length) {
+        magSection.style.display = '';
+        document.getElementById('bc-mag-list').innerHTML = mags.map((mag, i) => {
+            const magCode = `ARM${String(it.id).padStart(6,'0')}M${String(i+1).padStart(2,'0')}`;
+            const magLabel = mag.name || `Magazine ${i+1}`;
+            const capStr   = mag.capacity ? ` · ${mag.capacity} rds` : '';
+            return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;
+                        background:var(--bg-secondary);border-radius:8px;border:1px solid var(--border);margin-bottom:6px;">
+                <svg id="mag-bc-svg-${i}" style="flex-shrink:0;width:130px;height:44px;"></svg>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:600;font-size:0.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(magLabel)}${esc(capStr)}</div>
+                    ${mag.notes ? `<div style="font-size:0.72rem;color:var(--text-secondary);">${esc(mag.notes)}</div>` : ''}
+                    <div style="font-family:monospace;font-size:0.7rem;color:var(--text-secondary);margin-top:2px;">${magCode}</div>
+                </div>
+                <button class="btn btn-ghost btn-sm" onclick="printMagBarcode('${docId}',${i})" title="Print magazine label">🖨</button>
+            </div>`;
+        }).join('');
+        // Render JsBarcode for each mag after DOM update
+        setTimeout(() => {
+            mags.forEach((mag, i) => {
+                const magCode = `ARM${String(it.id).padStart(6,'0')}M${String(i+1).padStart(2,'0')}`;
+                try { JsBarcode(`#mag-bc-svg-${i}`, magCode, {format:'CODE128',width:1.6,height:40,displayValue:true,fontSize:10,margin:4,background:'#ffffff',lineColor:'#000000'}); }
+                catch(e) { console.error(e); }
+            });
+        }, 50);
+    } else {
+        magSection.style.display = 'none';
+    }
+
     document.getElementById('barcode-modal').classList.add('show');
 }
 
@@ -2294,6 +2420,37 @@ function printBarcode() {
         </style>
         ${document.getElementById('bc-svg').outerHTML}
         <div class="item-name">${label}</div>`;
+    window.print();
+}
+
+function printMagBarcode(docId, magIdx) {
+    const it = items.find(i=>i._docId===docId); if (!it) return;
+    const mag = (it.magazines||[])[magIdx]; if (!mag) return;
+    const firLabel = [it.manufacturer, it.model].filter(Boolean).join(' ') || `Item #${it.id}`;
+    const magCode  = `ARM${String(it.id).padStart(6,'0')}M${String(magIdx+1).padStart(2,'0')}`;
+    const magLabel = mag.name || `Magazine ${magIdx+1}`;
+    const capStr   = mag.capacity ? ` · ${mag.capacity} rds` : '';
+    // Build temp SVG for print
+    const tmpSvg = document.createElement('svg');
+    tmpSvg.id = 'print-mag-svg-tmp';
+    document.body.appendChild(tmpSvg);
+    try { JsBarcode('#print-mag-svg-tmp', magCode, {format:'CODE128',width:2.0,height:70,displayValue:true,fontSize:12,margin:8,background:'#ffffff',lineColor:'#000000'}); }
+    catch(e) { console.error(e); }
+    document.getElementById('print-content').innerHTML = `
+        <style>
+            @page { size: 2in 0.75in landscape; margin: 0; }
+            body { margin: 0; padding: 1px 3px 0; font-family: Arial, sans-serif;
+                   display: flex; flex-direction: column; align-items: center;
+                   justify-content: flex-start; height: 0.75in; width: 2in; overflow: hidden; gap: 0; }
+            svg { max-width: 1.95in; height: auto; flex-shrink: 1; display: block; }
+            .lbl { font-size: 6.5pt; font-weight: bold; text-align: center;
+                   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                   max-width: 1.9in; line-height: 1.1; margin: 0; padding: 0; }
+        </style>
+        ${tmpSvg.outerHTML}
+        <div class="lbl">${magLabel}${capStr}</div>
+        <div class="lbl" style="font-weight:normal;font-size:5.5pt;color:#555;">${firLabel}</div>`;
+    document.body.removeChild(tmpSvg);
     window.print();
 }
 

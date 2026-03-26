@@ -528,7 +528,11 @@
             <div class="form-grid">
                 <div class="form-group">
                     <label>Vehicle Type *</label>
-                    <select id="f-category" required><option value="">Select type...</option></select>
+                    <div style="display:flex;gap:6px;align-items:center;">
+                        <input type="text" id="f-category" list="cat-list" placeholder="Type or click ▼ to browse types" autocomplete="off" required style="flex:1;min-width:0;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="openCatPicker()" title="Show all types">▼</button>
+                    </div>
+                    <datalist id="cat-list"></datalist>
                 </div>
                 <div class="form-group">
                     <label>Make</label>
@@ -634,6 +638,11 @@
                         <span class="input-prefix">$</span>
                         <input type="number" id="f-price" placeholder="0.00" min="0" step="0.01" style="padding-left:24px;">
                     </div>
+                </div>
+                <div class="form-group">
+                    <label>Vendor / Seller</label>
+                    <input type="text" id="f-vendor" list="vendor-list" placeholder="e.g. Ford Dealer, Private Sale" autocomplete="off">
+                    <datalist id="vendor-list"></datalist>
                 </div>
                 <div class="form-group">
                     <label>Storage Location</label>
@@ -1078,10 +1087,11 @@ const storage = firebase.storage();
 //  STATE
 // ═══════════════════════════════════════
 let items = [];
-let categories = ['Car','Truck','SUV','Van','Minivan','Pickup Truck',
-    'Motorcycle','ATV','UTV / Side-by-Side','Boat','Jet Ski',
-    'RV / Motorhome','Travel Trailer','Flatbed Trailer','Utility Trailer',
-    'Semi Truck','Truck - Semi','Box Truck','Dump Truck','Tractor (Road)','Other'];
+let categories = ['ATV','Boat','Box Truck','Bus','Car','Dump Truck',
+    'Flatbed Trailer','Jet Ski','Low Speed Vehicle','Minivan','Motorcycle',
+    'Pickup Truck','RV / Motorhome','SUV','Semi Trailer','Tractor (Road)',
+    'Travel Trailer','Truck','Truck - Semi','UTV / Side-by-Side',
+    'Utility Trailer','Van','Other'];
 let makes = ['Ford','Chevrolet','GMC','Dodge','RAM','Toyota','Honda',
     'Nissan','Jeep','Chrysler','Cadillac','Buick','Lincoln','Mercury',
     'Pontiac','Oldsmobile','Saturn','Mazda','Subaru','Mitsubishi',
@@ -1595,8 +1605,10 @@ async function autoFillFromVIN(vin, statusEl, spinnerEl) {
         else if (/sport utility/i.test(bodyClass))            category = 'SUV';
         else if (/sedan|coupe|convert|hatch|wagon/i.test(bodyClass)) category = 'Car';
         else if (/van|minivan/i.test(bodyClass))              category = 'Van';
+        else if (/semi|tractor/i.test(bodyClass))             category = 'Truck - Semi';
         else if (/truck/i.test(bodyClass))                    category = 'Truck';
         else if (/motorcycle/i.test(bodyClass))               category = 'Motorcycle';
+        else if (/bus/i.test(bodyClass))                      category = 'Bus';
         if (category) {
             populateCatSelect();
             document.getElementById('f-category').value = category;
@@ -1726,25 +1738,27 @@ function renderDocsList() {
     if(empty) empty.style.display='none';
     list.innerHTML = active.map(d => {
         const hasPreview = d.existingUrl || d.file || d.base64;
-        const previewHtml = d.mimeType==='application/pdf'
-            ? `<span style="font-size:2rem;">📄</span>`
+        const isPdf = d.mimeType === 'application/pdf';
+        const previewHtml = isPdf
+            ? `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;height:100%;"><span style="font-size:1.8rem;line-height:1;">📄</span><span style="font-size:0.6rem;color:var(--text-secondary);font-weight:700;">PDF</span></div>`
             : (d.base64
                 ? `<img src="data:image/jpeg;base64,${d.base64}">`
                 : (d.existingUrl
                     ? `<img src="${d.existingUrl}" onerror="this.parentNode.innerHTML='<span style=font-size:2rem>📷</span>'">`
                     : `<span style="font-size:2rem;">📷</span>`));
+        const thumbAttrs = hasPreview ? `onclick="openDoc('${d._tempId}')" title="Click to open / download" style="cursor:pointer;border-color:var(--accent);"` : '';
         const summaryHtml = d.summary ? `<div class="doc-summary-text">${esc(d.summary)}</div>` : '';
         return `<div class="doc-card">
-            <div class="doc-thumb" ${hasPreview ? `onclick="openDoc('${d._tempId}')" title="Click to preview / download" style="cursor:pointer;"` : ''}>${previewHtml}</div>
+            <div class="doc-thumb" ${thumbAttrs}>${previewHtml}</div>
             <div class="doc-body">
                 <input type="text" placeholder="Document label (optional)" value="${esc(d.name||'')}"
                     oninput="setDocName('${d._tempId}',this.value)"
                     style="width:100%;box-sizing:border-box;margin-bottom:6px;font-size:0.82rem;">
                 ${summaryHtml}
-                <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                    ${hasPreview ? `<button type="button" class="btn btn-ghost btn-sm" onclick="openDoc('${d._tempId}')">👁 View</button>` : ''}
+                <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+                    ${hasPreview ? `<button type="button" class="btn btn-ghost btn-sm" onclick="openDoc('${d._tempId}')">👁 View / Download</button>` : ''}
                     <button type="button" class="btn btn-ghost btn-sm" id="sum-btn-${d._tempId}"
-                        onclick="summarizeDoc('${d._tempId}')">🤖 Summarize with AI</button>
+                        onclick="summarizeDoc('${d._tempId}')">🤖 Summarize</button>
                 </div>
             </div>
             <button type="button" class="btn btn-danger btn-sm" onclick="removeDoc('${d._tempId}')"
@@ -1841,6 +1855,7 @@ async function decodeVINWithNHTSA(vin) {
     else if (/sport utility/i.test(bodyClass))            category = 'SUV';
     else if (/sedan|coupe|convert|hatch|wagon/i.test(bodyClass)) category = 'Car';
     else if (/van|minivan/i.test(bodyClass))              category = 'Van';
+    else if (/semi|tractor/i.test(bodyClass))             category = 'Truck - Semi';
     else if (/truck/i.test(bodyClass))                    category = 'Truck';
     else if (/motorcycle/i.test(bodyClass))               category = 'Motorcycle';
     else if (/bus/i.test(bodyClass))                      category = 'Bus';
@@ -2008,15 +2023,19 @@ function fillFormFromVIN() {
 //  FORM
 // ═══════════════════════════════════════
 function populateCatSelect() {
-    const sel = document.getElementById('f-category');
-    const cur = sel.value;
-    sel.innerHTML = '<option value="">Select type...</option>';
-    categories.forEach(c => {
-        const o = document.createElement('option');
-        o.value = o.textContent = c;
-        if (c===cur) o.selected = true;
-        sel.appendChild(o);
-    });
+    const dl = document.getElementById('cat-list');
+    if (!dl) return;
+    const sorted = categories.slice().sort((a,b) => a==='Other'?1:b==='Other'?-1:a.localeCompare(b));
+    dl.innerHTML = sorted.map(c => `<option value="${esc(c)}">`).join('');
+}
+
+function openCatPicker() {
+    const el = document.getElementById('f-category');
+    el.focus();
+    const saved = el.value;
+    el.value = '';
+    try { el.showPicker(); } catch(e) {}
+    setTimeout(() => { if (!el.value) el.value = saved; }, 500);
 }
 
 function populateMakeList() {
@@ -2043,6 +2062,12 @@ function addMakeIfNew(name) {
     if (!makes.some(m=>m.toLowerCase()===name.toLowerCase())) makes.push(name);
 }
 
+function populateVendorList() {
+    const vendors = [...new Set(items.map(i=>i.vendor).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+    const dl = document.getElementById('vendor-list');
+    if (dl) dl.innerHTML = vendors.map(v=>`<option value="${esc(v)}">`).join('');
+}
+
 document.getElementById('item-form').addEventListener('submit', async e => {
     e.preventDefault();
     const eid   = document.getElementById('edit-id').value;
@@ -2063,6 +2088,7 @@ document.getElementById('item-form').addEventListener('submit', async e => {
         condition:    document.getElementById('f-condition').value,
         purchaseDate: document.getElementById('f-purchase-date').value,
         price:        document.getElementById('f-price').value.trim(),
+        vendor:       document.getElementById('f-vendor').value.trim(),
         location:      document.getElementById('f-location').value.trim(),
         defaultDriver: document.getElementById('f-driver').value.trim(),
         notes:         document.getElementById('f-notes').value.trim(),
@@ -2110,7 +2136,7 @@ document.getElementById('item-form').addEventListener('submit', async e => {
             await dbAddItem(data, photos);
             toast('Vehicle added!','success');
         }
-        populateMakeList(); populateDriverList();
+        populateMakeList(); populateDriverList(); populateVendorList();
         resetForm();
         showView('inventory');
     } catch(err) {
@@ -2168,6 +2194,7 @@ function editItem(docId) {
     document.getElementById('f-condition').value       = it.condition||'';
     document.getElementById('f-purchase-date').value   = it.purchaseDate||'';
     document.getElementById('f-price').value           = it.price||'';
+    document.getElementById('f-vendor').value          = it.vendor||'';
     document.getElementById('f-location').value        = it.location||'';
     document.getElementById('f-driver').value          = it.defaultDriver||'';
     document.getElementById('f-notes').value           = it.notes||'';

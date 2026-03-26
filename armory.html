@@ -623,6 +623,11 @@
                     <input type="number" id="f-price" placeholder="0.00" min="0" step="0.01">
                 </div>
                 <div class="form-group">
+                    <label>Vendor / Seller</label>
+                    <input type="text" id="f-vendor" list="vendor-list" placeholder="e.g. Cabela's, Bob's Gun Shop" autocomplete="off">
+                    <datalist id="vendor-list"></datalist>
+                </div>
+                <div class="form-group">
                     <label>Quantity</label>
                     <input type="number" id="f-quantity" placeholder="1" min="1" value="1">
                 </div>
@@ -1698,25 +1703,28 @@ function renderDocsList() {
     if(empty) empty.style.display='none';
     list.innerHTML = active.map(d => {
         const hasPreview = d.existingUrl || d.file || d.base64;
-        const previewHtml = d.mimeType==='application/pdf'
-            ? `<span style="font-size:2rem;">📄</span>`
+        const isPdf = d.mimeType === 'application/pdf';
+        const previewHtml = isPdf
+            ? `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;height:100%;"><span style="font-size:1.8rem;line-height:1;">📄</span><span style="font-size:0.6rem;color:var(--text-secondary);font-weight:700;">PDF</span></div>`
             : (d.base64
                 ? `<img src="data:image/jpeg;base64,${d.base64}">`
                 : (d.existingUrl
                     ? `<img src="${d.existingUrl}" onerror="this.parentNode.innerHTML='<span style=font-size:2rem>📷</span>'">`
                     : `<span style="font-size:2rem;">📷</span>`));
+        const thumbAttrs = hasPreview ? `onclick="openDoc('${d._tempId}')" title="Click to open / download" style="cursor:pointer;border-color:var(--accent);"` : '';
         const summaryHtml = d.summary ? `<div class="doc-summary-text">${esc(d.summary)}</div>` : '';
-        return `<div class="doc-card">
-            <div class="doc-thumb" ${hasPreview ? `onclick="openDoc('${d._tempId}')" title="Click to preview / download" style="cursor:pointer;"` : ''}>${previewHtml}</div>
+        const fileName = d.name || (isPdf ? 'document.pdf' : 'image');
+        return `<div class="doc-card" style="${hasPreview ? 'cursor:default;' : ''}">
+            <div class="doc-thumb" ${thumbAttrs}>${previewHtml}</div>
             <div class="doc-body">
                 <input type="text" placeholder="Document label (optional)" value="${esc(d.name||'')}"
                     oninput="setDocName('${d._tempId}',this.value)"
                     style="width:100%;box-sizing:border-box;margin-bottom:6px;font-size:0.82rem;">
                 ${summaryHtml}
-                <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                    ${hasPreview ? `<button type="button" class="btn btn-ghost btn-sm" onclick="openDoc('${d._tempId}')">👁 View</button>` : ''}
+                <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+                    ${hasPreview ? `<button type="button" class="btn btn-ghost btn-sm" onclick="openDoc('${d._tempId}')">👁 View / Download</button>` : ''}
                     <button type="button" class="btn btn-ghost btn-sm" id="sum-btn-${d._tempId}"
-                        onclick="summarizeDoc('${d._tempId}')">🤖 Summarize with AI</button>
+                        onclick="summarizeDoc('${d._tempId}')">🤖 Summarize</button>
                 </div>
             </div>
             <button type="button" class="btn btn-danger btn-sm" onclick="removeDoc('${d._tempId}')"
@@ -1848,6 +1856,12 @@ function populateCalList() {
     dl.innerHTML = calibers.map(c=>`<option value="${esc(c)}">`).join('');
 }
 
+function populateVendorList() {
+    const vendors = [...new Set(items.map(i=>i.vendor).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+    const dl = document.getElementById('vendor-list');
+    if (dl) dl.innerHTML = vendors.map(v=>`<option value="${esc(v)}">`).join('');
+}
+
 function addMfrIfNew(name) {
     if (!name) return;
     if (!manufacturers.some(m=>m.toLowerCase()===name.toLowerCase())) manufacturers.push(name);
@@ -1868,6 +1882,7 @@ document.getElementById('item-form').addEventListener('submit', async e => {
         magnification:document.getElementById('f-magnification').value.trim(),
         purchaseDate: document.getElementById('f-purchase-date').value,
         price:        document.getElementById('f-price').value.trim(),
+        vendor:       document.getElementById('f-vendor').value.trim(),
         quantity:     document.getElementById('f-quantity').value.trim() || '1',
         notes:        document.getElementById('f-notes').value.trim(),
         magazines:    formMagazines.filter(m => m.capacity || m.name).map((m,i) => ({ id:i+1, name:m.name||'', capacity:m.capacity||null, notes:m.notes||'' })),
@@ -1916,7 +1931,7 @@ document.getElementById('item-form').addEventListener('submit', async e => {
             await dbAddItem(data, photos);
             toast('Item added!','success');
         }
-        populateMfrList(); populateCalList();
+        populateMfrList(); populateCalList(); populateVendorList();
         resetForm();
         showView('inventory');
     } catch(err) {
@@ -1976,6 +1991,7 @@ function editItem(docId) {
     if (THREAD_CATS.has(it.category)) document.getElementById('thread-type-group').style.display = '';
     document.getElementById('f-purchase-date').value      = it.purchaseDate||'';
     document.getElementById('f-price').value              = it.price||'';
+    document.getElementById('f-vendor').value             = it.vendor||'';
     document.getElementById('f-quantity').value           = it.quantity||'1';
     document.getElementById('f-notes').value              = it.notes||'';
     document.getElementById('form-title').textContent         = `✏️ Edit Item #${it.id}`;

@@ -481,7 +481,10 @@
             <div class="form-grid">
                 <div class="form-group">
                     <label>Equipment Type *</label>
-                    <input type="text" id="f-category" list="cat-list" placeholder="Type to search..." autocomplete="off" required>
+                    <div style="display:flex;gap:6px;align-items:center;">
+                        <input type="text" id="f-category" list="cat-list" placeholder="Type to search or click ▼" autocomplete="off" required style="flex:1;min-width:0;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="openCatPicker()" title="Show all types">▼</button>
+                    </div>
                     <datalist id="cat-list"></datalist>
                 </div>
                 <div class="form-group">
@@ -525,6 +528,11 @@
                         <span class="input-prefix">$</span>
                         <input type="number" id="f-price" placeholder="0.00" min="0" step="0.01" style="padding-left:24px;">
                     </div>
+                </div>
+                <div class="form-group">
+                    <label>Vendor / Seller</label>
+                    <input type="text" id="f-vendor" list="vendor-list" placeholder="e.g. RDO Equipment, Private Sale" autocomplete="off">
+                    <datalist id="vendor-list"></datalist>
                 </div>
                 <div class="form-group span2">
                     <label>Storage Location</label>
@@ -1049,7 +1057,7 @@ async function initApp() {
         });
         document.getElementById('loading-screen').style.display = 'none';
         document.getElementById('app').style.display            = 'block';
-        populateCatSelect(); populateMakeList(); syncCatFilters();
+        populateCatSelect(); populateMakeList(); populateVendorList(); syncCatFilters();
         showView('dashboard');
     } catch(err) {
         document.getElementById('loading-screen').innerHTML =
@@ -1411,25 +1419,27 @@ function renderDocsList() {
     if(empty) empty.style.display='none';
     list.innerHTML = active.map(d => {
         const hasPreview = d.existingUrl || d.file || d.base64;
-        const previewHtml = d.mimeType==='application/pdf'
-            ? `<span style="font-size:2rem;">📄</span>`
+        const isPdf = d.mimeType === 'application/pdf';
+        const previewHtml = isPdf
+            ? `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;height:100%;"><span style="font-size:1.8rem;line-height:1;">📄</span><span style="font-size:0.6rem;color:var(--text-secondary);font-weight:700;">PDF</span></div>`
             : (d.base64
                 ? `<img src="data:image/jpeg;base64,${d.base64}">`
                 : (d.existingUrl
                     ? `<img src="${d.existingUrl}" onerror="this.parentNode.innerHTML='<span style=font-size:2rem>📷</span>'">`
                     : `<span style="font-size:2rem;">📷</span>`));
+        const thumbAttrs = hasPreview ? `onclick="openDoc('${d._tempId}')" title="Click to open / download" style="cursor:pointer;border-color:var(--accent);"` : '';
         const summaryHtml = d.summary ? `<div class="doc-summary-text">${esc(d.summary)}</div>` : '';
         return `<div class="doc-card">
-            <div class="doc-thumb" ${hasPreview ? `onclick="openDoc('${d._tempId}')" title="Click to preview / download" style="cursor:pointer;"` : ''}>${previewHtml}</div>
+            <div class="doc-thumb" ${thumbAttrs}>${previewHtml}</div>
             <div class="doc-body">
                 <input type="text" placeholder="Document label (optional)" value="${esc(d.name||'')}"
                     oninput="setDocName('${d._tempId}',this.value)"
                     style="width:100%;box-sizing:border-box;margin-bottom:6px;font-size:0.82rem;">
                 ${summaryHtml}
-                <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                    ${hasPreview ? `<button type="button" class="btn btn-ghost btn-sm" onclick="openDoc('${d._tempId}')">👁 View</button>` : ''}
+                <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+                    ${hasPreview ? `<button type="button" class="btn btn-ghost btn-sm" onclick="openDoc('${d._tempId}')">👁 View / Download</button>` : ''}
                     <button type="button" class="btn btn-ghost btn-sm" id="sum-btn-${d._tempId}"
-                        onclick="summarizeDoc('${d._tempId}')">🤖 Summarize with AI</button>
+                        onclick="summarizeDoc('${d._tempId}')">🤖 Summarize</button>
                 </div>
             </div>
             <button type="button" class="btn btn-danger btn-sm" onclick="removeDoc('${d._tempId}')"
@@ -1447,6 +1457,16 @@ function populateCatSelect() {
     dl.innerHTML = sortCategories(categories).map(c => `<option value="${esc(c)}">`).join('');
 }
 
+function openCatPicker() {
+    const el = document.getElementById('f-category');
+    el.focus();
+    const saved = el.value;
+    el.value = '';
+    try { el.showPicker(); } catch(e) {}
+    // Restore value if picker closes without selection
+    setTimeout(() => { if (!el.value) el.value = saved; }, 500);
+}
+
 function populateMakeList() {
     const dl = document.getElementById('make-list'); if (!dl) return;
     dl.innerHTML = makes.slice().sort((a,b)=>a.localeCompare(b)).map(m=>`<option value="${esc(m)}">`).join('');
@@ -1455,6 +1475,12 @@ function populateMakeList() {
 function addMakeIfNew(name) {
     if (!name) return;
     if (!makes.some(m=>m.toLowerCase()===name.toLowerCase())) makes.push(name);
+}
+
+function populateVendorList() {
+    const vendors = [...new Set(items.map(i=>i.vendor).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+    const dl = document.getElementById('vendor-list');
+    if (dl) dl.innerHTML = vendors.map(v=>`<option value="${esc(v)}">`).join('');
 }
 
 document.getElementById('item-form').addEventListener('submit', async e => {
@@ -1475,6 +1501,7 @@ document.getElementById('item-form').addEventListener('submit', async e => {
         condition:    document.getElementById('f-condition').value,
         purchaseDate: document.getElementById('f-purchase-date').value,
         price:        document.getElementById('f-price').value.trim(),
+        vendor:       document.getElementById('f-vendor').value.trim(),
         location:     document.getElementById('f-location').value.trim(),
         notes:        document.getElementById('f-notes').value.trim(),
     };
@@ -1572,6 +1599,7 @@ function editItem(docId) {
     document.getElementById('f-condition').value       = it.condition||'';
     document.getElementById('f-purchase-date').value   = it.purchaseDate||'';
     document.getElementById('f-price').value           = it.price||'';
+    document.getElementById('f-vendor').value          = it.vendor||'';
     document.getElementById('f-location').value        = it.location||'';
     document.getElementById('f-notes').value           = it.notes||'';
     document.getElementById('form-title').textContent      = `✏️ Edit Equipment #${it.id}`;

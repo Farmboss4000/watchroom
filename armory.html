@@ -653,7 +653,7 @@
                             <button type="button" class="remove-photo" onclick="removePhoto('paperwork')">✕</button>
                         </div>
                         <div class="photo-file-input">
-                            <input type="file" id="file-paperwork" accept="image/*" onchange="onPhotoSelected('paperwork',this)">
+                            <input type="file" id="file-paperwork" accept="image/*,application/pdf" onchange="onPhotoSelected('paperwork',this)">
                         </div>
                         <button type="button" class="btn-ai" id="btn-paperwork" onclick="summarizePaperwork()" disabled>📄 Summarize Paperwork with AI</button>
                     </div>
@@ -1232,7 +1232,8 @@ async function saveConfig() {
 }
 
 async function uploadPhoto(slot, file) {
-    const ext  = file.name ? file.name.split('.').pop() : 'jpg';
+    const ext  = file.name ? file.name.split('.').pop()
+               : file.type === 'application/pdf' ? 'pdf' : 'jpg';
     const path = `armory_photos/${Date.now()}_${slot}.${ext}`;
     const ref  = storage.ref().child(path);
     await ref.put(file);
@@ -1359,12 +1360,30 @@ async function onPhotoSelected(slot, input) {
     const file = input.files[0]; if (!file) return;
     formPhotos[slot].file    = file;
     formPhotos[slot].deleted = false;
-    const dataUrl = await compressImage(file) || await new Promise(r => {
-        const fr = new FileReader(); fr.onload = e => r(e.target.result); fr.readAsDataURL(file);
-    });
-    formPhotos[slot].base64   = dataUrl.split(',')[1];
-    formPhotos[slot].mimeType = 'image/jpeg';
-    renderPhotoPreview(slot, dataUrl);
+
+    if (file.type === 'application/pdf') {
+        // PDF: read raw base64, skip image compression
+        const dataUrl = await new Promise(r => {
+            const fr = new FileReader(); fr.onload = e => r(e.target.result); fr.readAsDataURL(file);
+        });
+        formPhotos[slot].base64   = dataUrl.split(',')[1];
+        formPhotos[slot].mimeType = 'application/pdf';
+        // Show PDF placeholder preview instead of <img>
+        const prev = document.getElementById('prev-'+slot);
+        prev.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:6px;padding:8px;">
+            <span style="font-size:2.2rem;">📄</span>
+            <span style="font-size:0.68rem;color:var(--text-secondary);text-align:center;word-break:break-all;">${esc(file.name)}</span>
+        </div><button type="button" class="remove-photo" onclick="removePhoto('${slot}')">✕</button>`;
+    } else {
+        // Image: compress and preview normally
+        const dataUrl = await compressImage(file) || await new Promise(r => {
+            const fr = new FileReader(); fr.onload = e => r(e.target.result); fr.readAsDataURL(file);
+        });
+        formPhotos[slot].base64   = dataUrl.split(',')[1];
+        formPhotos[slot].mimeType = 'image/jpeg';
+        renderPhotoPreview(slot, dataUrl);
+    }
+
     if (slot==='main')      document.getElementById('btn-identify').disabled  = false;
     if (slot==='serial')    document.getElementById('btn-ocr').disabled       = false;
     if (slot==='paperwork') document.getElementById('btn-paperwork').disabled = false;
@@ -1388,12 +1407,12 @@ function removePhoto(slot) {
 
 async function callClaude(base64, mimeType, prompt) {
     if (!apiKey) { toast('Set your Anthropic API key in Settings first.','error'); return null; }
+    const mediaBlock = mimeType === 'application/pdf'
+        ? { type:'document', source:{ type:'base64', media_type:'application/pdf', data:base64 } }
+        : { type:'image',    source:{ type:'base64', media_type:mimeType,           data:base64 } };
     const msgPayload = {
         model: aiModel, max_tokens:512,
-        messages:[{ role:'user', content:[
-            { type:'image', source:{ type:'base64', media_type:mimeType, data:base64 }},
-            { type:'text', text:prompt }
-        ]}]
+        messages:[{ role:'user', content:[ mediaBlock, { type:'text', text:prompt } ]}]
     };
     let res;
     try {
@@ -1571,7 +1590,7 @@ document.getElementById('item-form').addEventListener('submit', async e => {
             if (p.file) {
                 try {
                     const uploadData = p.base64
-                        ? await fetch('data:image/jpeg;base64,' + p.base64).then(r => r.blob())
+                        ? await fetch(`data:${p.mimeType||'image/jpeg'};base64,` + p.base64).then(r => r.blob())
                         : p.file;
                     const url = await uploadPhoto(slot, uploadData);
                     photos.push({ slot, url });

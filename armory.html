@@ -570,7 +570,7 @@
             <div class="form-grid">
                 <div class="form-group">
                     <label>Category *</label>
-                    <select id="f-category" required onchange="updateMagSection()" ><option value="">Select category...</option></select>
+                    <select id="f-category" required onchange="updateMagSection()" oninput="updateMagSection()"><option value="">Select category...</option></select>
                 </div>
                 <div class="form-group">
                     <label>Manufacturer</label>
@@ -1350,7 +1350,7 @@ function showView(v) {
     if (v==='inventory')    { syncCatFilters(); renderInventory(); }
     if (v==='reports')      { syncCatFilters(); renderReport(); }
     if (v==='categories')   renderCatTags();
-    if (v==='add-item')     populateCatSelect();
+    if (v==='add-item')     { populateCatSelect(); updateMagSection(); }
     if (v==='recycle-bin')  loadRecycleBin();
     if (v === 'diary') initDiary();
     if (v === 'packing-list') { syncCatFilters(); renderPackingPicker(); }
@@ -1748,15 +1748,21 @@ const MAG_CATS = new Set(['Pistol','Rifle','Revolver','Shotgun']);
 const THREAD_CATS = new Set(['Pistol','Rifle','Shotgun','Suppressor']);
 
 function updateMagSection() {
-    const cat = document.getElementById('f-category').value;
-    document.getElementById('mag-section').style.display = MAG_CATS.has(cat) ? '' : 'none';
-    document.getElementById('thread-type-group').style.display = THREAD_CATS.has(cat) ? '' : 'none';
+    const catEl = document.getElementById('f-category');
+    if (!catEl) return;
+    const cat = catEl.value;
+    const magSec = document.getElementById('mag-section');
+    if (magSec) magSec.style.display = MAG_CATS.has(cat) ? '' : 'none';
+    const threadGrp = document.getElementById('thread-type-group');
+    if (threadGrp) threadGrp.style.display = THREAD_CATS.has(cat) ? '' : 'none';
     const suppSection = document.getElementById('suppressor-section');
-    if (cat === 'Suppressor') {
-        suppSection.style.display = '';
-        renderSuppressorSection();
-    } else {
-        suppSection.style.display = 'none';
+    if (suppSection) {
+        if (cat === 'Suppressor') {
+            suppSection.style.display = '';
+            renderSuppressorSection();
+        } else {
+            suppSection.style.display = 'none';
+        }
     }
 }
 
@@ -1989,13 +1995,13 @@ function editItem(docId) {
     document.getElementById('edit-id').value              = it.id;
     document.getElementById('edit-doc-id').value          = it._docId;
     document.getElementById('f-category').value           = it.category||'';
+    updateMagSection();
     document.getElementById('f-manufacturer').value       = it.manufacturer||'';
     document.getElementById('f-model').value              = it.model||'';
     document.getElementById('f-serial').value             = it.serialNumber||'';
     document.getElementById('f-caliber').value            = it.caliber||'';
     document.getElementById('f-thread-type').value        = it.threadType||'';
     document.getElementById('f-magnification').value      = it.magnification||'';
-    if (THREAD_CATS.has(it.category)) document.getElementById('thread-type-group').style.display = '';
     document.getElementById('f-purchase-date').value      = it.purchaseDate||'';
     document.getElementById('f-price').value              = it.price||'';
     document.getElementById('f-vendor').value             = it.vendor||'';

@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Farmboss Armory</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -790,6 +791,43 @@
 
 <!-- ══ REPORTS ══ -->
 <div id="view-reports" class="view">
+
+    <!-- ── PURCHASES OVER TIME CHART ── -->
+    <div class="card" style="margin-bottom:18px;">
+        <div class="card-title" style="flex-wrap:wrap;gap:10px;">
+            <div class="card-title-left">📈 Purchases Over Time</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <div style="display:flex;border:1px solid var(--border);border-radius:7px;overflow:hidden;">
+                    <button id="chart-mode-count" onclick="setChartMode('count')"
+                        style="padding:5px 14px;font-size:0.78rem;font-weight:600;border:none;cursor:pointer;
+                               background:var(--accent);color:#fff;transition:all 0.15s;">
+                        # Items
+                    </button>
+                    <button id="chart-mode-value" onclick="setChartMode('value')"
+                        style="padding:5px 14px;font-size:0.78rem;font-weight:600;border:none;cursor:pointer;
+                               background:transparent;color:var(--text-secondary);transition:all 0.15s;">
+                        $ Value
+                    </button>
+                </div>
+                <select id="chart-group" onchange="renderPurchaseChart()"
+                    style="font-size:0.8rem;padding:5px 10px;border-radius:7px;border:1px solid var(--border);
+                           background:var(--bg-secondary);color:var(--text-primary);">
+                    <option value="month">Monthly</option>
+                    <option value="quarter">Quarterly</option>
+                    <option value="year">Yearly</option>
+                </select>
+            </div>
+        </div>
+        <div style="position:relative;height:260px;">
+            <canvas id="purchase-chart"></canvas>
+            <div id="purchase-chart-empty" style="display:none;position:absolute;inset:0;display:flex;
+                 align-items:center;justify-content:center;color:var(--text-secondary);font-size:0.9rem;">
+                No purchase date data to chart yet.
+            </div>
+        </div>
+        <div id="purchase-chart-summary" style="display:flex;gap:24px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);"></div>
+    </div>
+
     <div class="card">
         <div class="card-title">
             <div class="card-title-left">📋 Reports</div>
@@ -1346,7 +1384,7 @@ function showView(v) {
     document.querySelectorAll('nav button').forEach((btn,i) => btn.classList.toggle('active', VIEWS[i]===v));
     if (v==='dashboard')    renderDashboard();
     if (v==='inventory')    { syncCatFilters(); renderInventory(); }
-    if (v==='reports')      { syncCatFilters(); renderReport(); }
+    if (v==='reports')      { syncCatFilters(); renderReport(); renderPurchaseChart(); }
     if (v==='categories')   renderCatTags();
     if (v==='add-item')     { populateCatSelect(); updateMagSection(); }
     if (v==='recycle-bin')  loadRecycleBin();
@@ -1371,11 +1409,16 @@ function renderDashboard() {
         ? '$' + priced.reduce((s,i) => s + (Number(i.price)||0), 0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})
         : '—';
     const priceLabel = priced.length ? `Total Purchase Price <span style="font-size:0.65rem;opacity:0.6;">(${priced.length}/${totalLines})</span>` : 'Total Purchase Price';
+    const FIREARM_CATS = new Set(['pistol','rifle','revolver','shotgun']);
+    const totalFirearms = items
+        .filter(i => FIREARM_CATS.has((i.category||'').toLowerCase()))
+        .reduce((s,i) => s + (Number(i.quantity)||1), 0);
     document.getElementById('stats-grid').innerHTML = `
         <div class="stat-card"><div class="stat-value">${totalLines}</div><div class="stat-label">Total Line Items</div></div>
         <div class="stat-card"><div class="stat-value">${totalQty}</div><div class="stat-label">Total Quantity</div></div>
         <div class="stat-card"><div class="stat-value">${categories.length}</div><div class="stat-label">Categories</div></div>
         <div class="stat-card"><div class="stat-value">${recent}</div><div class="stat-label">Added This Month</div></div>
+        <div class="stat-card" style="border-color:#a78bfa;"><div class="stat-value" style="color:#a78bfa;">${totalFirearms}</div><div class="stat-label">Total Firearms<div style="font-size:0.65rem;opacity:0.55;font-weight:400;margin-top:2px;">Pistol · Rifle · Revolver · Shotgun</div></div></div>
         <div class="stat-card" style="border-color:#60a5fa;"><div class="stat-value" style="color:#60a5fa;font-size:1.4rem;">${totalPurchase}</div><div class="stat-label">${priceLabel}</div></div>
         <div class="stat-card" style="border-color:#22c55e;"><div class="stat-value" style="color:#22c55e;font-size:1.4rem;">${totalVal}</div><div class="stat-label">Est. Collection Value</div></div>`;
 
@@ -2286,6 +2329,213 @@ function renderReport() {
             <td style="color:var(--text-secondary);font-size:0.82rem">${esc(it.notes)||'—'}</td>
           </tr>`).join('')
         :'<tr><td colspan="10" style="text-align:center;color:var(--text-secondary);padding:30px">No items match filters.</td></tr>';
+}
+
+// ═══════════════════════════════════════
+//  PURCHASES OVER TIME CHART
+// ═══════════════════════════════════════
+let purchaseChartInst = null;
+let chartMode = 'count'; // 'count' | 'value'
+
+function setChartMode(mode) {
+    chartMode = mode;
+    const btnCount = document.getElementById('chart-mode-count');
+    const btnValue = document.getElementById('chart-mode-value');
+    if (btnCount && btnValue) {
+        if (mode === 'count') {
+            btnCount.style.background = 'var(--accent)'; btnCount.style.color = '#fff';
+            btnValue.style.background = 'transparent';   btnValue.style.color = 'var(--text-secondary)';
+        } else {
+            btnValue.style.background = '#3b82f6'; btnValue.style.color = '#fff';
+            btnCount.style.background = 'transparent';  btnCount.style.color = 'var(--text-secondary)';
+        }
+    }
+    renderPurchaseChart();
+}
+
+function renderPurchaseChart() {
+    const groupEl = document.getElementById('chart-group');
+    const emptyEl = document.getElementById('purchase-chart-empty');
+    const summaryEl = document.getElementById('purchase-chart-summary');
+    if (!groupEl) return;
+    const groupBy = groupEl.value; // 'month' | 'quarter' | 'year'
+
+    // Build bucket key per item
+    const withDates = items.filter(i => i.purchaseDate);
+    if (!withDates.length) {
+        if (emptyEl) { emptyEl.style.display = 'flex'; }
+        if (purchaseChartInst) { purchaseChartInst.destroy(); purchaseChartInst = null; }
+        return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    const buckets = {}; // key → { count, value }
+    withDates.forEach(it => {
+        const d = new Date(it.purchaseDate + 'T00:00:00');
+        let key;
+        if (groupBy === 'year') {
+            key = String(d.getFullYear());
+        } else if (groupBy === 'quarter') {
+            const q = Math.floor(d.getMonth() / 3) + 1;
+            key = `${d.getFullYear()} Q${q}`;
+        } else {
+            key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+        }
+        if (!buckets[key]) buckets[key] = { count: 0, value: 0 };
+        buckets[key].count += (Number(it.quantity) || 1);
+        buckets[key].value += (Number(it.price) || 0);
+    });
+
+    // Sort keys chronologically
+    const labels = Object.keys(buckets).sort();
+    const dataPoints = labels.map(k => chartMode === 'count' ? buckets[k].count : buckets[k].value);
+
+    // Format labels for display
+    const displayLabels = labels.map(k => {
+        if (groupBy === 'month') {
+            const [yr, mo] = k.split('-');
+            return new Date(+yr, +mo-1, 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+        }
+        return k;
+    });
+
+    // Compute running total for line overlay
+    const running = [];
+    let acc = 0;
+    dataPoints.forEach(v => { acc += v; running.push(acc); });
+
+    // Colors
+    const barColor   = chartMode === 'count' ? 'rgba(245,158,11,0.75)' : 'rgba(59,130,246,0.75)';
+    const barBorder  = chartMode === 'count' ? '#f59e0b' : '#3b82f6';
+    const lineColor  = chartMode === 'count' ? '#f59e0b' : '#3b82f6';
+
+    const canvas = document.getElementById('purchase-chart');
+    if (!canvas) return;
+
+    if (purchaseChartInst) { purchaseChartInst.destroy(); purchaseChartInst = null; }
+
+    purchaseChartInst = new Chart(canvas, {
+        data: {
+            labels: displayLabels,
+            datasets: [
+                {
+                    type: 'bar',
+                    label: chartMode === 'count' ? 'Items Purchased' : 'Amount Spent ($)',
+                    data: dataPoints,
+                    backgroundColor: barColor,
+                    borderColor: barBorder,
+                    borderWidth: 1.5,
+                    borderRadius: 4,
+                    yAxisID: 'y'
+                },
+                {
+                    type: 'line',
+                    label: chartMode === 'count' ? 'Running Total (items)' : 'Running Total ($)',
+                    data: running,
+                    borderColor: lineColor,
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    pointRadius: labels.length > 20 ? 0 : 3,
+                    pointHoverRadius: 5,
+                    tension: 0.35,
+                    yAxisID: 'y2'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: {
+                    labels: { color: '#94a3b8', font: { size: 11 } }
+                },
+                tooltip: {
+                    backgroundColor: '#1e293b',
+                    borderColor: '#334155',
+                    borderWidth: 1,
+                    titleColor: '#e2e8f0',
+                    bodyColor: '#94a3b8',
+                    callbacks: {
+                        label: ctx => {
+                            const v = ctx.parsed.y;
+                            if (ctx.datasetIndex === 0) {
+                                return chartMode === 'count'
+                                    ? ` ${v} item${v !== 1 ? 's' : ''}`
+                                    : ` $${v.toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2})}`;
+                            } else {
+                                return chartMode === 'count'
+                                    ? ` ${v} total items`
+                                    : ` $${v.toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2})} total`;
+                            }
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: 'rgba(255,255,255,0.05)' },
+                    ticks: { color: '#64748b', font: { size: 10 }, maxRotation: 45 }
+                },
+                y: {
+                    position: 'left',
+                    grid: { color: 'rgba(255,255,255,0.05)' },
+                    ticks: {
+                        color: '#64748b', font: { size: 10 },
+                        callback: v => chartMode === 'count' ? v : '$' + v.toLocaleString()
+                    }
+                },
+                y2: {
+                    position: 'right',
+                    grid: { drawOnChartArea: false },
+                    ticks: {
+                        color: lineColor, font: { size: 10 },
+                        callback: v => chartMode === 'count' ? v : '$' + v.toLocaleString()
+                    }
+                }
+            }
+        }
+    });
+
+    // Summary stats
+    const totalCount  = withDates.reduce((s,i) => s + (Number(i.quantity)||1), 0);
+    const totalValue  = withDates.reduce((s,i) => s + (Number(i.price)||0), 0);
+    const avgPerPeriod = labels.length ? (chartMode === 'count'
+        ? (totalCount / labels.length).toFixed(1)
+        : '$' + (totalValue / labels.length).toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2})
+    ) : '—';
+    const peakLabel  = labels[dataPoints.indexOf(Math.max(...dataPoints))];
+    const peakDisp   = displayLabels[dataPoints.indexOf(Math.max(...dataPoints))];
+    const peakVal    = Math.max(...dataPoints);
+
+    if (summaryEl) summaryEl.innerHTML = `
+        <div style="text-align:center;">
+            <div style="font-size:1.3rem;font-weight:800;color:${chartMode==='count'?'#f59e0b':'#3b82f6'};">
+                ${chartMode === 'count' ? totalCount : '$' + totalValue.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}
+            </div>
+            <div style="font-size:0.72rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;">
+                ${chartMode === 'count' ? 'Total Items' : 'Total Spent'}
+            </div>
+        </div>
+        <div style="text-align:center;">
+            <div style="font-size:1.3rem;font-weight:800;color:var(--text-primary);">${labels.length}</div>
+            <div style="font-size:0.72rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;">
+                ${groupBy === 'year' ? 'Years' : groupBy === 'quarter' ? 'Quarters' : 'Months'} w/ Purchases
+            </div>
+        </div>
+        <div style="text-align:center;">
+            <div style="font-size:1.3rem;font-weight:800;color:var(--text-primary);">${avgPerPeriod}</div>
+            <div style="font-size:0.72rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;">
+                Avg / ${groupBy === 'year' ? 'Year' : groupBy === 'quarter' ? 'Quarter' : 'Month'}
+            </div>
+        </div>
+        <div style="text-align:center;">
+            <div style="font-size:1.1rem;font-weight:800;color:var(--text-primary);">${peakDisp||'—'}</div>
+            <div style="font-size:0.72rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;">
+                Peak ${groupBy === 'year' ? 'Year' : groupBy === 'quarter' ? 'Quarter' : 'Month'}
+                ${peakVal ? '(' + (chartMode==='count' ? peakVal+' items' : '$'+peakVal.toLocaleString()) + ')' : ''}
+            </div>
+        </div>`;
 }
 
 function printReport() {

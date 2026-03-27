@@ -766,7 +766,6 @@
                 <thead><tr>
                     <th class="no-sort"><input type="checkbox" id="sel-all" onchange="toggleSelectAll(this)"></th>
                     <th class="no-sort" style="width:52px;">Photo</th>
-                    <th onclick="sortBy('id')">ID</th>
                     <th onclick="sortBy('category')">Category</th>
                     <th onclick="sortBy('manufacturer')">Manufacturer</th>
                     <th onclick="sortBy('model')">Model</th>
@@ -2117,8 +2116,8 @@ function renderInventory() {
     const data  = sorted(filteredItems('inv-search','inv-filter-cat'), invSortField, invSortDir);
     document.getElementById('inv-count').textContent = `${data.length} item${data.length!==1?'s':''}`;
     document.querySelectorAll('#inv-table thead th').forEach(th=>th.classList.remove('sort-asc','sort-desc'));
-    // col indices: 0=checkbox, 1=photo, 2=id, 3=category, 4=manufacturer, 5=model, 6=serial, 7=caliber, 8=qty, 9=purchased, 10=vendor, 11=price, 12=marketValue
-    const thIdx = {id:2,category:3,manufacturer:4,model:5,serialNumber:6,caliber:7,quantity:8,purchaseDate:9,vendor:10,price:11,marketValue:12};
+    // col indices: 0=checkbox, 1=photo, 2=category, 3=manufacturer, 4=model, 5=serial, 6=caliber, 7=qty, 8=purchased, 9=vendor, 10=price, 11=marketValue
+    const thIdx = {category:2,manufacturer:3,model:4,serialNumber:5,caliber:6,quantity:7,purchaseDate:8,vendor:9,price:10,marketValue:11};
     const ti = thIdx[invSortField];
     if (ti!==undefined) document.querySelectorAll('#inv-table thead th')[ti]?.classList.add(invSortDir==='asc'?'sort-asc':'sort-desc');
     const tbody = document.getElementById('inv-tbody');
@@ -2147,7 +2146,6 @@ function renderInventory() {
         return `<tr>
             <td><input type="checkbox" class="pack-check" data-docid="${it._docId}"></td>
             <td>${thumb}</td>
-            <td class="mono">#${it.id}</td>
             <td><span class="badge ${catClass(it.category)}">${it.category||'—'}</span></td>
             <td>${esc(it.manufacturer)||'—'}</td>
             <td>${esc(it.model)||'—'}</td>
@@ -2174,7 +2172,7 @@ function renderInventory() {
     const mvStr      = totalMV   > 0 ? '$'+totalMV.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
     const colCount   = 13; // checkbox, photo, id, cat, mfr, model, serial, caliber, qty, purchased, price, mv, actions
     document.getElementById('inv-tfoot').innerHTML = `<tr style="font-weight:700;border-top:2px solid var(--border);background:var(--bg-secondary);">
-        <td colspan="11" style="text-align:right;padding:8px 12px;color:var(--text-secondary);font-size:0.82rem;">TOTALS (${data.length} item${data.length!==1?'s':''})</td>
+        <td colspan="10" style="text-align:right;padding:8px 12px;color:var(--text-secondary);font-size:0.82rem;">TOTALS (${data.length} item${data.length!==1?'s':''})</td>
         <td style="padding:8px 12px;white-space:nowrap;color:#60a5fa;">${priceStr}</td>
         <td style="padding:8px 12px;white-space:nowrap;color:#22c55e;">${mvStr}</td>
         <td></td>

@@ -121,7 +121,7 @@
 
         /* ── STATS ── */
         main { padding:20px; max-width:1400px; margin:0 auto; flex:1; }
-        .stats-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:20px; }
+        .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; margin-bottom:20px; }
         .stat-card { background:var(--bg-secondary); border:1px solid var(--border); border-radius:10px;
             padding:18px 16px; text-align:center; }
         .stat-value { font-size:2rem; font-weight:800; color:var(--accent); line-height:1; margin-bottom:4px; }
@@ -1368,12 +1368,18 @@ function renderDashboard() {
     const totalVal = valued.length
         ? '$' + valued.reduce((s,i) => s + (Number(i.marketValue)||0), 0).toLocaleString()
         : '—';
+    const priced = items.filter(i => i.price && Number(i.price) > 0);
+    const totalPurchase = priced.length
+        ? '$' + priced.reduce((s,i) => s + (Number(i.price)||0), 0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})
+        : '—';
+    const priceLabel = priced.length ? `Total Purchase Price <span style="font-size:0.65rem;opacity:0.6;">(${priced.length}/${totalLines})</span>` : 'Total Purchase Price';
     document.getElementById('stats-grid').innerHTML = `
         <div class="stat-card"><div class="stat-value">${totalLines}</div><div class="stat-label">Total Line Items</div></div>
         <div class="stat-card"><div class="stat-value">${totalQty}</div><div class="stat-label">Total Quantity</div></div>
         <div class="stat-card"><div class="stat-value">${categories.length}</div><div class="stat-label">Categories</div></div>
         <div class="stat-card"><div class="stat-value">${recent}</div><div class="stat-label">Added This Month</div></div>
-        <div class="stat-card"><div class="stat-value" style="font-size:1.5rem;">${totalVal}</div><div class="stat-label">Est. Collection Value</div></div>`;
+        <div class="stat-card" style="border-color:#60a5fa;"><div class="stat-value" style="color:#60a5fa;font-size:1.4rem;">${totalPurchase}</div><div class="stat-label">${priceLabel}</div></div>
+        <div class="stat-card" style="border-color:#22c55e;"><div class="stat-value" style="color:#22c55e;font-size:1.4rem;">${totalVal}</div><div class="stat-label">Est. Collection Value</div></div>`;
 
     const counts = {};
     items.forEach(it => { counts[it.category]=(counts[it.category]||0)+1; });
@@ -2151,7 +2157,7 @@ function renderInventory() {
                 ${suppHostBadge}${mySuppBadge}
                 <button class="btn btn-info btn-sm" onclick="showBarcode('${it._docId}')" title="Barcode/Photos">▣</button>
                 <button class="btn btn-ghost btn-sm" onclick="openMaintenance('${it._docId}')" title="Maintenance Log">🔧</button>
-                <button class="btn btn-ghost btn-sm" onclick="editItem('${it._docId}')" title="Edit">✎</button>
+                <button class="btn btn-primary btn-sm" onclick="editItem('${it._docId}')" title="Edit Item" style="background:#7c3aed;border-color:#7c3aed;">✏️ Edit</button>
                 <button class="btn btn-danger btn-sm" onclick="deleteItem('${it._docId}')" title="Delete">✗</button>
             </td></tr>`;}).join('');
 

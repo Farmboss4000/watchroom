@@ -590,7 +590,7 @@
                     <input type="text" id="f-caliber" list="cal-list" placeholder="e.g. 9mm Luger" autocomplete="off">
                     <datalist id="cal-list"></datalist>
                 </div>
-                <div class="form-group" id="thread-type-group" style="display:none;">
+                <div class="form-group" id="thread-type-group">
                     <label>Thread Type</label>
                     <input type="text" id="f-thread-type" list="thread-list" placeholder="e.g. 1/2x28" autocomplete="off">
                     <datalist id="thread-list">
@@ -1752,8 +1752,6 @@ function updateMagSection() {
     const cat = catEl.value;
     const magSec = document.getElementById('mag-section');
     if (magSec) magSec.style.display = MAG_CATS.has(cat) ? '' : 'none';
-    const threadGrp = document.getElementById('thread-type-group');
-    if (threadGrp) threadGrp.style.display = THREAD_CATS.has(cat) ? '' : 'none';
     const suppSection = document.getElementById('suppressor-section');
     if (suppSection) {
         if (cat === 'Suppressor') {
@@ -1978,7 +1976,6 @@ function resetForm() {
     document.getElementById('mag-empty').style.display = 'none';
     // Clear thread type
     document.getElementById('f-thread-type').value = '';
-    document.getElementById('thread-type-group').style.display = 'none';
     // Clear suppressor assignments
     formAssignedTo = [];
     document.getElementById('suppressor-section').style.display = 'none';

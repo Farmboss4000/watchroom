@@ -735,6 +735,8 @@
     <a href="machinery.html" class="site-link">🚜 Machinery</a>
     <a href="automotive.html" class="site-link">🚗 Automotive</a>
     <a href="livestock.html" class="site-link">🐄 Livestock</a>
+    <a href="timepieces.html" class="site-link">⌚ Timepieces</a>
+    <a href="knives.html" class="site-link">🔪 Knives</a>
 </div>
 
 <!-- LOADING -->
@@ -895,6 +897,36 @@
                 </div>
             </div>
 
+            <!-- Timepieces -->
+            <div class="site-card">
+                <div class="site-card-top" style="background:#d97706;"></div>
+                <div class="site-card-body">
+                    <div class="site-card-header">
+                        <div class="site-card-icon">⌚</div>
+                        <div class="site-card-badge"><span id="badge-timepieces">—</span> items &nbsp;|&nbsp; TPC barcodes</div>
+                    </div>
+                    <div class="site-card-title">FARMBOSS TIMEPIECES</div>
+                    <div class="site-card-desc">Watch &amp; Clock Collection</div>
+                    <div class="site-card-meta"><strong id="meta-timepieces">—</strong> timepieces tracked</div>
+                    <a href="timepieces.html" class="site-card-btn" style="background:#d97706;color:#fff;">Go to Timepieces →</a>
+                </div>
+            </div>
+
+            <!-- Knives -->
+            <div class="site-card">
+                <div class="site-card-top" style="background:#dc2626;"></div>
+                <div class="site-card-body">
+                    <div class="site-card-header">
+                        <div class="site-card-icon">🔪</div>
+                        <div class="site-card-badge"><span id="badge-knives">—</span> items &nbsp;|&nbsp; KNF barcodes</div>
+                    </div>
+                    <div class="site-card-title">FARMBOSS KNIVES</div>
+                    <div class="site-card-desc">Blade &amp; Edged Tools Collection</div>
+                    <div class="site-card-meta"><strong id="meta-knives">—</strong> knives tracked</div>
+                    <a href="knives.html" class="site-card-btn" style="background:#dc2626;color:#fff;">Go to Knives →</a>
+                </div>
+            </div>
+
         </div>
 
         <!-- RECENT ACTIVITY SECTION -->
@@ -1016,14 +1048,17 @@
     }
 
     // ── LIVE COUNTS ──
-    const counts = { armory:0, machinery:0, automotive:0, livestock:0 };
+    const counts = { armory:0, machinery:0, automotive:0, livestock:0, timepieces:0, knives:0 };
 
     function updateCounts() {
-        ['armory','machinery','automotive','livestock'].forEach(k => {
+        ['armory','machinery','automotive','livestock','timepieces','knives'].forEach(k => {
             const v = counts[k];
-            document.getElementById('stat-' + k).textContent     = v;
-            document.getElementById('badge-' + k).textContent    = v;
-            document.getElementById('meta-' + k).textContent     = v;
+            const statEl = document.getElementById('stat-' + k);
+            if (statEl) statEl.textContent = v;
+            const badgeEl = document.getElementById('badge-' + k);
+            if (badgeEl) badgeEl.textContent = v;
+            const metaEl = document.getElementById('meta-' + k);
+            if (metaEl) metaEl.textContent = v;
         });
     }
 
@@ -1032,7 +1067,9 @@
             armory:     'items',
             machinery:  'machinery_items',
             automotive: 'automotive_items',
-            livestock:  'livestock_items'
+            livestock:  'livestock_items',
+            timepieces: 'timepiece_items',
+            knives:     'knife_items'
         };
         Object.entries(collections).forEach(([key, col]) => {
             const unsub = db.collection(col).onSnapshot(snap => {
@@ -1048,7 +1085,9 @@
         { col:'items',            label:'Armory',     icon:'🔫', nameField: i => [i.manufacturer,i.model].filter(Boolean).join(' ') || i.name || i.serialNumber || '(unnamed)' },
         { col:'automotive_items', label:'Automotive', icon:'🚗', nameField: i => [i.year,i.make,i.model].filter(Boolean).join(' ') || i.name || '(unnamed)' },
         { col:'machinery_items',  label:'Machinery',  icon:'🚜', nameField: i => [i.make,i.model].filter(Boolean).join(' ') || i.name || '(unnamed)' },
-        { col:'livestock_items',  label:'Livestock',  icon:'🐄', nameField: i => i.name || i.tagNumber || i.id || '(unnamed)' }
+        { col:'livestock_items',  label:'Livestock',  icon:'🐄', nameField: i => i.name || i.tagNumber || i.id || '(unnamed)' },
+        { col:'timepiece_items',  label:'Timepieces', icon:'⌚', nameField: i => [i.brand,i.model].filter(Boolean).join(' ') || i.reference || '(unnamed)' },
+        { col:'knife_items',      label:'Knives',     icon:'🔪', nameField: i => [i.brand,i.model].filter(Boolean).join(' ') || '(unnamed)' }
     ];
 
     const activityAllItems = {};

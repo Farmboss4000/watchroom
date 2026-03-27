@@ -730,7 +730,6 @@
 
 <!-- SITE SWITCHER -->
 <div class="site-switcher">
-    <span class="site-switcher-label">Farmboss Headquarters</span>
     <a href="index.html" class="site-link active">🏠 Headquarters</a>
     <a href="armory.html" class="site-link">🔫 Armory</a>
     <a href="machinery.html" class="site-link">🚜 Machinery</a>
@@ -898,6 +897,14 @@
 
         </div>
 
+        <!-- RECENT ACTIVITY SECTION -->
+        <div class="section-title">🕐 Recent Activity</div>
+        <div class="card" style="margin-bottom:20px;">
+            <div id="recent-activity-list" style="display:flex;flex-direction:column;gap:0;">
+                <div style="color:var(--text-secondary);padding:16px 0;text-align:center;">Loading recent activity…</div>
+            </div>
+        </div>
+
         <!-- QUOTES SECTION -->
         <div class="section-title">📚 Quote Collection</div>
         <div class="quotes-section">
@@ -1002,6 +1009,7 @@
     function initApp() {
         showScreen('app');
         initLiveCounts();
+        initRecentActivity();
         initClock();
         fetchWeather();
         initQuotes();
@@ -1030,6 +1038,77 @@
             const unsub = db.collection(col).onSnapshot(snap => {
                 counts[key] = snap.size;
                 updateCounts();
+            }, () => {});
+            unsubbers.push(unsub);
+        });
+    }
+
+    // ── RECENT ACTIVITY ──
+    const ACTIVITY_COLS = [
+        { col:'items',            label:'Armory',     icon:'🔫', nameField: i => [i.manufacturer,i.model].filter(Boolean).join(' ') || i.name || i.serialNumber || '(unnamed)' },
+        { col:'automotive_items', label:'Automotive', icon:'🚗', nameField: i => [i.year,i.make,i.model].filter(Boolean).join(' ') || i.name || '(unnamed)' },
+        { col:'machinery_items',  label:'Machinery',  icon:'🚜', nameField: i => [i.make,i.model].filter(Boolean).join(' ') || i.name || '(unnamed)' },
+        { col:'livestock_items',  label:'Livestock',  icon:'🐄', nameField: i => i.name || i.tagNumber || i.id || '(unnamed)' }
+    ];
+
+    const activityAllItems = {};
+
+    function renderRecentActivity() {
+        const all = [];
+        Object.entries(activityAllItems).forEach(([label, items]) => {
+            items.forEach(i => all.push(i));
+        });
+        all.sort((a,b) => {
+            const ta = a._ts || 0, tb = b._ts || 0;
+            return tb - ta;
+        });
+        const top15 = all.slice(0, 15);
+        const el = document.getElementById('recent-activity-list');
+        if (!el) return;
+        if (!top15.length) {
+            el.innerHTML = '<div style="color:var(--text-secondary);padding:16px 0;text-align:center;">No activity yet.</div>';
+            return;
+        }
+        el.innerHTML = top15.map((item, idx) => {
+            const border = idx < top15.length - 1 ? 'border-bottom:1px solid var(--border);' : '';
+            const dateStr = item._date ? item._date.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
+            const timeStr = item._date ? item._date.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:true}) : '';
+            return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;${border}">
+                <span style="font-size:1.3rem;flex-shrink:0;">${item._icon}</span>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item._name}</div>
+                    <div style="font-size:0.78rem;color:var(--text-secondary);">${item._label}</div>
+                </div>
+                <div style="text-align:right;flex-shrink:0;">
+                    <div style="font-size:0.8rem;color:var(--text-secondary);">${dateStr}</div>
+                    <div style="font-size:0.75rem;color:var(--text-secondary);opacity:0.7;">${timeStr}</div>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function initRecentActivity() {
+        ACTIVITY_COLS.forEach(({ col, label, icon, nameField }) => {
+            activityAllItems[label] = [];
+            const unsub = db.collection(col).onSnapshot(snap => {
+                activityAllItems[label] = snap.docs.map(d => {
+                    const data = d.data();
+                    let ts = null;
+                    if (data.addedAt) {
+                        if (typeof data.addedAt === 'string') ts = new Date(data.addedAt);
+                        else if (data.addedAt.toDate) ts = data.addedAt.toDate();
+                    }
+                    return {
+                        _docId: d.id,
+                        _ts: ts ? ts.getTime() : 0,
+                        _date: ts,
+                        _label: label,
+                        _icon: icon,
+                        _name: nameField(data),
+                        ...data
+                    };
+                });
+                renderRecentActivity();
             }, () => {});
             unsubbers.push(unsub);
         });

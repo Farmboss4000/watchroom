@@ -117,7 +117,7 @@
 
         /* ── STATS ── */
         main { padding:20px; max-width:1400px; margin:0 auto; flex:1; }
-        .stats-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:20px; }
+        .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; margin-bottom:20px; }
         .stat-card { background:var(--bg-secondary); border:1px solid var(--border); border-radius:10px;
             padding:18px 16px; text-align:center; }
         .stat-value { font-size:2rem; font-weight:800; color:var(--accent); line-height:1; margin-bottom:4px; }
@@ -373,7 +373,6 @@
 
 <!-- ══ SITE SWITCHER (outside #app) ══ -->
 <div class="site-switcher">
-    <span class="site-switcher-label">Farmboss Headquarters</span>
     <a href="index.html" class="site-link">🏠 Headquarters</a>
     <a href="armory.html" class="site-link">🔫 Armory</a>
     <a href="machinery.html" class="site-link active">🚜 Machinery</a>
@@ -1121,11 +1120,16 @@ function renderDashboard() {
     const recent = items.filter(i => i.addedAt && (Date.now()-new Date(i.addedAt).getTime())<ms30).length;
     const hours  = items.filter(i=>i.hours).map(i=>Number(i.hours)||0);
     const avgHrs = hours.length ? Math.round(hours.reduce((a,b)=>a+b,0)/hours.length).toLocaleString() : '—';
+    const priced = items.filter(i => i.price && Number(i.price) > 0);
+    const totalPurchase = priced.length
+        ? '$' + priced.reduce((s,i) => s + (Number(i.price)||0), 0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})
+        : '—';
     document.getElementById('stats-grid').innerHTML = `
         <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Total Equipment</div></div>
         <div class="stat-card"><div class="stat-value">${categories.length}</div><div class="stat-label">Equipment Types</div></div>
         <div class="stat-card"><div class="stat-value">${recent}</div><div class="stat-label">Added This Month</div></div>
-        <div class="stat-card"><div class="stat-value">${avgHrs}</div><div class="stat-label">Avg Engine Hours</div></div>`;
+        <div class="stat-card"><div class="stat-value">${avgHrs}</div><div class="stat-label">Avg Engine Hours</div></div>
+        <div class="stat-card"><div class="stat-value" style="color:#3b82f6;font-size:1.4rem;">${totalPurchase}</div><div class="stat-label">Total Purchase Price</div></div>`;
     const counts = {};
     items.forEach(it => { counts[it.category]=(counts[it.category]||0)+1; });
     const maxC = Math.max(...Object.values(counts),1);

@@ -1273,7 +1273,7 @@ function renderDashboard() {
     const valLabel = valued.length ? `Fleet Value <span style="font-size:0.65rem;opacity:0.6;">(${valued.length}/${total} valued)</span>` : 'Fleet Value';
     const priced = items.filter(i=>i.price && Number(i.price)>0);
     const totalPurchase = priced.length
-        ? '$' + priced.reduce((s,i)=>s+(Number(i.price)||0),0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})
+        ? '$' + Math.round(priced.reduce((s,i)=>s+(Number(i.price)||0),0)).toLocaleString('en-US')
         : '—';
     const priceLabel = priced.length ? `Total Paid <span style="font-size:0.65rem;opacity:0.6;">(${priced.length}/${total})</span>` : 'Total Paid';
     document.getElementById('stats-grid').innerHTML = `

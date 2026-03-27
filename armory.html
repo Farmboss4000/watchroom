@@ -832,6 +832,45 @@
         <div id="purchase-chart-summary" style="display:flex;gap:24px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);"></div>
     </div>
 
+    <!-- ── CALIBER REPORT ── -->
+    <div class="card" style="margin-bottom:18px;">
+        <div class="card-title" style="flex-wrap:wrap;gap:10px;">
+            <div class="card-title-left">🎯 Report by Caliber</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <div style="display:flex;border:1px solid var(--border);border-radius:7px;overflow:hidden;">
+                    <button id="cal-mode-count" onclick="setCaliberMode('count')"
+                        style="padding:5px 14px;font-size:0.78rem;font-weight:600;border:none;cursor:pointer;
+                               background:var(--accent);color:#fff;transition:all 0.15s;">
+                        # Items
+                    </button>
+                    <button id="cal-mode-qty" onclick="setCaliberMode('qty')"
+                        style="padding:5px 14px;font-size:0.78rem;font-weight:600;border:none;cursor:pointer;
+                               background:transparent;color:var(--text-secondary);transition:all 0.15s;">
+                        Total Qty
+                    </button>
+                    <button id="cal-mode-value" onclick="setCaliberMode('value')"
+                        style="padding:5px 14px;font-size:0.78rem;font-weight:600;border:none;cursor:pointer;
+                               background:transparent;color:var(--text-secondary);transition:all 0.15s;">
+                        $ Value
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div style="display:grid;grid-template-columns:minmax(260px,1fr) 2fr;gap:24px;align-items:start;">
+            <!-- Left: summary table -->
+            <div id="caliber-table-wrap" style="overflow-x:auto;"></div>
+            <!-- Right: horizontal bar chart -->
+            <div style="position:relative;min-height:160px;" id="caliber-chart-wrap">
+                <canvas id="caliber-chart"></canvas>
+                <div id="caliber-chart-empty" style="display:none;position:absolute;inset:0;
+                     display:flex;align-items:center;justify-content:center;
+                     color:var(--text-secondary);font-size:0.9rem;">
+                    No caliber data yet.
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="card">
         <div class="card-title">
             <div class="card-title-left">📋 Reports</div>
@@ -1333,7 +1372,7 @@ async function initApp() {
         let firstLoad = true;
         unsubItems = db.collection('items').onSnapshot(snap => {
             items = snap.docs.map(doc => ({ _docId:doc.id, ...doc.data() }));
-            renderDashboard(); renderInventory(); renderReport();
+            renderDashboard(); renderInventory(); renderReport(); renderCaliberReport();
             if (firstLoad) { firstLoad = false; autoRefreshMarketValues(); }
         });
         document.getElementById('loading-screen').style.display = 'none';
@@ -1388,7 +1427,7 @@ function showView(v) {
     document.querySelectorAll('nav button').forEach((btn,i) => btn.classList.toggle('active', VIEWS[i]===v));
     if (v==='dashboard')    renderDashboard();
     if (v==='inventory')    { syncCatFilters(); renderInventory(); }
-    if (v==='reports')      { syncCatFilters(); renderReport(); renderPurchaseChart(); }
+    if (v==='reports')      { syncCatFilters(); renderReport(); renderPurchaseChart(); renderCaliberReport(); }
     if (v==='categories')   renderCatTags();
     if (v==='add-item')     { populateCatSelect(); updateMagSection(); }
     if (v==='recycle-bin')  loadRecycleBin();
@@ -2540,6 +2579,184 @@ function renderPurchaseChart() {
                 ${peakVal ? '(' + (chartMode==='count' ? peakVal+' items' : '$'+peakVal.toLocaleString()) + ')' : ''}
             </div>
         </div>`;
+}
+
+// ═══════════════════════════════════════
+//  CALIBER REPORT
+// ═══════════════════════════════════════
+let caliberChartInst = null;
+let caliberMode = 'count'; // 'count' | 'qty' | 'value'
+
+function setCaliberMode(mode) {
+    caliberMode = mode;
+    const btns = { count: 'cal-mode-count', qty: 'cal-mode-qty', value: 'cal-mode-value' };
+    Object.entries(btns).forEach(([k, id]) => {
+        const el = document.getElementById(id); if (!el) return;
+        if (k === mode) { el.style.background = 'var(--accent)'; el.style.color = '#fff'; }
+        else { el.style.background = 'transparent'; el.style.color = 'var(--text-secondary)'; }
+    });
+    renderCaliberReport();
+}
+
+function renderCaliberReport() {
+    const tableWrap = document.getElementById('caliber-table-wrap');
+    const chartWrap = document.getElementById('caliber-chart-wrap');
+    const emptyEl   = document.getElementById('caliber-chart-empty');
+    const canvas    = document.getElementById('caliber-chart');
+    if (!tableWrap || !canvas) return;
+
+    // Build caliber buckets from ALL items
+    const buckets = {};
+    items.forEach(it => {
+        const cal = (it.caliber || '').trim() || '(No Caliber)';
+        if (!buckets[cal]) buckets[cal] = { count: 0, qty: 0, value: 0, mv: 0 };
+        buckets[cal].count += 1;
+        buckets[cal].qty   += (Number(it.quantity) || 1);
+        buckets[cal].value += (Number(it.price) || 0);
+        buckets[cal].mv    += (Number(it.marketValue) || 0);
+    });
+
+    const entries = Object.entries(buckets).sort((a, b) => {
+        const va = caliberMode === 'count' ? b[1].count : caliberMode === 'qty' ? b[1].qty : b[1].value;
+        const vb = caliberMode === 'count' ? a[1].count : caliberMode === 'qty' ? a[1].qty : a[1].value;
+        return va - vb; // ascending so horizontal bar renders top-down biggest first
+    });
+
+    if (!entries.length) {
+        if (emptyEl) emptyEl.style.display = 'flex';
+        if (caliberChartInst) { caliberChartInst.destroy(); caliberChartInst = null; }
+        tableWrap.innerHTML = '';
+        return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    const totalItems = items.length;
+    const totalQty   = items.reduce((s, i) => s + (Number(i.quantity)||1), 0);
+    const totalVal   = items.reduce((s, i) => s + (Number(i.price)||0), 0);
+
+    // ── Summary table ──
+    const sorted = [...entries].reverse(); // biggest first for table
+    tableWrap.innerHTML = `
+        <table style="width:100%;font-size:0.83rem;border-collapse:collapse;">
+            <thead>
+                <tr>
+                    <th style="text-align:left;padding:7px 10px;background:var(--bg-card);font-size:0.72rem;
+                               text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary);
+                               border-bottom:2px solid var(--border);">Caliber</th>
+                    <th style="text-align:right;padding:7px 10px;background:var(--bg-card);font-size:0.72rem;
+                               text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary);
+                               border-bottom:2px solid var(--border);">Items</th>
+                    <th style="text-align:right;padding:7px 10px;background:var(--bg-card);font-size:0.72rem;
+                               text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary);
+                               border-bottom:2px solid var(--border);">Qty</th>
+                    <th style="text-align:right;padding:7px 10px;background:var(--bg-card);font-size:0.72rem;
+                               text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary);
+                               border-bottom:2px solid var(--border);">Paid</th>
+                    <th style="text-align:right;padding:7px 10px;background:var(--bg-card);font-size:0.72rem;
+                               text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary);
+                               border-bottom:2px solid var(--border);">Mkt Val</th>
+                    <th style="text-align:right;padding:7px 10px;background:var(--bg-card);font-size:0.72rem;
+                               text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary);
+                               border-bottom:2px solid var(--border);">%</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${sorted.map(([cal, b]) => {
+                    const pct = totalItems ? ((b.count / totalItems) * 100).toFixed(1) : '0.0';
+                    const pctBar = `<div style="display:flex;align-items:center;gap:6px;justify-content:flex-end;">
+                        <div style="width:36px;height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
+                            <div style="width:${pct}%;height:100%;background:var(--accent);border-radius:3px;"></div>
+                        </div>
+                        <span style="font-size:0.75rem;color:var(--text-secondary);min-width:32px;text-align:right;">${pct}%</span>
+                    </div>`;
+                    return `<tr style="border-bottom:1px solid var(--border);" onmouseover="this.style.background='var(--accent-dim)'" onmouseout="this.style.background=''">
+                        <td style="padding:7px 10px;font-weight:600;color:var(--text-primary);">${esc(cal)}</td>
+                        <td style="padding:7px 10px;text-align:right;font-weight:700;color:var(--accent);">${b.count}</td>
+                        <td style="padding:7px 10px;text-align:right;color:var(--text-secondary);">${b.qty}</td>
+                        <td style="padding:7px 10px;text-align:right;color:#3b82f6;">${b.value ? '$'+Math.round(b.value).toLocaleString() : '—'}</td>
+                        <td style="padding:7px 10px;text-align:right;color:#22c55e;">${b.mv ? '$'+Math.round(b.mv).toLocaleString() : '—'}</td>
+                        <td style="padding:7px 10px;">${pctBar}</td>
+                    </tr>`;
+                }).join('')}
+            </tbody>
+            <tfoot>
+                <tr style="background:var(--bg-card);font-weight:700;border-top:2px solid var(--border);">
+                    <td style="padding:7px 10px;">Totals</td>
+                    <td style="padding:7px 10px;text-align:right;color:var(--accent);">${totalItems}</td>
+                    <td style="padding:7px 10px;text-align:right;">${totalQty}</td>
+                    <td style="padding:7px 10px;text-align:right;color:#3b82f6;">${totalVal ? '$'+Math.round(totalVal).toLocaleString() : '—'}</td>
+                    <td style="padding:7px 10px;text-align:right;color:#22c55e;">${items.reduce((s,i)=>s+(Number(i.marketValue)||0),0) ? '$'+Math.round(items.reduce((s,i)=>s+(Number(i.marketValue)||0),0)).toLocaleString() : '—'}</td>
+                    <td style="padding:7px 10px;text-align:right;color:var(--text-secondary);">100%</td>
+                </tr>
+            </tfoot>
+        </table>`;
+
+    // ── Horizontal bar chart ──
+    const chartLabels = entries.map(([cal]) => cal);
+    const chartData   = entries.map(([, b]) =>
+        caliberMode === 'count' ? b.count : caliberMode === 'qty' ? b.qty : b.value
+    );
+
+    // Dynamic chart height based on number of calibers
+    const barH = Math.max(28, Math.min(48, 340 / Math.max(chartLabels.length, 1)));
+    const chartHeight = Math.max(120, chartLabels.length * barH + 40);
+    canvas.parentElement.style.minHeight = chartHeight + 'px';
+    canvas.height = chartHeight;
+
+    const barColor  = caliberMode === 'value' ? 'rgba(59,130,246,0.75)' : 'rgba(245,158,11,0.75)';
+    const barBorder = caliberMode === 'value' ? '#3b82f6' : '#f59e0b';
+
+    if (caliberChartInst) { caliberChartInst.destroy(); caliberChartInst = null; }
+
+    caliberChartInst = new Chart(canvas, {
+        type: 'bar',
+        data: {
+            labels: chartLabels,
+            datasets: [{
+                label: caliberMode === 'count' ? 'Items' : caliberMode === 'qty' ? 'Total Qty' : 'Total Paid ($)',
+                data: chartData,
+                backgroundColor: barColor,
+                borderColor: barBorder,
+                borderWidth: 1.5,
+                borderRadius: 4
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#1e293b',
+                    borderColor: '#334155',
+                    borderWidth: 1,
+                    titleColor: '#e2e8f0',
+                    bodyColor: '#94a3b8',
+                    callbacks: {
+                        label: ctx => {
+                            const v = ctx.parsed.x;
+                            if (caliberMode === 'value') return ` $${Math.round(v).toLocaleString()}`;
+                            return ` ${v} ${caliberMode === 'qty' ? 'total qty' : 'item' + (v !== 1 ? 's' : '')}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: 'rgba(100,116,139,0.12)' },
+                    ticks: {
+                        color: '#64748b', font: { size: 10 },
+                        callback: v => caliberMode === 'value' ? '$' + v.toLocaleString() : v
+                    }
+                },
+                y: {
+                    grid: { display: false },
+                    ticks: { color: '#94a3b8', font: { size: 11 } }
+                }
+            }
+        }
+    });
 }
 
 function printReport() {

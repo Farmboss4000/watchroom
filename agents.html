@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Farmboss Agents</title>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0;}
+        :root{
+            --bg-primary:#0f0f1a;--bg-secondary:#16162a;--bg-card:#1e1e35;
+            --accent:#8b5cf6;--accent-hover:#7c3aed;--accent-dim:rgba(139,92,246,0.15);
+            --text-primary:#e2e8f0;--text-secondary:#8892a4;--border:#2a2a45;
+            --success:#10b981;--danger:#ef4444;--warning:#f59e0b;--info:#3b82f6;
+            --stream-bg:#0a0a14;
+        }
+        body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:var(--bg-primary);color:var(--text-primary);min-height:100vh;overflow-x:hidden;}
+        /* SITE SWITCHER */
+        .site-switcher{background:#111827;display:flex;align-items:center;padding:5px 18px;gap:4px;font-size:0.77rem;border-bottom:1px solid rgba(255,255,255,0.07);overflow-x:auto;scrollbar-width:none;}
+        .site-switcher::-webkit-scrollbar{display:none;}
+        .site-link{text-decoration:none;color:#9ca3af;padding:4px 12px;border-radius:4px;display:flex;align-items:center;gap:6px;font-weight:500;transition:all 0.15s;white-space:nowrap;}
+        .site-link:hover{background:rgba(255,255,255,0.1);color:#e5e7eb;}
+        .site-link.active{background:rgba(255,255,255,0.13);color:#fff;font-weight:600;}
+        /* LOGIN */
+        #login-screen{position:fixed;inset:0;background:linear-gradient(135deg,#0a0a18 0%,#14103a 100%);display:flex;align-items:center;justify-content:center;z-index:9000;flex-direction:column;gap:12px;}
+        .login-site-links{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;}
+        .login-site-links a{color:rgba(255,255,255,0.5);font-size:0.78rem;text-decoration:none;padding:4px 12px;border:1px solid rgba(255,255,255,0.2);border-radius:4px;transition:all 0.15s;}
+        .login-site-links a:hover{color:#fff;border-color:rgba(255,255,255,0.5);}
+        .login-site-links a.active{color:var(--accent);border-color:var(--accent);}
+        .login-box{background:#1a1a2e;border:1px solid var(--border);border-radius:14px;padding:44px 40px;width:100%;max-width:400px;box-shadow:0 24px 64px rgba(0,0,0,0.6);}
+        .login-logo{width:56px;height:56px;background:linear-gradient(135deg,var(--accent),#a78bfa);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 16px;color:#fff;}
+        .login-box h2{text-align:center;font-size:1.5rem;color:#fff;margin-bottom:4px;}
+        .login-sub{text-align:center;font-size:0.85rem;color:var(--text-secondary);margin-bottom:28px;}
+        .login-error{color:var(--danger);font-size:0.82rem;margin-bottom:12px;min-height:18px;text-align:center;}
+        .form-group label{display:block;font-size:0.78rem;font-weight:600;color:var(--text-secondary);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.4px;}
+        .form-group input,.form-group select,.form-group textarea{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:7px;font-size:0.9rem;font-family:inherit;color:var(--text-primary);background:var(--bg-card);transition:border-color 0.15s;}
+        .form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--accent);}
+        .form-group{margin-bottom:14px;}
+        #loading-screen{display:none;position:fixed;inset:0;background:var(--bg-primary);flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:8000;}
+        .spinner{width:44px;height:44px;border:4px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
+        @keyframes spin{to{transform:rotate(360deg);}}
+        /* APP */
+        #app{display:none;min-height:100vh;flex-direction:column;}
+        header{background:#0d0d1f;padding:0 20px;display:flex;align-items:center;gap:16px;min-height:56px;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,0.5);border-bottom:1px solid var(--border);flex-wrap:wrap;}
+        .logo-area{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+        .logo-icon{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),#a78bfa);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;}
+        header h1{font-size:1.15rem;font-weight:700;color:#fff;white-space:nowrap;}
+        header h1 span{color:var(--accent);}
+        nav{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;flex-shrink:0;}
+        nav button{background:transparent;border:none;color:var(--text-secondary);padding:8px 13px;border-radius:6px;cursor:pointer;font-size:0.83rem;transition:all 0.15s;white-space:nowrap;}
+        nav button:hover{background:var(--accent-dim);color:#fff;}
+        nav button.active{background:var(--accent);color:#fff;font-weight:600;}
+        .header-right{display:flex;align-items:center;gap:10px;margin-left:auto;}
+        .user-badge{font-size:0.78rem;color:var(--text-secondary);background:rgba(255,255,255,0.05);padding:4px 10px;border-radius:5px;}
+        .btn-signout{background:transparent;border:1px solid rgba(255,255,255,0.15);color:var(--text-secondary);padding:5px 12px;border-radius:5px;cursor:pointer;font-size:0.78rem;transition:all 0.15s;}
+        .btn-signout:hover{border-color:var(--danger);color:var(--danger);}
+        main{padding:20px;max-width:1400px;margin:0 auto;flex:1;}
+        /* CARDS & LAYOUT */
+        .card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:22px;margin-bottom:20px;}
+        .card-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;gap:10px;flex-wrap:wrap;}
+        .card-title-left{font-size:1rem;font-weight:700;color:var(--text-primary);}
+        .view{display:none;}.view.active{display:block;}
+        .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:20px;}
+        .stat-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:18px 16px;text-align:center;}
+        .stat-value{font-size:2rem;font-weight:800;color:var(--accent);line-height:1;margin-bottom:4px;}
+        .stat-label{font-size:0.77rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;}
+        /* BUTTONS */
+        .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:7px;font-size:0.85rem;font-weight:600;cursor:pointer;border:none;transition:all 0.15s;font-family:inherit;}
+        .btn-primary{background:var(--accent);color:#fff;}.btn-primary:hover{background:var(--accent-hover);}
+        .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text-primary);}.btn-ghost:hover{background:var(--bg-card);}
+        .btn-danger{background:var(--danger);color:#fff;}.btn-danger:hover{opacity:0.85;}
+        .btn-success{background:var(--success);color:#fff;}.btn-success:hover{opacity:0.85;}
+        .btn-sm{padding:5px 10px;font-size:0.78rem;}
+        /* FORM */
+        .form-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+        .form-group.full-width{grid-column:1/-1;}
+        .form-group.span2{grid-column:span 2;}
+        .form-actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+        /* AGENT LIBRARY */
+        .agent-cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
+        .agent-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:18px;cursor:pointer;transition:all 0.15s;position:relative;}
+        .agent-card:hover{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 8px 24px rgba(139,92,246,0.15);}
+        .agent-card.running{border-color:var(--success);animation:pulse-border 1.5s ease-in-out infinite;}
+        @keyframes pulse-border{0%,100%{box-shadow:0 0 0 1px var(--success);}50%{box-shadow:0 0 0 3px rgba(16,185,129,0.3);}}
+        .agent-card-icon{font-size:2rem;margin-bottom:10px;}
+        .agent-card-name{font-size:1rem;font-weight:700;color:var(--text-primary);margin-bottom:4px;}
+        .agent-card-desc{font-size:0.8rem;color:var(--text-secondary);line-height:1.45;margin-bottom:12px;}
+        .agent-card-meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+        .badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;white-space:nowrap;}
+        .badge-model{background:var(--accent-dim);color:var(--accent);}
+        .badge-runs{background:rgba(16,185,129,0.15);color:var(--success);}
+        .agent-card-actions{display:flex;gap:6px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border);}
+        /* RUN CONSOLE */
+        .console-layout{display:grid;grid-template-columns:280px 1fr;gap:16px;height:calc(100vh - 160px);min-height:500px;}
+        @media(max-width:800px){.console-layout{grid-template-columns:1fr;height:auto;}}
+        .console-sidebar{background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;}
+        .console-main{display:flex;flex-direction:column;gap:12px;}
+        .stream-box{flex:1;background:var(--stream-bg);border:1px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column;}
+        .stream-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px;font-size:0.88rem;line-height:1.6;}
+        .msg{padding:12px 14px;border-radius:8px;max-width:90%;word-wrap:break-word;}
+        .msg-user{background:var(--accent-dim);border:1px solid rgba(139,92,246,0.3);align-self:flex-end;color:var(--text-primary);}
+        .msg-agent{background:var(--bg-card);border:1px solid var(--border);align-self:flex-start;color:var(--text-primary);white-space:pre-wrap;font-family:'Segoe UI',monospace;}
+        .msg-system{background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);align-self:center;font-size:0.78rem;color:var(--warning);border-radius:6px;padding:6px 12px;}
+        .msg-label{font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;color:var(--text-secondary);}
+        .stream-input-bar{padding:12px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:flex-end;}
+        .stream-input-bar textarea{flex:1;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);padding:9px 12px;font-size:0.87rem;font-family:inherit;resize:none;min-height:40px;max-height:120px;}
+        .stream-input-bar textarea:focus{outline:none;border-color:var(--accent);}
+        .cursor-blink{display:inline-block;width:2px;height:1em;background:var(--accent);margin-left:1px;vertical-align:text-bottom;animation:blink 0.8s ease-in-out infinite;}
+        @keyframes blink{0%,100%{opacity:1;}50%{opacity:0;}}
+        /* SIDEBAR FIELDS */
+        .sidebar-label{font-size:0.72rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px;}
+        .sidebar-section{padding-bottom:12px;border-bottom:1px solid var(--border);}
+        /* HISTORY */
+        .run-item{background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;cursor:pointer;transition:background 0.1s;}
+        .run-item:hover{background:var(--bg-card);}
+        .run-item-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:6px;}
+        .run-item-name{font-size:0.9rem;font-weight:700;color:var(--text-primary);}
+        .run-item-prompt{font-size:0.8rem;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px;}
+        .run-item-result{font-size:0.8rem;color:var(--text-primary);opacity:0.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+        /* MODAL */
+        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;opacity:0;pointer-events:none;transition:opacity 0.2s;}
+        .modal-overlay.show{opacity:1;pointer-events:all;}
+        .modal{background:var(--bg-secondary);border:1px solid var(--border);border-radius:14px;padding:28px 24px;width:100%;max-width:700px;margin:16px;max-height:90vh;overflow-y:auto;transform:scale(0.95);transition:transform 0.2s;}
+        .modal-overlay.show .modal{transform:scale(1);}
+        .modal-title{font-size:1.1rem;font-weight:700;color:var(--text-primary);margin-bottom:16px;}
+        .modal-actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+        /* TOKEN/COST INDICATOR */
+        .token-bar{display:flex;gap:16px;font-size:0.78rem;color:var(--text-secondary);padding:8px 12px;background:var(--bg-card);border-radius:6px;}
+        .token-val{color:var(--text-primary);font-weight:700;}
+        /* TOAST */
+        .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary);padding:10px 20px;border-radius:8px;font-size:0.87rem;font-weight:500;opacity:0;transition:all 0.3s;z-index:9999;pointer-events:none;white-space:nowrap;}
+        .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+        .toast.success{background:var(--success);border-color:var(--success);color:#fff;}
+        .toast.error{background:var(--danger);border-color:var(--danger);color:#fff;}
+        /* RUN DETAIL MODAL */
+        .run-detail-pre{background:var(--stream-bg);border:1px solid var(--border);border-radius:8px;padding:14px;font-size:0.82rem;line-height:1.6;color:var(--text-primary);white-space:pre-wrap;word-break:break-word;max-height:400px;overflow-y:auto;font-family:monospace;}
+        @media(max-width:720px){header{flex-wrap:wrap;padding:8px 12px;gap:6px;}.user-badge{display:none;}nav{order:3;width:100%;border-top:1px solid var(--border);padding-top:6px;}main{padding:12px;}.stats-grid{grid-template-columns:1fr 1fr;}.form-grid{grid-template-columns:1fr;gap:12px;}.form-group.full-width,.form-group.span2{grid-column:1;}.console-layout{grid-template-columns:1fr;}}
+    </style>
+</head>
+<body>
+
+<div id="login-screen">
+    <div class="login-site-links">
+        <a href="index.html">🏠 HQ</a>
+        <a href="armory.html">🔫 Armory</a>
+        <a href="automotive.html">🚗 Auto</a>
+        <a href="machinery.html">🚜 Machinery</a>
+        <a href="pharmacy.html">💊 Pharmacy</a>
+        <a href="insurance.html">🛡 Insurance</a>
+        <a href="agents.html" class="active">🤖 Agents</a>
+    </div>
+    <div class="login-box">
+        <div class="login-logo">🤖</div>
+        <h2 style="color:#fff;">Farmboss Agents</h2>
+        <p class="login-sub">Sign in to create &amp; run AI agents</p>
+        <form id="login-form">
+            <div class="form-group" style="margin-bottom:14px;">
+                <label>Email</label>
+                <input type="email" id="login-email" placeholder="your@email.com" required autocomplete="username">
+            </div>
+            <div class="form-group" style="margin-bottom:20px;">
+                <label>Password</label>
+                <input type="password" id="login-password" placeholder="••••••••" required autocomplete="current-password">
+            </div>
+            <div class="login-error" id="login-error"></div>
+            <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;" id="login-btn">Sign In</button>
+        </form>
+    </div>
+</div>
+
+<div id="loading-screen"><div class="spinner"></div><p style="color:var(--text-secondary);">Loading agents...</p></div>
+
+<div id="app">
+<div class="site-switcher">
+    <a href="index.html" class="site-link">🏠 Headquarters</a>
+    <a href="armory.html" class="site-link">🔫 Armory</a>
+    <a href="machinery.html" class="site-link">🚜 Machinery</a>
+    <a href="automotive.html" class="site-link">🚗 Automotive</a>
+    <a href="timepieces.html" class="site-link">⌚ Timepieces</a>
+    <a href="knives.html" class="site-link">🔪 Knives</a>
+    <a href="pharmacy.html" class="site-link">💊 Pharmacy</a>
+    <a href="insurance.html" class="site-link">🛡 Insurance</a>
+    <a href="agents.html" class="site-link active">🤖 Agents</a>
+</div>
+<header>
+    <div class="logo-area">
+        <div class="logo-icon">🤖</div>
+        <h1>Farmboss <span>Agents</span></h1>
+    </div>
+    <nav>
+        <button class="active" onclick="showView('dashboard')">Dashboard</button>
+        <button onclick="showView('library')">Agent Library</button>
+        <button onclick="showView('create')">＋ Create Agent</button>
+        <button onclick="showView('console')">▶ Run Console</button>
+        <button onclick="showView('history')">Run History</button>
+        <button onclick="showView('settings')">⚙ Settings</button>
+    </nav>
+    <div class="header-right">
+        <span class="user-badge" id="user-email"></span>
+        <button class="btn-signout" onclick="doSignOut()">Sign Out</button>
+    </div>
+</header>
+<main>
+
+<!-- DASHBOARD -->
+<div id="view-dashboard" class="view active">
+    <div style="background:linear-gradient(135deg,#0a0820 0%,#180f35 60%,#200a40 100%);border-radius:12px;padding:28px 32px;margin-bottom:20px;position:relative;overflow:hidden;">
+        <div style="position:absolute;inset:0;background:radial-gradient(circle at 80% 50%,rgba(139,92,246,0.15) 0%,transparent 60%);pointer-events:none;"></div>
+        <div style="position:relative;">
+            <div style="font-size:1.6rem;font-weight:800;color:#fff;margin-bottom:4px;">Farmboss <span style="color:var(--accent);">Agents</span></div>
+            <div style="font-size:0.88rem;color:rgba(255,255,255,0.55);">Create · Configure · Run · Stream results in real time</div>
+        </div>
+    </div>
+    <div class="stats-grid" id="stats-grid"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;" class="dash-cols">
+        <div class="card">
+            <div class="card-title"><div class="card-title-left">🤖 Recent Agents</div><button class="btn btn-ghost btn-sm" onclick="showView('library')">View All</button></div>
+            <div id="recent-agents-list"></div>
+        </div>
+        <div class="card">
+            <div class="card-title"><div class="card-title-left">📋 Recent Runs</div><button class="btn btn-ghost btn-sm" onclick="showView('history')">View All</button></div>
+            <div id="recent-runs-list"></div>
+        </div>
+    </div>
+</div>
+
+<!-- AGENT LIBRARY -->
+<div id="view-library" class="view">
+    <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+        <input type="text" id="lib-search" placeholder="Search agents..." oninput="renderLibrary()" style="flex:1;min-width:200px;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:0.87rem;font-family:inherit;background:var(--bg-secondary);color:var(--text-primary);">
+        <button class="btn btn-primary" onclick="showView('create')">＋ New Agent</button>
+        <button class="btn btn-ghost btn-sm" onclick="installTemplates()">📦 Install Templates</button>
+    </div>
+    <div class="agent-cards-grid" id="library-grid">
+        <div style="color:var(--text-secondary);padding:40px;text-align:center;grid-column:1/-1;">Loading agents...</div>
+    </div>
+</div>
+
+<!-- CREATE / EDIT AGENT -->
+<div id="view-create" class="view">
+    <div class="card">
+        <div class="card-title"><div class="card-title-left" id="create-title">＋ Create New Agent</div></div>
+        <form id="agent-form">
+            <input type="hidden" id="edit-agent-id">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Agent Name *</label>
+                    <input type="text" id="f-name" placeholder="e.g. Research Assistant" required>
+                </div>
+                <div class="form-group">
+                    <label>Icon / Emoji</label>
+                    <input type="text" id="f-icon" placeholder="🤖" maxlength="4">
+                </div>
+                <div class="form-group">
+                    <label>Model</label>
+                    <select id="f-model">
+                        <option value="claude-sonnet-4-5">Claude Sonnet 4.5 (Balanced)</option>
+                        <option value="claude-opus-4-5">Claude Opus 4.5 (Powerful)</option>
+                        <option value="claude-haiku-4-5">Claude Haiku 4.5 (Fast)</option>
+                        <option value="claude-opus-4-5-20251101">Claude Opus 4.5 (Latest)</option>
+                        <option value="claude-sonnet-4-6">Claude Sonnet 4.6</option>
+                    </select>
+                </div>
+                <div class="form-group span2">
+                    <label>Description</label>
+                    <input type="text" id="f-desc" placeholder="What does this agent do?">
+                </div>
+                <div class="form-group">
+                    <label>Category / Tag</label>
+                    <input type="text" id="f-category" list="cat-list" placeholder="e.g. Research, Writing, Analysis" autocomplete="off">
+                    <datalist id="cat-list"><option value="Research"><option value="Writing"><option value="Analysis"><option value="Coding"><option value="Summary"><option value="Creative"><option value="Q&A"><option value="Farmboss"></datalist>
+                </div>
+                <div class="form-group">
+                    <label>Max Tokens</label>
+                    <input type="number" id="f-max-tokens" value="2048" min="100" max="8192" step="100">
+                </div>
+                <div class="form-group">
+                    <label>Temperature (0–1)</label>
+                    <input type="number" id="f-temperature" value="0.7" min="0" max="1" step="0.05">
+                </div>
+                <div class="form-group full-width">
+                    <label>System Prompt *</label>
+                    <textarea id="f-system" rows="10" placeholder="You are a helpful assistant that..." required style="font-family:monospace;font-size:0.85rem;"></textarea>
+                </div>
+                <div class="form-group full-width">
+                    <label>Default / Starter Message <span style="font-weight:400;font-size:0.75rem;color:var(--text-secondary);">(optional — pre-fills the run console)</span></label>
+                    <input type="text" id="f-starter" placeholder="e.g. Hello! How can I help you today?">
+                </div>
+                <div class="form-group full-width">
+                    <label>Notes</label>
+                    <textarea id="f-notes" rows="2" placeholder="Usage tips, example prompts, known limitations..."></textarea>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" id="agent-submit-btn">Save Agent</button>
+                <button type="button" class="btn btn-ghost" onclick="resetAgentForm()">Clear</button>
+                <button type="button" class="btn btn-ghost" onclick="showView('library')">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- RUN CONSOLE -->
+<div id="view-console" class="view">
+    <div class="console-layout">
+        <!-- Sidebar -->
+        <div class="console-sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-label">Active Agent</div>
+                <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+                    <span id="console-agent-icon" style="font-size:1.5rem;">🤖</span>
+                    <div>
+                        <div id="console-agent-name" style="font-weight:700;font-size:0.9rem;color:var(--text-primary);">No agent selected</div>
+                        <div id="console-agent-model" style="font-size:0.75rem;color:var(--text-secondary);"></div>
+                    </div>
+                </div>
+                <select id="console-agent-select" onchange="selectConsoleAgent(this.value)" style="width:100%;padding:7px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-size:0.82rem;font-family:inherit;">
+                    <option value="">— Select Agent —</option>
+                </select>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-label">Conversation Mode</div>
+                <label style="display:flex;align-items:center;gap:8px;font-size:0.82rem;cursor:pointer;color:var(--text-secondary);">
+                    <input type="checkbox" id="multi-turn" style="accent-color:var(--accent);">
+                    Multi-turn (keep history)
+                </label>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-label">Override Model</div>
+                <select id="override-model" style="width:100%;padding:7px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-size:0.82rem;font-family:inherit;">
+                    <option value="">Use agent default</option>
+                    <option value="claude-sonnet-4-5">Claude Sonnet 4.5</option>
+                    <option value="claude-opus-4-5">Claude Opus 4.5</option>
+                    <option value="claude-haiku-4-5">Claude Haiku 4.5</option>
+                    <option value="claude-sonnet-4-6">Claude Sonnet 4.6</option>
+                </select>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-label">System Prompt</div>
+                <div id="console-system-preview" style="font-size:0.75rem;color:var(--text-secondary);line-height:1.5;max-height:120px;overflow-y:auto;background:var(--bg-card);padding:8px;border-radius:6px;">No agent selected.</div>
+            </div>
+            <div>
+                <div class="sidebar-label">Stats</div>
+                <div id="console-stats" style="font-size:0.78rem;color:var(--text-secondary);line-height:1.8;"></div>
+            </div>
+            <div style="margin-top:auto;display:flex;flex-direction:column;gap:6px;">
+                <button class="btn btn-ghost btn-sm" onclick="clearConversation()" style="width:100%;justify-content:center;">🗑 Clear Chat</button>
+                <button class="btn btn-success btn-sm" onclick="saveConversation()" style="width:100%;justify-content:center;" id="btn-save-conv">💾 Save Run</button>
+            </div>
+        </div>
+        <!-- Main stream area -->
+        <div class="console-main">
+            <div class="stream-box">
+                <div class="stream-messages" id="stream-messages">
+                    <div class="msg msg-system">Select an agent from the sidebar, then type your message below to begin. Responses stream in real time.</div>
+                </div>
+                <div style="padding:6px 12px;background:var(--bg-card);border-top:1px solid var(--border);display:flex;gap:16px;">
+                    <span style="font-size:0.72rem;color:var(--text-secondary);">Total tokens: <strong id="total-tokens" style="color:var(--text-primary);">0</strong></span>
+                    <span style="font-size:0.72rem;color:var(--text-secondary);">Messages: <strong id="msg-count" style="color:var(--text-primary);">0</strong></span>
+                    <span id="stream-status" style="font-size:0.72rem;color:var(--success);margin-left:auto;"></span>
+                </div>
+                <div class="stream-input-bar">
+                    <textarea id="stream-input" placeholder="Type your message… (Ctrl+Enter to send)" rows="1" oninput="autoResize(this)" onkeydown="handleStreamKey(event)"></textarea>
+                    <button class="btn btn-primary" id="btn-send" onclick="sendMessage()" style="padding:9px 16px;flex-shrink:0;">Send ▶</button>
+                    <button class="btn btn-danger btn-sm" id="btn-stop" onclick="stopStream()" style="display:none;flex-shrink:0;">■ Stop</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- RUN HISTORY -->
+<div id="view-history" class="view">
+    <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+        <input type="text" id="hist-search" placeholder="Search runs..." oninput="renderHistory()" style="flex:1;min-width:200px;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:0.87rem;font-family:inherit;background:var(--bg-secondary);color:var(--text-primary);">
+        <select id="hist-agent-filter" onchange="renderHistory()" style="padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:0.87rem;font-family:inherit;background:var(--bg-secondary);color:var(--text-primary);">
+            <option value="">All Agents</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="loadHistory()">🔄 Refresh</button>
+    </div>
+    <div id="history-list"></div>
+</div>
+
+<!-- SETTINGS -->
+<div id="view-settings" class="view">
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">🔑 Anthropic API Key</div></div>
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+            <div class="form-group" style="flex:1;min-width:260px;">
+                <label>API Key</label>
+                <input type="password" id="api-key-input" placeholder="sk-ant-api03-...">
+            </div>
+            <button class="btn btn-primary" onclick="saveApiKey()" style="height:38px;align-self:flex-end;">Save Key</button>
+            <button class="btn btn-ghost" onclick="testApiKey()" style="height:38px;align-self:flex-end;">Test</button>
+        </div>
+        <div id="api-status" style="margin-top:10px;font-size:0.82rem;padding:8px 12px;border-radius:6px;display:none;"></div>
+    </div>
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">🌐 CORS Proxy URL</div></div>
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+            <div class="form-group" style="flex:1;min-width:260px;">
+                <label>Proxy URL</label>
+                <input type="text" id="proxy-input" placeholder="https://your-worker.workers.dev">
+            </div>
+            <button class="btn btn-primary" onclick="saveProxy()" style="height:38px;align-self:flex-end;">Save</button>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">📖 How Streaming Works</div></div>
+        <div style="font-size:0.85rem;color:var(--text-secondary);line-height:1.7;">
+            <p>The Run Console connects to the Anthropic API via your Cloudflare Worker proxy and streams the response token by token using Server-Sent Events (SSE).</p>
+            <p style="margin-top:8px;">The proxy forwards <code style="background:var(--bg-card);padding:2px 6px;border-radius:4px;color:var(--accent);">stream: true</code> to the Anthropic API. As each token arrives, it appears immediately in the console — just like in Claude.ai.</p>
+            <p style="margin-top:8px;">If streaming fails, the console automatically falls back to a standard (non-streaming) request and displays the full response when complete.</p>
+        </div>
+    </div>
+</div>
+
+</main>
+</div><!-- /app -->
+
+<!-- RUN DETAIL MODAL -->
+<div class="modal-overlay" id="run-detail-modal">
+    <div class="modal" style="max-width:780px;">
+        <div class="modal-title" id="run-detail-title"></div>
+        <div id="run-detail-body"></div>
+        <div class="modal-actions">
+            <button class="btn btn-primary" id="run-detail-rerun">▶ Re-run in Console</button>
+            <button class="btn btn-ghost" onclick="closeModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+firebase.initializeApp({
+    apiKey:"AIzaSyB7c4urD9tJO80S7nADItxjwhSYVqlrkEU",
+    authDomain:"watchroom-714a0.firebaseapp.com",
+    projectId:"watchroom-714a0",
+    storageBucket:"watchroom-714a0.firebasestorage.app",
+    messagingSenderId:"911514107783",
+    appId:"1:911514107783:web:20e8a729fd66577c28dd22"
+});
+const auth=firebase.auth(), db=firebase.firestore();
+
+let agents=[], runs=[], unsubAgents=null;
+let apiKey='', proxyUrl='', activeAgent=null;
+let conversation=[]; // [{role,content}]
+let totalTokensUsed=0, isStreaming=false, streamAbortController=null;
+let currentRunId=null;
+
+const VIEWS=['dashboard','library','create','console','history','settings'];
+
+const AGENT_TEMPLATES=[
+    {name:'Research Assistant',icon:'🔬',category:'Research',model:'claude-sonnet-4-5',maxTokens:4096,temperature:0.4,
+     description:'Thorough research assistant that provides well-sourced analysis on any topic.',
+     systemPrompt:`You are a thorough and accurate research assistant. When given a topic or question, you:
+1. Provide a comprehensive overview
+2. Break down the key concepts clearly
+3. Present multiple perspectives where relevant
+4. Highlight important caveats or uncertainties
+5. Structure your response with clear headings
+
+Always be accurate, cite your reasoning, and flag anything you are uncertain about.`},
+    {name:'Writing Coach',icon:'✍️',category:'Writing',model:'claude-sonnet-4-5',maxTokens:2048,temperature:0.8,
+     description:'Helps improve, edit, and refine any piece of writing.',
+     systemPrompt:`You are an expert writing coach and editor. Your job is to help improve writing at any level. You:
+- Identify clarity, grammar, style, and structure issues
+- Suggest concrete improvements with examples
+- Preserve the author's voice while strengthening the work
+- Explain WHY each change improves the writing
+
+Be constructive and specific. Show the improved version alongside your explanations.`},
+    {name:'Code Reviewer',icon:'💻',category:'Coding',model:'claude-sonnet-4-5',maxTokens:4096,temperature:0.2,
+     description:'Reviews code for bugs, performance, security, and best practices.',
+     systemPrompt:`You are a senior software engineer performing code reviews. For any code provided, you:
+1. Identify bugs, edge cases, and logical errors
+2. Flag security vulnerabilities
+3. Suggest performance improvements
+4. Check for best practices and readability
+5. Provide corrected/improved code snippets
+
+Format your response with: Summary, Issues Found (with severity), Suggested Improvements, Revised Code (if applicable).`},
+    {name:'Farmboss Advisor',icon:'🌾',category:'Farmboss',model:'claude-sonnet-4-5',maxTokens:2048,temperature:0.6,
+     description:'Farm and ranch management advisor for the Stoebner operation.',
+     systemPrompt:`You are an experienced farm and ranch management advisor for the Farmboss operation — a Texas-based family farm and ranch. You provide practical, actionable advice on:
+- Livestock management (cattle, horses, pigs, chickens)
+- Equipment maintenance and purchasing decisions
+- Land management and crop planning
+- Financial planning for agricultural operations
+- Texas-specific regulations and resources
+
+Be practical, direct, and grounded in real-world ranch experience.`},
+    {name:'Summarizer',icon:'📋',category:'Summary',model:'claude-haiku-4-5',maxTokens:1024,temperature:0.3,
+     description:'Condenses long text into clear, concise summaries.',
+     systemPrompt:`You are a precise summarization assistant. When given text, you produce:
+- A 1-2 sentence TL;DR
+- 3-5 key bullet points
+- Any important action items or decisions mentioned
+
+Keep summaries accurate, brief, and scannable. Never add interpretation not in the original text.`},
+    {name:'Devil\'s Advocate',icon:'😈',category:'Analysis',model:'claude-sonnet-4-5',maxTokens:2048,temperature:0.9,
+     description:'Challenges assumptions and steelmans opposing viewpoints.',
+     systemPrompt:`You are a devil's advocate. Your job is to challenge ideas by:
+- Finding the strongest counterarguments
+- Steelmanning opposing positions
+- Identifying hidden assumptions
+- Pointing out what could go wrong
+
+You are not trying to be right — you are trying to make ideas stronger by stress-testing them. Be sharp, direct, and intellectually honest.`},
+];
+
+auth.onAuthStateChanged(user=>{
+    if(user){
+        document.getElementById('login-screen').style.display='none';
+        document.getElementById('loading-screen').style.display='flex';
+        document.getElementById('app').style.display='none';
+        document.getElementById('user-email').textContent=user.email;
+        initApp();
+    }else{
+        document.getElementById('login-screen').style.display='flex';
+        document.getElementById('loading-screen').style.display='none';
+        document.getElementById('app').style.display='none';
+        if(unsubAgents){unsubAgents();unsubAgents=null;}
+    }
+});
+
+document.getElementById('login-form').addEventListener('submit',async e=>{
+    e.preventDefault();
+    const email=document.getElementById('login-email').value.trim();
+    const pass=document.getElementById('login-password').value;
+    const errEl=document.getElementById('login-error'), btn=document.getElementById('login-btn');
+    errEl.textContent=''; btn.textContent='Signing in...'; btn.disabled=true;
+    try{ await auth.signInWithEmailAndPassword(email,pass); }
+    catch(err){ errEl.textContent='Invalid email or password.'; btn.textContent='Sign In'; btn.disabled=false; }
+});
+async function doSignOut(){ if(!confirm('Sign out?'))return; await auth.signOut(); }
+
+async function initApp(){
+    try{
+        const keyDoc=await db.collection('settings').doc('apikey').get();
+        if(keyDoc.exists&&keyDoc.data().key){ apiKey=keyDoc.data().key; document.getElementById('api-key-input').value=apiKey; }
+        const proxyDoc=await db.collection('settings').doc('proxy').get();
+        if(proxyDoc.exists&&proxyDoc.data().url){ proxyUrl=proxyDoc.data().url; document.getElementById('proxy-input').value=proxyUrl; }
+        unsubAgents=db.collection('agents').onSnapshot(snap=>{
+            agents=snap.docs.map(doc=>({_docId:doc.id,...doc.data()})).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+            renderDashboard(); renderLibrary(); populateConsoleSelect(); populateHistFilter();
+        });
+        loadHistory();
+        document.getElementById('loading-screen').style.display='none';
+        document.getElementById('app').style.display='block';
+        showView('dashboard');
+    }catch(err){
+        document.getElementById('loading-screen').innerHTML=`<p style="color:var(--danger);padding:20px;text-align:center;">Error: ${err.message}<br><br><button class="btn btn-ghost" onclick="doSignOut()">Sign Out</button></p>`;
+    }
+}
+
+function showView(v){
+    VIEWS.forEach(id=>{ const el=document.getElementById('view-'+id); if(el) el.classList.remove('active'); });
+    const t=document.getElementById('view-'+v); if(t) t.classList.add('active');
+    document.querySelectorAll('nav button').forEach((b,i)=>{ b.classList.toggle('active',VIEWS[i]===v); });
+    if(v==='create'&&!document.getElementById('edit-agent-id').value) resetAgentForm();
+    if(v==='history') loadHistory();
+}
+
+// ── DASHBOARD ────────────────────────────────────────────────────
+function renderDashboard(){
+    const totalRuns=runs.length;
+    const today=new Date(); today.setHours(0,0,0,0);
+    const runsToday=runs.filter(r=>{ const d=r.runAt?.toDate?.()||new Date(0); return d>=today; }).length;
+    document.getElementById('stats-grid').innerHTML=`
+        <div class="stat-card"><div class="stat-value">${agents.length}</div><div class="stat-label">Agents Built</div></div>
+        <div class="stat-card"><div class="stat-value" style="color:var(--success);">${totalRuns}</div><div class="stat-label">Total Runs</div></div>
+        <div class="stat-card"><div class="stat-value" style="color:var(--warning);">${runsToday}</div><div class="stat-label">Runs Today</div></div>
+        <div class="stat-card"><div class="stat-value" style="color:#60a5fa;">${[...new Set(agents.map(a=>a.category).filter(Boolean))].length}</div><div class="stat-label">Categories</div></div>
+    `;
+    const recentAgents=document.getElementById('recent-agents-list');
+    recentAgents.innerHTML=agents.slice(0,5).map(a=>`
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer;" onclick="openInConsole('${a._docId}')">
+            <span style="font-size:1.2rem;">${a.icon||'🤖'}</span>
+            <div style="flex:1;min-width:0;">
+                <div style="font-weight:600;font-size:0.88rem;">${esc(a.name)}</div>
+                <div style="font-size:0.75rem;color:var(--text-secondary);">${esc(a.category||'—')} · ${esc(a.model||'')}</div>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();openInConsole('${a._docId}')">▶</button>
+        </div>`).join('')||'<div style="color:var(--text-secondary);padding:20px;text-align:center;font-size:0.85rem;">No agents yet. <a href="#" onclick="showView(\'create\');return false;" style="color:var(--accent);">Create one →</a></div>';
+    const recentRuns=document.getElementById('recent-runs-list');
+    const r5=runs.slice(0,5);
+    recentRuns.innerHTML=r5.map(r=>`
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer;" onclick="openRunDetail('${r._docId}')">
+            <div style="flex:1;min-width:0;">
+                <div style="font-weight:600;font-size:0.85rem;">${esc(r.agentName||'Unknown Agent')}</div>
+                <div style="font-size:0.75rem;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc((r.messages?.[0]?.content||r.userMessage||'').slice(0,60))}</div>
+            </div>
+            <span style="font-size:0.7rem;color:var(--text-secondary);flex-shrink:0;">${r.runAt?.toDate?.()?fmtAgo(r.runAt.toDate()):''}</span>
+        </div>`).join('')||'<div style="color:var(--text-secondary);padding:20px;text-align:center;font-size:0.85rem;">No runs yet.</div>';
+}
+
+// ── LIBRARY ──────────────────────────────────────────────────────
+function renderLibrary(){
+    const q=(document.getElementById('lib-search')?.value||'').toLowerCase();
+    const filtered=agents.filter(a=> !q || `${a.name} ${a.description} ${a.category}`.toLowerCase().includes(q));
+    const grid=document.getElementById('library-grid');
+    if(!filtered.length){ grid.innerHTML='<div style="color:var(--text-secondary);padding:40px;text-align:center;grid-column:1/-1;">No agents found. <a href="#" onclick="showView(\'create\');return false;" style="color:var(--accent);">Create one →</a></div>'; return; }
+    grid.innerHTML=filtered.map(a=>`
+        <div class="agent-card">
+            <div class="agent-card-icon">${a.icon||'🤖'}</div>
+            <div class="agent-card-name">${esc(a.name)}</div>
+            <div class="agent-card-desc">${esc(a.description||'No description.')}</div>
+            <div class="agent-card-meta">
+                <span class="badge badge-model">${esc(a.model||'—')}</span>
+                ${a.category?`<span class="badge" style="background:rgba(255,255,255,0.07);color:var(--text-secondary);">${esc(a.category)}</span>`:''}
+            </div>
+            <div class="agent-card-actions">
+                <button class="btn btn-primary btn-sm" onclick="openInConsole('${a._docId}')">▶ Run</button>
+                <button class="btn btn-ghost btn-sm" onclick="editAgent('${a._docId}')">✏ Edit</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteAgent('${a._docId}','${esc(a.name)}')">🗑</button>
+            </div>
+        </div>`).join('');
+}
+
+// ── AGENT FORM ────────────────────────────────────────────────────
+function resetAgentForm(){
+    document.getElementById('agent-form').reset();
+    document.getElementById('edit-agent-id').value='';
+    document.getElementById('create-title').textContent='＋ Create New Agent';
+    document.getElementById('agent-submit-btn').textContent='Save Agent';
+    document.getElementById('f-icon').value='🤖';
+    document.getElementById('f-max-tokens').value='2048';
+    document.getElementById('f-temperature').value='0.7';
+}
+function editAgent(docId){
+    const a=agents.find(x=>x._docId===docId); if(!a) return;
+    resetAgentForm();
+    document.getElementById('edit-agent-id').value=docId;
+    document.getElementById('create-title').textContent='✏ Edit Agent';
+    document.getElementById('agent-submit-btn').textContent='Update Agent';
+    const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=v||''; };
+    set('f-name',a.name); set('f-icon',a.icon||'🤖'); set('f-model',a.model);
+    set('f-desc',a.description); set('f-category',a.category); set('f-max-tokens',a.maxTokens||2048);
+    set('f-temperature',a.temperature!=null?a.temperature:0.7);
+    set('f-system',a.systemPrompt); set('f-starter',a.starterMessage); set('f-notes',a.notes);
+    showView('create');
+}
+document.getElementById('agent-form').addEventListener('submit',async e=>{
+    e.preventDefault();
+    const btn=document.getElementById('agent-submit-btn'); btn.disabled=true; btn.textContent='Saving...';
+    const docId=document.getElementById('edit-agent-id').value;
+    const data={
+        name:document.getElementById('f-name').value.trim(),
+        icon:document.getElementById('f-icon').value.trim()||'🤖',
+        model:document.getElementById('f-model').value,
+        description:document.getElementById('f-desc').value.trim(),
+        category:document.getElementById('f-category').value.trim(),
+        maxTokens:Number(document.getElementById('f-max-tokens').value)||2048,
+        temperature:Number(document.getElementById('f-temperature').value)||0.7,
+        systemPrompt:document.getElementById('f-system').value.trim(),
+        starterMessage:document.getElementById('f-starter').value.trim(),
+        notes:document.getElementById('f-notes').value.trim(),
+        updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+    };
+    try{
+        if(docId){ await db.collection('agents').doc(docId).update(data); toast('Agent updated!','success'); }
+        else{ data.createdAt=firebase.firestore.FieldValue.serverTimestamp(); await db.collection('agents').add(data); toast('Agent created!','success'); }
+        showView('library');
+    }catch(err){ toast('Error: '+err.message,'error'); }
+    btn.disabled=false; btn.textContent=docId?'Update Agent':'Save Agent';
+});
+async function deleteAgent(docId,name){
+    if(!confirm(`Delete agent "${name}"? Run history will be kept.`)) return;
+    try{ await db.collection('agents').doc(docId).delete(); toast('Agent deleted.'); }
+    catch(e){ toast('Error: '+e.message,'error'); }
+}
+
+// ── CONSOLE ───────────────────────────────────────────────────────
+function populateConsoleSelect(){
+    const sel=document.getElementById('console-agent-select');
+    const cur=sel.value;
+    sel.innerHTML='<option value="">— Select Agent —</option>'+agents.map(a=>`<option value="${a._docId}">${a.icon||'🤖'} ${esc(a.name)}</option>`).join('');
+    if(cur) sel.value=cur;
+}
+function selectConsoleAgent(docId){
+    activeAgent=agents.find(a=>a._docId===docId)||null;
+    if(!activeAgent){ document.getElementById('console-agent-name').textContent='No agent selected'; document.getElementById('console-agent-model').textContent=''; document.getElementById('console-system-preview').textContent='No agent selected.'; return; }
+    document.getElementById('console-agent-icon').textContent=activeAgent.icon||'🤖';
+    document.getElementById('console-agent-name').textContent=activeAgent.name;
+    document.getElementById('console-agent-model').textContent=activeAgent.model||'';
+    document.getElementById('console-system-preview').textContent=activeAgent.systemPrompt||'(no system prompt)';
+    if(activeAgent.starterMessage&&conversation.length===0){
+        document.getElementById('stream-input').value=activeAgent.starterMessage;
+        autoResize(document.getElementById('stream-input'));
+    }
+    appendSystemMsg(`Agent switched: ${activeAgent.name}`);
+}
+function openInConsole(docId){
+    showView('console');
+    document.getElementById('console-agent-select').value=docId;
+    selectConsoleAgent(docId);
+    document.getElementById('stream-input').focus();
+}
+
+function appendSystemMsg(text){
+    const msgs=document.getElementById('stream-messages');
+    const div=document.createElement('div'); div.className='msg msg-system'; div.textContent=text;
+    msgs.appendChild(div); msgs.scrollTop=msgs.scrollHeight;
+}
+function appendUserMsg(text){
+    const msgs=document.getElementById('stream-messages');
+    const wrap=document.createElement('div'); wrap.style.cssText='display:flex;flex-direction:column;align-items:flex-end;';
+    wrap.innerHTML=`<div style="font-size:0.68rem;color:var(--text-secondary);margin-bottom:3px;text-align:right;">You</div><div class="msg msg-user">${esc(text)}</div>`;
+    msgs.appendChild(wrap); msgs.scrollTop=msgs.scrollHeight;
+}
+function createAgentMsgEl(){
+    const msgs=document.getElementById('stream-messages');
+    const wrap=document.createElement('div'); wrap.style.cssText='display:flex;flex-direction:column;align-items:flex-start;max-width:90%;';
+    wrap.innerHTML=`<div style="font-size:0.68rem;color:var(--accent);margin-bottom:3px;">${activeAgent?.name||'Agent'} <span style="color:var(--text-secondary);font-size:0.65rem;">${activeAgent?.model||''}</span></div><div class="msg msg-agent" id="streaming-msg"></div>`;
+    msgs.appendChild(wrap); msgs.scrollTop=msgs.scrollHeight;
+    return document.getElementById('streaming-msg');
+}
+function updateStats(){
+    document.getElementById('total-tokens').textContent=totalTokensUsed.toLocaleString();
+    document.getElementById('msg-count').textContent=conversation.length;
+}
+
+async function sendMessage(){
+    if(isStreaming) return;
+    const input=document.getElementById('stream-input');
+    const text=input.value.trim();
+    if(!text){ toast('Enter a message first.','error'); return; }
+    if(!activeAgent){ toast('Select an agent first.','error'); return; }
+    if(!apiKey){ toast('Add your API key in Settings.','error'); showView('settings'); return; }
+    if(!proxyUrl){ toast('Add your proxy URL in Settings.','error'); showView('settings'); return; }
+    input.value=''; autoResize(input);
+    appendUserMsg(text);
+    const multiTurn=document.getElementById('multi-turn').checked;
+    if(multiTurn){ conversation.push({role:'user',content:text}); }
+    else{ conversation=[{role:'user',content:text}]; }
+    await callAgent(text, multiTurn);
+}
+
+async function callAgent(userText, keepHistory){
+    isStreaming=true;
+    document.getElementById('btn-send').style.display='none';
+    document.getElementById('btn-stop').style.display='flex';
+    document.getElementById('stream-status').textContent='⬤ Streaming...';
+    const model=document.getElementById('override-model').value||activeAgent.model||'claude-sonnet-4-5';
+    const msgEl=createAgentMsgEl(); msgEl.innerHTML='<span class="cursor-blink"></span>';
+    let fullText='';
+    streamAbortController=new AbortController();
+    const body={
+        apiKey, model,
+        max_tokens:activeAgent.maxTokens||2048,
+        ...(activeAgent.temperature!=null?{temperature:activeAgent.temperature}:{}),
+        ...(activeAgent.systemPrompt?{system:activeAgent.systemPrompt}:{}),
+        messages:conversation,
+        stream:true
+    };
+    try{
+        const res=await fetch(proxyUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:streamAbortController.signal});
+        if(!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+        const contentType=res.headers.get('content-type')||'';
+        // Streaming SSE
+        if(contentType.includes('text/event-stream')||contentType.includes('text/plain')){
+            const reader=res.body.getReader(); const decoder=new TextDecoder();
+            let buf='';
+            while(true){
+                const {done,value}=await reader.read();
+                if(done) break;
+                buf+=decoder.decode(value,{stream:true});
+                const lines=buf.split('\n'); buf=lines.pop();
+                for(const line of lines){
+                    if(!line.startsWith('data:')) continue;
+                    const data=line.slice(5).trim();
+                    if(data==='[DONE]') break;
+                    try{
+                        const p=JSON.parse(data);
+                        if(p.type==='content_block_delta'&&p.delta?.type==='text_delta'){ fullText+=p.delta.text; msgEl.textContent=fullText; msgEl.insertAdjacentHTML('beforeend','<span class="cursor-blink"></span>'); document.getElementById('stream-messages').scrollTop=99999; }
+                        if(p.type==='message_delta'&&p.usage){ totalTokensUsed+=p.usage.output_tokens||0; updateStats(); }
+                        if(p.usage){ totalTokensUsed+=(p.usage.input_tokens||0)+(p.usage.output_tokens||0); updateStats(); }
+                    }catch{}
+                }
+            }
+        } else {
+            // Non-streaming fallback — show simulated typing
+            const json=await res.json();
+            const content=json.content?.[0]?.text||json.choices?.[0]?.message?.content||'(No response)';
+            if(json.usage){ totalTokensUsed+=(json.usage.input_tokens||0)+(json.usage.output_tokens||0); updateStats(); }
+            // Simulate streaming with typing effect
+            for(let i=0;i<=content.length;i+=4){
+                fullText=content.slice(0,i);
+                msgEl.textContent=fullText;
+                msgEl.insertAdjacentHTML('beforeend','<span class="cursor-blink"></span>');
+                document.getElementById('stream-messages').scrollTop=99999;
+                await new Promise(r=>setTimeout(r,8));
+            }
+            fullText=content;
+        }
+        msgEl.textContent=fullText;
+        if(keepHistory) conversation.push({role:'assistant',content:fullText});
+        updateStats();
+        document.getElementById('stream-status').textContent='✓ Complete';
+        // Auto-save to Firestore
+        await db.collection('agent_runs').add({
+            agentId:activeAgent._docId, agentName:activeAgent.name, agentIcon:activeAgent.icon||'🤖',
+            model, messages:[...conversation], userMessage:userText, response:fullText,
+            tokensUsed:totalTokensUsed, runAt:firebase.firestore.FieldValue.serverTimestamp()
+        });
+        setTimeout(()=>{ document.getElementById('stream-status').textContent=''; },3000);
+    }catch(e){
+        if(e.name==='AbortError'){ msgEl.textContent=fullText||'(stopped)'; appendSystemMsg('Stream stopped.'); }
+        else{ msgEl.style.color='var(--danger)'; msgEl.textContent='Error: '+e.message; appendSystemMsg('Run failed: '+e.message); }
+        document.getElementById('stream-status').textContent='';
+    }finally{
+        isStreaming=false;
+        document.getElementById('btn-send').style.display='flex';
+        document.getElementById('btn-stop').style.display='none';
+    }
+}
+
+function stopStream(){ if(streamAbortController) streamAbortController.abort(); }
+function clearConversation(){ conversation=[]; document.getElementById('stream-messages').innerHTML=''; appendSystemMsg('Chat cleared.'); totalTokensUsed=0; updateStats(); }
+
+async function saveConversation(){
+    if(!conversation.length){ toast('Nothing to save.','error'); return; }
+    const last=conversation[conversation.length-1];
+    try{
+        await db.collection('agent_runs').add({
+            agentId:activeAgent?._docId||'', agentName:activeAgent?.name||'Unknown', agentIcon:activeAgent?.icon||'🤖',
+            model:activeAgent?.model||'', messages:[...conversation], userMessage:conversation[0]?.content||'',
+            response:last.role==='assistant'?last.content:'', tokensUsed:totalTokensUsed,
+            runAt:firebase.firestore.FieldValue.serverTimestamp(), manualSave:true
+        });
+        toast('Conversation saved!','success'); loadHistory();
+    }catch(e){ toast('Error: '+e.message,'error'); }
+}
+
+// ── HISTORY ───────────────────────────────────────────────────────
+async function loadHistory(){
+    try{
+        const snap=await db.collection('agent_runs').orderBy('runAt','desc').limit(100).get();
+        runs=snap.docs.map(doc=>({_docId:doc.id,...doc.data()}));
+        renderHistory(); renderDashboard(); populateHistFilter();
+    }catch(e){ console.warn('History load:',e.message); }
+}
+function populateHistFilter(){
+    const sel=document.getElementById('hist-agent-filter'); if(!sel) return;
+    const cur=sel.value;
+    const names=[...new Set(runs.map(r=>r.agentName).filter(Boolean))].sort();
+    sel.innerHTML='<option value="">All Agents</option>'+names.map(n=>`<option value="${n}">${esc(n)}</option>`).join('');
+    if(cur) sel.value=cur;
+}
+function renderHistory(){
+    const q=(document.getElementById('hist-search')?.value||'').toLowerCase();
+    const fa=document.getElementById('hist-agent-filter')?.value||'';
+    const filtered=runs.filter(r=>{
+        if(fa&&r.agentName!==fa) return false;
+        if(q&&!`${r.agentName} ${r.userMessage} ${r.response}`.toLowerCase().includes(q)) return false;
+        return true;
+    });
+    const container=document.getElementById('history-list');
+    if(!filtered.length){ container.innerHTML='<div style="color:var(--text-secondary);padding:40px;text-align:center;">No runs found.</div>'; return; }
+    container.innerHTML=filtered.map(r=>`
+        <div class="run-item" onclick="openRunDetail('${r._docId}')">
+            <div class="run-item-header">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span>${r.agentIcon||'🤖'}</span>
+                    <div class="run-item-name">${esc(r.agentName||'Unknown')}</div>
+                    <span class="badge badge-model">${esc(r.model||'')}</span>
+                </div>
+                <div style="font-size:0.72rem;color:var(--text-secondary);">${r.runAt?.toDate?.()?fmtAgo(r.runAt.toDate()):''}</div>
+            </div>
+            <div class="run-item-prompt">💬 ${esc((r.userMessage||'').slice(0,100))}</div>
+            <div class="run-item-result">↩ ${esc((r.response||'').slice(0,120))}</div>
+        </div>`).join('');
+}
+function openRunDetail(docId){
+    const r=runs.find(x=>x._docId===docId); if(!r) return;
+    document.getElementById('run-detail-title').innerHTML=`${r.agentIcon||'🤖'} ${esc(r.agentName||'Unknown')} <span style="font-size:0.75rem;color:var(--text-secondary);font-weight:400;"> · ${esc(r.model||'')} · ${r.runAt?.toDate?.()?fmtAgo(r.runAt.toDate()):''}</span>`;
+    const msgs=r.messages||[{role:'user',content:r.userMessage||''},{role:'assistant',content:r.response||''}];
+    document.getElementById('run-detail-body').innerHTML=msgs.map(m=>`
+        <div style="margin-bottom:12px;">
+            <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:${m.role==='user'?'var(--accent)':'var(--success)'};margin-bottom:4px;">${m.role==='user'?'You':'Agent'}</div>
+            <div class="run-detail-pre">${esc(m.content||'')}</div>
+        </div>`).join('');
+    document.getElementById('run-detail-rerun').onclick=()=>{ closeModal(); openInConsole(r.agentId||''); if(r.userMessage) setTimeout(()=>{ document.getElementById('stream-input').value=r.userMessage; autoResize(document.getElementById('stream-input')); },200); };
+    document.getElementById('run-detail-modal').classList.add('show');
+}
+function closeModal(){ document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('show')); }
+
+// ── SETTINGS ─────────────────────────────────────────────────────
+async function saveApiKey(){
+    apiKey=document.getElementById('api-key-input').value.trim();
+    try{ await db.collection('settings').doc('apikey').set({key:apiKey}); toast('API key saved!','success'); }
+    catch(e){ toast('Error: '+e.message,'error'); }
+}
+async function saveProxy(){
+    proxyUrl=document.getElementById('proxy-input').value.trim();
+    try{ await db.collection('settings').doc('proxy').set({url:proxyUrl}); toast('Proxy URL saved!','success'); }
+    catch(e){ toast('Error: '+e.message,'error'); }
+}
+async function testApiKey(){
+    if(!apiKey||!proxyUrl){ toast('Save API key and proxy URL first.','error'); return; }
+    const el=document.getElementById('api-status'); el.style.display='block'; el.textContent='Testing...'; el.style.background='rgba(59,130,246,0.15)'; el.style.color='var(--info)';
+    try{
+        const res=await fetch(proxyUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({apiKey,model:'claude-haiku-4-5',max_tokens:20,messages:[{role:'user',content:'Say "OK" only.'}]})});
+        if(!res.ok) throw new Error('HTTP '+res.status);
+        const json=await res.json();
+        const txt=json.content?.[0]?.text||json.choices?.[0]?.message?.content||'';
+        el.textContent='✓ Connected! Response: '+txt; el.style.background='rgba(16,185,129,0.15)'; el.style.color='var(--success)';
+    }catch(e){ el.textContent='✗ Error: '+e.message; el.style.background='rgba(239,68,68,0.15)'; el.style.color='var(--danger)'; }
+}
+
+// ── TEMPLATES ─────────────────────────────────────────────────────
+async function installTemplates(){
+    if(!confirm(`Install ${AGENT_TEMPLATES.length} built-in agent templates? This will add them to your library.`)) return;
+    try{
+        const batch=db.batch();
+        AGENT_TEMPLATES.forEach(t=>{ const ref=db.collection('agents').doc(); batch.set(ref,{...t,createdAt:firebase.firestore.FieldValue.serverTimestamp(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()}); });
+        await batch.commit();
+        toast(`Installed ${AGENT_TEMPLATES.length} templates!`,'success');
+    }catch(e){ toast('Error: '+e.message,'error'); }
+}
+
+// ── UTILITIES ─────────────────────────────────────────────────────
+function autoResize(el){ el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,120)+'px'; }
+function handleStreamKey(e){ if(e.key==='Enter'&&e.ctrlKey){ e.preventDefault(); sendMessage(); } }
+function esc(str){ return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmtAgo(date){
+    const s=Math.round((Date.now()-date)/1000);
+    if(s<60) return s+'s ago'; if(s<3600) return Math.round(s/60)+'m ago';
+    if(s<86400) return Math.round(s/3600)+'h ago'; return Math.round(s/86400)+'d ago';
+}
+function toast(msg,type=''){
+    const t=document.getElementById('toast'); t.textContent=msg;
+    t.className='toast'+(type?' '+type:''); t.classList.add('show');
+    setTimeout(()=>t.classList.remove('show'),3000);
+}
+// Add Enter key handler for login
+document.getElementById('login-email').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('login-password').focus(); });
+</script>
+</body>
+</html>

@@ -252,7 +252,7 @@
         /* ── HERO ── */
         .hero {
             position: relative;
-            background: #0f172a;
+            background: linear-gradient(135deg, #060d1a 0%, #0f172a 35%, #1a1535 70%, #0d1f3a 100%);
             display: flex;
             align-items: stretch;
             overflow: hidden;
@@ -270,28 +270,28 @@
             height: auto;
             display: block;
             object-fit: contain;
+            border-radius: 12px;
         }
-        /* Fade left edge of photo into dark background */
+        /* Soften all edges of cowboy hat photo into background */
         .hero-photo::before {
             content: '';
             position: absolute;
             inset: 0;
-            background: linear-gradient(
-                to right,
-                #0f172a 0%,
-                rgba(15,23,42,0.5) 30%,
-                transparent 65%
-            );
+            background:
+                linear-gradient(to right, #0f172a 0%, rgba(15,23,42,0.65) 22%, transparent 55%),
+                linear-gradient(to left,  #0f172a 0%, rgba(15,23,42,0.5) 18%, transparent 45%),
+                linear-gradient(to top,   #0f172a 0%, rgba(15,23,42,0.4) 15%, transparent 40%);
             z-index: 1;
             pointer-events: none;
+            border-radius: 12px;
         }
         /* Fade bottom edge */
         .hero-photo::after {
             content: '';
             position: absolute;
             bottom: 0; left: 0; right: 0;
-            height: 80px;
-            background: linear-gradient(to top, #0f172a 20%, transparent);
+            height: 100px;
+            background: linear-gradient(to top, #0f172a 10%, rgba(15,23,42,0.7) 40%, transparent);
             z-index: 1;
             pointer-events: none;
         }
@@ -877,6 +877,7 @@
     <a href="knives.html" class="site-link">🔪 Knives</a>
     <a href="pharmacy.html" class="site-link">💊 Pharmacy</a>
     <a href="insurance.html" class="site-link">🛡 Insurance</a>
+    <a href="agents.html" class="site-link">🤖 Agents</a>
 </div>
 
 <!-- LOADING -->
@@ -1101,6 +1102,21 @@
                 </div>
             </div>
 
+            <!-- Agents -->
+            <div class="site-card">
+                <div class="site-card-top" style="background:#8b5cf6;"></div>
+                <div class="site-card-body">
+                    <div class="site-card-header">
+                        <div class="site-card-icon">🤖</div>
+                        <div class="site-card-badge"><span id="badge-agents">—</span> agents built</div>
+                    </div>
+                    <div class="site-card-title">FARMBOSS AGENTS</div>
+                    <div class="site-card-desc">AI Agent Creator &amp; Runner</div>
+                    <div class="site-card-meta"><strong id="meta-agents">—</strong> total runs</div>
+                    <a href="agents.html" class="site-card-btn" style="background:#8b5cf6;color:#fff;">Go to Agents →</a>
+                </div>
+            </div>
+
         </div>
 
         <!-- RECENT ACTIVITY SECTION -->
@@ -1274,7 +1290,10 @@
             automotive: 'automotive_items',
             livestock:  'livestock_items',
             timepieces: 'timepiece_items',
-            knives:     'knife_items'
+            knives:     'knife_items',
+            pharmacy:   'rx_items',
+            insurance:  'insurance_items',
+            agents:     'agents'
         };
         Object.entries(collections).forEach(([key, col]) => {
             const unsub = db.collection(col).onSnapshot(snap => {
@@ -1283,6 +1302,12 @@
             }, () => {});
             unsubbers.push(unsub);
         });
+        // Agents: also track total runs for meta
+        const unsubRuns = db.collection('agent_runs').onSnapshot(snap => {
+            const metaEl = document.getElementById('meta-agents');
+            if (metaEl) metaEl.textContent = snap.size + ' total run' + (snap.size !== 1 ? 's' : '');
+        }, () => {});
+        unsubbers.push(unsubRuns);
     }
 
     // ── RECENT ACTIVITY ──

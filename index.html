@@ -380,6 +380,9 @@
             .hero-photo { width: 100%; max-width: 300px; margin: 0 auto; }
             .hero-text { padding: 28px 20px 8px; text-align: center; }
             .hero-title { font-size: 2rem; }
+            .dtw-bar { flex-direction: column; gap: 8px; }
+            .dtw-clock-area { min-width: 0; }
+            .dashboard-quote { font-size: 0.85rem; padding: 10px 14px; }
         }
 
         /* ── MAIN CONTENT ── */
@@ -831,9 +834,9 @@
 
         /* Site switcher: compact links on small screens */
         @media (max-width: 600px) {
-            .site-switcher { padding: 5px 10px; gap: 2px; }
+            .site-switcher { padding: 4px 8px; gap: 2px; }
             .site-switcher-label { display: none; }
-            .site-link { padding: 5px 9px; font-size: 0.73rem; }
+            .site-link { padding: 5px 8px; font-size: 0.72rem; }
         }
 
         /* Hero photo: constrain height and cover-fit on mobile */
@@ -845,14 +848,27 @@
         /* Main content: reduce padding on mobile */
         @media (max-width: 720px) {
             .main-content { padding: 12px 12px 40px; }
-            .header { flex-wrap: wrap; padding: 8px 12px; gap: 6px; }
-            .header-right { flex-shrink: 0; }
+            .header { flex-wrap: wrap; gap: 6px; padding: 10px 14px; }
+            .header-right { flex-shrink: 0; margin-left: auto; }
             .user-badge { display: none; }
+            .stats-grid { grid-template-columns: 1fr 1fr; }
+            input[type="text"],
+            input[type="email"],
+            input[type="number"],
+            input[type="date"],
+            input[type="tel"],
+            select,
+            textarea { font-size: 16px; }
         }
 
         /* Site card button: full-width on mobile */
         @media (max-width: 480px) {
             .site-card-btn { display: block; width: 100%; text-align: center; }
+            .sites-grid { grid-template-columns: 1fr; }
+            .stats-grid { grid-template-columns: 1fr 1fr; }
+            .hero-title { font-size: 1.7rem; }
+            .section-title { font-size: 0.85rem; }
+            .login-box { padding: 24px 18px; }
         }
 
         /* Header: shrink user badge and sign-out on very small screens */
@@ -861,6 +877,9 @@
             .user-badge { max-width: 120px; font-size: 0.72rem; padding: 4px 8px; }
             .signout-btn { padding: 4px 10px; font-size: 0.75rem; }
             .header-title { font-size: 1rem; }
+        }
+        @media (max-width: 380px) {
+            .stats-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>

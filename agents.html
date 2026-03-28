@@ -136,7 +136,41 @@
         .toast.error{background:var(--danger);border-color:var(--danger);color:#fff;}
         /* RUN DETAIL MODAL */
         .run-detail-pre{background:var(--stream-bg);border:1px solid var(--border);border-radius:8px;padding:14px;font-size:0.82rem;line-height:1.6;color:var(--text-primary);white-space:pre-wrap;word-break:break-word;max-height:400px;overflow-y:auto;font-family:monospace;}
-        @media(max-width:720px){header{flex-wrap:wrap;padding:8px 12px;gap:6px;}.user-badge{display:none;}nav{order:3;width:100%;border-top:1px solid var(--border);padding-top:6px;}main{padding:12px;}.stats-grid{grid-template-columns:1fr 1fr;}.form-grid{grid-template-columns:1fr;gap:12px;}.form-group.full-width,.form-group.span2{grid-column:1;}.console-layout{grid-template-columns:1fr;}}
+        @media(max-width:720px){
+            header{flex-wrap:wrap;padding:10px 14px;gap:6px;}
+            .logo-area{flex:1;min-width:0;overflow:hidden;}
+            header h1{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
+            .header-right{flex-shrink:0;margin-left:auto;}
+            .user-badge{display:none;}
+            nav{order:3;width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px;border-top:1px solid var(--border);padding-top:6px;}
+            nav button{padding:6px 10px;font-size:0.78rem;white-space:nowrap;flex-shrink:0;}
+            main{padding:12px;}
+            .stats-grid{grid-template-columns:1fr 1fr;}
+            .form-grid{grid-template-columns:1fr 1fr;gap:12px;}
+            .form-group.span2{grid-column:span 1;}
+            .table-wrapper table{font-size:0.8rem;}
+            .table-wrapper th{font-size:0.72rem;padding:6px 8px;}
+            .table-wrapper td{padding:6px 8px;}
+            .console-layout{grid-template-columns:1fr;}
+            .dash-cols{grid-template-columns:1fr !important;}
+            .agent-cards{grid-template-columns:1fr !important;}
+            input[type="text"],input[type="email"],input[type="number"],input[type="date"],input[type="tel"],select,textarea{font-size:16px;}
+        }
+        @media(max-width:600px){
+            .site-switcher{padding:4px 8px;gap:2px;}
+            .site-switcher-label{display:none;}
+            .site-link{padding:5px 8px;font-size:0.72rem;}
+            .console-layout{flex-direction:column;}
+            .console-sidebar{width:100%;min-width:0;max-height:180px;overflow-y:auto;border-right:none;border-bottom:1px solid var(--border);}
+        }
+        @media(max-width:480px){
+            main{padding:10px;}
+            .form-grid{grid-template-columns:1fr;}
+            .form-group.full-width,.form-group.span2{grid-column:1;}
+        }
+        @media(max-width:380px){
+            .stats-grid{grid-template-columns:1fr;}
+        }
     </style>
 </head>
 <body>

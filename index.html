@@ -896,6 +896,7 @@
     <a href="knives.html" class="site-link">🔪 Knives</a>
     <a href="pharmacy.html" class="site-link">💊 Pharmacy</a>
     <a href="insurance.html" class="site-link">🛡 Insurance</a>
+    <a href="realestate.html" class="site-link">🏡 Real Estate</a>
     <a href="agents.html" class="site-link">🤖 Agents</a>
 </div>
 
@@ -1121,6 +1122,21 @@
                 </div>
             </div>
 
+            <!-- Real Estate -->
+            <div class="site-card">
+                <div class="site-card-top" style="background:#0891b2;"></div>
+                <div class="site-card-body">
+                    <div class="site-card-header">
+                        <div class="site-card-icon">🏡</div>
+                        <div class="site-card-badge"><span id="badge-realestate">—</span> properties</div>
+                    </div>
+                    <div class="site-card-title">FARMBOSS REAL ESTATE</div>
+                    <div class="site-card-desc">Property Portfolio &amp; Mortgage Tracker</div>
+                    <div class="site-card-meta"><strong id="meta-realestate">—</strong> properties tracked</div>
+                    <a href="realestate.html" class="site-card-btn" style="background:#0891b2;color:#fff;">Go to Real Estate →</a>
+                </div>
+            </div>
+
             <!-- Agents -->
             <div class="site-card">
                 <div class="site-card-top" style="background:#8b5cf6;"></div>
@@ -1310,9 +1326,10 @@
             livestock:  'livestock_items',
             timepieces: 'timepiece_items',
             knives:     'knife_items',
-            pharmacy:   'rx_items',
-            insurance:  'insurance_items',
-            agents:     'agents'
+            pharmacy:    'rx_items',
+            insurance:   'insurance_items',
+            realestate:  'realestate_items',
+            agents:      'agents'
         };
         Object.entries(collections).forEach(([key, col]) => {
             const unsub = db.collection(col).onSnapshot(snap => {

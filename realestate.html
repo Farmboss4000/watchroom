@@ -1,0 +1,1268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Farmboss Real Estate</title>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0;}
+        :root{
+            --bg-primary:#f0f7fa;--bg-secondary:#ffffff;--bg-card:#e4f0f6;
+            --accent:#0891b2;--accent-hover:#0e7490;--accent-dim:rgba(8,145,178,0.10);
+            --text-primary:#0c2340;--text-secondary:#446070;--border:#b8d4e0;
+            --success:#16a34a;--danger:#dc2626;--warning:#d97706;--info:#2563eb;--hdr-bg:#061825;
+        }
+        body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:var(--bg-primary);color:var(--text-primary);min-height:100vh;overflow-x:hidden;}
+        /* ── SITE SWITCHER ── */
+        .site-switcher{background:#111827;display:flex;align-items:center;padding:5px 18px;gap:4px;font-size:0.77rem;border-bottom:1px solid rgba(255,255,255,0.07);overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap;scrollbar-width:none;}
+        .site-switcher::-webkit-scrollbar{display:none;}
+        .site-link{text-decoration:none;color:#9ca3af;padding:4px 12px;border-radius:4px;display:flex;align-items:center;gap:6px;font-weight:500;transition:all 0.15s;white-space:nowrap;}
+        .site-link:hover{background:rgba(255,255,255,0.1);color:#e5e7eb;}
+        .site-link.active{background:rgba(255,255,255,0.13);color:#fff;font-weight:600;}
+        /* ── LOGIN ── */
+        #login-screen{position:fixed;inset:0;background:linear-gradient(135deg,#061825 0%,#0c2d48 100%);display:flex;align-items:center;justify-content:center;z-index:9000;flex-direction:column;gap:12px;}
+        .login-site-links{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;}
+        .login-site-links a{color:rgba(255,255,255,0.5);font-size:0.78rem;text-decoration:none;padding:4px 12px;border:1px solid rgba(255,255,255,0.2);border-radius:4px;transition:all 0.15s;}
+        .login-site-links a:hover{color:#fff;border-color:rgba(255,255,255,0.5);}
+        .login-site-links a.active{color:var(--accent);border-color:var(--accent);}
+        .login-box{background:#fff;border-radius:14px;padding:44px 40px;width:100%;max-width:400px;box-shadow:0 24px 64px rgba(0,0,0,0.4);}
+        .login-logo{width:56px;height:56px;background:var(--accent);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 16px;color:#fff;}
+        .login-box h2{text-align:center;font-size:1.5rem;color:#1a1f2e;margin-bottom:4px;}
+        .login-sub{text-align:center;font-size:0.85rem;color:#6b7280;margin-bottom:28px;}
+        .login-error{color:var(--danger);font-size:0.82rem;margin-bottom:12px;min-height:18px;text-align:center;}
+        .login-full{width:100%;justify-content:center;}
+        /* ── LOADING ── */
+        #loading-screen{display:none;position:fixed;inset:0;background:var(--bg-primary);flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:8000;}
+        .spinner{width:44px;height:44px;border:4px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
+        @keyframes spin{to{transform:rotate(360deg);}}
+        /* ── APP LAYOUT ── */
+        #app{display:none;min-height:100vh;flex-direction:column;}
+        header{background:var(--hdr-bg);padding:0 20px;display:flex;align-items:center;gap:16px;min-height:56px;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,0.3);flex-wrap:wrap;}
+        .logo-area{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+        .logo-icon{width:32px;height:32px;background:var(--accent);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:17px;color:#fff;flex-shrink:0;}
+        header h1{font-size:1.15rem;font-weight:700;color:#fff;white-space:nowrap;}
+        header h1 span{color:var(--accent);}
+        nav{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;flex-shrink:0;}
+        nav::-webkit-scrollbar{display:none;}
+        nav button{background:transparent;border:none;color:#9ca3af;padding:8px 13px;border-radius:6px;cursor:pointer;font-size:0.83rem;transition:all 0.15s;white-space:nowrap;}
+        nav button:hover{background:rgba(8,145,178,0.25);color:#fff;}
+        nav button.active{background:var(--accent);color:#fff;font-weight:600;}
+        .header-right{display:flex;align-items:center;gap:10px;margin-left:auto;}
+        .user-badge{font-size:0.78rem;color:#9ca3af;background:rgba(255,255,255,0.08);padding:4px 10px;border-radius:5px;}
+        .btn-signout{background:transparent;border:1px solid rgba(255,255,255,0.2);color:#9ca3af;padding:5px 12px;border-radius:5px;cursor:pointer;font-size:0.78rem;transition:all 0.15s;}
+        .btn-signout:hover{border-color:var(--danger);color:var(--danger);}
+        /* ── HERO ── */
+        .hero{background:linear-gradient(135deg,#061825 0%,#0c2d48 60%,#0e3a5c 100%);border-radius:12px;padding:28px 32px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:16px;overflow:hidden;position:relative;}
+        .hero::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");}
+        .hero-title{font-size:1.6rem;font-weight:800;color:#fff;margin-bottom:4px;position:relative;}
+        .hero-title span{color:var(--accent);}
+        .hero-sub{font-size:0.88rem;color:rgba(255,255,255,0.65);position:relative;}
+        .hero-stats{display:flex;gap:32px;flex-wrap:wrap;position:relative;}
+        .hero-stat{text-align:center;}
+        .hero-stat-val{font-size:1.5rem;font-weight:800;color:#fff;line-height:1;}
+        .hero-stat-lbl{font-size:0.72rem;color:rgba(255,255,255,0.55);text-transform:uppercase;letter-spacing:0.5px;margin-top:3px;}
+        /* ── MAIN ── */
+        main{padding:20px;max-width:1400px;margin:0 auto;flex:1;}
+        .view{display:none;}.view.active{display:block;}
+        /* ── STATS ── */
+        .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:20px;}
+        .stat-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:18px 16px;text-align:center;}
+        .stat-value{font-size:1.9rem;font-weight:800;color:var(--accent);line-height:1;margin-bottom:4px;}
+        .stat-label{font-size:0.77rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;}
+        /* ── CARD ── */
+        .card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:22px;margin-bottom:20px;}
+        .card-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;gap:10px;flex-wrap:wrap;}
+        .card-title-left{font-size:1rem;font-weight:700;color:var(--text-primary);}
+        /* ── BUTTONS ── */
+        .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:7px;font-size:0.85rem;font-weight:600;cursor:pointer;border:none;transition:all 0.15s;font-family:inherit;}
+        .btn-primary{background:var(--accent);color:#fff;}.btn-primary:hover{background:var(--accent-hover);}
+        .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text-primary);}.btn-ghost:hover{background:var(--bg-card);}
+        .btn-danger{background:var(--danger);color:#fff;}.btn-danger:hover{opacity:0.85;}
+        .btn-success{background:var(--success);color:#fff;}.btn-success:hover{opacity:0.85;}
+        .btn-sm{padding:5px 10px;font-size:0.78rem;}
+        .btn-secondary{background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary);}.btn-secondary:hover{background:var(--border);}
+        /* ── FORMS ── */
+        .form-group{margin-bottom:14px;}
+        .form-group label{display:block;font-size:0.8rem;font-weight:600;color:var(--text-secondary);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.4px;}
+        .form-group input,.form-group select,.form-group textarea{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:7px;font-size:0.9rem;font-family:inherit;color:var(--text-primary);background:var(--bg-secondary);transition:border-color 0.15s;}
+        .form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--accent);}
+        .input-prefix-wrap{position:relative;}
+        .input-prefix{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-secondary);font-size:0.9rem;pointer-events:none;}
+        .input-prefix+input{padding-left:24px;}
+        .form-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+        .form-group.full-width{grid-column:1/-1;}
+        .form-group.span2{grid-column:span 2;}
+        .form-actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+        .section-divider{font-size:0.82rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin:22px 0 12px;padding-bottom:6px;border-bottom:2px solid var(--border);grid-column:1/-1;}
+        /* ── TOOLBAR ── */
+        .toolbar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;}
+        .toolbar input[type="text"]{flex:1;min-width:200px;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:0.87rem;font-family:inherit;background:var(--bg-secondary);color:var(--text-primary);}
+        .toolbar input:focus{outline:none;border-color:var(--accent);}
+        .toolbar select{padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:0.87rem;font-family:inherit;background:var(--bg-secondary);color:var(--text-primary);cursor:pointer;}
+        /* ── TABLE ── */
+        .table-wrapper{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+        table{width:100%;border-collapse:collapse;font-size:0.85rem;}
+        thead th{background:var(--bg-card);padding:10px 12px;text-align:left;font-size:0.74rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary);border-bottom:2px solid var(--border);white-space:nowrap;}
+        tbody tr{border-bottom:1px solid var(--border);transition:background 0.1s;}
+        tbody tr:hover{background:var(--accent-dim);}
+        tbody td{padding:10px 12px;vertical-align:middle;}
+        .empty{text-align:center;padding:40px 20px;color:var(--text-secondary);}
+        .empty-icon{font-size:3rem;margin-bottom:12px;}
+        /* ── BADGES ── */
+        .badge{display:inline-block;padding:3px 9px;border-radius:5px;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;white-space:nowrap;}
+        .badge-primary{background:#dbeafe;color:#1d4ed8;}
+        .badge-rental{background:#dcfce7;color:#15803d;}
+        .badge-vacation{background:#fef3c7;color:#92400e;}
+        .badge-farm{background:#ecfdf5;color:#065f46;}
+        .badge-commercial{background:#f3e8ff;color:#6d28d9;}
+        .badge-land{background:#fce7f3;color:#9d174d;}
+        .badge-other{background:var(--bg-card);color:var(--text-secondary);}
+        .badge-active{background:#dcfce7;color:#15803d;}
+        .badge-vacant{background:#fef3c7;color:#92400e;}
+        .badge-for-sale{background:#dbeafe;color:#1d4ed8;}
+        .badge-sold{background:#f1f5f9;color:#475569;}
+        .badge-pending{background:#fde8d0;color:#92400e;}
+        /* ── ALERT BANNERS ── */
+        .alert-banner{border-radius:10px;padding:14px 18px;margin-bottom:14px;display:flex;align-items:center;gap:12px;font-size:0.88rem;font-weight:600;}
+        .alert-danger{background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;}
+        .alert-warning{background:#fef3c7;color:#92400e;border:1px solid #fcd34d;}
+        .alert-info{background:#dbeafe;color:#1e40af;border:1px solid #93c5fd;}
+        /* ── PROPERTY CARDS ── */
+        .prop-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:18px;margin-bottom:20px;}
+        .prop-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:box-shadow 0.2s,transform 0.15s;position:relative;}
+        .prop-card:hover{box-shadow:0 6px 24px rgba(8,145,178,0.12);transform:translateY(-2px);}
+        .prop-card-photo{width:100%;height:180px;object-fit:cover;background:var(--bg-card);display:flex;align-items:center;justify-content:center;font-size:3rem;color:var(--border);}
+        .prop-card-photo img{width:100%;height:180px;object-fit:cover;display:block;}
+        .prop-card-body{padding:16px;}
+        .prop-card-type-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+        .prop-card-name{font-size:1rem;font-weight:700;color:var(--text-primary);margin-bottom:2px;}
+        .prop-card-addr{font-size:0.82rem;color:var(--text-secondary);margin-bottom:10px;}
+        .prop-card-stats{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:12px;}
+        .prop-card-stat{font-size:0.8rem;}
+        .prop-card-stat-lbl{color:var(--text-secondary);font-size:0.72rem;text-transform:uppercase;letter-spacing:0.3px;}
+        .prop-card-stat-val{font-weight:700;color:var(--text-primary);}
+        .prop-card-actions{display:flex;gap:6px;flex-wrap:wrap;}
+        .prop-status-pill{position:absolute;top:12px;right:12px;padding:3px 10px;border-radius:20px;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;}
+        /* ── DETAIL MODAL ── */
+        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;opacity:0;pointer-events:none;transition:opacity 0.2s;}
+        .modal-overlay.show{opacity:1;pointer-events:all;}
+        .modal{background:#fff;border-radius:14px;padding:28px 24px;width:100%;max-width:740px;margin:16px;max-height:90vh;overflow-y:auto;transform:scale(0.95);transition:transform 0.2s;}
+        .modal-overlay.show .modal{transform:scale(1);}
+        .modal-title{font-size:1.15rem;font-weight:700;color:var(--text-primary);margin-bottom:18px;display:flex;align-items:center;gap:10px;}
+        .modal-section{margin-bottom:18px;padding-bottom:18px;border-bottom:1px solid var(--border);}
+        .modal-section:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0;}
+        .modal-section-title{font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary);margin-bottom:10px;}
+        .modal-fields{display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;}
+        .modal-field-lbl{font-size:0.73rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.3px;}
+        .modal-field-val{font-size:0.88rem;font-weight:600;color:var(--text-primary);}
+        /* ── PHOTO SLOTS ── */
+        .photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:8px;}
+        .photo-slot{position:relative;aspect-ratio:4/3;border:2px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--bg-card);overflow:hidden;cursor:pointer;transition:border-color 0.15s;}
+        .photo-slot:hover{border-color:var(--accent);}
+        .photo-slot img{width:100%;height:100%;object-fit:cover;display:block;}
+        .photo-slot-empty{font-size:1.8rem;color:var(--border);}
+        .photo-slot-label{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.55);color:#fff;font-size:0.68rem;text-align:center;padding:3px 4px;font-weight:600;}
+        .photo-slot input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;}
+        .remove-photo{position:absolute;top:5px;right:5px;background:rgba(0,0,0,0.6);border:none;color:#fff;width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;z-index:2;}
+        /* ── FINANCIAL VIEW ── */
+        .fin-prop-header{background:var(--bg-card);border-radius:10px;padding:14px 18px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border:1px solid var(--border);}
+        .fin-prop-name{font-weight:700;font-size:0.95rem;}
+        .fin-prop-addr{font-size:0.8rem;color:var(--text-secondary);}
+        .fin-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:10px;}
+        .fin-metric{background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:12px 14px;text-align:center;}
+        .fin-metric-val{font-size:1.25rem;font-weight:800;color:var(--accent);}
+        .fin-metric-lbl{font-size:0.72rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.4px;margin-top:2px;}
+        /* ── REPORTS ── */
+        .report-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);gap:12px;flex-wrap:wrap;}
+        .report-row:last-child{border-bottom:none;}
+        /* ── TOAST ── */
+        .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#1a1f2e;color:#fff;padding:10px 20px;border-radius:8px;font-size:0.87rem;font-weight:500;opacity:0;transition:all 0.3s;z-index:9999;pointer-events:none;white-space:nowrap;max-width:90vw;}
+        .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+        .toast.success{background:var(--success);}.toast.error{background:var(--danger);}
+        /* ── RECYCLE BIN ── */
+        .bin-item{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+        .bin-item:last-child{border-bottom:none;}
+        /* ── RESPONSIVE ── */
+        @media(max-width:720px){
+            header{flex-wrap:wrap;padding:10px 14px;gap:6px;}
+            .logo-area{flex:1;min-width:0;}
+            header h1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+            .header-right{flex-shrink:0;margin-left:auto;}
+            .user-badge{display:none;}
+            nav{order:3;width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px;border-top:1px solid rgba(255,255,255,0.1);padding-top:6px;}
+            nav button{padding:6px 10px;font-size:0.78rem;white-space:nowrap;flex-shrink:0;}
+            main{padding:12px;}
+            .hero{padding:20px 18px;flex-direction:column;align-items:flex-start;gap:14px;}
+            .hero-title{font-size:1.3rem;}
+            .hero-stats{gap:18px;}
+            .stats-grid{grid-template-columns:1fr 1fr;gap:10px;}
+            .form-grid{grid-template-columns:1fr 1fr;gap:12px;}
+            .form-group.span2{grid-column:span 1;}
+            .prop-grid{grid-template-columns:1fr;}
+            .modal{padding:20px 16px;}
+            .modal-fields{grid-template-columns:1fr;}
+            .toolbar input[type="text"],.toolbar select{min-width:0;width:auto;}
+            .table-wrapper table{font-size:0.8rem;}
+            .table-wrapper th{font-size:0.72rem;padding:6px 8px;}
+            .table-wrapper td{padding:6px 8px;}
+            .btn{min-height:40px;}
+            .btn-sm{min-height:34px;}
+            .form-actions{flex-direction:column;}
+            .form-actions .btn{width:100%;justify-content:center;}
+            .login-box{padding:30px 22px;margin:16px;}
+            input[type="text"],input[type="email"],input[type="number"],input[type="date"],input[type="tel"],select,textarea{font-size:16px;}
+        }
+        @media(max-width:600px){
+            .site-switcher{padding:4px 8px;gap:2px;}
+            .site-link{padding:5px 8px;font-size:0.72rem;}
+        }
+        @media(max-width:480px){
+            main{padding:10px;}
+            .card{padding:16px;}
+            .form-grid{grid-template-columns:1fr;}
+            .form-group.full-width,.form-group.span2{grid-column:1;}
+            .toolbar{flex-wrap:wrap;gap:8px;}
+            .toolbar input[type="text"]{width:100%;flex:1 1 100%;}
+            .toolbar select{flex:1 1 calc(50% - 4px);min-width:0;}
+            .fin-metrics{grid-template-columns:1fr 1fr;}
+            .photo-grid{grid-template-columns:repeat(2,1fr);}
+        }
+        @media(max-width:380px){
+            .stats-grid{grid-template-columns:1fr;}
+            .hero-stats{flex-direction:column;gap:10px;}
+        }
+    </style>
+</head>
+<body>
+
+<!-- SITE SWITCHER -->
+<div class="site-switcher">
+    <a href="index.html" class="site-link">🏠 Headquarters</a>
+    <a href="armory.html" class="site-link">🔫 Armory</a>
+    <a href="machinery.html" class="site-link">🚜 Machinery</a>
+    <a href="automotive.html" class="site-link">🚗 Automotive</a>
+    <a href="livestock.html" class="site-link">🐄 Livestock</a>
+    <a href="timepieces.html" class="site-link">⌚ Timepieces</a>
+    <a href="knives.html" class="site-link">🔪 Knives</a>
+    <a href="pharmacy.html" class="site-link">💊 Pharmacy</a>
+    <a href="insurance.html" class="site-link">🛡 Insurance</a>
+    <a href="realestate.html" class="site-link active">🏡 Real Estate</a>
+    <a href="agents.html" class="site-link">🤖 Agents</a>
+</div>
+
+<!-- LOGIN -->
+<div id="login-screen">
+    <div class="login-site-links">
+        <a href="index.html">🏠 HQ</a>
+        <a href="armory.html">🔫 Armory</a>
+        <a href="machinery.html">🚜 Machinery</a>
+        <a href="automotive.html">🚗 Automotive</a>
+        <a href="livestock.html">🐄 Livestock</a>
+        <a href="timepieces.html">⌚ Timepieces</a>
+        <a href="knives.html">🔪 Knives</a>
+        <a href="pharmacy.html">💊 Pharmacy</a>
+        <a href="insurance.html">🛡 Insurance</a>
+        <a href="realestate.html" class="active">🏡 Real Estate</a>
+        <a href="agents.html">🤖 Agents</a>
+    </div>
+    <div class="login-box">
+        <div class="login-logo">🏡</div>
+        <h2>Farmboss Real Estate</h2>
+        <p class="login-sub">Sign in to manage your property portfolio</p>
+        <div class="login-error" id="login-error"></div>
+        <form id="login-form">
+            <div class="form-group"><label>Email</label><input type="email" id="login-email" placeholder="you@example.com" required autocomplete="username"></div>
+            <div class="form-group"><label>Password</label><input type="password" id="login-password" placeholder="••••••••" required autocomplete="current-password"></div>
+            <button type="submit" class="btn btn-primary login-full" id="login-btn">Sign In</button>
+        </form>
+    </div>
+</div>
+
+<div id="loading-screen"><div class="spinner"></div><p style="color:var(--text-secondary);font-size:0.9rem;">Loading properties...</p></div>
+
+<div id="app" style="display:flex;">
+
+<!-- HEADER -->
+<div style="display:flex;flex-direction:column;min-height:100vh;flex:1;">
+<header>
+    <div class="logo-area">
+        <div class="logo-icon">🏡</div>
+        <h1>Farmboss <span>Real Estate</span></h1>
+    </div>
+    <nav>
+        <button class="active" onclick="showView('dashboard')">Dashboard</button>
+        <button onclick="showView('properties')">Properties</button>
+        <button onclick="showView('add-property')">＋ Add Property</button>
+        <button onclick="showView('financial')">Financial</button>
+        <button onclick="showView('reports')">Reports</button>
+        <button onclick="showView('recycle-bin')">🗑 Recycle Bin</button>
+    </nav>
+    <div class="header-right">
+        <div class="user-badge" id="user-email"></div>
+        <button class="btn-signout" onclick="doSignOut()">Sign Out</button>
+    </div>
+</header>
+
+<main>
+
+<!-- ══════════════════════════════════════
+     DASHBOARD
+══════════════════════════════════════ -->
+<div class="view active" id="view-dashboard">
+    <div class="hero">
+        <div>
+            <div class="hero-title">Property <span>Portfolio</span></div>
+            <div class="hero-sub">Track your real estate assets, mortgages &amp; rental income</div>
+        </div>
+        <div class="hero-stats" id="hero-stats">
+            <div class="hero-stat"><div class="hero-stat-val" id="hs-count">—</div><div class="hero-stat-lbl">Properties</div></div>
+            <div class="hero-stat"><div class="hero-stat-val" id="hs-value">—</div><div class="hero-stat-lbl">Portfolio Value</div></div>
+            <div class="hero-stat"><div class="hero-stat-val" id="hs-equity">—</div><div class="hero-stat-lbl">Total Equity</div></div>
+            <div class="hero-stat"><div class="hero-stat-val" id="hs-rent">—</div><div class="hero-stat-lbl">Monthly Rent</div></div>
+        </div>
+    </div>
+
+    <div id="dash-alerts"></div>
+
+    <div class="stats-grid">
+        <div class="stat-card"><div class="stat-value" id="ds-active">—</div><div class="stat-label">Active Properties</div></div>
+        <div class="stat-card"><div class="stat-value" id="ds-rentals">—</div><div class="stat-label">Rental Units</div></div>
+        <div class="stat-card"><div class="stat-value" id="ds-mortgage">—</div><div class="stat-label">Monthly Mortgage</div></div>
+        <div class="stat-card"><div class="stat-value" id="ds-net">—</div><div class="stat-label">Net Monthly</div></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;" class="dash-cols">
+        <div class="card">
+            <div class="card-title">
+                <div class="card-title-left">🏡 Recent Properties</div>
+                <button class="btn btn-ghost btn-sm" onclick="showView('properties')">View All</button>
+            </div>
+            <div id="dash-recent-list"><div class="empty">No properties yet.</div></div>
+        </div>
+        <div class="card">
+            <div class="card-title"><div class="card-title-left">📊 By Type</div></div>
+            <div id="dash-type-breakdown"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     PROPERTIES LIST
+══════════════════════════════════════ -->
+<div class="view" id="view-properties">
+    <div class="card">
+        <div class="card-title">
+            <div class="card-title-left">🏡 All Properties</div>
+            <button class="btn btn-primary btn-sm" onclick="showView('add-property')">＋ Add Property</button>
+        </div>
+        <div class="toolbar">
+            <input type="text" id="prop-search" placeholder="Search by name, address, city..." oninput="renderProperties()">
+            <select id="prop-type-filter" onchange="renderProperties()">
+                <option value="">All Types</option>
+                <option>Primary Home</option><option>Rental</option><option>Vacation</option>
+                <option>Farm</option><option>Commercial</option><option>Land</option><option>Other</option>
+            </select>
+            <select id="prop-status-filter" onchange="renderProperties()">
+                <option value="">All Statuses</option>
+                <option>Active</option><option>Vacant</option><option>For Sale</option>
+                <option>Under Contract</option><option>Sold</option>
+            </select>
+            <select id="prop-view-toggle" onchange="renderProperties()">
+                <option value="cards">Card View</option>
+                <option value="table">Table View</option>
+            </select>
+        </div>
+        <div id="prop-count-bar" style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:12px;"></div>
+        <div id="properties-content"></div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     ADD / EDIT PROPERTY
+══════════════════════════════════════ -->
+<div class="view" id="view-add-property">
+    <div class="card">
+        <div class="card-title">
+            <div class="card-title-left" id="form-title">＋ Add Property</div>
+            <button class="btn btn-ghost btn-sm" onclick="cancelForm()">✕ Cancel</button>
+        </div>
+        <form id="property-form" onsubmit="saveProperty(event)">
+            <div class="form-grid">
+                <div class="section-divider">Basic Information</div>
+                <div class="form-group span2"><label>Property Nickname / Name *</label><input type="text" id="f-name" placeholder="e.g. Main House, Lake Cabin, 123 Oak St" required></div>
+                <div class="form-group"><label>Property Type *</label>
+                    <select id="f-type" required onchange="toggleTypeSections()">
+                        <option value="">— Select —</option>
+                        <option>Primary Home</option><option>Rental</option><option>Vacation</option>
+                        <option>Farm</option><option>Commercial</option><option>Land</option><option>Other</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Status</label>
+                    <select id="f-status">
+                        <option>Active</option><option>Vacant</option><option>For Sale</option>
+                        <option>Under Contract</option><option>Sold</option>
+                    </select>
+                </div>
+                <div class="form-group full-width"><label>Street Address *</label><input type="text" id="f-street" placeholder="123 Main Street" required></div>
+                <div class="form-group span2"><label>City</label><input type="text" id="f-city" placeholder="City"></div>
+                <div class="form-group"><label>State</label><input type="text" id="f-state" placeholder="MN" maxlength="2"></div>
+                <div class="form-group"><label>ZIP Code</label><input type="text" id="f-zip" placeholder="55318"></div>
+                <div class="form-group"><label>County</label><input type="text" id="f-county" placeholder="Carver"></div>
+
+                <div class="section-divider">Property Details</div>
+                <div class="form-group"><label>Bedrooms</label><input type="number" id="f-beds" min="0" placeholder="3"></div>
+                <div class="form-group"><label>Bathrooms (Full)</label><input type="number" id="f-baths-full" min="0" step="1" placeholder="2"></div>
+                <div class="form-group"><label>Bathrooms (Half)</label><input type="number" id="f-baths-half" min="0" step="1" placeholder="1"></div>
+                <div class="form-group"><label>Garage Spaces</label><input type="number" id="f-garage" min="0" placeholder="2"></div>
+                <div class="form-group"><label>Living Area (sq ft)</label><input type="number" id="f-sqft" min="0" placeholder="2400"></div>
+                <div class="form-group"><label>Lot Size (acres)</label><input type="number" id="f-lot-acres" min="0" step="0.01" placeholder="1.5"></div>
+                <div class="form-group"><label>Year Built</label><input type="number" id="f-year-built" min="1800" max="2030" placeholder="1998"></div>
+                <div class="form-group"><label>Stories</label><input type="number" id="f-stories" min="1" placeholder="2"></div>
+                <div class="form-group"><label>Parcel / Tax ID #</label><input type="text" id="f-parcel" placeholder="12-345-678"></div>
+
+                <div class="section-divider">Purchase &amp; Value</div>
+                <div class="form-group"><label>Purchase Price ($)</label>
+                    <div class="input-prefix-wrap"><span class="input-prefix">$</span><input type="number" id="f-purchase-price" min="0" step="1" placeholder="350000"></div>
+                </div>
+                <div class="form-group"><label>Purchase Date</label><input type="date" id="f-purchase-date"></div>
+                <div class="form-group"><label>Down Payment ($)</label>
+                    <div class="input-prefix-wrap"><span class="input-prefix">$</span><input type="number" id="f-down-payment" min="0" step="1" placeholder="70000"></div>
+                </div>
+                <div class="form-group"><label>Closing Costs ($)</label>
+                    <div class="input-prefix-wrap"><span class="input-prefix">$</span><input type="number" id="f-closing-costs" min="0" step="1" placeholder="6500"></div>
+                </div>
+                <div class="form-group"><label>Current Est. Value ($)</label>
+                    <div class="input-prefix-wrap"><span class="input-prefix">$</span><input type="number" id="f-current-value" min="0" step="1" placeholder="420000"></div>
+                </div>
+                <div class="form-group"><label>Value Last Updated</label><input type="date" id="f-value-date"></div>
+
+                <div class="section-divider">Mortgage</div>
+                <div class="form-group"><label>Mortgage Lender</label><input type="text" id="f-mort-lender" placeholder="Wells Fargo"></div>
+                <div class="form-group"><label>Loan Account #</label><input type="text" id="f-mort-account" placeholder="Loan number"></div>
+                <div class="form-group"><label>Loan Type</label>
+                    <select id="f-mort-type"><option value="">— None —</option><option>Fixed Rate</option><option>ARM</option><option>FHA</option><option>VA</option><option>USDA</option><option>Conventional</option><option>Interest Only</option></select>
+                </div>
+                <div class="form-group"><label>Original Loan Balance ($)</label>
+                    <div class="input-prefix-wrap"><span class="input-prefix">$</span><input type="number" id="f-mort-original" min="0" step="1" placeholder="280000"></div>
+                </div>
+                <div class="form-group"><label>Current Loan Balance ($)</label>
+                    <div class="input-prefix-wrap"><span class="input-prefix">$</span><input type="number" id="f-mort-balance" min="0" step="1" placeholder="265000"></div>
+                </div>
+                <div class="form-group"><label>Monthly Payment (P&amp;I) ($)</label>
+                    <div class="input-prefix-wrap"><span class="input-prefix">$</span><input type="number" id="f-mort-payment" min="0" step="1" placeholder="1480"></div>
+                </div>
+                <div class="form-group"><label>Interest Rate (%)</label>
+                    <div class="input-prefix-wrap"><span class="input-prefix">%</span><input type="number" id="f-mort-rate" min="0" max="30" step="0.001" placeholder="4.250"></div>
+                </div>
+                <div class="form-group"><label>Loan Term (years)</label><input type="number" id="f-mort-term" min="1" max="50" placeholder="30"></div>
+                <div class="form-group"><label>Loan Start Date</label><input type="date" id="f-mort-start"></div>
+                <div class="form-group"><label>Next Payment Due</label><input type="date" id="f-mort-next"></div>
+
+                <div class="section-divider">Property Taxes &amp; HOA</div>
+                <div class="form-group"><label>Annual Property Tax ($)</label>
+                    <div class="input-prefix-wrap"><span class="input-prefix">$</span><input type="number" id="f-tax-annual" min="0" step="1" placeholder="4200"></div>
+                </div>
+                <div class="form-group"><label>Tax Due Date</label><input type="date" id="f-tax-due"></div>
+                <div class="form-group"><label>HOA Monthly Fee ($)</label>
+                    <div class="input-prefix-wrap"><span class="input-prefix">$</span><input type="number" id="f-hoa-fee" min="0" step="1" placeholder="0"></div>
+                </div>
+                <div class="form-group"><label>HOA Company</label><input type="text" id="f-hoa-company" placeholder="HOA name"></div>
+                <div class="form-group"><label>HOA Contact Phone</label><input type="tel" id="f-hoa-phone" placeholder="(612) 555-0000"></div>
+
+                <div class="section-divider" id="rental-divider" style="display:none;">Rental Information</div>
+                <div id="rental-fields" style="display:contents;">
+                    <div class="form-group" id="rf-tenant-name" style="display:none;"><label>Tenant Name</label><input type="text" id="f-tenant-name" placeholder="John Doe"></div>
+                    <div class="form-group" id="rf-tenant-phone" style="display:none;"><label>Tenant Phone</label><input type="tel" id="f-tenant-phone" placeholder="(612) 555-0000"></div>
+                    <div class="form-group" id="rf-tenant-email" style="display:none;"><label>Tenant Email</label><input type="email" id="f-tenant-email" placeholder="tenant@email.com"></div>
+                    <div class="form-group" id="rf-lease-start" style="display:none;"><label>Lease Start</label><input type="date" id="f-lease-start"></div>
+                    <div class="form-group" id="rf-lease-end" style="display:none;"><label>Lease End</label><input type="date" id="f-lease-end"></div>
+                    <div class="form-group" id="rf-monthly-rent" style="display:none;"><label>Monthly Rent ($)</label>
+                        <div class="input-prefix-wrap"><span class="input-prefix">$</span><input type="number" id="f-monthly-rent" min="0" step="1" placeholder="1800"></div>
+                    </div>
+                    <div class="form-group" id="rf-deposit" style="display:none;"><label>Security Deposit ($)</label>
+                        <div class="input-prefix-wrap"><span class="input-prefix">$</span><input type="number" id="f-deposit" min="0" step="1" placeholder="1800"></div>
+                    </div>
+                    <div class="form-group" id="rf-pet-deposit" style="display:none;"><label>Pet Deposit ($)</label>
+                        <div class="input-prefix-wrap"><span class="input-prefix">$</span><input type="number" id="f-pet-deposit" min="0" step="1" placeholder="300"></div>
+                    </div>
+                </div>
+
+                <div class="section-divider">Property Insurance</div>
+                <div class="form-group"><label>Insurance Company</label><input type="text" id="f-ins-company" placeholder="State Farm"></div>
+                <div class="form-group"><label>Policy Number</label><input type="text" id="f-ins-policy" placeholder="Policy #"></div>
+                <div class="form-group"><label>Annual Premium ($)</label>
+                    <div class="input-prefix-wrap"><span class="input-prefix">$</span><input type="number" id="f-ins-premium" min="0" step="1" placeholder="1400"></div>
+                </div>
+                <div class="form-group"><label>Renewal Date</label><input type="date" id="f-ins-renewal"></div>
+                <div class="form-group"><label>Agent Name</label><input type="text" id="f-ins-agent" placeholder="Agent name"></div>
+                <div class="form-group"><label>Agent Phone</label><input type="tel" id="f-ins-agent-phone" placeholder="(612) 555-0000"></div>
+
+                <div class="section-divider">Photos</div>
+                <div class="form-group full-width">
+                    <div class="photo-grid" id="photo-slots"></div>
+                </div>
+
+                <div class="section-divider">Notes</div>
+                <div class="form-group full-width"><label>Notes / Description</label><textarea id="f-notes" rows="4" placeholder="Any additional details about this property..."></textarea></div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" id="prop-submit-btn">Save Property</button>
+                <button type="button" class="btn btn-ghost" onclick="cancelForm()">Cancel</button>
+                <button type="button" class="btn btn-danger" id="prop-delete-btn" style="display:none;margin-left:auto;" onclick="deleteProperty()">🗑 Move to Bin</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     FINANCIAL VIEW
+══════════════════════════════════════ -->
+<div class="view" id="view-financial">
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">💰 Financial Overview</div></div>
+        <div id="financial-content"><div class="empty"><div class="empty-icon">💰</div><div>No properties added yet.</div></div></div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     REPORTS
+══════════════════════════════════════ -->
+<div class="view" id="view-reports">
+    <div class="card" style="margin-bottom:18px;">
+        <div class="card-title"><div class="card-title-left">📊 Portfolio Summary</div></div>
+        <div id="report-summary"></div>
+    </div>
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">🏡 Properties by Type</div></div>
+        <div id="report-by-type"></div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     RECYCLE BIN
+══════════════════════════════════════ -->
+<div class="view" id="view-recycle-bin">
+    <div class="card">
+        <div class="card-title">
+            <div class="card-title-left">🗑 Recycle Bin</div>
+            <button class="btn btn-ghost btn-sm" onclick="loadBin()">🔄 Refresh</button>
+        </div>
+        <div id="bin-list"><div class="empty">Recycle bin is empty.</div></div>
+    </div>
+</div>
+
+</main>
+</div><!-- end flex column -->
+</div><!-- end #app -->
+
+<!-- DETAIL MODAL -->
+<div class="modal-overlay" id="detail-modal">
+    <div class="modal" style="max-width:780px;">
+        <div class="modal-title" id="detail-modal-title">Property Details</div>
+        <div id="detail-modal-body"></div>
+        <div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;">
+            <button class="btn btn-primary btn-sm" id="detail-edit-btn">✏️ Edit</button>
+            <button class="btn btn-ghost btn-sm" onclick="closeModal('detail-modal')">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+firebase.initializeApp({
+    apiKey:"AIzaSyB7c4urD9tJO80S7nADItxjwhSYVqlrkEU",
+    authDomain:"watchroom-714a0.firebaseapp.com",
+    projectId:"watchroom-714a0",
+    storageBucket:"watchroom-714a0.appspot.com",
+    messagingSenderId:"123456789",
+    appId:"1:123456789:web:abcdef"
+});
+const auth = firebase.auth();
+const db   = firebase.firestore();
+const stor = firebase.storage();
+
+// ── STATE ──
+let properties = [];
+let binItems   = [];
+let unsubProps = null;
+let editingId  = null;
+// photo slots: keys and labels
+const PHOTO_KEYS = ['photoFront','photoBack','photoInterior','photoAerial','photoDoc'];
+const PHOTO_LABELS = ['Exterior Front','Exterior Back','Interior','Aerial / Lot','Document'];
+let photoData = {}; // key → data url or existing URL
+
+// ── AUTH ──
+auth.onAuthStateChanged(u => {
+    document.getElementById('loading-screen').style.display = 'none';
+    if (u) {
+        document.getElementById('login-screen').style.display  = 'none';
+        document.getElementById('app').style.display           = 'flex';
+        document.getElementById('user-email').textContent      = u.email;
+        startListening();
+    } else {
+        document.getElementById('app').style.display           = 'none';
+        document.getElementById('login-screen').style.display  = 'flex';
+        if (unsubProps) { unsubProps(); unsubProps = null; }
+    }
+});
+document.getElementById('loading-screen').style.display = 'flex';
+document.getElementById('login-screen').style.display   = 'none';
+
+// login form
+document.getElementById('login-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn = document.getElementById('login-btn');
+    btn.disabled = true; btn.textContent = 'Signing in…';
+    try {
+        await auth.signInWithEmailAndPassword(
+            document.getElementById('login-email').value.trim(),
+            document.getElementById('login-password').value
+        );
+    } catch(err) {
+        document.getElementById('login-error').textContent = err.message;
+        btn.disabled = false; btn.textContent = 'Sign In';
+    }
+});
+function doSignOut() { auth.signOut(); }
+
+// ── REAL-TIME LISTENER ──
+function startListening() {
+    unsubProps = db.collection('realestate_items')
+        .where('deleted','!=',true)
+        .onSnapshot(snap => {
+            properties = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+            renderAll();
+        }, () => {});
+}
+
+function renderAll() {
+    renderDashboard();
+    renderProperties();
+    renderFinancial();
+    renderReports();
+}
+
+// ── NAVIGATION ──
+function showView(name) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-' + name).classList.add('active');
+    document.querySelectorAll('nav button').forEach((b,i) => {
+        const map = ['dashboard','properties','add-property','financial','reports','recycle-bin'];
+        b.classList.toggle('active', map[i] === name);
+    });
+    if (name === 'add-property' && !editingId) resetForm();
+    if (name === 'recycle-bin') loadBin();
+}
+
+// ── HELPERS ──
+function fmt$(n) { if (!n && n !== 0) return '—'; return '$' + Number(n).toLocaleString(); }
+function fmtPct(n) { if (!n && n !== 0) return '—'; return Number(n).toFixed(3) + '%'; }
+function fmtDate(s) { if (!s) return '—'; const d = new Date(s + 'T12:00:00'); return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function daysUntil(dateStr) {
+    if (!dateStr) return null;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const d = new Date(dateStr + 'T12:00:00');
+    return Math.round((d - today) / 86400000);
+}
+function typeBadgeClass(t) {
+    const map = {'Primary Home':'primary','Rental':'rental','Vacation':'vacation','Farm':'farm','Commercial':'commercial','Land':'land'};
+    return 'badge-' + (map[t] || 'other');
+}
+function statusClass(s) {
+    const map = {'Active':'active','Vacant':'vacant','For Sale':'for-sale','Under Contract':'pending','Sold':'sold'};
+    return 'badge-' + (map[s] || 'other');
+}
+function calcEquity(p) {
+    const val = Number(p.currentValue) || 0;
+    const bal = Number(p.mortBalance) || 0;
+    return val - bal;
+}
+
+let toastTimer;
+function showToast(msg, isErr) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (isErr ? ' error' : ' success');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.className = 'toast', 3000);
+}
+function closeModal(id) {
+    document.getElementById(id).classList.remove('show');
+}
+
+// ── DASHBOARD ──
+function renderDashboard() {
+    const active = properties.filter(p => p.status !== 'Sold');
+    const totalValue  = active.reduce((s,p) => s + (Number(p.currentValue)||0), 0);
+    const totalEquity = active.reduce((s,p) => s + Math.max(0, calcEquity(p)), 0);
+    const totalRent   = active.filter(p=>p.type==='Rental').reduce((s,p) => s + (Number(p.monthlyRent)||0), 0);
+    const totalMort   = active.reduce((s,p) => s + (Number(p.mortPayment)||0), 0);
+    const netMonthly  = totalRent - totalMort;
+
+    setText('hs-count', active.length);
+    setText('hs-value', totalValue ? '$' + (totalValue/1000).toFixed(0) + 'K' : '—');
+    setText('hs-equity', totalEquity ? '$' + (totalEquity/1000).toFixed(0) + 'K' : '—');
+    setText('hs-rent', totalRent ? fmt$(totalRent) : '—');
+    setText('ds-active', active.length);
+    setText('ds-rentals', active.filter(p=>p.type==='Rental').length);
+    setText('ds-mortgage', totalMort ? fmt$(totalMort) : '—');
+    setText('ds-net', (totalRent || totalMort) ? fmt$(netMonthly) : '—');
+
+    // Alerts
+    const alerts = [];
+    const today = new Date(); today.setHours(0,0,0,0);
+    active.forEach(p => {
+        if (p.mortNext) {
+            const d = daysUntil(p.mortNext);
+            if (d !== null && d <= 7 && d >= 0) alerts.push({cls:'alert-warning', msg: `⚠️ <b>${esc(p.name)}</b> — mortgage payment due in ${d} day${d!==1?'s':''} (${fmtDate(p.mortNext)})`});
+            if (d !== null && d < 0) alerts.push({cls:'alert-danger', msg: `🚨 <b>${esc(p.name)}</b> — mortgage payment overdue! (${fmtDate(p.mortNext)})`});
+        }
+        if (p.taxDue) {
+            const d = daysUntil(p.taxDue);
+            if (d !== null && d <= 30 && d >= 0) alerts.push({cls:'alert-warning', msg: `🏛️ <b>${esc(p.name)}</b> — property tax due in ${d} day${d!==1?'s':''} (${fmtDate(p.taxDue)})`});
+        }
+        if (p.insRenewal) {
+            const d = daysUntil(p.insRenewal);
+            if (d !== null && d <= 30 && d >= 0) alerts.push({cls:'alert-warning', msg: `🛡 <b>${esc(p.name)}</b> — insurance renewal in ${d} day${d!==1?'s':''}`});
+        }
+        if (p.type === 'Rental' && p.leaseEnd) {
+            const d = daysUntil(p.leaseEnd);
+            if (d !== null && d <= 60 && d >= 0) alerts.push({cls:'alert-info', msg: `📋 <b>${esc(p.name)}</b> — lease expires in ${d} day${d!==1?'s':''} (${fmtDate(p.leaseEnd)})`});
+        }
+    });
+    document.getElementById('dash-alerts').innerHTML = alerts.map(a => `<div class="alert-banner ${a.cls}">${a.msg}</div>`).join('');
+
+    // Recent
+    const recent = [...active].sort((a,b) => {
+        const ta = a.addedAt?.toMillis?.() || 0;
+        const tb = b.addedAt?.toMillis?.() || 0;
+        return tb - ta;
+    }).slice(0, 5);
+    document.getElementById('dash-recent-list').innerHTML = recent.length
+        ? recent.map(p => `
+            <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);cursor:pointer;" onclick="openDetail('${p._id}')">
+                <span style="font-size:1.3rem;">🏡</span>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:600;font-size:0.88rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(p.name)}</div>
+                    <div style="font-size:0.78rem;color:var(--text-secondary);">${esc(p.city||'')}${p.state?', '+p.state:''} · ${p.type||'Unknown'}</div>
+                </div>
+                <span class="badge ${typeBadgeClass(p.type)}">${esc(p.type||'')}</span>
+            </div>`).join('')
+        : '<div class="empty">No properties yet.</div>';
+
+    // By type
+    const typeCounts = {};
+    active.forEach(p => { const t = p.type||'Other'; typeCounts[t] = (typeCounts[t]||0)+1; });
+    document.getElementById('dash-type-breakdown').innerHTML = Object.keys(typeCounts).length
+        ? Object.entries(typeCounts).sort((a,b)=>b[1]-a[1]).map(([t,c]) => `
+            <div class="report-row">
+                <div><span class="badge ${typeBadgeClass(t)}">${esc(t)}</span></div>
+                <div style="font-weight:700;">${c} propert${c!==1?'ies':'y'}</div>
+            </div>`).join('')
+        : '<div class="empty">No data.</div>';
+}
+function setText(id, val) { const el = document.getElementById(id); if(el) el.textContent = val; }
+
+// ── PROPERTIES VIEW ──
+function renderProperties() {
+    const search = (document.getElementById('prop-search')?.value || '').toLowerCase();
+    const typeF  = document.getElementById('prop-type-filter')?.value || '';
+    const statF  = document.getElementById('prop-status-filter')?.value || '';
+    const viewMode = document.getElementById('prop-view-toggle')?.value || 'cards';
+
+    let filtered = properties.filter(p => {
+        const addr = [p.name, p.street, p.city, p.state, p.zip].join(' ').toLowerCase();
+        if (search && !addr.includes(search)) return false;
+        if (typeF && p.type !== typeF) return false;
+        if (statF && p.status !== statF) return false;
+        return true;
+    });
+
+    const countBar = document.getElementById('prop-count-bar');
+    if (countBar) countBar.textContent = `${filtered.length} propert${filtered.length!==1?'ies':'y'}`;
+
+    const cont = document.getElementById('properties-content');
+    if (!cont) return;
+
+    if (!filtered.length) {
+        cont.innerHTML = `<div class="empty"><div class="empty-icon">🏡</div><div>No properties found.</div></div>`;
+        return;
+    }
+
+    if (viewMode === 'table') {
+        cont.innerHTML = `<div class="table-wrapper"><table>
+            <thead><tr>
+                <th>Name</th><th>Type</th><th>Status</th><th>Address</th>
+                <th>Value</th><th>Equity</th><th>Mortgage/Mo</th><th>Actions</th>
+            </tr></thead>
+            <tbody>${filtered.map(p => `<tr>
+                <td style="font-weight:600;">${esc(p.name)}</td>
+                <td><span class="badge ${typeBadgeClass(p.type)}">${esc(p.type||'')}</span></td>
+                <td><span class="badge ${statusClass(p.status)}">${esc(p.status||'')}</span></td>
+                <td style="white-space:nowrap;">${esc(p.city||'')}${p.state?', '+p.state:''}</td>
+                <td>${fmt$(p.currentValue)}</td>
+                <td style="color:${calcEquity(p)>=0?'var(--success)':'var(--danger)'};">${fmt$(calcEquity(p))}</td>
+                <td>${fmt$(p.mortPayment)}</td>
+                <td style="white-space:nowrap;">
+                    <button class="btn btn-ghost btn-sm" onclick="openDetail('${p._id}')">View</button>
+                    <button class="btn btn-ghost btn-sm" onclick="editProperty('${p._id}')">Edit</button>
+                </td>
+            </tr>`).join('')}</tbody>
+        </table></div>`;
+    } else {
+        cont.innerHTML = `<div class="prop-grid">${filtered.map(p => propCard(p)).join('')}</div>`;
+    }
+}
+
+function propCard(p) {
+    const photoUrl = p.photoFront || '';
+    const equity = calcEquity(p);
+    return `<div class="prop-card">
+        ${photoUrl
+            ? `<div class="prop-card-photo"><img src="${esc(photoUrl)}" alt="${esc(p.name)}" loading="lazy"></div>`
+            : `<div class="prop-card-photo">🏡</div>`}
+        <span class="prop-status-pill badge ${statusClass(p.status)}">${esc(p.status||'Active')}</span>
+        <div class="prop-card-body">
+            <div class="prop-card-type-row">
+                <span class="badge ${typeBadgeClass(p.type)}">${esc(p.type||'Other')}</span>
+            </div>
+            <div class="prop-card-name">${esc(p.name)}</div>
+            <div class="prop-card-addr">${esc(p.street||'')}${p.city?', '+p.city:''}${p.state?' '+p.state:''} ${esc(p.zip||'')}</div>
+            <div class="prop-card-stats">
+                <div class="prop-card-stat"><div class="prop-card-stat-lbl">Est. Value</div><div class="prop-card-stat-val">${fmt$(p.currentValue)}</div></div>
+                <div class="prop-card-stat"><div class="prop-card-stat-lbl">Equity</div><div class="prop-card-stat-val" style="color:${equity>=0?'var(--success)':'var(--danger)'};">${fmt$(equity)}</div></div>
+                <div class="prop-card-stat"><div class="prop-card-stat-lbl">Mortgage/Mo</div><div class="prop-card-stat-val">${fmt$(p.mortPayment)}</div></div>
+                <div class="prop-card-stat"><div class="prop-card-stat-lbl">${p.type==='Rental'?'Monthly Rent':'Beds/Baths'}</div><div class="prop-card-stat-val">${p.type==='Rental' ? fmt$(p.monthlyRent) : (p.beds||'—') + 'bd / ' + (p.bathsFull||'—') + 'ba'}</div></div>
+            </div>
+            <div class="prop-card-actions">
+                <button class="btn btn-ghost btn-sm" onclick="openDetail('${p._id}')">📋 Details</button>
+                <button class="btn btn-primary btn-sm" onclick="editProperty('${p._id}')">✏️ Edit</button>
+            </div>
+        </div>
+    </div>`;
+}
+
+// ── DETAIL MODAL ──
+function openDetail(id) {
+    const p = properties.find(x => x._id === id);
+    if (!p) return;
+    const modal = document.getElementById('detail-modal');
+    document.getElementById('detail-modal-title').textContent = '🏡 ' + (p.name || 'Property');
+    document.getElementById('detail-edit-btn').onclick = () => { closeModal('detail-modal'); editProperty(id); };
+
+    const f = (lbl, val) => `<div><div class="modal-field-lbl">${lbl}</div><div class="modal-field-val">${val||'—'}</div></div>`;
+    const equity = calcEquity(p);
+
+    document.getElementById('detail-modal-body').innerHTML = `
+        <div class="modal-section">
+            <div class="modal-section-title">Property</div>
+            <div class="modal-fields">
+                ${f('Type', `<span class="badge ${typeBadgeClass(p.type)}">${esc(p.type||'')}</span>`)}
+                ${f('Status', `<span class="badge ${statusClass(p.status)}">${esc(p.status||'')}</span>`)}
+                ${f('Address', esc([p.street,p.city,p.state,p.zip].filter(Boolean).join(', ')))}
+                ${f('County', esc(p.county))}
+                ${f('Beds / Baths', (p.beds||'—')+'bd / '+(p.bathsFull||'—')+'ba'+(p.bathsHalf?' + '+p.bathsHalf+'hb':''))}
+                ${f('Garage', p.garage ? p.garage+' car' : '—')}
+                ${f('Living Area', p.sqft ? Number(p.sqft).toLocaleString()+' sq ft' : '—')}
+                ${f('Lot', p.lotAcres ? p.lotAcres+' acres' : '—')}
+                ${f('Year Built', p.yearBuilt)}
+                ${f('Parcel #', esc(p.parcel))}
+            </div>
+        </div>
+        <div class="modal-section">
+            <div class="modal-section-title">Value &amp; Purchase</div>
+            <div class="modal-fields">
+                ${f('Purchase Price', fmt$(p.purchasePrice))}
+                ${f('Purchase Date', fmtDate(p.purchaseDate))}
+                ${f('Down Payment', fmt$(p.downPayment))}
+                ${f('Current Est. Value', fmt$(p.currentValue))}
+                ${f('Current Equity', `<span style="color:${equity>=0?'var(--success)':'var(--danger)'};">${fmt$(equity)}</span>`)}
+                ${f('Value Updated', fmtDate(p.valueDate))}
+            </div>
+        </div>
+        ${p.mortLender || p.mortBalance ? `<div class="modal-section">
+            <div class="modal-section-title">Mortgage</div>
+            <div class="modal-fields">
+                ${f('Lender', esc(p.mortLender))}
+                ${f('Loan Type', esc(p.mortType))}
+                ${f('Account #', esc(p.mortAccount))}
+                ${f('Original Balance', fmt$(p.mortOriginal))}
+                ${f('Current Balance', fmt$(p.mortBalance))}
+                ${f('Monthly Payment', fmt$(p.mortPayment))}
+                ${f('Interest Rate', p.mortRate ? p.mortRate+'%' : '—')}
+                ${f('Term', p.mortTerm ? p.mortTerm+' years' : '—')}
+                ${f('Start Date', fmtDate(p.mortStart))}
+                ${f('Next Payment', fmtDate(p.mortNext))}
+            </div>
+        </div>` : ''}
+        ${p.taxAnnual || p.hoaFee ? `<div class="modal-section">
+            <div class="modal-section-title">Taxes &amp; HOA</div>
+            <div class="modal-fields">
+                ${f('Annual Tax', fmt$(p.taxAnnual))}
+                ${f('Monthly Tax', p.taxAnnual ? fmt$(Math.round(p.taxAnnual/12)) : '—')}
+                ${f('Tax Due Date', fmtDate(p.taxDue))}
+                ${f('HOA Monthly', fmt$(p.hoaFee))}
+                ${f('HOA Company', esc(p.hoaCompany))}
+                ${f('HOA Phone', esc(p.hoaPhone))}
+            </div>
+        </div>` : ''}
+        ${p.type === 'Rental' && p.tenantName ? `<div class="modal-section">
+            <div class="modal-section-title">Rental</div>
+            <div class="modal-fields">
+                ${f('Tenant', esc(p.tenantName))}
+                ${f('Phone', esc(p.tenantPhone))}
+                ${f('Email', esc(p.tenantEmail))}
+                ${f('Lease', fmtDate(p.leaseStart)+' – '+fmtDate(p.leaseEnd))}
+                ${f('Monthly Rent', fmt$(p.monthlyRent))}
+                ${f('Security Deposit', fmt$(p.deposit))}
+                ${f('Pet Deposit', fmt$(p.petDeposit))}
+            </div>
+        </div>` : ''}
+        ${p.insCompany ? `<div class="modal-section">
+            <div class="modal-section-title">Property Insurance</div>
+            <div class="modal-fields">
+                ${f('Company', esc(p.insCompany))}
+                ${f('Policy #', esc(p.insPolicy))}
+                ${f('Annual Premium', fmt$(p.insPremium))}
+                ${f('Renewal', fmtDate(p.insRenewal))}
+                ${f('Agent', esc(p.insAgent))}
+                ${f('Agent Phone', esc(p.insAgentPhone))}
+            </div>
+        </div>` : ''}
+        ${p.notes ? `<div class="modal-section"><div class="modal-section-title">Notes</div><p style="font-size:0.88rem;line-height:1.6;white-space:pre-wrap;">${esc(p.notes)}</p></div>` : ''}
+        <div class="modal-section">
+            <div class="modal-section-title">Photos</div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                ${PHOTO_KEYS.map((k,i) => p[k] ? `<div style="text-align:center;"><img src="${esc(p[k])}" style="width:120px;height:80px;object-fit:cover;border-radius:6px;border:1px solid var(--border);" alt="${PHOTO_LABELS[i]}"><div style="font-size:0.7rem;color:var(--text-secondary);margin-top:3px;">${PHOTO_LABELS[i]}</div></div>` : '').join('')}
+                ${PHOTO_KEYS.every(k => !p[k]) ? '<span style="color:var(--text-secondary);font-size:0.85rem;">No photos uploaded.</span>' : ''}
+            </div>
+        </div>`;
+
+    modal.classList.add('show');
+}
+
+// ── FINANCIAL VIEW ──
+function renderFinancial() {
+    const active = properties.filter(p => p.status !== 'Sold');
+    if (!active.length) {
+        document.getElementById('financial-content').innerHTML = `<div class="empty"><div class="empty-icon">💰</div><div>No properties yet.</div></div>`;
+        return;
+    }
+    let totalValue=0, totalBalance=0, totalMort=0, totalTax=0, totalHoa=0, totalRent=0, totalIns=0;
+    active.forEach(p => {
+        totalValue   += Number(p.currentValue)||0;
+        totalBalance += Number(p.mortBalance)||0;
+        totalMort    += Number(p.mortPayment)||0;
+        totalTax     += Number(p.taxAnnual)||0;
+        totalHoa     += Number(p.hoaFee)||0;
+        totalRent    += Number(p.monthlyRent)||0;
+        totalIns     += Number(p.insPremium)||0;
+    });
+    const totalEquity = totalValue - totalBalance;
+    const monthlyExpenses = totalMort + Math.round(totalTax/12) + totalHoa + Math.round(totalIns/12);
+    const netMonthly = totalRent - monthlyExpenses;
+
+    document.getElementById('financial-content').innerHTML = `
+        <div class="fin-metrics" style="margin-bottom:24px;">
+            <div class="fin-metric"><div class="fin-metric-val">${fmt$(totalValue)}</div><div class="fin-metric-lbl">Portfolio Value</div></div>
+            <div class="fin-metric"><div class="fin-metric-val">${fmt$(totalBalance)}</div><div class="fin-metric-lbl">Total Debt</div></div>
+            <div class="fin-metric"><div class="fin-metric-val" style="color:${totalEquity>=0?'var(--success)':'var(--danger)'};">${fmt$(totalEquity)}</div><div class="fin-metric-lbl">Net Equity</div></div>
+            <div class="fin-metric"><div class="fin-metric-val">${fmt$(totalRent)}</div><div class="fin-metric-lbl">Monthly Rental Income</div></div>
+            <div class="fin-metric"><div class="fin-metric-val">${fmt$(monthlyExpenses)}</div><div class="fin-metric-lbl">Monthly Expenses</div></div>
+            <div class="fin-metric"><div class="fin-metric-val" style="color:${netMonthly>=0?'var(--success)':'var(--danger)'};">${fmt$(netMonthly)}</div><div class="fin-metric-lbl">Net Monthly Cash Flow</div></div>
+        </div>
+        ${active.map(p => {
+            const eq = calcEquity(p);
+            const monthlyTax = Math.round((Number(p.taxAnnual)||0)/12);
+            const monthlyIns = Math.round((Number(p.insPremium)||0)/12);
+            const total_exp = (Number(p.mortPayment)||0) + monthlyTax + (Number(p.hoaFee)||0) + monthlyIns;
+            const net = (Number(p.monthlyRent)||0) - total_exp;
+            return `<div class="fin-prop-header">
+                <div>
+                    <div class="fin-prop-name">🏡 ${esc(p.name)}</div>
+                    <div class="fin-prop-addr">${esc(p.city||'')}${p.state?', '+p.state:''} · <span class="badge ${typeBadgeClass(p.type)}">${esc(p.type||'')}</span></div>
+                </div>
+                <button class="btn btn-ghost btn-sm" onclick="editProperty('${p._id}')">✏️ Edit</button>
+            </div>
+            <div class="fin-metrics" style="margin-bottom:20px;">
+                <div class="fin-metric"><div class="fin-metric-val">${fmt$(p.currentValue)}</div><div class="fin-metric-lbl">Est. Value</div></div>
+                <div class="fin-metric"><div class="fin-metric-val">${fmt$(p.mortBalance)}</div><div class="fin-metric-lbl">Loan Balance</div></div>
+                <div class="fin-metric"><div class="fin-metric-val" style="color:${eq>=0?'var(--success)':'var(--danger)'};">${fmt$(eq)}</div><div class="fin-metric-lbl">Equity</div></div>
+                <div class="fin-metric"><div class="fin-metric-val">${fmt$(p.mortPayment)}</div><div class="fin-metric-lbl">Mortgage/Mo</div></div>
+                <div class="fin-metric"><div class="fin-metric-val">${monthlyTax?fmt$(monthlyTax):'—'}</div><div class="fin-metric-lbl">Tax/Mo</div></div>
+                <div class="fin-metric"><div class="fin-metric-val">${p.hoaFee?fmt$(p.hoaFee):'—'}</div><div class="fin-metric-lbl">HOA/Mo</div></div>
+                ${p.type==='Rental'?`<div class="fin-metric"><div class="fin-metric-val" style="color:var(--success);">${fmt$(p.monthlyRent)}</div><div class="fin-metric-lbl">Rental Income</div></div>
+                <div class="fin-metric"><div class="fin-metric-val" style="color:${net>=0?'var(--success)':'var(--danger)'};">${fmt$(net)}</div><div class="fin-metric-lbl">Net Cash Flow</div></div>`:''}
+                ${p.mortRate?`<div class="fin-metric"><div class="fin-metric-val">${p.mortRate}%</div><div class="fin-metric-lbl">Interest Rate</div></div>`:''}
+            </div>`;
+        }).join('')}`;
+}
+
+// ── REPORTS ──
+function renderReports() {
+    const active = properties.filter(p => p.status !== 'Sold');
+    const totalValue  = active.reduce((s,p)=>s+(Number(p.currentValue)||0),0);
+    const totalEquity = active.reduce((s,p)=>s+Math.max(0,calcEquity(p)),0);
+    const totalMort   = active.reduce((s,p)=>s+(Number(p.mortBalance)||0),0);
+    const totalRent   = active.filter(p=>p.type==='Rental').reduce((s,p)=>s+(Number(p.monthlyRent)||0),0);
+
+    document.getElementById('report-summary').innerHTML = `
+        <div class="report-row"><span>Total Portfolio Value</span><strong>${fmt$(totalValue)}</strong></div>
+        <div class="report-row"><span>Total Mortgage Debt</span><strong>${fmt$(totalMort)}</strong></div>
+        <div class="report-row"><span>Total Net Equity</span><strong style="color:var(--success);">${fmt$(totalEquity)}</strong></div>
+        <div class="report-row"><span>Monthly Rental Income</span><strong>${fmt$(totalRent)}</strong></div>
+        <div class="report-row"><span>Total Properties (active)</span><strong>${active.length}</strong></div>
+        <div class="report-row"><span>Properties Sold</span><strong>${properties.filter(p=>p.status==='Sold').length}</strong></div>`;
+
+    const typeCounts = {};
+    const typeValues = {};
+    active.forEach(p => {
+        const t = p.type||'Other';
+        typeCounts[t] = (typeCounts[t]||0)+1;
+        typeValues[t] = (typeValues[t]||0) + (Number(p.currentValue)||0);
+    });
+    document.getElementById('report-by-type').innerHTML = Object.keys(typeCounts).length
+        ? `<div class="table-wrapper"><table><thead><tr><th>Type</th><th>Count</th><th>Total Value</th><th>Avg Value</th></tr></thead><tbody>
+            ${Object.entries(typeCounts).sort((a,b)=>b[1]-a[1]).map(([t,c])=>`<tr>
+                <td><span class="badge ${typeBadgeClass(t)}">${esc(t)}</span></td>
+                <td>${c}</td><td>${fmt$(typeValues[t])}</td><td>${fmt$(Math.round(typeValues[t]/c))}</td>
+            </tr>`).join('')}
+        </tbody></table></div>`
+        : '<div class="empty">No properties yet.</div>';
+}
+
+// ── FORM ──
+function toggleTypeSections() {
+    const type = document.getElementById('f-type').value;
+    const isRental = type === 'Rental';
+    const rentalIds = ['rf-tenant-name','rf-tenant-phone','rf-tenant-email','rf-lease-start','rf-lease-end','rf-monthly-rent','rf-deposit','rf-pet-deposit'];
+    rentalIds.forEach(id => { const el = document.getElementById(id); if(el) el.style.display = isRental ? '' : 'none'; });
+    const div = document.getElementById('rental-divider');
+    if (div) div.style.display = isRental ? '' : 'none';
+}
+
+const PHOTO_SLOT_NAMES = ['photoFront','photoBack','photoInterior','photoAerial','photoDoc'];
+
+function buildPhotoSlots() {
+    const grid = document.getElementById('photo-slots');
+    if (!grid) return;
+    grid.innerHTML = PHOTO_SLOT_NAMES.map((k, i) => `
+        <div class="photo-slot" id="slot-${k}">
+            <div class="photo-slot-empty" id="slot-empty-${k}">📷</div>
+            <img id="slot-img-${k}" style="display:none;width:100%;height:100%;object-fit:cover;" alt="${PHOTO_LABELS[i]}">
+            <div class="photo-slot-label">${PHOTO_LABELS[i]}</div>
+            <button type="button" class="remove-photo" id="slot-rm-${k}" style="display:none;" onclick="removePhoto('${k}')">✕</button>
+            <input type="file" accept="image/*,.pdf" onchange="handlePhoto(event,'${k}')">
+        </div>`).join('');
+}
+
+function handlePhoto(e, key) {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+        if (file.type.startsWith('image/')) {
+            // compress
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const max = 1200;
+                let w = img.width, h = img.height;
+                if (w > max) { h = Math.round(h*max/w); w = max; }
+                canvas.width = w; canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                const url = canvas.toDataURL('image/jpeg', 0.82);
+                photoData[key] = url;
+                setSlotImage(key, url);
+            };
+            img.src = ev.target.result;
+        } else {
+            photoData[key] = ev.target.result;
+            setSlotImage(key, null, '📄');
+        }
+    };
+    reader.readAsDataURL(file);
+}
+function setSlotImage(key, url, icon) {
+    const img = document.getElementById('slot-img-'+key);
+    const empty = document.getElementById('slot-empty-'+key);
+    const rm = document.getElementById('slot-rm-'+key);
+    if (url) { img.src = url; img.style.display='block'; empty.style.display='none'; }
+    else if (icon) { empty.textContent = icon; empty.style.display='block'; img.style.display='none'; }
+    if (rm) rm.style.display = 'flex';
+}
+function removePhoto(key) {
+    photoData[key] = null;
+    const img = document.getElementById('slot-img-'+key);
+    const empty = document.getElementById('slot-empty-'+key);
+    const rm = document.getElementById('slot-rm-'+key);
+    if (img) { img.src=''; img.style.display='none'; }
+    if (empty) { empty.textContent='📷'; empty.style.display='flex'; }
+    if (rm) rm.style.display='none';
+}
+
+function resetForm() {
+    editingId = null;
+    document.getElementById('form-title').textContent = '＋ Add Property';
+    document.getElementById('prop-submit-btn').textContent = 'Save Property';
+    document.getElementById('prop-delete-btn').style.display = 'none';
+    document.getElementById('property-form').reset();
+    photoData = {};
+    buildPhotoSlots();
+    toggleTypeSections();
+}
+
+function gv(id) { return document.getElementById(id)?.value?.trim() || ''; }
+function sv(id, val) { const el = document.getElementById(id); if(el) el.value = val||''; }
+
+function editProperty(id) {
+    const p = properties.find(x => x._id === id);
+    if (!p) return;
+    editingId = id;
+    showView('add-property');
+    document.getElementById('form-title').textContent = '✏️ Edit Property';
+    document.getElementById('prop-submit-btn').textContent = 'Update Property';
+    document.getElementById('prop-delete-btn').style.display = 'inline-flex';
+
+    sv('f-name', p.name); sv('f-type', p.type); sv('f-status', p.status);
+    sv('f-street', p.street); sv('f-city', p.city); sv('f-state', p.state);
+    sv('f-zip', p.zip); sv('f-county', p.county);
+    sv('f-beds', p.beds); sv('f-baths-full', p.bathsFull); sv('f-baths-half', p.bathsHalf);
+    sv('f-garage', p.garage); sv('f-sqft', p.sqft); sv('f-lot-acres', p.lotAcres);
+    sv('f-year-built', p.yearBuilt); sv('f-stories', p.stories); sv('f-parcel', p.parcel);
+    sv('f-purchase-price', p.purchasePrice); sv('f-purchase-date', p.purchaseDate);
+    sv('f-down-payment', p.downPayment); sv('f-closing-costs', p.closingCosts);
+    sv('f-current-value', p.currentValue); sv('f-value-date', p.valueDate);
+    sv('f-mort-lender', p.mortLender); sv('f-mort-account', p.mortAccount);
+    sv('f-mort-type', p.mortType); sv('f-mort-original', p.mortOriginal);
+    sv('f-mort-balance', p.mortBalance); sv('f-mort-payment', p.mortPayment);
+    sv('f-mort-rate', p.mortRate); sv('f-mort-term', p.mortTerm);
+    sv('f-mort-start', p.mortStart); sv('f-mort-next', p.mortNext);
+    sv('f-tax-annual', p.taxAnnual); sv('f-tax-due', p.taxDue);
+    sv('f-hoa-fee', p.hoaFee); sv('f-hoa-company', p.hoaCompany); sv('f-hoa-phone', p.hoaPhone);
+    sv('f-tenant-name', p.tenantName); sv('f-tenant-phone', p.tenantPhone);
+    sv('f-tenant-email', p.tenantEmail); sv('f-lease-start', p.leaseStart);
+    sv('f-lease-end', p.leaseEnd); sv('f-monthly-rent', p.monthlyRent);
+    sv('f-deposit', p.deposit); sv('f-pet-deposit', p.petDeposit);
+    sv('f-ins-company', p.insCompany); sv('f-ins-policy', p.insPolicy);
+    sv('f-ins-premium', p.insPremium); sv('f-ins-renewal', p.insRenewal);
+    sv('f-ins-agent', p.insAgent); sv('f-ins-agent-phone', p.insAgentPhone);
+    sv('f-notes', p.notes);
+
+    toggleTypeSections();
+    photoData = {};
+    buildPhotoSlots();
+    PHOTO_SLOT_NAMES.forEach(k => {
+        if (p[k]) { photoData[k] = p[k]; setSlotImage(k, p[k]); }
+    });
+}
+
+async function saveProperty(e) {
+    e.preventDefault();
+    const btn = document.getElementById('prop-submit-btn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+
+    const data = {
+        name: gv('f-name'), type: gv('f-type'), status: gv('f-status'),
+        street: gv('f-street'), city: gv('f-city'), state: gv('f-state').toUpperCase(),
+        zip: gv('f-zip'), county: gv('f-county'),
+        beds: gv('f-beds'), bathsFull: gv('f-baths-full'), bathsHalf: gv('f-baths-half'),
+        garage: gv('f-garage'), sqft: gv('f-sqft'), lotAcres: gv('f-lot-acres'),
+        yearBuilt: gv('f-year-built'), stories: gv('f-stories'), parcel: gv('f-parcel'),
+        purchasePrice: gv('f-purchase-price'), purchaseDate: gv('f-purchase-date'),
+        downPayment: gv('f-down-payment'), closingCosts: gv('f-closing-costs'),
+        currentValue: gv('f-current-value'), valueDate: gv('f-value-date'),
+        mortLender: gv('f-mort-lender'), mortAccount: gv('f-mort-account'),
+        mortType: gv('f-mort-type'), mortOriginal: gv('f-mort-original'),
+        mortBalance: gv('f-mort-balance'), mortPayment: gv('f-mort-payment'),
+        mortRate: gv('f-mort-rate'), mortTerm: gv('f-mort-term'),
+        mortStart: gv('f-mort-start'), mortNext: gv('f-mort-next'),
+        taxAnnual: gv('f-tax-annual'), taxDue: gv('f-tax-due'),
+        hoaFee: gv('f-hoa-fee'), hoaCompany: gv('f-hoa-company'), hoaPhone: gv('f-hoa-phone'),
+        tenantName: gv('f-tenant-name'), tenantPhone: gv('f-tenant-phone'),
+        tenantEmail: gv('f-tenant-email'), leaseStart: gv('f-lease-start'),
+        leaseEnd: gv('f-lease-end'), monthlyRent: gv('f-monthly-rent'),
+        deposit: gv('f-deposit'), petDeposit: gv('f-pet-deposit'),
+        insCompany: gv('f-ins-company'), insPolicy: gv('f-ins-policy'),
+        insPremium: gv('f-ins-premium'), insRenewal: gv('f-ins-renewal'),
+        insAgent: gv('f-ins-agent'), insAgentPhone: gv('f-ins-agent-phone'),
+        notes: gv('f-notes'), deleted: false,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    // Photos
+    PHOTO_SLOT_NAMES.forEach(k => { data[k] = photoData[k] || ''; });
+    if (!editingId) data.addedAt = firebase.firestore.FieldValue.serverTimestamp();
+
+    try {
+        if (editingId) {
+            await db.collection('realestate_items').doc(editingId).update(data);
+            showToast('Property updated!');
+        } else {
+            await db.collection('realestate_items').add(data);
+            showToast('Property saved!');
+        }
+        resetForm();
+        showView('properties');
+    } catch(err) {
+        showToast('Error: ' + err.message, true);
+    } finally {
+        btn.disabled = false; btn.textContent = editingId ? 'Update Property' : 'Save Property';
+    }
+}
+
+function cancelForm() {
+    resetForm();
+    showView('properties');
+}
+
+async function deleteProperty() {
+    if (!editingId || !confirm('Move this property to the recycle bin?')) return;
+    try {
+        await db.collection('realestate_items').doc(editingId).update({
+            deleted: true, deletedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        showToast('Moved to recycle bin.');
+        resetForm();
+        showView('properties');
+    } catch(err) { showToast('Error: ' + err.message, true); }
+}
+
+// ── RECYCLE BIN ──
+async function loadBin() {
+    const snap = await db.collection('realestate_items').where('deleted','==',true).get();
+    binItems = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+    const el = document.getElementById('bin-list');
+    if (!binItems.length) { el.innerHTML = '<div class="empty">Recycle bin is empty.</div>'; return; }
+    el.innerHTML = binItems.map(p => `
+        <div class="bin-item">
+            <div style="flex:1;min-width:0;">
+                <div style="font-weight:600;">${esc(p.name)}</div>
+                <div style="font-size:0.8rem;color:var(--text-secondary);">${esc(p.type||'')} · ${esc(p.city||'')}${p.state?', '+p.state:''}</div>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="restoreProperty('${p._id}')">↩️ Restore</button>
+            <button class="btn btn-danger btn-sm" onclick="permanentDelete('${p._id}')">🗑 Delete</button>
+        </div>`).join('');
+}
+async function restoreProperty(id) {
+    await db.collection('realestate_items').doc(id).update({ deleted: false, deletedAt: firebase.firestore.FieldValue.delete() });
+    showToast('Property restored!');
+    loadBin();
+}
+async function permanentDelete(id) {
+    if (!confirm('Permanently delete this property? This cannot be undone.')) return;
+    await db.collection('realestate_items').doc(id).delete();
+    showToast('Permanently deleted.');
+    loadBin();
+}
+
+// INIT photo slots on load
+buildPhotoSlots();
+</script>
+</body>
+</html>

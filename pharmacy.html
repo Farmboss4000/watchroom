@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Farmboss Pharmacy</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0;}
+        :root{
+            --bg-primary:#f0f4f8;--bg-secondary:#ffffff;--bg-card:#e6eef5;
+            --accent:#0ea5e9;--accent-hover:#0284c7;--accent-dim:rgba(14,165,233,0.12);
+            --text-primary:#1a1f2e;--text-secondary:#5a6070;--border:#cdd4e0;
+            --success:#16a34a;--danger:#dc2626;--warning:#d97706;--info:#2563eb;--hdr-bg:#0c1a2e;
+        }
+        body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:var(--bg-primary);color:var(--text-primary);min-height:100vh;overflow-x:hidden;}
+        .site-switcher{background:#111827;display:flex;align-items:center;padding:5px 18px;gap:4px;font-size:0.77rem;border-bottom:1px solid rgba(255,255,255,0.07);overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap;scrollbar-width:none;}
+        .site-switcher::-webkit-scrollbar{display:none;}
+        .site-link{text-decoration:none;color:#9ca3af;padding:4px 12px;border-radius:4px;display:flex;align-items:center;gap:6px;font-weight:500;transition:all 0.15s;white-space:nowrap;}
+        .site-link:hover{background:rgba(255,255,255,0.1);color:#e5e7eb;}
+        .site-link.active{background:rgba(255,255,255,0.13);color:#fff;font-weight:600;}
+        #login-screen{position:fixed;inset:0;background:linear-gradient(135deg,#0c1a2e 0%,#0a2540 100%);display:flex;align-items:center;justify-content:center;z-index:9000;flex-direction:column;gap:12px;}
+        .login-site-links{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;}
+        .login-site-links a{color:rgba(255,255,255,0.5);font-size:0.78rem;text-decoration:none;padding:4px 12px;border:1px solid rgba(255,255,255,0.2);border-radius:4px;transition:all 0.15s;}
+        .login-site-links a:hover{color:#fff;border-color:rgba(255,255,255,0.5);}
+        .login-site-links a.active{color:var(--accent);border-color:var(--accent);}
+        .login-box{background:#fff;border-radius:14px;padding:44px 40px;width:100%;max-width:400px;box-shadow:0 24px 64px rgba(0,0,0,0.4);}
+        .login-logo{width:56px;height:56px;background:var(--accent);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 16px;color:#fff;}
+        .login-box h2{text-align:center;font-size:1.5rem;color:#1a1f2e;margin-bottom:4px;}
+        .login-sub{text-align:center;font-size:0.85rem;color:#6b7280;margin-bottom:28px;}
+        .login-error{color:var(--danger);font-size:0.82rem;margin-bottom:12px;min-height:18px;text-align:center;}
+        .login-full{width:100%;justify-content:center;}
+        .form-group{margin-bottom:14px;}
+        .form-group label{display:block;font-size:0.8rem;font-weight:600;color:#374151;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.4px;}
+        .form-group input,.form-group select,.form-group textarea{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:7px;font-size:0.9rem;font-family:inherit;color:var(--text-primary);background:var(--bg-secondary);transition:border-color 0.15s;}
+        .form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--accent);}
+        #loading-screen{display:none;position:fixed;inset:0;background:var(--bg-primary);flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:8000;}
+        .spinner{width:44px;height:44px;border:4px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
+        @keyframes spin{to{transform:rotate(360deg);}}
+        #app{display:none;min-height:100vh;flex-direction:column;}
+        header{background:var(--hdr-bg);padding:0 20px;display:flex;align-items:center;gap:16px;min-height:56px;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,0.25);flex-wrap:wrap;}
+        .logo-area{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+        .logo-icon{width:32px;height:32px;background:var(--accent);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:17px;color:#fff;flex-shrink:0;}
+        header h1{font-size:1.15rem;font-weight:700;color:#fff;white-space:nowrap;}
+        header h1 span{color:var(--accent);}
+        nav{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;flex-shrink:0;}
+        nav::-webkit-scrollbar{display:none;}
+        nav button{background:transparent;border:none;color:#9ca3af;padding:8px 13px;border-radius:6px;cursor:pointer;font-size:0.83rem;transition:all 0.15s;white-space:nowrap;}
+        nav button:hover{background:rgba(14,165,233,0.2);color:#fff;}
+        nav button.active{background:var(--accent);color:#fff;font-weight:600;}
+        .header-right{display:flex;align-items:center;gap:10px;margin-left:auto;}
+        .user-badge{font-size:0.78rem;color:#9ca3af;background:rgba(255,255,255,0.08);padding:4px 10px;border-radius:5px;}
+        .btn-signout{background:transparent;border:1px solid rgba(255,255,255,0.2);color:#9ca3af;padding:5px 12px;border-radius:5px;cursor:pointer;font-size:0.78rem;transition:all 0.15s;}
+        .btn-signout:hover{border-color:var(--danger);color:var(--danger);}
+        .hero{background:linear-gradient(135deg,#061220 0%,#0a2540 60%,#0c3060 100%);border-radius:12px;padding:28px 32px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:16px;overflow:hidden;position:relative;}
+        .hero::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");}
+        .hero-title{font-size:1.6rem;font-weight:800;color:#fff;margin-bottom:4px;position:relative;}
+        .hero-title span{color:var(--accent);}
+        .hero-sub{font-size:0.88rem;color:rgba(255,255,255,0.65);position:relative;}
+        main{padding:20px;max-width:1400px;margin:0 auto;flex:1;}
+        .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:20px;}
+        .stat-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:18px 16px;text-align:center;}
+        .stat-value{font-size:2rem;font-weight:800;color:var(--accent);line-height:1;margin-bottom:4px;}
+        .stat-label{font-size:0.77rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;}
+        .card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:22px;margin-bottom:20px;}
+        .card-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;gap:10px;flex-wrap:wrap;}
+        .card-title-left{font-size:1rem;font-weight:700;color:var(--text-primary);}
+        .view{display:none;}.view.active{display:block;}
+        .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:7px;font-size:0.85rem;font-weight:600;cursor:pointer;border:none;transition:all 0.15s;font-family:inherit;}
+        .btn-primary{background:var(--accent);color:#fff;}.btn-primary:hover{background:var(--accent-hover);}
+        .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text-primary);}.btn-ghost:hover{background:var(--bg-card);}
+        .btn-danger{background:var(--danger);color:#fff;}.btn-danger:hover{opacity:0.85;}
+        .btn-warning{background:var(--warning);color:#fff;}.btn-warning:hover{opacity:0.85;}
+        .btn-sm{padding:5px 10px;font-size:0.78rem;}
+        .btn-secondary{background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary);}.btn-secondary:hover{background:var(--border);}
+        .form-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+        .form-group.full-width{grid-column:1/-1;}
+        .form-group.span2{grid-column:span 2;}
+        .input-prefix-wrap{position:relative;}
+        .input-prefix{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-secondary);font-size:0.9rem;pointer-events:none;}
+        .input-prefix+input{padding-left:24px;}
+        .form-actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+        .toolbar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;}
+        .toolbar input[type="text"]{flex:1;min-width:200px;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:0.87rem;font-family:inherit;background:var(--bg-secondary);color:var(--text-primary);}
+        .toolbar input:focus{outline:none;border-color:var(--accent);}
+        .toolbar select{padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:0.87rem;font-family:inherit;background:var(--bg-secondary);color:var(--text-primary);cursor:pointer;}
+        .table-wrapper{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+        table{width:100%;border-collapse:collapse;font-size:0.85rem;}
+        thead th{background:var(--bg-card);padding:10px 12px;text-align:left;font-size:0.74rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary);border-bottom:2px solid var(--border);cursor:pointer;white-space:nowrap;user-select:none;}
+        thead th.no-sort{cursor:default;}
+        thead th:hover:not(.no-sort){color:var(--accent);}
+        thead th.sort-asc::after{content:' ↑';color:var(--accent);}
+        thead th.sort-desc::after{content:' ↓';color:var(--accent);}
+        tbody tr{border-bottom:1px solid var(--border);transition:background 0.1s;}
+        tbody tr:hover{background:var(--accent-dim);}
+        tbody td{padding:10px 12px;vertical-align:middle;}
+        .mono{font-family:monospace;font-size:0.83rem;}
+        .empty{text-align:center;padding:40px 20px;color:var(--text-secondary);}
+        .empty-icon{font-size:3rem;margin-bottom:12px;}
+        .badge{display:inline-block;padding:3px 9px;border-radius:5px;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;white-space:nowrap;}
+        .badge-active{background:#dcfce7;color:#15803d;}
+        .badge-inactive{background:#f1f5f9;color:#64748b;}
+        .badge-discontinued{background:#fee2e2;color:#b91c1c;}
+        .badge-overdue{background:#fee2e2;color:#b91c1c;}
+        .badge-due-soon{background:#fef3c7;color:#92400e;}
+        .badge-ok{background:#dcfce7;color:#15803d;}
+        .refill-row-overdue{background:#fff5f5 !important;}
+        .refill-row-soon{background:#fffbeb !important;}
+        .cat-breakdown{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+        .cat-breakdown-item{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg-card);border-radius:7px;}
+        .cbi-name{font-size:0.82rem;color:var(--text-primary);min-width:140px;font-weight:500;}
+        .cbi-count{font-size:0.82rem;font-weight:700;color:var(--accent);min-width:28px;text-align:right;}
+        .cbi-bar{flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden;}
+        .cbi-bar-fill{height:100%;background:var(--accent);border-radius:3px;transition:width 0.3s;}
+        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;opacity:0;pointer-events:none;transition:opacity 0.2s;}
+        .modal-overlay.show{opacity:1;pointer-events:all;}
+        .modal{background:#fff;border-radius:14px;padding:28px 24px;width:100%;max-width:520px;margin:16px;max-height:90vh;overflow-y:auto;transform:scale(0.95);transition:transform 0.2s;}
+        .modal-overlay.show .modal{transform:scale(1);}
+        .modal-title{font-size:1.1rem;font-weight:700;color:var(--text-primary);margin-bottom:4px;}
+        .modal-sub{font-size:0.85rem;color:var(--text-secondary);margin-bottom:16px;}
+        .modal-actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+        .api-key-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;}
+        .api-key-row .form-group{flex:1;min-width:260px;}
+        .api-status{font-size:0.82rem;margin-top:8px;padding:8px 12px;border-radius:6px;}
+        .api-status.ok{background:#dcfce7;color:#15803d;}
+        .api-status.err{background:#fee2e2;color:#b91c1c;}
+        .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#1a1f2e;color:#fff;padding:10px 20px;border-radius:8px;font-size:0.87rem;font-weight:500;opacity:0;transition:all 0.3s;z-index:9999;pointer-events:none;white-space:nowrap;max-width:90vw;display:flex;align-items:center;gap:6px;}
+        .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+        .toast.success{background:var(--success);}
+        .toast.error{background:var(--danger);}
+        .alert-banner{border-radius:10px;padding:14px 18px;margin-bottom:14px;display:flex;align-items:center;gap:12px;font-size:0.88rem;font-weight:600;}
+        .alert-danger{background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;}
+        .alert-warning{background:#fef3c7;color:#92400e;border:1px solid #fcd34d;}
+        .refill-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:12px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+        .refill-card.overdue{border-left:4px solid var(--danger);background:#fff8f8;}
+        .refill-card.due-soon{border-left:4px solid var(--warning);background:#fffcf0;}
+        .refill-card.ok{border-left:4px solid var(--success);}
+        .refill-card-info{flex:1;min-width:200px;}
+        .refill-card-name{font-size:1rem;font-weight:700;color:var(--text-primary);}
+        .refill-card-sub{font-size:0.8rem;color:var(--text-secondary);margin-top:2px;}
+        .refill-card-days{font-size:1.5rem;font-weight:800;min-width:60px;text-align:right;}
+        .days-overdue{color:var(--danger);}
+        .days-soon{color:var(--warning);}
+        .days-ok{color:var(--success);}
+        .photo-slot{display:flex;flex-direction:column;gap:6px;max-width:220px;}
+        .photo-slot-label{font-size:0.78rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.4px;}
+        .photo-preview{width:100%;aspect-ratio:4/3;border:2px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--bg-card);overflow:hidden;position:relative;}
+        .photo-preview img{width:100%;height:100%;object-fit:cover;border-radius:6px;}
+        .no-photo{font-size:2rem;color:var(--border);}
+        .remove-photo{position:absolute;top:5px;right:5px;background:rgba(0,0,0,0.55);border:none;color:#fff;width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;}
+        .thumb{width:40px;height:40px;object-fit:cover;border-radius:5px;border:1px solid var(--border);display:block;}
+        .thumb-placeholder{width:40px;height:40px;border-radius:5px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--border);font-size:1.1rem;background:var(--bg-card);}
+        .chart-container{position:relative;height:260px;}
+        .report-stat{display:inline-block;text-align:center;padding:10px 16px;}
+        .report-stat-val{font-size:1.6rem;font-weight:800;color:var(--accent);}
+        .report-stat-lbl{font-size:0.72rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary);font-weight:600;}
+        @media(max-width:720px){header{flex-wrap:wrap;padding:8px 12px;gap:6px;}.user-badge{display:none;}nav{order:3;width:100%;border-top:1px solid rgba(255,255,255,0.1);padding-top:6px;}main{padding:12px;}.stats-grid{grid-template-columns:1fr 1fr;gap:10px;}.form-grid{grid-template-columns:1fr;gap:12px;}.form-group.full-width,.form-group.span2{grid-column:1;}.toolbar{flex-direction:column;align-items:stretch;}.cat-breakdown{grid-template-columns:1fr;}}
+    </style>
+</head>
+<body>
+
+<div id="login-screen">
+    <div class="login-site-links">
+        <a href="index.html">🏠 HQ</a>
+        <a href="armory.html">🔫 Armory</a>
+        <a href="automotive.html">🚗 Auto</a>
+        <a href="machinery.html">🚜 Machinery</a>
+        <a href="timepieces.html">⌚ Timepieces</a>
+        <a href="knives.html">🔪 Knives</a>
+        <a href="pharmacy.html" class="active">💊 Pharmacy</a>
+    </div>
+    <div class="login-box">
+        <div class="login-logo">💊</div>
+        <h2>Farmboss Pharmacy</h2>
+        <p class="login-sub">Sign in to manage prescriptions</p>
+        <form id="login-form">
+            <div class="form-group" style="margin-bottom:14px;">
+                <label>Email</label>
+                <input type="email" id="login-email" placeholder="your@email.com" required autocomplete="username">
+            </div>
+            <div class="form-group" style="margin-bottom:20px;">
+                <label>Password</label>
+                <input type="password" id="login-password" placeholder="••••••••" required autocomplete="current-password">
+            </div>
+            <div class="login-error" id="login-error"></div>
+            <button type="submit" class="btn btn-primary login-full" id="login-btn">Sign In</button>
+        </form>
+    </div>
+</div>
+
+<div id="loading-screen"><div class="spinner"></div><p>Loading prescriptions...</p></div>
+
+<div id="app">
+<div class="site-switcher">
+    <a href="index.html" class="site-link">🏠 Headquarters</a>
+    <a href="armory.html" class="site-link">🔫 Armory</a>
+    <a href="machinery.html" class="site-link">🚜 Machinery</a>
+    <a href="automotive.html" class="site-link">🚗 Automotive</a>
+    <a href="timepieces.html" class="site-link">⌚ Timepieces</a>
+    <a href="knives.html" class="site-link">🔪 Knives</a>
+    <a href="pharmacy.html" class="site-link active">💊 Pharmacy</a>
+</div>
+<header>
+    <div class="logo-area">
+        <div class="logo-icon">💊</div>
+        <h1>Farmboss <span>Pharmacy</span></h1>
+    </div>
+    <nav>
+        <button class="active" onclick="showView('dashboard')">Dashboard</button>
+        <button onclick="showView('add-item')">Add Prescription</button>
+        <button onclick="showView('inventory')">All Medications</button>
+        <button onclick="showView('refills')">Refills Due</button>
+        <button onclick="showView('reports')">Reports</button>
+        <button onclick="showView('settings')">⚙ Settings</button>
+        <button onclick="showView('recycle-bin')">🗑 Recycle Bin</button>
+    </nav>
+    <div class="header-right">
+        <span class="user-badge" id="user-email"></span>
+        <button class="btn-signout" onclick="doSignOut()">Sign Out</button>
+    </div>
+</header>
+<main>
+
+<!-- DASHBOARD -->
+<div id="view-dashboard" class="view active">
+    <div class="hero">
+        <div>
+            <div class="hero-title">Farmboss <span>Pharmacy</span></div>
+            <div class="hero-sub">Family prescription &amp; medication tracker</div>
+        </div>
+        <svg width="110" height="110" viewBox="0 0 110 110" style="opacity:0.85;flex-shrink:0;" xmlns="http://www.w3.org/2000/svg">
+            <rect x="30" y="15" width="50" height="80" rx="10" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="3"/>
+            <rect x="40" y="28" width="30" height="4" rx="2" fill="rgba(14,165,233,0.8)"/>
+            <rect x="40" y="38" width="20" height="4" rx="2" fill="rgba(255,255,255,0.4)"/>
+            <rect x="40" y="48" width="25" height="4" rx="2" fill="rgba(255,255,255,0.4)"/>
+            <rect x="40" y="58" width="15" height="4" rx="2" fill="rgba(255,255,255,0.4)"/>
+            <circle cx="55" cy="76" r="10" fill="rgba(14,165,233,0.4)" stroke="rgba(14,165,233,0.8)" stroke-width="2"/>
+            <text x="55" y="80" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="12" font-weight="700">Rx</text>
+        </svg>
+    </div>
+    <div id="alert-banners"></div>
+    <div class="stats-grid" id="stats-grid"></div>
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">👤 Medications by Person</div></div>
+        <div class="cat-breakdown" id="person-breakdown"></div>
+    </div>
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">🕐 Recently Added</div></div>
+        <div class="table-wrapper">
+            <table><thead><tr>
+                <th class="no-sort">Medication</th>
+                <th class="no-sort">Person</th>
+                <th class="no-sort">Dosage</th>
+                <th class="no-sort">Status</th>
+                <th class="no-sort">Next Refill</th>
+                <th class="no-sort">Added</th>
+            </tr></thead>
+            <tbody id="recent-tbody"></tbody></table>
+        </div>
+    </div>
+</div>
+
+<!-- ADD / EDIT -->
+<div id="view-add-item" class="view">
+    <div class="card">
+        <div class="card-title"><div class="card-title-left" id="form-title">➕ Add New Prescription</div></div>
+        <form id="item-form">
+            <input type="hidden" id="edit-id">
+            <input type="hidden" id="edit-doc-id">
+            <div class="form-grid">
+                <!-- Row 1: Core identity -->
+                <div class="form-group span2">
+                    <label>Medication Name (Brand) *</label>
+                    <input type="text" id="f-med-name" list="med-list" placeholder="e.g. Lipitor, Xanax, Metformin" autocomplete="off" required>
+                    <datalist id="med-list"></datalist>
+                </div>
+                <div class="form-group">
+                    <label>Generic Name</label>
+                    <input type="text" id="f-generic" placeholder="e.g. Atorvastatin">
+                </div>
+                <!-- Row 2: Person & Doctor -->
+                <div class="form-group">
+                    <label>Person *</label>
+                    <input type="text" id="f-person" list="person-list" placeholder="Family member name" autocomplete="off" required>
+                    <datalist id="person-list"></datalist>
+                </div>
+                <div class="form-group">
+                    <label>Prescribing Doctor</label>
+                    <input type="text" id="f-doctor" list="doctor-list" placeholder="Dr. Smith" autocomplete="off">
+                    <datalist id="doctor-list"></datalist>
+                </div>
+                <div class="form-group">
+                    <label>Pharmacy</label>
+                    <input type="text" id="f-pharmacy" list="pharmacy-list" placeholder="e.g. Walgreens, CVS, HEB" autocomplete="off">
+                    <datalist id="pharmacy-list"></datalist>
+                </div>
+                <!-- Row 3: Dosage -->
+                <div class="form-group">
+                    <label>Dosage</label>
+                    <input type="text" id="f-dosage" placeholder="e.g. 10mg, 500mg, 5ml">
+                </div>
+                <div class="form-group">
+                    <label>Dosage Form</label>
+                    <select id="f-dosage-form">
+                        <option value="">Select form...</option>
+                        <option>Tablet</option>
+                        <option>Capsule</option>
+                        <option>Liquid / Suspension</option>
+                        <option>Injection</option>
+                        <option>Patch</option>
+                        <option>Inhaler</option>
+                        <option>Cream / Ointment</option>
+                        <option>Drops (Eye/Ear)</option>
+                        <option>Suppository</option>
+                        <option>Sublingual</option>
+                        <option>Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Frequency</label>
+                    <div style="display:flex;gap:6px;align-items:center;">
+                        <input type="text" id="f-frequency" list="freq-list" placeholder="e.g. Once daily" autocomplete="off" style="flex:1;min-width:0;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('f-frequency').showPicker ? document.getElementById('f-frequency').showPicker() : document.getElementById('f-frequency').focus()">▼</button>
+                    </div>
+                    <datalist id="freq-list">
+                        <option>Once daily (QD)</option>
+                        <option>Twice daily (BID)</option>
+                        <option>Three times daily (TID)</option>
+                        <option>Four times daily (QID)</option>
+                        <option>Every 8 hours</option>
+                        <option>Every 12 hours</option>
+                        <option>As needed (PRN)</option>
+                        <option>Weekly</option>
+                        <option>Every 2 weeks</option>
+                        <option>Monthly</option>
+                        <option>Bedtime (QHS)</option>
+                    </datalist>
+                </div>
+                <!-- Row 4: Rx Details -->
+                <div class="form-group">
+                    <label>Rx / Prescription Number</label>
+                    <input type="text" id="f-rx-number" placeholder="e.g. 1234567">
+                </div>
+                <div class="form-group">
+                    <label>NDC Code</label>
+                    <input type="text" id="f-ndc" placeholder="e.g. 0071-0156-23">
+                </div>
+                <div class="form-group">
+                    <label>Medication Class</label>
+                    <input type="text" id="f-class" list="class-list" placeholder="e.g. Statin, SSRI, ACE Inhibitor" autocomplete="off">
+                    <datalist id="class-list">
+                        <option>ACE Inhibitor</option>
+                        <option>Antibiotic</option>
+                        <option>Anticoagulant</option>
+                        <option>Antidepressant</option>
+                        <option>Antihistamine</option>
+                        <option>Antihypertensive</option>
+                        <option>Anti-inflammatory (NSAID)</option>
+                        <option>Antiviral</option>
+                        <option>Benzodiazepine</option>
+                        <option>Beta Blocker</option>
+                        <option>Calcium Channel Blocker</option>
+                        <option>Corticosteroid</option>
+                        <option>Diabetes (Biguanide)</option>
+                        <option>Diuretic</option>
+                        <option>Hormone / HRT</option>
+                        <option>Muscle Relaxant</option>
+                        <option>Opioid Analgesic</option>
+                        <option>Proton Pump Inhibitor</option>
+                        <option>SSRI / SNRI</option>
+                        <option>Statin</option>
+                        <option>Thyroid</option>
+                        <option>Vitamin / Supplement</option>
+                        <option>Other</option>
+                    </datalist>
+                </div>
+                <!-- Row 5: Quantity & Refills -->
+                <div class="form-group">
+                    <label>Quantity per Fill</label>
+                    <input type="number" id="f-quantity" placeholder="e.g. 30, 90" min="1" step="1">
+                </div>
+                <div class="form-group">
+                    <label>Days Supply</label>
+                    <input type="number" id="f-days-supply" placeholder="e.g. 30, 90" min="1" step="1" oninput="autoCalcNextFill()">
+                </div>
+                <div class="form-group">
+                    <label>Refills Remaining</label>
+                    <input type="number" id="f-refills" placeholder="e.g. 5" min="0" step="1">
+                </div>
+                <!-- Row 6: Dates -->
+                <div class="form-group">
+                    <label>Last Fill Date</label>
+                    <input type="date" id="f-fill-date" oninput="autoCalcNextFill()">
+                </div>
+                <div class="form-group">
+                    <label>Next Fill Date</label>
+                    <input type="date" id="f-next-fill-date">
+                </div>
+                <div class="form-group">
+                    <label>Expiration Date</label>
+                    <input type="date" id="f-expiration">
+                </div>
+                <!-- Row 7: Status & Purpose -->
+                <div class="form-group">
+                    <label>Status</label>
+                    <select id="f-status">
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                        <option value="Discontinued">Discontinued</option>
+                    </select>
+                </div>
+                <div class="form-group span2">
+                    <label>Purpose / Condition Treated</label>
+                    <input type="text" id="f-purpose" placeholder="e.g. High cholesterol, Anxiety, Type 2 Diabetes">
+                </div>
+                <!-- Row 8: Notes -->
+                <div class="form-group full-width">
+                    <label>Notes</label>
+                    <textarea id="f-notes" rows="2" placeholder="Side effects, instructions, special handling, allergies noted..."></textarea>
+                </div>
+            </div>
+
+            <!-- LABEL PHOTO -->
+            <div style="margin-top:22px;padding-top:18px;border-top:1px solid var(--border);">
+                <div style="font-size:0.85rem;font-weight:600;color:var(--text-primary);margin-bottom:14px;">📷 Label &amp; Medication Photos</div>
+                <div style="display:flex;gap:16px;flex-wrap:wrap;">
+                    <div class="photo-slot">
+                        <div class="photo-slot-label">🏷 Prescription Label</div>
+                        <div class="photo-preview" id="prev-label"><span class="no-photo">🏷</span><button type="button" class="remove-photo" onclick="removePhoto('label')">✕</button></div>
+                        <input type="file" id="file-label" accept="image/*" onchange="onPhotoSelected('label',this)" style="font-size:0.78rem;color:var(--text-secondary);width:100%;margin-top:6px;">
+                    </div>
+                    <div class="photo-slot">
+                        <div class="photo-slot-label">💊 Medication / Bottle</div>
+                        <div class="photo-preview" id="prev-pill"><span class="no-photo">💊</span><button type="button" class="remove-photo" onclick="removePhoto('pill')">✕</button></div>
+                        <input type="file" id="file-pill" accept="image/*" onchange="onPhotoSelected('pill',this)" style="font-size:0.78rem;color:var(--text-secondary);width:100%;margin-top:6px;">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" id="form-submit-btn">Save Prescription</button>
+                <button type="button" class="btn btn-ghost" onclick="resetForm()">Clear</button>
+                <button type="button" class="btn btn-ghost" onclick="showView('inventory')">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ALL MEDICATIONS -->
+<div id="view-inventory" class="view">
+    <div class="toolbar">
+        <input type="text" id="inv-search" placeholder="Search medications, person, doctor..." oninput="renderInventory()">
+        <select id="inv-filter-person" onchange="renderInventory()"><option value="">All People</option></select>
+        <select id="inv-filter-status" onchange="renderInventory()">
+            <option value="">All Statuses</option>
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+            <option value="Discontinued">Discontinued</option>
+        </select>
+        <select id="inv-filter-class" onchange="renderInventory()"><option value="">All Classes</option></select>
+        <button class="btn btn-primary btn-sm" onclick="showView('add-item')">+ Add Rx</button>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden;">
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th class="no-sort" style="width:44px;"></th>
+                        <th onclick="setSort('medName')">Medication</th>
+                        <th onclick="setSort('person')">Person</th>
+                        <th onclick="setSort('dosage')">Dosage</th>
+                        <th onclick="setSort('frequency')">Frequency</th>
+                        <th onclick="setSort('refillsRemaining')">Refills Left</th>
+                        <th onclick="setSort('nextFillDate')">Next Fill</th>
+                        <th onclick="setSort('expirationDate')">Expires</th>
+                        <th onclick="setSort('status')">Status</th>
+                        <th class="no-sort">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="inv-tbody"></tbody>
+                <tfoot id="inv-tfoot"></tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- REFILLS DUE -->
+<div id="view-refills" class="view">
+    <div class="toolbar" style="margin-bottom:12px;">
+        <h2 style="font-size:1.1rem;font-weight:700;">⏰ Refills Due</h2>
+        <select id="refill-filter-person" onchange="renderRefills()"><option value="">All People</option></select>
+        <button class="btn btn-ghost btn-sm" onclick="renderRefills()">🔄 Refresh</button>
+    </div>
+    <div id="refill-overdue-section" style="display:none;">
+        <div style="font-size:0.85rem;font-weight:700;color:var(--danger);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">🔴 Overdue / No Refills</div>
+        <div id="refill-overdue-list"></div>
+    </div>
+    <div id="refill-soon-section" style="display:none;">
+        <div style="font-size:0.85rem;font-weight:700;color:var(--warning);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;margin-top:16px;">🟡 Due Within 7 Days</div>
+        <div id="refill-soon-list"></div>
+    </div>
+    <div id="refill-ok-section">
+        <div style="font-size:0.85rem;font-weight:700;color:var(--success);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">🟢 Active — OK</div>
+        <div id="refill-ok-list"></div>
+    </div>
+    <div id="refill-empty" class="empty" style="display:none;"><div class="empty-icon">✅</div><p>No active medications on file.</p></div>
+</div>
+
+<!-- REPORTS -->
+<div id="view-reports" class="view">
+    <div class="card">
+        <div class="card-title">
+            <div class="card-title-left">📊 Medications by Class</div>
+        </div>
+        <div class="cat-breakdown" id="class-breakdown"></div>
+    </div>
+    <div class="card">
+        <div class="card-title">
+            <div class="card-title-left">👤 Medications per Person</div>
+        </div>
+        <div style="max-width:500px;"><div class="chart-container"><canvas id="person-chart"></canvas></div></div>
+    </div>
+    <div class="card">
+        <div class="card-title">
+            <div class="card-title-left">📋 Full Medication List</div>
+            <button class="btn btn-ghost btn-sm" onclick="window.print()">🖨 Print</button>
+        </div>
+        <div class="table-wrapper">
+            <table>
+                <thead><tr>
+                    <th class="no-sort">Medication</th>
+                    <th class="no-sort">Generic</th>
+                    <th class="no-sort">Person</th>
+                    <th class="no-sort">Dosage</th>
+                    <th class="no-sort">Frequency</th>
+                    <th class="no-sort">Doctor</th>
+                    <th class="no-sort">Pharmacy</th>
+                    <th class="no-sort">Status</th>
+                </tr></thead>
+                <tbody id="report-tbody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- SETTINGS -->
+<div id="view-settings" class="view">
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">⚙ Settings</div></div>
+        <div class="form-group">
+            <label>Refill Alert Threshold (days)</label>
+            <input type="number" id="alert-days-input" value="7" min="1" max="30" style="max-width:120px;">
+        </div>
+        <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:8px;">Save Settings</button>
+    </div>
+</div>
+
+<!-- RECYCLE BIN -->
+<div id="view-recycle-bin" class="view">
+    <div class="toolbar">
+        <div><h2 style="font-size:1.1rem;font-weight:700;">🗑 Recycle Bin</h2></div>
+        <button class="btn btn-ghost btn-sm" onclick="loadRecycleBin()">🔄 Refresh</button>
+    </div>
+    <div class="card"><div id="recycle-bin-list"><div class="empty"><div class="empty-icon">🗑</div><p>Recycle bin is empty</p></div></div></div>
+</div>
+
+</main>
+</div><!-- /app -->
+
+<!-- DETAIL MODAL -->
+<div class="modal-overlay" id="detail-modal">
+    <div class="modal" style="max-width:600px;">
+        <div class="modal-title" id="detail-title"></div>
+        <div id="detail-body" style="font-size:0.88rem;line-height:1.7;color:var(--text-secondary);"></div>
+        <div class="modal-actions">
+            <button class="btn btn-primary" onclick="editFromDetail()">✏ Edit</button>
+            <button class="btn btn-ghost" onclick="closeModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+firebase.initializeApp({
+    apiKey:"AIzaSyB7c4urD9tJO80S7nADItxjwhSYVqlrkEU",
+    authDomain:"watchroom-714a0.firebaseapp.com",
+    projectId:"watchroom-714a0",
+    storageBucket:"watchroom-714a0.firebasestorage.app",
+    messagingSenderId:"911514107783",
+    appId:"1:911514107783:web:20e8a729fd66577c28dd22"
+});
+const auth=firebase.auth(), db=firebase.firestore(), storage=firebase.storage();
+
+let items=[], invSortField='medName', invSortDir='asc', unsubItems=null;
+let alertDays=7, detailItemId=null;
+let formPhotos={
+    label:{file:null,base64:null,mimeType:null,existingUrl:null,deleted:false},
+    pill:{file:null,base64:null,mimeType:null,existingUrl:null,deleted:false}
+};
+let personChartInst=null;
+
+const VIEWS=['dashboard','add-item','inventory','refills','reports','settings','recycle-bin'];
+
+auth.onAuthStateChanged(user=>{
+    if(user){
+        document.getElementById('login-screen').style.display='none';
+        document.getElementById('loading-screen').style.display='flex';
+        document.getElementById('app').style.display='none';
+        document.getElementById('user-email').textContent=user.email;
+        initApp();
+    } else {
+        document.getElementById('login-screen').style.display='flex';
+        document.getElementById('loading-screen').style.display='none';
+        document.getElementById('app').style.display='none';
+        if(unsubItems){unsubItems();unsubItems=null;} items=[];
+    }
+});
+
+document.getElementById('login-form').addEventListener('submit',async e=>{
+    e.preventDefault();
+    const email=document.getElementById('login-email').value.trim();
+    const pass=document.getElementById('login-password').value;
+    const errEl=document.getElementById('login-error'), btn=document.getElementById('login-btn');
+    errEl.textContent=''; btn.textContent='Signing in...'; btn.disabled=true;
+    try{ await auth.signInWithEmailAndPassword(email,pass); }
+    catch(err){ errEl.textContent='Invalid email or password.'; btn.textContent='Sign In'; btn.disabled=false; }
+});
+
+async function doSignOut(){ if(!confirm('Sign out?'))return; await auth.signOut(); }
+
+async function initApp(){
+    try{
+        const cfgDoc=await db.collection('rx_config').doc('data').get();
+        if(cfgDoc.exists){ const d=cfgDoc.data(); if(d.alertDays) alertDays=d.alertDays; }
+        document.getElementById('alert-days-input').value=alertDays;
+        unsubItems=db.collection('rx_items').onSnapshot(snap=>{
+            items=snap.docs.map(doc=>({_docId:doc.id,...doc.data()}));
+            renderDashboard(); renderInventory(); renderRefills(); renderReport();
+            populateDataLists(); syncPersonFilters();
+        },()=>{});
+        document.getElementById('loading-screen').style.display='none';
+        document.getElementById('app').style.display='block';
+        showView('dashboard');
+    }catch(err){
+        document.getElementById('loading-screen').innerHTML=`<p style="color:var(--danger);padding:20px;text-align:center;">Error: ${err.message}<br><br><button class="btn btn-ghost" onclick="doSignOut()">Sign Out</button></p>`;
+    }
+}
+
+function showView(v){
+    VIEWS.forEach(id=>{ const el=document.getElementById('view-'+id); if(el) el.classList.remove('active'); });
+    const target=document.getElementById('view-'+v); if(target) target.classList.add('active');
+    document.querySelectorAll('nav button').forEach((b,i)=>{ b.classList.toggle('active', VIEWS[i]===v); });
+    if(v==='add-item'&&!document.getElementById('edit-doc-id').value){ resetForm(); }
+    if(v==='reports') renderReport();
+}
+
+// ── DAYS HELPERS ──────────────────────────────────────────────────
+function daysUntil(dateStr){
+    if(!dateStr) return null;
+    const today=new Date(); today.setHours(0,0,0,0);
+    const d=new Date(dateStr+'T00:00:00');
+    return Math.round((d-today)/86400000);
+}
+function fmtDate(dateStr){
+    if(!dateStr) return '—';
+    const [y,m,d]=dateStr.split('-'); return `${m}/${d}/${y}`;
+}
+function statusBadge(s){
+    const map={Active:'badge-active',Inactive:'badge-inactive',Discontinued:'badge-discontinued'};
+    return `<span class="badge ${map[s]||'badge-inactive'}">${s||'Unknown'}</span>`;
+}
+function refillBadge(daysLeft){
+    if(daysLeft===null) return '<span class="badge badge-inactive">No Date</span>';
+    if(daysLeft<0) return `<span class="badge badge-overdue">Overdue ${Math.abs(daysLeft)}d</span>`;
+    if(daysLeft<=alertDays) return `<span class="badge badge-due-soon">Due in ${daysLeft}d</span>`;
+    return `<span class="badge badge-ok">In ${daysLeft}d</span>`;
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────────────
+function renderDashboard(){
+    const active=items.filter(i=>i.status==='Active');
+    const overdue=active.filter(i=>{ const d=daysUntil(i.nextFillDate); return d!==null&&d<0&&(i.refillsRemaining===undefined||Number(i.refillsRemaining)>0); });
+    const dueSoon=active.filter(i=>{ const d=daysUntil(i.nextFillDate); return d!==null&&d>=0&&d<=alertDays; });
+    const expiringSoon=active.filter(i=>{ const d=daysUntil(i.expirationDate); return d!==null&&d>=0&&d<=30; });
+    const persons=new Set(items.map(i=>i.person).filter(Boolean));
+
+    // Alert banners
+    let banners='';
+    if(overdue.length) banners+=`<div class="alert-banner alert-danger">🔴 <strong>${overdue.length} prescription${overdue.length>1?'s':''}</strong> overdue for refill! Check the Refills Due tab.</div>`;
+    if(dueSoon.length) banners+=`<div class="alert-banner alert-warning">🟡 <strong>${dueSoon.length} prescription${dueSoon.length>1?'s':''}</strong> need refilling within ${alertDays} days.</div>`;
+    document.getElementById('alert-banners').innerHTML=banners;
+
+    // Stats
+    document.getElementById('stats-grid').innerHTML=`
+        <div class="stat-card"><div class="stat-value" style="color:#0ea5e9;">${active.length}</div><div class="stat-label">Active Rx</div></div>
+        <div class="stat-card" style="border-color:${overdue.length?'#dc2626':'var(--border)'}"><div class="stat-value" style="color:${overdue.length?'#dc2626':'#94a3b8'};">${overdue.length}</div><div class="stat-label">Overdue Refills</div></div>
+        <div class="stat-card" style="border-color:${dueSoon.length?'#d97706':'var(--border)'}"><div class="stat-value" style="color:${dueSoon.length?'#d97706':'#94a3b8'};">${dueSoon.length}</div><div class="stat-label">Due ≤${alertDays} Days</div></div>
+        <div class="stat-card"><div class="stat-value" style="color:#8b5cf6;">${expiringSoon.length}</div><div class="stat-label">Expiring ≤30d</div></div>
+        <div class="stat-card"><div class="stat-value" style="color:#0ea5e9;">${persons.size}</div><div class="stat-label">People Covered</div></div>
+        <div class="stat-card"><div class="stat-value" style="color:#64748b;">${items.length}</div><div class="stat-label">Total Rx on File</div></div>
+    `;
+
+    // By-person breakdown
+    const personMap={};
+    active.forEach(i=>{ const p=i.person||'Unknown'; personMap[p]=(personMap[p]||0)+1; });
+    const personEntries=Object.entries(personMap).sort((a,b)=>b[1]-a[1]);
+    const maxP=personEntries[0]?.[1]||1;
+    document.getElementById('person-breakdown').innerHTML=personEntries.map(([name,cnt])=>`
+        <div class="cat-breakdown-item">
+            <div class="cbi-name">👤 ${name}</div>
+            <div class="cbi-count">${cnt}</div>
+            <div class="cbi-bar"><div class="cbi-bar-fill" style="width:${Math.round(cnt/maxP*100)}%"></div></div>
+        </div>`).join('')||'<p style="color:var(--text-secondary);font-size:0.85rem;">No active medications.</p>';
+
+    // Recent
+    const recent=[...items].sort((a,b)=>(b._ts?.seconds||0)-(a._ts?.seconds||0)).slice(0,8);
+    document.getElementById('recent-tbody').innerHTML=recent.length ? recent.map(i=>{
+        const added=i._ts?.toDate ? i._ts.toDate().toLocaleDateString() : '—';
+        return `<tr onclick="openDetail('${i._docId}')" style="cursor:pointer;">
+            <td><strong>${i.medName||'—'}</strong>${i.genericName?`<div style="font-size:0.75rem;color:var(--text-secondary);">${i.genericName}</div>`:''}</td>
+            <td>${i.person||'—'}</td>
+            <td>${[i.dosage,i.dosageForm].filter(Boolean).join(' ')||'—'}</td>
+            <td>${statusBadge(i.status)}</td>
+            <td>${i.nextFillDate?fmtDate(i.nextFillDate):'—'}</td>
+            <td>${added}</td>
+        </tr>`;
+    }).join('') : '<tr><td colspan="6" class="empty">No prescriptions yet.</td></tr>';
+}
+
+// ── INVENTORY ─────────────────────────────────────────────────────
+function setSort(f){
+    if(invSortField===f) invSortDir=invSortDir==='asc'?'desc':'asc'; else{invSortField=f;invSortDir='asc';}
+    renderInventory();
+}
+
+function renderInventory(){
+    const search=(document.getElementById('inv-search')?.value||'').toLowerCase();
+    const fp=document.getElementById('inv-filter-person')?.value||'';
+    const fs=document.getElementById('inv-filter-status')?.value||'';
+    const fc=document.getElementById('inv-filter-class')?.value||'';
+    let filtered=items.filter(i=>{
+        if(fp&&i.person!==fp) return false;
+        if(fs&&i.status!==fs) return false;
+        if(fc&&i.medClass!==fc) return false;
+        if(search){
+            const hay=`${i.medName} ${i.genericName} ${i.person} ${i.doctor} ${i.pharmacy} ${i.purpose}`.toLowerCase();
+            if(!hay.includes(search)) return false;
+        }
+        return true;
+    });
+    filtered.sort((a,b)=>{
+        let va=a[invSortField]||'', vb=b[invSortField]||'';
+        if(typeof va==='number'||typeof vb==='number'){ va=Number(va)||0; vb=Number(vb)||0; }
+        else{ va=String(va).toLowerCase(); vb=String(vb).toLowerCase(); }
+        return invSortDir==='asc'?(va>vb?1:va<vb?-1:0):(va<vb?1:va>vb?-1:0);
+    });
+
+    // Sort headers
+    document.querySelectorAll('#view-inventory thead th').forEach(th=>{
+        th.classList.remove('sort-asc','sort-desc');
+        const f=th.getAttribute('onclick')?.match(/setSort\('(\w+)'\)/)?.[1];
+        if(f===invSortField) th.classList.add(invSortDir==='asc'?'sort-asc':'sort-desc');
+    });
+
+    const tbody=document.getElementById('inv-tbody');
+    tbody.innerHTML=filtered.length ? filtered.map(i=>{
+        const days=daysUntil(i.nextFillDate);
+        const thumb=i.photoLabel ? `<img class="thumb" src="${i.photoLabel}" alt="">` : `<div class="thumb-placeholder">💊</div>`;
+        return `<tr>
+            <td>${thumb}</td>
+            <td><strong style="cursor:pointer;color:var(--accent);" onclick="openDetail('${i._docId}')">${i.medName||'—'}</strong>${i.genericName?`<div style="font-size:0.75rem;color:var(--text-secondary);">${i.genericName}</div>`:''}</td>
+            <td>${i.person||'—'}</td>
+            <td>${[i.dosage,i.dosageForm].filter(Boolean).join(' ')||'—'}</td>
+            <td style="font-size:0.8rem;">${i.frequency||'—'}</td>
+            <td style="text-align:center;">${i.refillsRemaining!=null?i.refillsRemaining:'—'}</td>
+            <td>${i.nextFillDate?fmtDate(i.nextFillDate)+'<br>'+refillBadge(days):'—'}</td>
+            <td>${i.expirationDate?fmtDate(i.expirationDate):'—'}</td>
+            <td>${statusBadge(i.status)}</td>
+            <td>
+                <div style="display:flex;gap:5px;">
+                    <button class="btn btn-ghost btn-sm" onclick="editItem('${i._docId}')">✏</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteItem('${i._docId}','${(i.medName||'').replace(/'/g,"\\'")}')">🗑</button>
+                </div>
+            </td>
+        </tr>`;
+    }).join('') : `<tr><td colspan="10" class="empty"><div class="empty-icon">💊</div>No prescriptions found.</td></tr>`;
+
+    // Footer
+    const active=filtered.filter(i=>i.status==='Active').length;
+    document.getElementById('inv-tfoot').innerHTML=`<tr style="background:var(--bg-card);font-weight:700;font-size:0.8rem;">
+        <td colspan="10" style="padding:10px 12px;color:var(--text-secondary);">
+            ${filtered.length} prescription${filtered.length!==1?'s':''} shown &nbsp;·&nbsp; ${active} active
+        </td>
+    </tr>`;
+}
+
+// ── REFILLS ───────────────────────────────────────────────────────
+function renderRefills(){
+    const fp=(document.getElementById('refill-filter-person')?.value||'');
+    const active=items.filter(i=>i.status==='Active'&&(!fp||i.person===fp));
+    if(!active.length){
+        document.getElementById('refill-empty').style.display='block';
+        ['overdue','soon','ok'].forEach(s=>{ document.getElementById('refill-'+s+'-section').style.display='none'; });
+        return;
+    }
+    document.getElementById('refill-empty').style.display='none';
+
+    const overdue=[], soon=[], ok=[];
+    active.forEach(i=>{
+        const d=daysUntil(i.nextFillDate);
+        if(d===null||d>=alertDays+1) ok.push({...i,_daysLeft:d});
+        else if(d<0) overdue.push({...i,_daysLeft:d});
+        else soon.push({...i,_daysLeft:d});
+    });
+    overdue.sort((a,b)=>a._daysLeft-b._daysLeft);
+    soon.sort((a,b)=>a._daysLeft-b._daysLeft);
+    ok.sort((a,b)=>(a._daysLeft||999)-(b._daysLeft||999));
+
+    function makeCard(i){
+        const d=i._daysLeft;
+        const cls=d<0?'overdue':d<=alertDays?'due-soon':'ok';
+        const daysTxt=d===null?'No date set':d<0?`${Math.abs(d)}d overdue`:d===0?'Due today':`${d}d left`;
+        const daysCls=d<0?'days-overdue':d<=alertDays?'days-soon':'days-ok';
+        return `<div class="refill-card ${cls}">
+            <div class="refill-card-info">
+                <div class="refill-card-name">💊 ${i.medName||'—'} ${i.dosage?'('+i.dosage+')':''}</div>
+                <div class="refill-card-sub">
+                    👤 ${i.person||'—'} &nbsp;·&nbsp; ${i.frequency||'—'} &nbsp;·&nbsp;
+                    Refills left: <strong>${i.refillsRemaining!=null?i.refillsRemaining:'unknown'}</strong>
+                    ${i.pharmacy?' &nbsp;·&nbsp; 🏪 '+i.pharmacy:''}
+                </div>
+                ${i.doctor?`<div class="refill-card-sub">👨‍⚕️ ${i.doctor}${i.rxNumber?' · Rx#'+i.rxNumber:''}</div>`:''}
+            </div>
+            <div>
+                <div class="refill-card-days ${daysCls}">${d===null?'—':Math.abs(d||0)+'d'}</div>
+                <div style="font-size:0.7rem;color:var(--text-secondary);text-align:center;">${daysTxt}</div>
+                <div style="margin-top:6px;display:flex;gap:4px;justify-content:center;">
+                    <button class="btn btn-ghost btn-sm" onclick="editItem('${i._docId}')">✏ Edit</button>
+                    <button class="btn btn-primary btn-sm" onclick="markRefilled('${i._docId}')">✅ Refilled</button>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    document.getElementById('refill-overdue-section').style.display=overdue.length?'block':'none';
+    document.getElementById('refill-overdue-list').innerHTML=overdue.map(makeCard).join('');
+    document.getElementById('refill-soon-section').style.display=soon.length?'block':'none';
+    document.getElementById('refill-soon-list').innerHTML=soon.map(makeCard).join('');
+    document.getElementById('refill-ok-section').style.display=ok.length?'block':'none';
+    document.getElementById('refill-ok-list').innerHTML=ok.map(makeCard).join('');
+}
+
+async function markRefilled(docId){
+    const item=items.find(i=>i._docId===docId);
+    if(!item) return;
+    const today=new Date();
+    const fillDate=today.toISOString().split('T')[0];
+    const daysSupply=Number(item.daysSupply)||30;
+    const next=new Date(today); next.setDate(next.getDate()+daysSupply);
+    const nextFill=next.toISOString().split('T')[0];
+    const refillsLeft=item.refillsRemaining!=null?Math.max(0,Number(item.refillsRemaining)-1):item.refillsRemaining;
+    try{
+        await db.collection('rx_items').doc(docId).update({
+            fillDate, nextFillDate:nextFill,
+            ...(refillsLeft!=null?{refillsRemaining:refillsLeft}:{})
+        });
+        toast(`Marked refilled — next fill: ${fmtDate(nextFill)}`, 'success');
+    }catch(e){ toast('Error updating: '+e.message,'error'); }
+}
+
+// ── REPORT ────────────────────────────────────────────────────────
+function renderReport(){
+    // By class
+    const classMap={};
+    items.filter(i=>i.status==='Active').forEach(i=>{ const c=i.medClass||'Unclassified'; classMap[c]=(classMap[c]||0)+1; });
+    const classEntries=Object.entries(classMap).sort((a,b)=>b[1]-a[1]);
+    const maxC=classEntries[0]?.[1]||1;
+    document.getElementById('class-breakdown').innerHTML=classEntries.map(([name,cnt])=>`
+        <div class="cat-breakdown-item">
+            <div class="cbi-name">${name}</div>
+            <div class="cbi-count">${cnt}</div>
+            <div class="cbi-bar"><div class="cbi-bar-fill" style="width:${Math.round(cnt/maxC*100)}%"></div></div>
+        </div>`).join('')||'<p style="color:var(--text-secondary);font-size:0.85rem;">No active medications.</p>';
+
+    // Person chart
+    const personMap={};
+    items.forEach(i=>{ const p=i.person||'Unknown'; personMap[p]=(personMap[p]||0)+1; });
+    const labels=Object.keys(personMap).sort();
+    const data=labels.map(l=>personMap[l]);
+    const ctx=document.getElementById('person-chart');
+    if(personChartInst){ personChartInst.destroy(); personChartInst=null; }
+    if(ctx){
+        personChartInst=new Chart(ctx,{
+            type:'bar',
+            data:{labels,datasets:[{label:'Prescriptions',data,backgroundColor:'rgba(14,165,233,0.7)',borderColor:'rgba(14,165,233,1)',borderWidth:1,borderRadius:6}]},
+            options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1},grid:{color:'rgba(0,0,0,0.05)'}},x:{grid:{display:false}}}}
+        });
+    }
+
+    // Full list table
+    const sorted=[...items].sort((a,b)=>(a.person||'').localeCompare(b.person||'')||(a.medName||'').localeCompare(b.medName||''));
+    document.getElementById('report-tbody').innerHTML=sorted.map(i=>`<tr>
+        <td><strong>${i.medName||'—'}</strong></td>
+        <td style="color:var(--text-secondary);font-size:0.82rem;">${i.genericName||'—'}</td>
+        <td>${i.person||'—'}</td>
+        <td>${[i.dosage,i.dosageForm].filter(Boolean).join(' ')||'—'}</td>
+        <td style="font-size:0.8rem;">${i.frequency||'—'}</td>
+        <td style="font-size:0.8rem;">${i.doctor||'—'}</td>
+        <td style="font-size:0.8rem;">${i.pharmacy||'—'}</td>
+        <td>${statusBadge(i.status)}</td>
+    </tr>`).join('')||'<tr><td colspan="8" class="empty">No prescriptions on file.</td></tr>';
+}
+
+// ── FORM ──────────────────────────────────────────────────────────
+function autoCalcNextFill(){
+    const fillDate=document.getElementById('f-fill-date').value;
+    const daysSupply=Number(document.getElementById('f-days-supply').value);
+    if(fillDate&&daysSupply>0){
+        const d=new Date(fillDate+'T00:00:00');
+        d.setDate(d.getDate()+daysSupply);
+        document.getElementById('f-next-fill-date').value=d.toISOString().split('T')[0];
+    }
+}
+
+function resetForm(){
+    document.getElementById('item-form').reset();
+    document.getElementById('edit-id').value='';
+    document.getElementById('edit-doc-id').value='';
+    document.getElementById('form-title').textContent='➕ Add New Prescription';
+    document.getElementById('form-submit-btn').textContent='Save Prescription';
+    formPhotos={label:{file:null,base64:null,mimeType:null,existingUrl:null,deleted:false},pill:{file:null,base64:null,mimeType:null,existingUrl:null,deleted:false}};
+    ['label','pill'].forEach(k=>{ const p=document.getElementById('prev-'+k); if(p){ p.innerHTML='<span class="no-photo">💊</span><button type="button" class="remove-photo" onclick="removePhoto(\''+k+'\')">✕</button>'; } });
+}
+
+function editItem(docId){
+    const i=items.find(x=>x._docId===docId); if(!i) return;
+    resetForm();
+    document.getElementById('edit-doc-id').value=docId;
+    document.getElementById('form-title').textContent='✏ Edit Prescription';
+    document.getElementById('form-submit-btn').textContent='Update Prescription';
+    const set=(id,val)=>{ const el=document.getElementById(id); if(el) el.value=val||''; };
+    set('f-med-name',i.medName); set('f-generic',i.genericName); set('f-person',i.person);
+    set('f-doctor',i.doctor); set('f-pharmacy',i.pharmacy); set('f-rx-number',i.rxNumber);
+    set('f-ndc',i.ndcCode); set('f-dosage',i.dosage); set('f-dosage-form',i.dosageForm);
+    set('f-frequency',i.frequency); set('f-quantity',i.quantity); set('f-days-supply',i.daysSupply);
+    set('f-refills',i.refillsRemaining); set('f-fill-date',i.fillDate); set('f-next-fill-date',i.nextFillDate);
+    set('f-expiration',i.expirationDate); set('f-purpose',i.purpose); set('f-status',i.status||'Active');
+    set('f-class',i.medClass); set('f-notes',i.notes);
+    if(i.photoLabel){ formPhotos.label.existingUrl=i.photoLabel; const p=document.getElementById('prev-label'); if(p) p.innerHTML=`<img src="${i.photoLabel}" alt=""><button type="button" class="remove-photo" onclick="removePhoto('label')">✕</button>`; }
+    if(i.photoPill){ formPhotos.pill.existingUrl=i.photoPill; const p=document.getElementById('prev-pill'); if(p) p.innerHTML=`<img src="${i.photoPill}" alt=""><button type="button" class="remove-photo" onclick="removePhoto('pill')">✕</button>`; }
+    showView('add-item');
+    setTimeout(()=>window.scrollTo({top:0,behavior:'smooth'}),50);
+}
+
+document.getElementById('item-form').addEventListener('submit',async e=>{
+    e.preventDefault();
+    const btn=document.getElementById('form-submit-btn');
+    btn.disabled=true; btn.textContent='Saving...';
+    try{
+        const docId=document.getElementById('edit-doc-id').value;
+        const data={
+            medName:document.getElementById('f-med-name').value.trim(),
+            genericName:document.getElementById('f-generic').value.trim(),
+            person:document.getElementById('f-person').value.trim(),
+            doctor:document.getElementById('f-doctor').value.trim(),
+            pharmacy:document.getElementById('f-pharmacy').value.trim(),
+            rxNumber:document.getElementById('f-rx-number').value.trim(),
+            ndcCode:document.getElementById('f-ndc').value.trim(),
+            dosage:document.getElementById('f-dosage').value.trim(),
+            dosageForm:document.getElementById('f-dosage-form').value,
+            frequency:document.getElementById('f-frequency').value.trim(),
+            quantity:document.getElementById('f-quantity').value?Number(document.getElementById('f-quantity').value):null,
+            daysSupply:document.getElementById('f-days-supply').value?Number(document.getElementById('f-days-supply').value):null,
+            refillsRemaining:document.getElementById('f-refills').value!==''?Number(document.getElementById('f-refills').value):null,
+            fillDate:document.getElementById('f-fill-date').value||null,
+            nextFillDate:document.getElementById('f-next-fill-date').value||null,
+            expirationDate:document.getElementById('f-expiration').value||null,
+            purpose:document.getElementById('f-purpose').value.trim(),
+            status:document.getElementById('f-status').value||'Active',
+            medClass:document.getElementById('f-class').value.trim(),
+            notes:document.getElementById('f-notes').value.trim(),
+            _ts:firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        // Photos
+        for(const [k,fp] of Object.entries(formPhotos)){
+            const fieldName=k==='label'?'photoLabel':'photoPill';
+            if(fp.deleted){ data[fieldName]=null; }
+            else if(fp.base64){
+                const path=`rx_photos/${Date.now()}_${k}`;
+                const ref=storage.ref(path);
+                await ref.putString(fp.base64,'base64',{contentType:fp.mimeType});
+                data[fieldName]=await ref.getDownloadURL();
+            } else if(fp.existingUrl){ data[fieldName]=fp.existingUrl; }
+        }
+
+        if(docId){ await db.collection('rx_items').doc(docId).update(data); toast('Prescription updated!','success'); }
+        else{ await db.collection('rx_items').add(data); toast('Prescription added!','success'); }
+        resetForm(); showView('inventory');
+    }catch(err){ toast('Error: '+err.message,'error'); }
+    btn.disabled=false; btn.textContent=document.getElementById('edit-doc-id').value?'Update Prescription':'Save Prescription';
+});
+
+async function deleteItem(docId,name){
+    if(!confirm(`Move "${name}" to recycle bin?`)) return;
+    try{
+        const item=items.find(i=>i._docId===docId); if(!item) return;
+        await db.collection('recycle_bin').add({...item,site:'pharmacy',deletedAt:firebase.firestore.FieldValue.serverTimestamp()});
+        await db.collection('rx_items').doc(docId).delete();
+        toast(`"${name}" moved to recycle bin`,'success');
+    }catch(err){ toast('Error: '+err.message,'error'); }
+}
+
+async function loadRecycleBin(){
+    const list=document.getElementById('recycle-bin-list');
+    list.innerHTML='<div class="empty"><div class="empty-icon">⏳</div><p>Loading...</p></div>';
+    try{
+        const snap=await db.collection('recycle_bin').where('site','==','pharmacy').orderBy('deletedAt','desc').get();
+        if(snap.empty){ list.innerHTML='<div class="empty"><div class="empty-icon">🗑</div><p>Recycle bin is empty</p></div>'; return; }
+        list.innerHTML=snap.docs.map(doc=>{
+            const i=doc.data();
+            return `<div style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid var(--border);">
+                <div style="flex:1;"><strong>${i.medName||'Unknown'}</strong> <span style="color:var(--text-secondary);font-size:0.8rem;">${i.person||''}</span></div>
+                <button class="btn btn-ghost btn-sm" onclick="restoreItem('${doc.id}')">↩ Restore</button>
+                <button class="btn btn-danger btn-sm" onclick="permDelete('${doc.id}','${(i.medName||'').replace(/'/g,"\\'")}')">✕ Delete</button>
+            </div>`;
+        }).join('');
+    }catch(e){ list.innerHTML=`<div class="empty"><p style="color:var(--danger);">Error: ${e.message}</p></div>`; }
+}
+
+async function restoreItem(binDocId){
+    try{
+        const doc=await db.collection('recycle_bin').doc(binDocId).get();
+        const {site:_s,deletedAt:_d,...data}=doc.data();
+        await db.collection('rx_items').add({...data,_ts:firebase.firestore.FieldValue.serverTimestamp()});
+        await db.collection('recycle_bin').doc(binDocId).delete();
+        toast('Prescription restored!','success'); loadRecycleBin();
+    }catch(e){ toast('Error: '+e.message,'error'); }
+}
+
+async function permDelete(binDocId,name){
+    if(!confirm(`Permanently delete "${name}"? This cannot be undone.`)) return;
+    try{ await db.collection('recycle_bin').doc(binDocId).delete(); toast('Permanently deleted','success'); loadRecycleBin(); }
+    catch(e){ toast('Error: '+e.message,'error'); }
+}
+
+// ── DETAIL MODAL ──────────────────────────────────────────────────
+function openDetail(docId){
+    const i=items.find(x=>x._docId===docId); if(!i) return;
+    detailItemId=docId;
+    document.getElementById('detail-title').textContent=`💊 ${i.medName||'Unknown'}${i.genericName?' ('+i.genericName+')':''}`;
+    const days=daysUntil(i.nextFillDate);
+    document.getElementById('detail-body').innerHTML=`
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin-bottom:14px;">
+            <div><strong>Person:</strong> ${i.person||'—'}</div>
+            <div><strong>Status:</strong> ${statusBadge(i.status)}</div>
+            <div><strong>Dosage:</strong> ${[i.dosage,i.dosageForm].filter(Boolean).join(' ')||'—'}</div>
+            <div><strong>Frequency:</strong> ${i.frequency||'—'}</div>
+            <div><strong>Doctor:</strong> ${i.doctor||'—'}</div>
+            <div><strong>Pharmacy:</strong> ${i.pharmacy||'—'}</div>
+            <div><strong>Rx Number:</strong> ${i.rxNumber||'—'}</div>
+            <div><strong>NDC:</strong> ${i.ndcCode||'—'}</div>
+            <div><strong>Quantity/Fill:</strong> ${i.quantity||'—'}</div>
+            <div><strong>Days Supply:</strong> ${i.daysSupply||'—'}</div>
+            <div><strong>Refills Left:</strong> ${i.refillsRemaining!=null?i.refillsRemaining:'—'}</div>
+            <div><strong>Last Filled:</strong> ${i.fillDate?fmtDate(i.fillDate):'—'}</div>
+            <div><strong>Next Fill:</strong> ${i.nextFillDate?fmtDate(i.nextFillDate)+' '+refillBadge(days):'—'}</div>
+            <div><strong>Expires:</strong> ${i.expirationDate?fmtDate(i.expirationDate):'—'}</div>
+            <div><strong>Class:</strong> ${i.medClass||'—'}</div>
+            <div><strong>Purpose:</strong> ${i.purpose||'—'}</div>
+        </div>
+        ${i.notes?`<div style="background:var(--bg-card);padding:10px 12px;border-radius:8px;font-size:0.85rem;"><strong>Notes:</strong> ${i.notes}</div>`:''}
+        ${i.photoLabel?`<img src="${i.photoLabel}" style="width:100%;max-width:300px;border-radius:8px;margin-top:12px;border:1px solid var(--border);" alt="Label">`:'' }
+    `;
+    document.getElementById('detail-modal').classList.add('show');
+}
+function editFromDetail(){ closeModal(); if(detailItemId) editItem(detailItemId); }
+function closeModal(){ document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('show')); }
+
+// ── PHOTOS ────────────────────────────────────────────────────────
+function onPhotoSelected(key,input){
+    const file=input.files[0]; if(!file) return;
+    const reader=new FileReader();
+    reader.onload=()=>{
+        const img=new Image();
+        img.onload=()=>{
+            const canvas=document.createElement('canvas');
+            const MAX=1200; let w=img.width, h=img.height;
+            if(w>MAX||h>MAX){ if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;} }
+            canvas.width=w; canvas.height=h;
+            canvas.getContext('2d').drawImage(img,0,0,w,h);
+            const b64=canvas.toDataURL('image/jpeg',0.8).split(',')[1];
+            formPhotos[key]={file,base64:b64,mimeType:'image/jpeg',existingUrl:null,deleted:false};
+            const p=document.getElementById('prev-'+key);
+            if(p) p.innerHTML=`<img src="data:image/jpeg;base64,${b64}" alt=""><button type="button" class="remove-photo" onclick="removePhoto('${key}')">✕</button>`;
+        };
+        img.src=reader.result;
+    };
+    reader.readAsDataURL(file);
+}
+function removePhoto(key){
+    formPhotos[key]={file:null,base64:null,mimeType:null,existingUrl:null,deleted:true};
+    const p=document.getElementById('prev-'+key);
+    const emoji=key==='label'?'🏷':'💊';
+    if(p) p.innerHTML=`<span class="no-photo">${emoji}</span><button type="button" class="remove-photo" onclick="removePhoto('${key}')">✕</button>`;
+}
+
+// ── DATA LISTS ────────────────────────────────────────────────────
+function populateDataLists(){
+    const set=(id,vals)=>{ const dl=document.getElementById(id); if(dl){ dl.innerHTML=vals.map(v=>`<option value="${v}">`).join(''); } };
+    set('med-list',[...new Set(items.map(i=>i.medName).filter(Boolean))].sort());
+    set('person-list',[...new Set(items.map(i=>i.person).filter(Boolean))].sort());
+    set('doctor-list',[...new Set(items.map(i=>i.doctor).filter(Boolean))].sort());
+    set('pharmacy-list',[...new Set(items.map(i=>i.pharmacy).filter(Boolean))].sort());
+}
+function syncPersonFilters(){
+    const persons=[...new Set(items.map(i=>i.person).filter(Boolean))].sort();
+    ['inv-filter-person','refill-filter-person'].forEach(id=>{
+        const sel=document.getElementById(id); if(!sel) return;
+        const cur=sel.value;
+        sel.innerHTML='<option value="">All People</option>'+persons.map(p=>`<option value="${p}">${p}</option>`).join('');
+        if(cur) sel.value=cur;
+    });
+    // Classes
+    const classes=[...new Set(items.map(i=>i.medClass).filter(Boolean))].sort();
+    const csel=document.getElementById('inv-filter-class'); if(csel){
+        const cur=csel.value;
+        csel.innerHTML='<option value="">All Classes</option>'+classes.map(c=>`<option value="${c}">${c}</option>`).join('');
+        if(cur) csel.value=cur;
+    }
+}
+
+// ── SETTINGS ─────────────────────────────────────────────────────
+async function saveSettings(){
+    alertDays=Number(document.getElementById('alert-days-input').value)||7;
+    try{
+        await db.collection('rx_config').doc('data').set({alertDays},{merge:true});
+        toast('Settings saved!','success'); renderDashboard(); renderRefills();
+    }catch(e){ toast('Error: '+e.message,'error'); }
+}
+
+// ── TOAST ─────────────────────────────────────────────────────────
+function toast(msg,type=''){
+    const t=document.getElementById('toast'); t.textContent=msg;
+    t.className='toast'+(type?' '+type:''); t.classList.add('show');
+    setTimeout(()=>t.classList.remove('show'),3000);
+}
+</script>
+</body>
+</html>

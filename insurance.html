@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Farmboss Insurance</title>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0;}
+        :root{
+            --bg-primary:#f0f4f0;--bg-secondary:#ffffff;--bg-card:#e6eee6;
+            --accent:#16a34a;--accent-hover:#15803d;--accent-dim:rgba(22,163,74,0.10);
+            --text-primary:#1a2e1a;--text-secondary:#4a6050;--border:#c8d8c8;
+            --success:#16a34a;--danger:#dc2626;--warning:#d97706;--info:#2563eb;--hdr-bg:#0f1f0f;
+        }
+        body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:var(--bg-primary);color:var(--text-primary);min-height:100vh;overflow-x:hidden;}
+        .site-switcher{background:#111827;display:flex;align-items:center;padding:5px 18px;gap:4px;font-size:0.77rem;border-bottom:1px solid rgba(255,255,255,0.07);overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap;scrollbar-width:none;}
+        .site-switcher::-webkit-scrollbar{display:none;}
+        .site-link{text-decoration:none;color:#9ca3af;padding:4px 12px;border-radius:4px;display:flex;align-items:center;gap:6px;font-weight:500;transition:all 0.15s;white-space:nowrap;}
+        .site-link:hover{background:rgba(255,255,255,0.1);color:#e5e7eb;}
+        .site-link.active{background:rgba(255,255,255,0.13);color:#fff;font-weight:600;}
+        #login-screen{position:fixed;inset:0;background:linear-gradient(135deg,#0f1f0f 0%,#0a2510 100%);display:flex;align-items:center;justify-content:center;z-index:9000;flex-direction:column;gap:12px;}
+        .login-site-links{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;}
+        .login-site-links a{color:rgba(255,255,255,0.5);font-size:0.78rem;text-decoration:none;padding:4px 12px;border:1px solid rgba(255,255,255,0.2);border-radius:4px;transition:all 0.15s;}
+        .login-site-links a:hover{color:#fff;border-color:rgba(255,255,255,0.5);}
+        .login-site-links a.active{color:var(--accent);border-color:var(--accent);}
+        .login-box{background:#fff;border-radius:14px;padding:44px 40px;width:100%;max-width:400px;box-shadow:0 24px 64px rgba(0,0,0,0.4);}
+        .login-logo{width:56px;height:56px;background:var(--accent);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 16px;color:#fff;}
+        .login-box h2{text-align:center;font-size:1.5rem;color:#1a1f2e;margin-bottom:4px;}
+        .login-sub{text-align:center;font-size:0.85rem;color:#6b7280;margin-bottom:28px;}
+        .login-error{color:var(--danger);font-size:0.82rem;margin-bottom:12px;min-height:18px;text-align:center;}
+        .login-full{width:100%;justify-content:center;}
+        .form-group{margin-bottom:14px;}
+        .form-group label{display:block;font-size:0.8rem;font-weight:600;color:#374151;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.4px;}
+        .form-group input,.form-group select,.form-group textarea{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:7px;font-size:0.9rem;font-family:inherit;color:var(--text-primary);background:var(--bg-secondary);transition:border-color 0.15s;}
+        .form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--accent);}
+        #loading-screen{display:none;position:fixed;inset:0;background:var(--bg-primary);flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:8000;}
+        .spinner{width:44px;height:44px;border:4px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
+        @keyframes spin{to{transform:rotate(360deg);}}
+        #app{display:none;min-height:100vh;flex-direction:column;}
+        header{background:var(--hdr-bg);padding:0 20px;display:flex;align-items:center;gap:16px;min-height:56px;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,0.25);flex-wrap:wrap;}
+        .logo-area{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+        .logo-icon{width:32px;height:32px;background:var(--accent);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:17px;color:#fff;flex-shrink:0;}
+        header h1{font-size:1.15rem;font-weight:700;color:#fff;white-space:nowrap;}
+        header h1 span{color:var(--accent);}
+        nav{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;flex-shrink:0;}
+        nav::-webkit-scrollbar{display:none;}
+        nav button{background:transparent;border:none;color:#9ca3af;padding:8px 13px;border-radius:6px;cursor:pointer;font-size:0.83rem;transition:all 0.15s;white-space:nowrap;}
+        nav button:hover{background:rgba(22,163,74,0.2);color:#fff;}
+        nav button.active{background:var(--accent);color:#fff;font-weight:600;}
+        .header-right{display:flex;align-items:center;gap:10px;margin-left:auto;}
+        .user-badge{font-size:0.78rem;color:#9ca3af;background:rgba(255,255,255,0.08);padding:4px 10px;border-radius:5px;}
+        .btn-signout{background:transparent;border:1px solid rgba(255,255,255,0.2);color:#9ca3af;padding:5px 12px;border-radius:5px;cursor:pointer;font-size:0.78rem;transition:all 0.15s;}
+        .btn-signout:hover{border-color:var(--danger);color:var(--danger);}
+        .hero{background:linear-gradient(135deg,#0a1a0a 0%,#0f2510 60%,#0f3015 100%);border-radius:12px;padding:28px 32px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:16px;overflow:hidden;position:relative;}
+        .hero::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");}
+        .hero-title{font-size:1.6rem;font-weight:800;color:#fff;margin-bottom:4px;position:relative;}
+        .hero-title span{color:var(--accent);}
+        .hero-sub{font-size:0.88rem;color:rgba(255,255,255,0.65);position:relative;}
+        main{padding:20px;max-width:1400px;margin:0 auto;flex:1;}
+        .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:20px;}
+        .stat-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:18px 16px;text-align:center;}
+        .stat-value{font-size:2rem;font-weight:800;color:var(--accent);line-height:1;margin-bottom:4px;}
+        .stat-label{font-size:0.77rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;}
+        .card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:22px;margin-bottom:20px;}
+        .card-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;gap:10px;flex-wrap:wrap;}
+        .card-title-left{font-size:1rem;font-weight:700;color:var(--text-primary);}
+        .view{display:none;}.view.active{display:block;}
+        .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:7px;font-size:0.85rem;font-weight:600;cursor:pointer;border:none;transition:all 0.15s;font-family:inherit;}
+        .btn-primary{background:var(--accent);color:#fff;}.btn-primary:hover{background:var(--accent-hover);}
+        .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text-primary);}.btn-ghost:hover{background:var(--bg-card);}
+        .btn-danger{background:var(--danger);color:#fff;}.btn-danger:hover{opacity:0.85;}
+        .btn-sm{padding:5px 10px;font-size:0.78rem;}
+        .btn-secondary{background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary);}.btn-secondary:hover{background:var(--border);}
+        .form-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+        .form-group.full-width{grid-column:1/-1;}
+        .form-group.span2{grid-column:span 2;}
+        .input-prefix-wrap{position:relative;}
+        .input-prefix{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-secondary);font-size:0.9rem;pointer-events:none;}
+        .input-prefix+input{padding-left:24px;}
+        .form-actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+        .tabs{display:flex;gap:4px;margin-bottom:20px;border-bottom:2px solid var(--border);padding-bottom:0;}
+        .tab-btn{background:transparent;border:none;padding:10px 18px;font-size:0.88rem;font-weight:600;color:var(--text-secondary);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all 0.15s;}
+        .tab-btn:hover{color:var(--text-primary);}
+        .tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+        .tab-pane{display:none;}.tab-pane.active{display:block;}
+        .toolbar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;}
+        .toolbar input[type="text"]{flex:1;min-width:200px;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:0.87rem;font-family:inherit;background:var(--bg-secondary);color:var(--text-primary);}
+        .toolbar input:focus{outline:none;border-color:var(--accent);}
+        .toolbar select{padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:0.87rem;font-family:inherit;background:var(--bg-secondary);color:var(--text-primary);cursor:pointer;}
+        .table-wrapper{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+        table{width:100%;border-collapse:collapse;font-size:0.85rem;}
+        thead th{background:var(--bg-card);padding:10px 12px;text-align:left;font-size:0.74rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary);border-bottom:2px solid var(--border);white-space:nowrap;}
+        thead th.sortable{cursor:pointer;user-select:none;}
+        thead th.sortable:hover{color:var(--accent);}
+        thead th.sort-asc::after{content:' ↑';color:var(--accent);}
+        thead th.sort-desc::after{content:' ↓';color:var(--accent);}
+        tbody tr{border-bottom:1px solid var(--border);transition:background 0.1s;}
+        tbody tr:hover{background:var(--accent-dim);}
+        tbody td{padding:10px 12px;vertical-align:middle;}
+        .mono{font-family:monospace;font-size:0.83rem;}
+        .empty{text-align:center;padding:40px 20px;color:var(--text-secondary);}
+        .empty-icon{font-size:3rem;margin-bottom:12px;}
+        .badge{display:inline-block;padding:3px 9px;border-radius:5px;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;white-space:nowrap;}
+        .badge-home{background:#fef3c7;color:#92400e;}
+        .badge-auto{background:#dbeafe;color:#1d4ed8;}
+        .badge-health{background:#dcfce7;color:#15803d;}
+        .badge-life{background:#f3e8ff;color:#6d28d9;}
+        .badge-farm{background:#fce7f3;color:#9d174d;}
+        .badge-umbrella{background:#f1f5f9;color:#475569;}
+        .badge-other{background:var(--bg-card);color:var(--text-secondary);}
+        .badge-active{background:#dcfce7;color:#15803d;}
+        .badge-inactive{background:#f1f5f9;color:#64748b;}
+        .badge-expiring{background:#fef3c7;color:#92400e;}
+        .badge-expired{background:#fee2e2;color:#b91c1c;}
+        .alert-banner{border-radius:10px;padding:14px 18px;margin-bottom:14px;display:flex;align-items:center;gap:12px;font-size:0.88rem;font-weight:600;}
+        .alert-danger{background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;}
+        .alert-warning{background:#fef3c7;color:#92400e;border:1px solid #fcd34d;}
+        .policy-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:14px;position:relative;transition:box-shadow 0.15s;}
+        .policy-card:hover{box-shadow:0 4px 20px rgba(0,0,0,0.08);}
+        .policy-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+        .policy-card-title{font-size:1.05rem;font-weight:700;color:var(--text-primary);}
+        .policy-card-sub{font-size:0.82rem;color:var(--text-secondary);margin-top:3px;}
+        .policy-card-body{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px 16px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);}
+        .policy-field{font-size:0.82rem;}
+        .policy-field-label{color:var(--text-secondary);font-size:0.73rem;text-transform:uppercase;letter-spacing:0.4px;font-weight:600;margin-bottom:1px;}
+        .policy-field-val{color:var(--text-primary);font-weight:600;}
+        .policy-card-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;}
+        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;opacity:0;pointer-events:none;transition:opacity 0.2s;}
+        .modal-overlay.show{opacity:1;pointer-events:all;}
+        .modal{background:#fff;border-radius:14px;padding:28px 24px;width:100%;max-width:640px;margin:16px;max-height:90vh;overflow-y:auto;transform:scale(0.95);transition:transform 0.2s;}
+        .modal-overlay.show .modal{transform:scale(1);}
+        .modal-title{font-size:1.1rem;font-weight:700;color:var(--text-primary);margin-bottom:16px;}
+        .modal-actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+        .photo-preview{width:100%;max-width:200px;aspect-ratio:4/3;border:2px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--bg-card);overflow:hidden;position:relative;}
+        .photo-preview img{width:100%;height:100%;object-fit:cover;border-radius:6px;}
+        .no-photo{font-size:2rem;color:var(--border);}
+        .remove-photo{position:absolute;top:5px;right:5px;background:rgba(0,0,0,0.55);border:none;color:#fff;width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;}
+        .section-divider{font-size:0.82rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin:20px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border);}
+        .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#1a1f2e;color:#fff;padding:10px 20px;border-radius:8px;font-size:0.87rem;font-weight:500;opacity:0;transition:all 0.3s;z-index:9999;pointer-events:none;white-space:nowrap;max-width:90vw;}
+        .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+        .toast.success{background:var(--success);}
+        .toast.error{background:var(--danger);}
+        @media(max-width:720px){header{flex-wrap:wrap;padding:8px 12px;gap:6px;}.user-badge{display:none;}nav{order:3;width:100%;border-top:1px solid rgba(255,255,255,0.1);padding-top:6px;}main{padding:12px;}.stats-grid{grid-template-columns:1fr 1fr;gap:10px;}.form-grid{grid-template-columns:1fr;gap:12px;}.form-group.full-width,.form-group.span2{grid-column:1;}.policy-card-body{grid-template-columns:1fr 1fr;}}
+    </style>
+</head>
+<body>
+
+<div id="login-screen">
+    <div class="login-site-links">
+        <a href="index.html">🏠 HQ</a>
+        <a href="armory.html">🔫 Armory</a>
+        <a href="automotive.html">🚗 Auto</a>
+        <a href="machinery.html">🚜 Machinery</a>
+        <a href="timepieces.html">⌚ Timepieces</a>
+        <a href="knives.html">🔪 Knives</a>
+        <a href="pharmacy.html">💊 Pharmacy</a>
+        <a href="insurance.html" class="active">🛡 Insurance</a>
+    </div>
+    <div class="login-box">
+        <div class="login-logo">🛡</div>
+        <h2>Farmboss Insurance</h2>
+        <p class="login-sub">Sign in to manage your policies</p>
+        <form id="login-form">
+            <div class="form-group" style="margin-bottom:14px;">
+                <label>Email</label>
+                <input type="email" id="login-email" placeholder="your@email.com" required autocomplete="username">
+            </div>
+            <div class="form-group" style="margin-bottom:20px;">
+                <label>Password</label>
+                <input type="password" id="login-password" placeholder="••••••••" required autocomplete="current-password">
+            </div>
+            <div class="login-error" id="login-error"></div>
+            <button type="submit" class="btn btn-primary login-full" id="login-btn">Sign In</button>
+        </form>
+    </div>
+</div>
+
+<div id="loading-screen"><div class="spinner"></div><p>Loading policies...</p></div>
+
+<div id="app">
+<div class="site-switcher">
+    <a href="index.html" class="site-link">🏠 Headquarters</a>
+    <a href="armory.html" class="site-link">🔫 Armory</a>
+    <a href="machinery.html" class="site-link">🚜 Machinery</a>
+    <a href="automotive.html" class="site-link">🚗 Automotive</a>
+    <a href="timepieces.html" class="site-link">⌚ Timepieces</a>
+    <a href="knives.html" class="site-link">🔪 Knives</a>
+    <a href="pharmacy.html" class="site-link">💊 Pharmacy</a>
+    <a href="insurance.html" class="site-link active">🛡 Insurance</a>
+</div>
+<header>
+    <div class="logo-area">
+        <div class="logo-icon">🛡</div>
+        <h1>Farmboss <span>Insurance</span></h1>
+    </div>
+    <nav>
+        <button class="active" onclick="showView('dashboard')">Dashboard</button>
+        <button onclick="showView('add-item')">Add Policy</button>
+        <button onclick="showView('policies')">All Policies</button>
+        <button onclick="showView('contacts')">Contacts &amp; Agents</button>
+        <button onclick="showView('recycle-bin')">🗑 Recycle Bin</button>
+    </nav>
+    <div class="header-right">
+        <span class="user-badge" id="user-email"></span>
+        <button class="btn-signout" onclick="doSignOut()">Sign Out</button>
+    </div>
+</header>
+<main>
+
+<!-- DASHBOARD -->
+<div id="view-dashboard" class="view active">
+    <div class="hero">
+        <div>
+            <div class="hero-title">Farmboss <span>Insurance</span></div>
+            <div class="hero-sub">Home · Auto · Health · Life · Farm — all in one place</div>
+        </div>
+        <svg width="110" height="110" viewBox="0 0 110 110" style="opacity:0.85;flex-shrink:0;" xmlns="http://www.w3.org/2000/svg">
+            <path d="M55 10 L90 28 L90 55 C90 76 73 92 55 100 C37 92 20 76 20 55 L20 28 Z" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="3"/>
+            <path d="M55 22 L78 35 L78 55 C78 70 68 82 55 88 C42 82 32 70 32 55 L32 35 Z" fill="rgba(22,163,74,0.25)"/>
+            <line x1="43" y1="55" x2="50" y2="63" stroke="rgba(255,255,255,0.9)" stroke-width="3" stroke-linecap="round"/>
+            <line x1="50" y1="63" x2="67" y2="45" stroke="rgba(255,255,255,0.9)" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+    </div>
+    <div id="alert-banners"></div>
+    <div class="stats-grid" id="stats-grid"></div>
+
+    <!-- Policy type breakdown cards -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;margin-bottom:20px;" id="type-cards"></div>
+
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">📋 All Policies — Quick View</div></div>
+        <div class="table-wrapper">
+            <table>
+                <thead><tr>
+                    <th>Type</th>
+                    <th>Policy Name</th>
+                    <th>Carrier</th>
+                    <th>Policy #</th>
+                    <th>Insured</th>
+                    <th>Premium</th>
+                    <th>Renewal Date</th>
+                    <th>Status</th>
+                </tr></thead>
+                <tbody id="dash-tbody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ADD / EDIT POLICY -->
+<div id="view-add-item" class="view">
+    <div class="card">
+        <div class="card-title"><div class="card-title-left" id="form-title">➕ Add New Policy</div></div>
+        <form id="item-form">
+            <input type="hidden" id="edit-doc-id">
+
+            <div class="section-divider">📌 Policy Identity</div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Insurance Type *</label>
+                    <select id="f-type" required onchange="showTypeFields()">
+                        <option value="">Select type...</option>
+                        <option value="Home">🏠 Home / Homeowners</option>
+                        <option value="Renters">🏢 Renters</option>
+                        <option value="Auto">🚗 Auto / Vehicle</option>
+                        <option value="Health">❤ Health / Medical</option>
+                        <option value="Dental">🦷 Dental</option>
+                        <option value="Vision">👓 Vision</option>
+                        <option value="Life">🌿 Life</option>
+                        <option value="Farm">🌾 Farm / Ranch</option>
+                        <option value="Umbrella">☂ Umbrella / Liability</option>
+                        <option value="Disability">♿ Disability</option>
+                        <option value="Pet">🐾 Pet</option>
+                        <option value="Travel">✈ Travel</option>
+                        <option value="Other">📋 Other</option>
+                    </select>
+                </div>
+                <div class="form-group span2">
+                    <label>Policy Name / Description *</label>
+                    <input type="text" id="f-name" placeholder="e.g. Home Insurance - Main House, Jeff's Health Plan" required>
+                </div>
+                <div class="form-group">
+                    <label>Insurance Carrier</label>
+                    <input type="text" id="f-carrier" list="carrier-list" placeholder="e.g. State Farm, Allstate, USAA" autocomplete="off">
+                    <datalist id="carrier-list"></datalist>
+                </div>
+                <div class="form-group">
+                    <label>Policy Number</label>
+                    <input type="text" id="f-policy-number" placeholder="e.g. HOM-123456789">
+                </div>
+                <div class="form-group">
+                    <label>Group Number</label>
+                    <input type="text" id="f-group-number" placeholder="e.g. GRP-001234 (health)">
+                </div>
+            </div>
+
+            <div class="section-divider">👥 Insured Parties</div>
+            <div class="form-grid">
+                <div class="form-group span2">
+                    <label>Primary Insured</label>
+                    <input type="text" id="f-insured-primary" placeholder="e.g. Jeff Stoebner">
+                </div>
+                <div class="form-group full-width">
+                    <label>Additional Insured / Dependents</label>
+                    <input type="text" id="f-insured-others" placeholder="e.g. Sarah Stoebner, All children — comma-separated">
+                </div>
+            </div>
+
+            <div class="section-divider">💰 Premium &amp; Coverage</div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Premium Amount ($)</label>
+                    <div class="input-prefix-wrap">
+                        <span class="input-prefix">$</span>
+                        <input type="number" id="f-premium" placeholder="0.00" min="0" step="0.01" style="padding-left:24px;">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Premium Frequency</label>
+                    <select id="f-premium-freq">
+                        <option value="">Select...</option>
+                        <option>Monthly</option>
+                        <option>Quarterly</option>
+                        <option>Semi-Annual</option>
+                        <option>Annual</option>
+                        <option>Payroll Deduction</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Deductible ($)</label>
+                    <div class="input-prefix-wrap">
+                        <span class="input-prefix">$</span>
+                        <input type="number" id="f-deductible" placeholder="0.00" min="0" step="0.01" style="padding-left:24px;">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Coverage Limit ($)</label>
+                    <div class="input-prefix-wrap">
+                        <span class="input-prefix">$</span>
+                        <input type="number" id="f-coverage-limit" placeholder="e.g. 500000" min="0" step="1" style="padding-left:24px;">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Out-of-Pocket Max ($) <span style="font-weight:400;font-size:0.75rem;">(health)</span></label>
+                    <div class="input-prefix-wrap">
+                        <span class="input-prefix">$</span>
+                        <input type="number" id="f-oop-max" placeholder="e.g. 7500" min="0" step="1" style="padding-left:24px;">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Copay / Coinsurance</label>
+                    <input type="text" id="f-copay" placeholder="e.g. $30 copay / 80-20 after deductible">
+                </div>
+            </div>
+
+            <div class="section-divider">📅 Dates</div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Effective Date</label>
+                    <input type="date" id="f-effective-date">
+                </div>
+                <div class="form-group">
+                    <label>Renewal / Expiration Date</label>
+                    <input type="date" id="f-renewal-date">
+                </div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <select id="f-status">
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                        <option value="Cancelled">Cancelled</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="section-divider">📞 Agent &amp; Contact</div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Agent Name</label>
+                    <input type="text" id="f-agent-name" list="agent-list" placeholder="e.g. John Smith" autocomplete="off">
+                    <datalist id="agent-list"></datalist>
+                </div>
+                <div class="form-group">
+                    <label>Agent Phone</label>
+                    <input type="tel" id="f-agent-phone" placeholder="e.g. (555) 123-4567">
+                </div>
+                <div class="form-group">
+                    <label>Agent Email</label>
+                    <input type="email" id="f-agent-email" placeholder="agent@company.com">
+                </div>
+                <div class="form-group span2">
+                    <label>Claims Phone / 24hr Line</label>
+                    <input type="tel" id="f-claims-phone" placeholder="e.g. 1-800-STATEFARM">
+                </div>
+                <div class="form-group">
+                    <label>Claims Website</label>
+                    <input type="url" id="f-claims-url" placeholder="https://...">
+                </div>
+            </div>
+
+            <!-- TYPE-SPECIFIC: Auto -->
+            <div id="auto-fields" style="display:none;">
+                <div class="section-divider">🚗 Vehicle Details</div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Vehicle(s) Covered</label>
+                        <input type="text" id="f-vehicles" placeholder="e.g. 2022 Ram 1500, 2020 Chevy Tahoe">
+                    </div>
+                    <div class="form-group">
+                        <label>Liability Limits</label>
+                        <input type="text" id="f-liability" placeholder="e.g. 100/300/100">
+                    </div>
+                    <div class="form-group">
+                        <label>Roadside Assistance</label>
+                        <select id="f-roadside">
+                            <option value="">Unknown</option>
+                            <option value="Yes">Yes — Included</option>
+                            <option value="No">No</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TYPE-SPECIFIC: Home -->
+            <div id="home-fields" style="display:none;">
+                <div class="section-divider">🏠 Property Details</div>
+                <div class="form-grid">
+                    <div class="form-group span2">
+                        <label>Property Address</label>
+                        <input type="text" id="f-property-address" placeholder="123 Main St, City, State ZIP">
+                    </div>
+                    <div class="form-group">
+                        <label>Dwelling Coverage ($)</label>
+                        <div class="input-prefix-wrap">
+                            <span class="input-prefix">$</span>
+                            <input type="number" id="f-dwelling" placeholder="e.g. 400000" min="0" step="1" style="padding-left:24px;">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Personal Property ($)</label>
+                        <div class="input-prefix-wrap">
+                            <span class="input-prefix">$</span>
+                            <input type="number" id="f-personal-prop" placeholder="e.g. 150000" min="0" step="1" style="padding-left:24px;">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Liability Coverage ($)</label>
+                        <div class="input-prefix-wrap">
+                            <span class="input-prefix">$</span>
+                            <input type="number" id="f-home-liability" placeholder="e.g. 300000" min="0" step="1" style="padding-left:24px;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TYPE-SPECIFIC: Health -->
+            <div id="health-fields" style="display:none;">
+                <div class="section-divider">❤ Health Plan Details</div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Plan Type</label>
+                        <select id="f-plan-type">
+                            <option value="">Select...</option>
+                            <option>HMO</option><option>PPO</option><option>EPO</option>
+                            <option>HDHP / HSA-eligible</option><option>POS</option><option>Medicare</option><option>Medicaid</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Network</label>
+                        <input type="text" id="f-network" placeholder="e.g. BlueCross BlueShield, Cigna">
+                    </div>
+                    <div class="form-group">
+                        <label>Primary Care Doctor</label>
+                        <input type="text" id="f-pcp" placeholder="e.g. Dr. Jane Smith">
+                    </div>
+                </div>
+            </div>
+
+            <!-- TYPE-SPECIFIC: Life -->
+            <div id="life-fields" style="display:none;">
+                <div class="section-divider">🌿 Life Insurance Details</div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Death Benefit ($)</label>
+                        <div class="input-prefix-wrap">
+                            <span class="input-prefix">$</span>
+                            <input type="number" id="f-death-benefit" placeholder="e.g. 500000" min="0" step="1" style="padding-left:24px;">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Policy Term</label>
+                        <input type="text" id="f-policy-term" placeholder="e.g. 20 Year Term, Whole Life">
+                    </div>
+                    <div class="form-group">
+                        <label>Beneficiary</label>
+                        <input type="text" id="f-beneficiary" placeholder="e.g. Sarah Stoebner (spouse) — 100%">
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-divider">📝 Notes &amp; Documents</div>
+            <div class="form-grid">
+                <div class="form-group full-width">
+                    <label>Notes</label>
+                    <textarea id="f-notes" rows="3" placeholder="Special riders, exclusions, claim history, login credentials hint, important notes..."></textarea>
+                </div>
+            </div>
+
+            <!-- DOCUMENT PHOTO -->
+            <div style="margin-top:4px;">
+                <div class="section-divider">📄 Insurance Card Photos</div>
+                <p style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:12px;">Upload front &amp; back of your insurance card. Log into your provider's app or website, screenshot the card, then upload it here.</p>
+                <div style="display:flex;gap:16px;flex-wrap:wrap;">
+                    <div>
+                        <div class="photo-preview" id="prev-card" style="max-width:260px;aspect-ratio:1.6/1;"><span class="no-photo">📄</span><button type="button" class="remove-photo" onclick="removePhoto('card')">✕</button></div>
+                        <div style="font-size:0.75rem;color:var(--text-secondary);margin-top:4px;">🪪 Card Front</div>
+                        <input type="file" id="file-card" accept="image/*" onchange="onPhotoSelected('card',this)" style="font-size:0.78rem;margin-top:4px;">
+                    </div>
+                    <div>
+                        <div class="photo-preview" id="prev-card2" style="max-width:260px;aspect-ratio:1.6/1;"><span class="no-photo">📄</span><button type="button" class="remove-photo" onclick="removePhoto('card2')">✕</button></div>
+                        <div style="font-size:0.75rem;color:var(--text-secondary);margin-top:4px;">🪪 Card Back</div>
+                        <input type="file" id="file-card2" accept="image/*" onchange="onPhotoSelected('card2',this)" style="font-size:0.78rem;margin-top:4px;">
+                    </div>
+                    <div>
+                        <div class="photo-preview" id="prev-card3" style="max-width:260px;aspect-ratio:1.6/1;"><span class="no-photo">📄</span><button type="button" class="remove-photo" onclick="removePhoto('card3')">✕</button></div>
+                        <div style="font-size:0.75rem;color:var(--text-secondary);margin-top:4px;">📋 Declaration Page / EOB</div>
+                        <input type="file" id="file-card3" accept="image/*,application/pdf" onchange="onPhotoSelected('card3',this)" style="font-size:0.78rem;margin-top:4px;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- EMAIL DISTRIBUTION -->
+            <div style="margin-top:4px;">
+                <div class="section-divider">📧 Card Distribution — Email Recipients</div>
+                <p style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:12px;">Add email addresses to receive this insurance card. Use the Send buttons to distribute the card to family members, employers, or HR departments.</p>
+                <div id="email-recipients-list" style="margin-bottom:10px;"></div>
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                    <input type="text" id="new-recipient-name" placeholder="Name (e.g. Sarah)" style="width:140px;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.85rem;font-family:inherit;">
+                    <input type="email" id="new-recipient-email" placeholder="email@example.com" style="flex:1;min-width:200px;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.85rem;font-family:inherit;">
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="addRecipient()">+ Add</button>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" id="form-submit-btn">Save Policy</button>
+                <button type="button" class="btn btn-ghost" onclick="resetForm()">Clear</button>
+                <button type="button" class="btn btn-ghost" onclick="showView('policies')">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ALL POLICIES -->
+<div id="view-policies" class="view">
+    <div class="toolbar">
+        <input type="text" id="pol-search" placeholder="Search carrier, policy #, insured name..." oninput="renderPolicies()">
+        <select id="pol-filter-type" onchange="renderPolicies()"><option value="">All Types</option></select>
+        <select id="pol-filter-status" onchange="renderPolicies()">
+            <option value="">All Statuses</option>
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+            <option value="Cancelled">Cancelled</option>
+        </select>
+        <button class="btn btn-primary btn-sm" onclick="showView('add-item')">+ Add Policy</button>
+    </div>
+    <div id="policies-list"></div>
+</div>
+
+<!-- CONTACTS -->
+<div id="view-contacts" class="view">
+    <div class="card">
+        <div class="card-title">
+            <div class="card-title-left">📞 Insurance Agents &amp; Contacts</div>
+        </div>
+        <div id="contacts-list"></div>
+    </div>
+</div>
+
+<!-- RECYCLE BIN -->
+<div id="view-recycle-bin" class="view">
+    <div class="toolbar">
+        <div><h2 style="font-size:1.1rem;font-weight:700;">🗑 Recycle Bin</h2></div>
+        <button class="btn btn-ghost btn-sm" onclick="loadRecycleBin()">🔄 Refresh</button>
+    </div>
+    <div class="card"><div id="recycle-bin-list"><div class="empty"><div class="empty-icon">🗑</div><p>Recycle bin is empty</p></div></div></div>
+</div>
+
+</main>
+</div><!-- /app -->
+
+<!-- CARD VIEWER MODAL -->
+<div class="modal-overlay" id="card-viewer-modal">
+    <div class="modal" style="max-width:500px;">
+        <div class="modal-title" id="card-viewer-title"></div>
+        <div id="card-viewer-images"></div>
+        <div class="modal-actions">
+            <button class="btn btn-primary" id="card-viewer-send" style="display:none;">📧 Email Card</button>
+            <button class="btn btn-ghost" onclick="closeCardViewer()">Close</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+firebase.initializeApp({
+    apiKey:"AIzaSyB7c4urD9tJO80S7nADItxjwhSYVqlrkEU",
+    authDomain:"watchroom-714a0.firebaseapp.com",
+    projectId:"watchroom-714a0",
+    storageBucket:"watchroom-714a0.firebasestorage.app",
+    messagingSenderId:"911514107783",
+    appId:"1:911514107783:web:20e8a729fd66577c28dd22"
+});
+const auth=firebase.auth(), db=firebase.firestore(), storage=firebase.storage();
+
+let items=[], unsubItems=null;
+let formPhotos={
+    card:{file:null,base64:null,mimeType:null,existingUrl:null,deleted:false},
+    card2:{file:null,base64:null,mimeType:null,existingUrl:null,deleted:false},
+    card3:{file:null,base64:null,mimeType:null,existingUrl:null,deleted:false}
+};
+let formRecipients=[]; // [{name,email}]
+
+const TYPE_BADGE={
+    Home:'badge-home',Renters:'badge-home',Auto:'badge-auto',
+    Health:'badge-health',Dental:'badge-health',Vision:'badge-health',
+    Life:'badge-life',Farm:'badge-farm',Umbrella:'badge-umbrella',
+    Disability:'badge-umbrella',Pet:'badge-other',Travel:'badge-other',Other:'badge-other'
+};
+const TYPE_ICON={
+    Home:'🏠',Renters:'🏢',Auto:'🚗',Health:'❤',Dental:'🦷',Vision:'👓',
+    Life:'🌿',Farm:'🌾',Umbrella:'☂',Disability:'♿',Pet:'🐾',Travel:'✈',Other:'📋'
+};
+const VIEWS=['dashboard','add-item','policies','contacts','recycle-bin'];
+
+auth.onAuthStateChanged(user=>{
+    if(user){
+        document.getElementById('login-screen').style.display='none';
+        document.getElementById('loading-screen').style.display='flex';
+        document.getElementById('app').style.display='none';
+        document.getElementById('user-email').textContent=user.email;
+        initApp();
+    }else{
+        document.getElementById('login-screen').style.display='flex';
+        document.getElementById('loading-screen').style.display='none';
+        document.getElementById('app').style.display='none';
+        if(unsubItems){unsubItems();unsubItems=null;} items=[];
+    }
+});
+
+document.getElementById('login-form').addEventListener('submit',async e=>{
+    e.preventDefault();
+    const email=document.getElementById('login-email').value.trim();
+    const pass=document.getElementById('login-password').value;
+    const errEl=document.getElementById('login-error'), btn=document.getElementById('login-btn');
+    errEl.textContent=''; btn.textContent='Signing in...'; btn.disabled=true;
+    try{ await auth.signInWithEmailAndPassword(email,pass); }
+    catch(err){ errEl.textContent='Invalid email or password.'; btn.textContent='Sign In'; btn.disabled=false; }
+});
+
+async function doSignOut(){ if(!confirm('Sign out?'))return; await auth.signOut(); }
+
+async function initApp(){
+    try{
+        unsubItems=db.collection('insurance_items').onSnapshot(snap=>{
+            items=snap.docs.map(doc=>({_docId:doc.id,...doc.data()}));
+            renderDashboard(); renderPolicies(); renderContacts(); populateDataLists(); syncTypeFilter();
+        },()=>{});
+        document.getElementById('loading-screen').style.display='none';
+        document.getElementById('app').style.display='block';
+        showView('dashboard');
+    }catch(err){
+        document.getElementById('loading-screen').innerHTML=`<p style="color:var(--danger);padding:20px;text-align:center;">Error: ${err.message}<br><br><button class="btn btn-ghost" onclick="doSignOut()">Sign Out</button></p>`;
+    }
+}
+
+function showView(v){
+    VIEWS.forEach(id=>{ const el=document.getElementById('view-'+id); if(el) el.classList.remove('active'); });
+    const target=document.getElementById('view-'+v); if(target) target.classList.add('active');
+    document.querySelectorAll('nav button').forEach((b,i)=>{ b.classList.toggle('active',VIEWS[i]===v); });
+    if(v==='add-item'&&!document.getElementById('edit-doc-id').value) resetForm();
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────
+function daysUntil(dateStr){
+    if(!dateStr) return null;
+    const today=new Date(); today.setHours(0,0,0,0);
+    const d=new Date(dateStr+'T00:00:00');
+    return Math.round((d-today)/86400000);
+}
+function fmtDate(dateStr){
+    if(!dateStr) return '—';
+    const [y,m,d]=dateStr.split('-'); return `${m}/${d}/${y}`;
+}
+function fmtMoney(v){ if(!v&&v!==0) return '—'; return '$'+Number(v).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:2}); }
+function statusBadge(p){
+    const days=daysUntil(p.renewalDate);
+    if(p.status==='Cancelled') return '<span class="badge badge-inactive">Cancelled</span>';
+    if(p.status==='Inactive') return '<span class="badge badge-inactive">Inactive</span>';
+    if(days!==null&&days<0) return '<span class="badge badge-expired">Expired</span>';
+    if(days!==null&&days<=30) return '<span class="badge badge-expiring">Renews Soon</span>';
+    return '<span class="badge badge-active">Active</span>';
+}
+function typeBadge(type){
+    return `<span class="badge ${TYPE_BADGE[type]||'badge-other'}">${TYPE_ICON[type]||'📋'} ${type||'Other'}</span>`;
+}
+function annualPremium(p){
+    const amt=Number(p.premium)||0; if(!amt) return null;
+    const freq=p.premiumFreq||'';
+    const mult={'Monthly':12,'Quarterly':4,'Semi-Annual':2,'Annual':1,'Payroll Deduction':26}[freq]||1;
+    return amt*mult;
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────────────
+function renderDashboard(){
+    const active=items.filter(i=>i.status==='Active'||!i.status);
+    const expiringSoon=active.filter(i=>{ const d=daysUntil(i.renewalDate); return d!==null&&d>=0&&d<=30; });
+    const expired=items.filter(i=>{ const d=daysUntil(i.renewalDate); return d!==null&&d<0&&i.status!=='Cancelled'; });
+    const totalAnnual=items.filter(i=>i.status!=='Cancelled').reduce((s,i)=>s+(annualPremium(i)||0),0);
+
+    // Alerts
+    let banners='';
+    if(expired.length) banners+=`<div class="alert-banner alert-danger">🔴 <strong>${expired.length} policy${expired.length>1?'ies':''}</strong> may be expired — check renewal dates.</div>`;
+    if(expiringSoon.length) banners+=`<div class="alert-banner alert-warning">🟡 <strong>${expiringSoon.length} policy${expiringSoon.length>1?'ies':''}</strong> renew${expiringSoon.length===1?'s':''} within 30 days.</div>`;
+    document.getElementById('alert-banners').innerHTML=banners;
+
+    // Stats
+    document.getElementById('stats-grid').innerHTML=`
+        <div class="stat-card"><div class="stat-value" style="color:#16a34a;">${active.length}</div><div class="stat-label">Active Policies</div></div>
+        <div class="stat-card" style="border-color:${expiringSoon.length?'#d97706':'var(--border)'}"><div class="stat-value" style="color:${expiringSoon.length?'#d97706':'#94a3b8'};">${expiringSoon.length}</div><div class="stat-label">Renewing ≤30 Days</div></div>
+        <div class="stat-card" style="border-color:${expired.length?'#dc2626':'var(--border)'}"><div class="stat-value" style="color:${expired.length?'#dc2626':'#94a3b8'};">${expired.length}</div><div class="stat-label">Possibly Expired</div></div>
+        <div class="stat-card"><div class="stat-value" style="color:#16a34a;font-size:1.5rem;">${totalAnnual?'$'+Math.round(totalAnnual).toLocaleString():'—'}</div><div class="stat-label">Est. Annual Premiums</div></div>
+        <div class="stat-card"><div class="stat-value" style="color:#64748b;">${items.length}</div><div class="stat-label">Total Policies</div></div>
+    `;
+
+    // Type breakdown cards
+    const typeMap={};
+    items.forEach(i=>{ const t=i.insType||'Other'; if(!typeMap[t]) typeMap[t]={count:0,annual:0}; typeMap[t].count++; typeMap[t].annual+=(annualPremium(i)||0); });
+    const typeHTML=Object.entries(typeMap).sort((a,b)=>b[1].count-a[1].count).map(([t,d])=>`
+        <div class="stat-card" style="text-align:left;padding:16px 18px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                <span style="font-size:1.3rem;">${TYPE_ICON[t]||'📋'}</span>
+                ${typeBadge(t)}
+            </div>
+            <div style="font-size:1.4rem;font-weight:800;color:var(--text-primary);">${d.count}</div>
+            <div style="font-size:0.75rem;color:var(--text-secondary);font-weight:600;text-transform:uppercase;letter-spacing:0.4px;">${t} Policies</div>
+            ${d.annual?`<div style="font-size:0.85rem;color:var(--success);font-weight:600;margin-top:4px;">~$${Math.round(d.annual).toLocaleString()}/yr</div>`:''}
+        </div>`).join('');
+    document.getElementById('type-cards').innerHTML=typeHTML||'<p style="color:var(--text-secondary);font-size:0.85rem;grid-column:1/-1;">No policies yet.</p>';
+
+    // Quick table
+    const sorted=[...items].sort((a,b)=>(a.insType||'').localeCompare(b.insType||'')||(a.policyName||'').localeCompare(b.policyName||''));
+    document.getElementById('dash-tbody').innerHTML=sorted.length?sorted.map(p=>`<tr>
+        <td>${typeBadge(p.insType)}</td>
+        <td><strong style="cursor:pointer;color:var(--accent);" onclick="editItem('${p._docId}')">${p.policyName||'—'}</strong></td>
+        <td>${p.carrier||'—'}</td>
+        <td class="mono">${p.policyNumber||'—'}</td>
+        <td style="font-size:0.82rem;">${p.insuredPrimary||'—'}</td>
+        <td style="color:var(--success);font-weight:600;">${p.premium?fmtMoney(p.premium)+(p.premiumFreq?' /'+p.premiumFreq.replace('Monthly','mo').replace('Annual','yr').replace('Quarterly','qtr'):''):'—'}</td>
+        <td>${p.renewalDate?fmtDate(p.renewalDate):'—'}</td>
+        <td>${statusBadge(p)}</td>
+    </tr>`).join(''):`<tr><td colspan="8" class="empty">No policies on file. <a href="#" onclick="showView('add-item');return false;" style="color:var(--accent);">Add one →</a></td></tr>`;
+}
+
+// ── POLICIES LIST ─────────────────────────────────────────────────
+function renderPolicies(){
+    const search=(document.getElementById('pol-search')?.value||'').toLowerCase();
+    const ft=document.getElementById('pol-filter-type')?.value||'';
+    const fs=document.getElementById('pol-filter-status')?.value||'';
+    let filtered=items.filter(p=>{
+        if(ft&&p.insType!==ft) return false;
+        if(fs&&(p.status||'Active')!==fs) return false;
+        if(search){
+            const hay=`${p.policyName} ${p.carrier} ${p.policyNumber} ${p.insuredPrimary} ${p.insuredOthers} ${p.agentName}`.toLowerCase();
+            if(!hay.includes(search)) return false;
+        }
+        return true;
+    });
+    filtered.sort((a,b)=>(a.insType||'').localeCompare(b.insType||'')||(a.policyName||'').localeCompare(b.policyName||''));
+
+    const container=document.getElementById('policies-list');
+    if(!filtered.length){
+        container.innerHTML='<div class="empty"><div class="empty-icon">🛡</div><p>No policies found.</p></div>';
+        return;
+    }
+    container.innerHTML=filtered.map(p=>{
+        const days=daysUntil(p.renewalDate);
+        const ap=annualPremium(p);
+        const renewColor=days!==null&&days<0?'#dc2626':days!==null&&days<=30?'#d97706':'var(--success)';
+        return `<div class="policy-card">
+            <div class="policy-card-top">
+                <div>
+                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px;">
+                        ${typeBadge(p.insType)} ${statusBadge(p)}
+                    </div>
+                    <div class="policy-card-title">${p.policyName||'Unnamed Policy'}</div>
+                    <div class="policy-card-sub">${p.carrier||''}${p.policyNumber?' · #'+p.policyNumber:''}</div>
+                </div>
+                <div style="text-align:right;flex-shrink:0;">
+                    ${p.photoCard?`<img src="${p.photoCard}" style="width:80px;height:50px;object-fit:cover;border-radius:6px;border:1px solid var(--border);" alt="Card">`:'' }
+                </div>
+            </div>
+            <div class="policy-card-body">
+                <div class="policy-field"><div class="policy-field-label">Insured</div><div class="policy-field-val">${p.insuredPrimary||'—'}</div></div>
+                ${p.insuredOthers?`<div class="policy-field"><div class="policy-field-label">Also Covered</div><div class="policy-field-val">${p.insuredOthers}</div></div>`:''}
+                <div class="policy-field"><div class="policy-field-label">Premium</div><div class="policy-field-val" style="color:var(--success);">${p.premium?fmtMoney(p.premium)+(p.premiumFreq?' /'+p.premiumFreq:''):'—'}${ap?`<div style="font-size:0.75rem;font-weight:400;color:var(--text-secondary);">≈ ${fmtMoney(ap)}/yr</div>`:''}</div></div>
+                <div class="policy-field"><div class="policy-field-label">Deductible</div><div class="policy-field-val">${fmtMoney(p.deductible)}</div></div>
+                ${p.coverageLimit?`<div class="policy-field"><div class="policy-field-label">Coverage Limit</div><div class="policy-field-val">${fmtMoney(p.coverageLimit)}</div></div>`:''}
+                ${p.oopMax?`<div class="policy-field"><div class="policy-field-label">OOP Max</div><div class="policy-field-val">${fmtMoney(p.oopMax)}</div></div>`:''}
+                <div class="policy-field"><div class="policy-field-label">Renewal Date</div><div class="policy-field-val" style="color:${renewColor};">${p.renewalDate?fmtDate(p.renewalDate)+(days!==null?` (${days>=0?days+'d':Math.abs(days)+'d ago'})`:''):'—'}</div></div>
+                ${p.agentName?`<div class="policy-field"><div class="policy-field-label">Agent</div><div class="policy-field-val">${p.agentName}${p.agentPhone?'<br><span style="font-weight:400;font-size:0.8rem;">'+p.agentPhone+'</span>':''}</div></div>`:''}
+                ${p.claimsPhone?`<div class="policy-field"><div class="policy-field-label">Claims Line</div><div class="policy-field-val">${p.claimsPhone}</div></div>`:''}
+                ${p.vehicles?`<div class="policy-field"><div class="policy-field-label">Vehicles</div><div class="policy-field-val">${p.vehicles}</div></div>`:''}
+                ${p.propertyAddress?`<div class="policy-field" style="grid-column:span 2;"><div class="policy-field-label">Property</div><div class="policy-field-val">${p.propertyAddress}</div></div>`:''}
+                ${p.beneficiary?`<div class="policy-field"><div class="policy-field-label">Beneficiary</div><div class="policy-field-val">${p.beneficiary}</div></div>`:''}
+                ${p.deathBenefit?`<div class="policy-field"><div class="policy-field-label">Death Benefit</div><div class="policy-field-val">${fmtMoney(p.deathBenefit)}</div></div>`:''}
+            </div>
+            ${p.notes?`<div style="background:var(--bg-card);padding:8px 12px;border-radius:7px;font-size:0.82rem;color:var(--text-secondary);margin-top:10px;">📝 ${p.notes}</div>`:''}
+            ${(p.emailRecipients&&p.emailRecipients.length)?`<div style="margin-top:8px;font-size:0.78rem;color:var(--text-secondary);">📧 Distribution: ${p.emailRecipients.map(r=>`<strong>${r.name}</strong>`).join(', ')}</div>`:''}
+            <div class="policy-card-actions">
+                <button class="btn btn-ghost btn-sm" onclick="editItem('${p._docId}')">✏ Edit</button>
+                ${(p.emailRecipients&&p.emailRecipients.length)?`<button class="btn btn-primary btn-sm" onclick="sendCardEmail('${p._docId}')">📧 Send Card</button>`:''}
+                ${(p.photoCard||p.photoCard2)?`<button class="btn btn-ghost btn-sm" onclick="viewCards('${p._docId}')">🪪 View Cards</button>`:''}
+                ${p.claimsUrl?`<a href="${p.claimsUrl}" target="_blank" class="btn btn-ghost btn-sm">🌐 Claims</a>`:''}
+                ${p.agentPhone?`<a href="tel:${p.agentPhone}" class="btn btn-ghost btn-sm">📞 Agent</a>`:''}
+                <button class="btn btn-danger btn-sm" onclick="deleteItem('${p._docId}','${(p.policyName||'Policy').replace(/'/g,"\\'")}')">🗑 Delete</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// ── CONTACTS ──────────────────────────────────────────────────────
+function renderContacts(){
+    const agentMap={};
+    items.forEach(p=>{
+        if(!p.agentName) return;
+        if(!agentMap[p.agentName]) agentMap[p.agentName]={name:p.agentName,phone:p.agentPhone,email:p.agentEmail,policies:[]};
+        agentMap[p.agentName].policies.push({type:p.insType,name:p.policyName,carrier:p.carrier});
+        if(!agentMap[p.agentName].phone&&p.agentPhone) agentMap[p.agentName].phone=p.agentPhone;
+        if(!agentMap[p.agentName].email&&p.agentEmail) agentMap[p.agentName].email=p.agentEmail;
+    });
+    const agents=Object.values(agentMap);
+    const container=document.getElementById('contacts-list');
+    if(!agents.length){
+        container.innerHTML='<div class="empty"><div class="empty-icon">📞</div><p>No agents on file yet. Add agent info when adding policies.</p></div>';
+        return;
+    }
+    container.innerHTML=agents.map(a=>`<div style="padding:14px 0;border-bottom:1px solid var(--border);">
+        <div style="font-size:1rem;font-weight:700;">${a.name}</div>
+        <div style="font-size:0.82rem;color:var(--text-secondary);margin:4px 0;">
+            ${a.phone?`📞 <a href="tel:${a.phone}" style="color:var(--accent);">${a.phone}</a> &nbsp;`:''}
+            ${a.email?`✉ <a href="mailto:${a.email}" style="color:var(--accent);">${a.email}</a>`:''}
+        </div>
+        <div style="font-size:0.8rem;color:var(--text-secondary);">Manages: ${a.policies.map(p=>`${TYPE_ICON[p.type]||'📋'} ${p.name||p.type}`).join(', ')}</div>
+    </div>`).join('');
+}
+
+// ── FORM ──────────────────────────────────────────────────────────
+function showTypeFields(){
+    const t=document.getElementById('f-type').value;
+    document.getElementById('auto-fields').style.display=t==='Auto'?'block':'none';
+    document.getElementById('home-fields').style.display=(t==='Home'||t==='Renters'||t==='Farm')?'block':'none';
+    document.getElementById('health-fields').style.display=(t==='Health'||t==='Dental'||t==='Vision')?'block':'none';
+    document.getElementById('life-fields').style.display=(t==='Life'||t==='Disability')?'block':'none';
+}
+
+function resetForm(){
+    document.getElementById('item-form').reset();
+    document.getElementById('edit-doc-id').value='';
+    document.getElementById('form-title').textContent='➕ Add New Policy';
+    document.getElementById('form-submit-btn').textContent='Save Policy';
+    ['auto','home','health','life'].forEach(t=>document.getElementById(t+'-fields').style.display='none');
+    formPhotos={card:{file:null,base64:null,mimeType:null,existingUrl:null,deleted:false},card2:{file:null,base64:null,mimeType:null,existingUrl:null,deleted:false},card3:{file:null,base64:null,mimeType:null,existingUrl:null,deleted:false}};
+    formRecipients=[];
+    ['card','card2','card3'].forEach(k=>{ const p=document.getElementById('prev-'+k); if(p) p.innerHTML='<span class="no-photo">📄</span><button type="button" class="remove-photo" onclick="removePhoto(\''+k+'\')">✕</button>'; });
+    renderRecipients();
+}
+
+function editItem(docId){
+    const p=items.find(x=>x._docId===docId); if(!p) return;
+    resetForm();
+    document.getElementById('edit-doc-id').value=docId;
+    document.getElementById('form-title').textContent='✏ Edit Policy';
+    document.getElementById('form-submit-btn').textContent='Update Policy';
+    const set=(id,val)=>{ const el=document.getElementById(id); if(el) el.value=val||''; };
+    set('f-type',p.insType); showTypeFields();
+    set('f-name',p.policyName); set('f-carrier',p.carrier); set('f-policy-number',p.policyNumber);
+    set('f-group-number',p.groupNumber); set('f-insured-primary',p.insuredPrimary);
+    set('f-insured-others',p.insuredOthers); set('f-premium',p.premium); set('f-premium-freq',p.premiumFreq);
+    set('f-deductible',p.deductible); set('f-coverage-limit',p.coverageLimit); set('f-oop-max',p.oopMax);
+    set('f-copay',p.copay); set('f-effective-date',p.effectiveDate); set('f-renewal-date',p.renewalDate);
+    set('f-status',p.status||'Active'); set('f-agent-name',p.agentName); set('f-agent-phone',p.agentPhone);
+    set('f-agent-email',p.agentEmail); set('f-claims-phone',p.claimsPhone); set('f-claims-url',p.claimsUrl);
+    set('f-vehicles',p.vehicles); set('f-liability',p.liability); set('f-roadside',p.roadside);
+    set('f-property-address',p.propertyAddress); set('f-dwelling',p.dwelling); set('f-personal-prop',p.personalProp);
+    set('f-home-liability',p.homeLiability); set('f-plan-type',p.planType); set('f-network',p.network);
+    set('f-pcp',p.pcp); set('f-death-benefit',p.deathBenefit); set('f-policy-term',p.policyTerm);
+    set('f-beneficiary',p.beneficiary); set('f-notes',p.notes);
+    if(p.photoCard){ formPhotos.card.existingUrl=p.photoCard; const el=document.getElementById('prev-card'); if(el) el.innerHTML=`<img src="${p.photoCard}" alt=""><button type="button" class="remove-photo" onclick="removePhoto('card')">✕</button>`; }
+    if(p.photoCard2){ formPhotos.card2.existingUrl=p.photoCard2; const el=document.getElementById('prev-card2'); if(el) el.innerHTML=`<img src="${p.photoCard2}" alt=""><button type="button" class="remove-photo" onclick="removePhoto('card2')">✕</button>`; }
+    if(p.photoCard3){ formPhotos.card3.existingUrl=p.photoCard3; const el=document.getElementById('prev-card3'); if(el) el.innerHTML=`<img src="${p.photoCard3}" alt=""><button type="button" class="remove-photo" onclick="removePhoto('card3')">✕</button>`; }
+    formRecipients=p.emailRecipients?[...p.emailRecipients]:[];
+    renderRecipients();
+    showView('add-item');
+    setTimeout(()=>window.scrollTo({top:0,behavior:'smooth'}),50);
+}
+
+document.getElementById('item-form').addEventListener('submit',async e=>{
+    e.preventDefault();
+    const btn=document.getElementById('form-submit-btn');
+    btn.disabled=true; btn.textContent='Saving...';
+    try{
+        const docId=document.getElementById('edit-doc-id').value;
+        const data={
+            insType:document.getElementById('f-type').value,
+            policyName:document.getElementById('f-name').value.trim(),
+            carrier:document.getElementById('f-carrier').value.trim(),
+            policyNumber:document.getElementById('f-policy-number').value.trim(),
+            groupNumber:document.getElementById('f-group-number').value.trim(),
+            insuredPrimary:document.getElementById('f-insured-primary').value.trim(),
+            insuredOthers:document.getElementById('f-insured-others').value.trim(),
+            premium:document.getElementById('f-premium').value?Number(document.getElementById('f-premium').value):null,
+            premiumFreq:document.getElementById('f-premium-freq').value,
+            deductible:document.getElementById('f-deductible').value?Number(document.getElementById('f-deductible').value):null,
+            coverageLimit:document.getElementById('f-coverage-limit').value?Number(document.getElementById('f-coverage-limit').value):null,
+            oopMax:document.getElementById('f-oop-max').value?Number(document.getElementById('f-oop-max').value):null,
+            copay:document.getElementById('f-copay').value.trim(),
+            effectiveDate:document.getElementById('f-effective-date').value||null,
+            renewalDate:document.getElementById('f-renewal-date').value||null,
+            status:document.getElementById('f-status').value||'Active',
+            agentName:document.getElementById('f-agent-name').value.trim(),
+            agentPhone:document.getElementById('f-agent-phone').value.trim(),
+            agentEmail:document.getElementById('f-agent-email').value.trim(),
+            claimsPhone:document.getElementById('f-claims-phone').value.trim(),
+            claimsUrl:document.getElementById('f-claims-url').value.trim(),
+            vehicles:document.getElementById('f-vehicles').value.trim(),
+            liability:document.getElementById('f-liability').value.trim(),
+            roadside:document.getElementById('f-roadside').value,
+            propertyAddress:document.getElementById('f-property-address').value.trim(),
+            dwelling:document.getElementById('f-dwelling').value?Number(document.getElementById('f-dwelling').value):null,
+            personalProp:document.getElementById('f-personal-prop').value?Number(document.getElementById('f-personal-prop').value):null,
+            homeLiability:document.getElementById('f-home-liability').value?Number(document.getElementById('f-home-liability').value):null,
+            planType:document.getElementById('f-plan-type').value,
+            network:document.getElementById('f-network').value.trim(),
+            pcp:document.getElementById('f-pcp').value.trim(),
+            deathBenefit:document.getElementById('f-death-benefit').value?Number(document.getElementById('f-death-benefit').value):null,
+            policyTerm:document.getElementById('f-policy-term').value.trim(),
+            beneficiary:document.getElementById('f-beneficiary').value.trim(),
+            notes:document.getElementById('f-notes').value.trim(),
+            _ts:firebase.firestore.FieldValue.serverTimestamp()
+        };
+        // Photos
+        const photoFieldMap={card:'photoCard',card2:'photoCard2',card3:'photoCard3'};
+        for(const [k,fp] of Object.entries(formPhotos)){
+            const field=photoFieldMap[k];
+            if(fp.deleted){ data[field]=null; }
+            else if(fp.base64){
+                const ref=storage.ref(`insurance_photos/${Date.now()}_${k}`);
+                await ref.putString(fp.base64,'base64',{contentType:fp.mimeType});
+                data[field]=await ref.getDownloadURL();
+            } else if(fp.existingUrl){ data[field]=fp.existingUrl; }
+        }
+        // Email recipients
+        data.emailRecipients=formRecipients.filter(r=>r.email);
+        if(docId){ await db.collection('insurance_items').doc(docId).update(data); toast('Policy updated!','success'); }
+        else{ await db.collection('insurance_items').add(data); toast('Policy added!','success'); }
+        resetForm(); showView('policies');
+    }catch(err){ toast('Error: '+err.message,'error'); }
+    btn.disabled=false; btn.textContent=document.getElementById('edit-doc-id').value?'Update Policy':'Save Policy';
+});
+
+async function deleteItem(docId,name){
+    if(!confirm(`Move "${name}" to recycle bin?`)) return;
+    try{
+        const item=items.find(i=>i._docId===docId); if(!item) return;
+        await db.collection('recycle_bin').add({...item,site:'insurance',deletedAt:firebase.firestore.FieldValue.serverTimestamp()});
+        await db.collection('insurance_items').doc(docId).delete();
+        toast(`"${name}" moved to recycle bin`,'success');
+    }catch(err){ toast('Error: '+err.message,'error'); }
+}
+
+async function loadRecycleBin(){
+    const list=document.getElementById('recycle-bin-list');
+    list.innerHTML='<div class="empty"><div class="empty-icon">⏳</div><p>Loading...</p></div>';
+    try{
+        const snap=await db.collection('recycle_bin').where('site','==','insurance').orderBy('deletedAt','desc').get();
+        if(snap.empty){ list.innerHTML='<div class="empty"><div class="empty-icon">🗑</div><p>Recycle bin is empty</p></div>'; return; }
+        list.innerHTML=snap.docs.map(doc=>{
+            const p=doc.data();
+            return `<div style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid var(--border);">
+                <div style="flex:1;"><strong>${p.policyName||'Unknown'}</strong> <span style="color:var(--text-secondary);font-size:0.8rem;">${p.insType||''} · ${p.carrier||''}</span></div>
+                <button class="btn btn-ghost btn-sm" onclick="restoreItem('${doc.id}')">↩ Restore</button>
+                <button class="btn btn-danger btn-sm" onclick="permDelete('${doc.id}','${(p.policyName||'Policy').replace(/'/g,"\\'")}')">✕ Delete</button>
+            </div>`;
+        }).join('');
+    }catch(e){ list.innerHTML=`<div class="empty"><p style="color:var(--danger);">Error: ${e.message}</p></div>`; }
+}
+
+async function restoreItem(binDocId){
+    try{
+        const doc=await db.collection('recycle_bin').doc(binDocId).get();
+        const {site:_s,deletedAt:_d,...data}=doc.data();
+        await db.collection('insurance_items').add({...data,_ts:firebase.firestore.FieldValue.serverTimestamp()});
+        await db.collection('recycle_bin').doc(binDocId).delete();
+        toast('Policy restored!','success'); loadRecycleBin();
+    }catch(e){ toast('Error: '+e.message,'error'); }
+}
+
+async function permDelete(binDocId,name){
+    if(!confirm(`Permanently delete "${name}"? This cannot be undone.`)) return;
+    try{ await db.collection('recycle_bin').doc(binDocId).delete(); toast('Permanently deleted','success'); loadRecycleBin(); }
+    catch(e){ toast('Error: '+e.message,'error'); }
+}
+
+// ── PHOTOS ────────────────────────────────────────────────────────
+function onPhotoSelected(key,input){
+    const file=input.files[0]; if(!file) return;
+    const reader=new FileReader();
+    reader.onload=()=>{
+        const img=new Image();
+        img.onload=()=>{
+            const canvas=document.createElement('canvas');
+            const MAX=1200; let w=img.width,h=img.height;
+            if(w>MAX||h>MAX){ if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;} }
+            canvas.width=w; canvas.height=h;
+            canvas.getContext('2d').drawImage(img,0,0,w,h);
+            const b64=canvas.toDataURL('image/jpeg',0.8).split(',')[1];
+            formPhotos[key]={file,base64:b64,mimeType:'image/jpeg',existingUrl:null,deleted:false};
+            const p=document.getElementById('prev-'+key);
+            if(p) p.innerHTML=`<img src="data:image/jpeg;base64,${b64}" alt=""><button type="button" class="remove-photo" onclick="removePhoto('${key}')">✕</button>`;
+        };
+        img.src=reader.result;
+    };
+    reader.readAsDataURL(file);
+}
+function removePhoto(key){
+    formPhotos[key]={file:null,base64:null,mimeType:null,existingUrl:null,deleted:true};
+    const p=document.getElementById('prev-'+key); if(p) p.innerHTML='<span class="no-photo">📄</span><button type="button" class="remove-photo" onclick="removePhoto(\''+key+'\')">✕</button>';
+}
+
+// ── CARD VIEWER ───────────────────────────────────────────────────
+function viewCards(docId){
+    const p=items.find(i=>i._docId===docId); if(!p) return;
+    const cards=[p.photoCard,p.photoCard2,p.photoCard3].filter(Boolean);
+    if(!cards.length){ toast('No card images uploaded yet.'); return; }
+    const modal=document.getElementById('card-viewer-modal');
+    document.getElementById('card-viewer-title').textContent=`🪪 ${p.policyName||p.insType||'Insurance Card'}`;
+    document.getElementById('card-viewer-images').innerHTML=cards.map((url,i)=>`
+        <div style="margin-bottom:12px;">
+            <div style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:4px;">${['Card Front','Card Back','Declaration / EOB'][i]}</div>
+            <img src="${url}" style="width:100%;border-radius:8px;border:1px solid var(--border);" alt="Card ${i+1}">
+        </div>`).join('');
+    // Recipients for send button
+    document.getElementById('card-viewer-send').style.display=(p.emailRecipients&&p.emailRecipients.length)?'inline-flex':'none';
+    document.getElementById('card-viewer-send').onclick=()=>{ closeCardViewer(); sendCardEmail(docId); };
+    modal.classList.add('show');
+}
+function closeCardViewer(){ document.getElementById('card-viewer-modal').classList.remove('show'); }
+
+// ── EMAIL RECIPIENTS ──────────────────────────────────────────────
+function addRecipient(){
+    const name=document.getElementById('new-recipient-name').value.trim();
+    const email=document.getElementById('new-recipient-email').value.trim();
+    if(!email||!email.includes('@')){ toast('Enter a valid email address','error'); return; }
+    formRecipients.push({name:name||email,email});
+    document.getElementById('new-recipient-name').value='';
+    document.getElementById('new-recipient-email').value='';
+    renderRecipients();
+}
+function removeRecipient(idx){
+    formRecipients.splice(idx,1); renderRecipients();
+}
+function renderRecipients(){
+    const container=document.getElementById('email-recipients-list');
+    if(!container) return;
+    container.innerHTML=formRecipients.length?formRecipients.map((r,i)=>`
+        <div style="display:inline-flex;align-items:center;gap:8px;background:var(--bg-card);border:1px solid var(--border);border-radius:20px;padding:4px 12px 4px 10px;margin:0 6px 6px 0;font-size:0.83rem;">
+            <span>📧 ${r.name} &lt;${r.email}&gt;</span>
+            <button type="button" onclick="removeRecipient(${i})" style="background:none;border:none;cursor:pointer;color:var(--text-secondary);font-size:0.8rem;padding:0;line-height:1;">✕</button>
+        </div>`).join(''):'<p style="font-size:0.8rem;color:var(--text-secondary);">No recipients yet.</p>';
+}
+
+function sendCardEmail(docId){
+    const p=items.find(i=>i._docId===docId); if(!p) return;
+    const recipients=p.emailRecipients||[];
+    if(!recipients.length){ toast('No email recipients configured for this policy. Edit the policy to add them.','error'); return; }
+    const to=recipients.map(r=>r.email).join(',');
+    const subject=encodeURIComponent(`Insurance Card — ${p.policyName||p.insType||'Policy'}`);
+    const body=encodeURIComponent(
+        `Hi,\n\nPlease find your insurance card information below:\n\n`+
+        `Policy: ${p.policyName||'—'}\n`+
+        `Carrier: ${p.carrier||'—'}\n`+
+        `Policy #: ${p.policyNumber||'—'}\n`+
+        (p.groupNumber?`Group #: ${p.groupNumber}\n`:'')+
+        `Insured: ${p.insuredPrimary||'—'}\n`+
+        (p.insuredOthers?`Also Covered: ${p.insuredOthers}\n`:'')+
+        (p.effectiveDate?`Effective: ${fmtDate(p.effectiveDate)}\n`:'')+
+        (p.renewalDate?`Renewal: ${fmtDate(p.renewalDate)}\n`:'')+
+        (p.copay?`Copay / Coinsurance: ${p.copay}\n`:'')+
+        (p.deductible?`Deductible: ${fmtMoney(p.deductible)}\n`:'')+
+        (p.oopMax?`OOP Max: ${fmtMoney(p.oopMax)}\n`:'')+
+        (p.planType?`Plan Type: ${p.planType}\n`:'')+
+        (p.network?`Network: ${p.network}\n`:'')+
+        (p.pcp?`Primary Care: ${p.pcp}\n`:'')+
+        (p.claimsPhone?`\nClaims Line: ${p.claimsPhone}\n`:'')+
+        (p.agentName?`Agent: ${p.agentName}${p.agentPhone?' · '+p.agentPhone:''}\n`:'')+
+        `\n(Card images are stored in Farmboss Insurance)\n\nFarmboss Insurance Tracker`
+    );
+    window.open(`mailto:${to}?subject=${subject}&body=${body}`,'_blank');
+    toast(`Email drafted for ${recipients.length} recipient${recipients.length>1?'s':''}!`,'success');
+}
+
+// ── DATALISTS & FILTERS ───────────────────────────────────────────
+function populateDataLists(){
+    const set=(id,vals)=>{ const dl=document.getElementById(id); if(dl) dl.innerHTML=vals.map(v=>`<option value="${v}">`).join(''); };
+    set('carrier-list',[...new Set(items.map(i=>i.carrier).filter(Boolean))].sort());
+    set('agent-list',[...new Set(items.map(i=>i.agentName).filter(Boolean))].sort());
+}
+function syncTypeFilter(){
+    const types=[...new Set(items.map(i=>i.insType).filter(Boolean))].sort();
+    const sel=document.getElementById('pol-filter-type'); if(!sel) return;
+    const cur=sel.value;
+    sel.innerHTML='<option value="">All Types</option>'+types.map(t=>`<option value="${t}">${TYPE_ICON[t]||''} ${t}</option>`).join('');
+    if(cur) sel.value=cur;
+}
+
+// ── TOAST ─────────────────────────────────────────────────────────
+function toast(msg,type=''){
+    const t=document.getElementById('toast'); t.textContent=msg;
+    t.className='toast'+(type?' '+type:''); t.classList.add('show');
+    setTimeout(()=>t.classList.remove('show'),3000);
+}
+</script>
+</body>
+</html>

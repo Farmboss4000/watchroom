@@ -714,6 +714,99 @@
             color: var(--accent);
         }
 
+        /* ── ONE LINERS SECTION ── */
+        .oneliners-section {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 28px;
+            margin-top: 8px;
+        }
+        .oneliners-add-row {
+            display: grid;
+            grid-template-columns: 1fr 200px auto;
+            gap: 12px;
+            align-items: flex-end;
+            margin-bottom: 28px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border);
+        }
+        @media (max-width: 700px) { .oneliners-add-row { grid-template-columns: 1fr; } }
+        .oneliners-add-row input {
+            width: 100%; padding: 10px 13px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.88rem;
+            font-family: inherit;
+        }
+        .oneliners-add-row input:focus { outline: none; border-color: #f59e0b; }
+        .oneliners-add-row label { display: block; font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.5px; color: var(--text-secondary); margin-bottom: 5px; }
+        .oneliners-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 12px;
+        }
+        @media (max-width: 680px) { .oneliners-list { grid-template-columns: 1fr; } }
+        .oneliner-item {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            border-left: 4px solid #f59e0b;
+            border-radius: 10px;
+            padding: 14px 14px 10px;
+            transition: background 0.15s;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .oneliner-item:hover { background: rgba(255,255,255,0.08); }
+        .oneliner-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .oneliner-num {
+            font-size: 0.68rem;
+            color: #f59e0b;
+            font-weight: 700;
+            letter-spacing: 0.6px;
+            text-transform: uppercase;
+        }
+        .oneliner-del {
+            background: none; border: none; color: #475569;
+            cursor: pointer; font-size: 1rem; padding: 0 2px;
+            transition: color 0.15s; line-height: 1;
+        }
+        .oneliner-del:hover { color: #f87171; }
+        .oneliner-text {
+            color: var(--text-primary);
+            font-size: 0.93rem;
+            line-height: 1.5;
+            font-weight: 500;
+        }
+        .oneliner-source {
+            font-size: 0.78rem;
+            color: #f59e0b;
+            font-weight: 600;
+        }
+        .oneliners-empty {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            text-align: center;
+            padding: 32px 0;
+            grid-column: 1 / -1;
+        }
+        .oneliners-count-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+        .oneliners-count-label { font-size: 0.82rem; color: var(--text-secondary); }
+        .oneliners-count-num { font-size: 1.1rem; font-weight: 800; color: #f59e0b; }
+
         /* ── TOAST ── */
         #toast {
             position: fixed;
@@ -1048,6 +1141,36 @@
 
         </div>
 
+        <!-- FAMOUS ONE LINERS SECTION -->
+        <div class="section-title" style="margin-top:32px;">⚡ Famous One Liners</div>
+        <div class="oneliners-section">
+
+            <!-- Add One Liner Row -->
+            <div class="oneliners-add-row">
+                <div>
+                    <label for="ol-text">One Liner</label>
+                    <input type="text" id="ol-text" placeholder="Enter a famous one liner...">
+                </div>
+                <div>
+                    <label for="ol-source">Source / Attribution</label>
+                    <input type="text" id="ol-source" placeholder="— Attributed to...">
+                </div>
+                <button class="form-btn" style="white-space:nowrap;background:#f59e0b;color:#1a1a2e;" onclick="addOneLiner()">⚡ Add One Liner</button>
+            </div>
+
+            <!-- Count bar -->
+            <div class="oneliners-count-bar">
+                <span class="oneliners-count-label">All one liners &nbsp;<span class="oneliners-count-num" id="oneliners-count"></span></span>
+                <button onclick="shuffleOneLiners()" style="background:none;border:1px solid rgba(255,255,255,0.15);color:var(--text-secondary);padding:4px 12px;border-radius:6px;font-size:0.78rem;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='var(--text-secondary)'">🔀 Shuffle</button>
+            </div>
+
+            <!-- One Liner Cards Grid -->
+            <div class="oneliners-list" id="oneliners-list">
+                <div class="oneliners-empty">No one liners yet. Add one above!</div>
+            </div>
+
+        </div>
+
     </div><!-- /main-content -->
 
     <!-- FOOTER -->
@@ -1126,6 +1249,7 @@
         initClock();
         fetchWeather();
         initQuotes();
+        initOneLiners();
     }
 
     // ── LIVE COUNTS ──
@@ -1414,6 +1538,95 @@
             btn.disabled = false; btn.textContent = '🔍 Remove Duplicates';
         }
     }
+
+    // ── ONE LINERS ──
+    let oneLiners = [], unsubOneLiners = null, olShuffled = false;
+
+    function initOneLiners() {
+        const list = document.getElementById('oneliners-list');
+        if (list) list.innerHTML = '<div class="oneliners-empty">Loading one liners…</div>';
+
+        db.collection('one_liners').get().then(snap => {
+            oneLiners = snap.docs.map(doc => ({ _docId: doc.id, ...doc.data() }))
+                .sort((a, b) => { const ms = v => (v && typeof v.toMillis==='function') ? v.toMillis() : 0; return ms(a.addedAt) - ms(b.addedAt); });
+            renderOneLiners();
+        }).catch(err => {
+            if (list) list.innerHTML = `<div class="oneliners-empty" style="color:#f87171;">⚠️ Could not load: ${err.message}</div>`;
+        });
+
+        if (unsubOneLiners) unsubOneLiners();
+        unsubOneLiners = db.collection('one_liners').onSnapshot(snap => {
+            oneLiners = snap.docs.map(doc => ({ _docId: doc.id, ...doc.data() }))
+                .sort((a, b) => { const ms = v => (v && typeof v.toMillis==='function') ? v.toMillis() : 0; return ms(a.addedAt) - ms(b.addedAt); });
+            olShuffled = false;
+            renderOneLiners();
+        }, err => {
+            const el = document.getElementById('oneliners-list');
+            if (el && !oneLiners.length) el.innerHTML = `<div class="oneliners-empty" style="color:#f87171;">⚠️ Live updates unavailable: ${err.message}</div>`;
+        });
+    }
+
+    function renderOneLiners() {
+        const list = document.getElementById('oneliners-list');
+        const countEl = document.getElementById('oneliners-count');
+        if (!list) return;
+        countEl.textContent = oneLiners.length ? `${oneLiners.length} one liners` : '';
+        if (!oneLiners.length) {
+            list.innerHTML = '<div class="oneliners-empty">No one liners yet. Add one above!</div>';
+            return;
+        }
+        list.innerHTML = oneLiners.map((ol, i) => `
+            <div class="oneliner-item">
+                <div class="oneliner-header">
+                    <span class="oneliner-num">⚡ ${i + 1}</span>
+                    <button class="oneliner-del" onclick="deleteOneLiner('${ol._docId}')" title="Delete">🗑</button>
+                </div>
+                <div class="oneliner-text">${escHtml(ol.text || '')}</div>
+                ${ol.source ? `<div class="oneliner-source">— ${escHtml(ol.source)}</div>` : ''}
+            </div>`).join('');
+    }
+
+    async function addOneLiner() {
+        const text   = document.getElementById('ol-text').value.trim();
+        const source = document.getElementById('ol-source').value.trim();
+        if (!text) { showToast('Please enter a one liner.', true); return; }
+        try {
+            await db.collection('one_liners').add({ text, source, addedAt: firebase.firestore.FieldValue.serverTimestamp() });
+            document.getElementById('ol-text').value   = '';
+            document.getElementById('ol-source').value = '';
+            showToast('One liner added! ⚡');
+        } catch(e) {
+            showToast('Error adding one liner.', true);
+        }
+    }
+
+    async function deleteOneLiner(docId) {
+        try {
+            await db.collection('one_liners').doc(docId).delete();
+            showToast('One liner deleted.');
+        } catch(e) {
+            showToast('Error deleting one liner.', true);
+        }
+    }
+
+    function shuffleOneLiners() {
+        // Fisher-Yates shuffle
+        const arr = [...oneLiners];
+        for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        oneLiners = arr;
+        olShuffled = true;
+        renderOneLiners();
+        showToast('One liners shuffled! 🔀');
+    }
+
+    // Allow Enter key to submit one liner
+    document.addEventListener('DOMContentLoaded', () => {
+        const input = document.getElementById('ol-text');
+        if (input) input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addOneLiner(); } });
+    });
 
     function escHtml(str) {
         return String(str)

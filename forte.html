@@ -1,0 +1,1332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FORTÉ — Intelligence &amp; Reporting</title>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0;}
+        :root{
+            --bg:#faf9f6;--bg2:#ffffff;--bg3:#f2ede6;
+            --navy:#0c1824;--navy2:#152130;--navy3:#1d3045;
+            --gold:#c9963a;--gold2:#b8860b;--gold-dim:rgba(201,150,58,0.12);
+            --text:#0c1824;--text2:#4a5568;--text3:#8a9ab0;
+            --border:#ddd5c8;--border2:#e8e2d8;
+            --success:#16a34a;--danger:#dc2626;--warn:#d97706;
+            --radius:10px;--shadow:0 2px 12px rgba(12,24,36,0.08);
+        }
+        body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;}
+
+        /* ── SITE SWITCHER ── */
+        .site-switcher{background:#111827;display:flex;align-items:center;padding:5px 18px;gap:4px;font-size:0.77rem;overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap;scrollbar-width:none;}
+        .site-switcher::-webkit-scrollbar{display:none;}
+        .site-link{text-decoration:none;color:#9ca3af;padding:4px 12px;border-radius:4px;display:flex;align-items:center;gap:5px;font-weight:500;transition:all 0.15s;white-space:nowrap;}
+        .site-link:hover{background:rgba(255,255,255,0.1);color:#e5e7eb;}
+        .site-link.active{background:rgba(201,150,58,0.2);color:#c9963a;font-weight:700;}
+
+        /* ── LOGIN ── */
+        #login-screen{position:fixed;inset:0;background:linear-gradient(135deg,var(--navy) 0%,var(--navy2) 60%,#1a2d40 100%);display:flex;align-items:center;justify-content:center;z-index:9000;flex-direction:column;gap:14px;}
+        .login-site-links{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;}
+        .login-site-links a{color:rgba(255,255,255,0.45);font-size:0.77rem;text-decoration:none;padding:4px 12px;border:1px solid rgba(255,255,255,0.15);border-radius:4px;transition:all 0.15s;}
+        .login-site-links a:hover{color:#fff;border-color:rgba(255,255,255,0.4);}
+        .login-site-links a.active{color:var(--gold);border-color:var(--gold);}
+        .login-box{background:#fff;border-radius:16px;padding:44px 40px;width:100%;max-width:400px;box-shadow:0 32px 80px rgba(0,0,0,0.45);}
+        .login-logo{width:60px;height:60px;background:linear-gradient(135deg,var(--navy) 0%,var(--navy3) 100%);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:900;color:var(--gold);margin:0 auto 16px;letter-spacing:-1px;font-family:Georgia,serif;}
+        .login-box h2{text-align:center;font-size:1.5rem;font-weight:800;color:var(--navy);margin-bottom:4px;letter-spacing:-0.5px;}
+        .login-sub{text-align:center;font-size:0.83rem;color:var(--text2);margin-bottom:28px;}
+        .login-error{color:var(--danger);font-size:0.82rem;margin-bottom:12px;min-height:18px;text-align:center;}
+        /* ── LOADING ── */
+        #loading-screen{display:none;position:fixed;inset:0;background:var(--bg);flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:8000;}
+        .spinner{width:44px;height:44px;border:3px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin 0.8s linear infinite;}
+        @keyframes spin{to{transform:rotate(360deg);}}
+        /* ── APP ── */
+        #app{display:none;min-height:100vh;flex-direction:column;}
+        header{background:var(--navy);padding:0 24px;display:flex;align-items:center;gap:16px;min-height:58px;position:sticky;top:0;z-index:100;box-shadow:0 2px 16px rgba(0,0,0,0.35);flex-wrap:wrap;}
+        .logo-area{display:flex;align-items:center;gap:12px;flex-shrink:0;}
+        .logo-mark{width:34px;height:34px;background:linear-gradient(135deg,var(--gold) 0%,var(--gold2) 100%);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1rem;font-weight:900;color:var(--navy);font-family:Georgia,serif;letter-spacing:-1px;}
+        header h1{font-size:1.15rem;font-weight:800;color:#fff;letter-spacing:1px;font-family:Georgia,serif;}
+        header h1 span{color:var(--gold);}
+        nav{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;flex-shrink:0;}
+        nav::-webkit-scrollbar{display:none;}
+        nav button{background:transparent;border:none;color:#8a9ab0;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:0.83rem;font-weight:500;transition:all 0.15s;white-space:nowrap;}
+        nav button:hover{background:rgba(201,150,58,0.15);color:#fff;}
+        nav button.active{background:var(--gold);color:var(--navy);font-weight:700;}
+        .header-right{display:flex;align-items:center;gap:10px;margin-left:auto;}
+        .user-badge{font-size:0.77rem;color:#8a9ab0;background:rgba(255,255,255,0.07);padding:4px 10px;border-radius:5px;}
+        .btn-signout{background:transparent;border:1px solid rgba(255,255,255,0.15);color:#8a9ab0;padding:5px 12px;border-radius:5px;cursor:pointer;font-size:0.77rem;transition:all 0.15s;}
+        .btn-signout:hover{border-color:var(--danger);color:var(--danger);}
+        /* ── HERO ── */
+        .forte-hero{background:linear-gradient(135deg,var(--navy) 0%,var(--navy2) 55%,#1a2d40 100%);border-radius:14px;padding:32px 36px;margin-bottom:24px;position:relative;overflow:hidden;}
+        .forte-hero::before{content:'';position:absolute;top:-30px;right:-30px;width:220px;height:220px;background:radial-gradient(circle,rgba(201,150,58,0.18) 0%,transparent 70%);pointer-events:none;}
+        .forte-hero::after{content:'';position:absolute;bottom:-40px;left:-20px;width:180px;height:180px;background:radial-gradient(circle,rgba(29,48,69,0.8) 0%,transparent 70%);pointer-events:none;}
+        .forte-hero-inner{position:relative;z-index:1;}
+        .forte-eyebrow{font-size:0.72rem;font-weight:700;letter-spacing:2px;color:var(--gold);text-transform:uppercase;margin-bottom:8px;}
+        .forte-hero-title{font-size:2rem;font-weight:900;color:#fff;font-family:Georgia,serif;letter-spacing:-0.5px;line-height:1.1;margin-bottom:8px;}
+        .forte-hero-sub{font-size:0.9rem;color:rgba(255,255,255,0.6);max-width:520px;line-height:1.5;}
+        .forte-hero-stats{display:flex;gap:36px;margin-top:24px;flex-wrap:wrap;}
+        .forte-stat{text-align:left;}
+        .forte-stat-val{font-size:1.8rem;font-weight:800;color:#fff;line-height:1;}
+        .forte-stat-lbl{font-size:0.7rem;font-weight:600;color:rgba(255,255,255,0.45);text-transform:uppercase;letter-spacing:0.6px;margin-top:3px;}
+        /* ── MAIN ── */
+        main{padding:22px 24px;max-width:1440px;margin:0 auto;flex:1;width:100%;}
+        .view{display:none;}.view.active{display:block;}
+        /* ── UTILITY ── */
+        .card{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);padding:24px;margin-bottom:20px;box-shadow:var(--shadow);}
+        .card-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;gap:10px;flex-wrap:wrap;}
+        .card-hdr-title{font-size:0.95rem;font-weight:700;color:var(--navy);display:flex;align-items:center;gap:8px;}
+        .card-hdr-title .tag{font-size:0.7rem;font-weight:700;background:var(--gold-dim);color:var(--gold2);border:1px solid rgba(201,150,58,0.25);padding:2px 8px;border-radius:4px;letter-spacing:0.5px;text-transform:uppercase;}
+        /* ── BUTTONS ── */
+        .btn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:7px;font-size:0.85rem;font-weight:600;cursor:pointer;border:none;transition:all 0.15s;font-family:inherit;}
+        .btn-gold{background:var(--gold);color:var(--navy);}.btn-gold:hover{background:var(--gold2);transform:translateY(-1px);box-shadow:0 4px 12px rgba(201,150,58,0.3);}
+        .btn-navy{background:var(--navy);color:#fff;}.btn-navy:hover{background:var(--navy3);}
+        .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text);}.btn-ghost:hover{background:var(--bg3);}
+        .btn-danger{background:var(--danger);color:#fff;}.btn-danger:hover{opacity:0.85;}
+        .btn-sm{padding:5px 12px;font-size:0.78rem;}
+        .btn:disabled{opacity:0.55;cursor:not-allowed;transform:none !important;}
+        /* ── FORMS ── */
+        .fg{margin-bottom:14px;}
+        .fg label{display:block;font-size:0.78rem;font-weight:700;color:var(--text2);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px;}
+        .fg input,.fg select,.fg textarea{width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:7px;font-size:0.9rem;font-family:inherit;color:var(--text);background:#fff;transition:border-color 0.15s;}
+        .fg input:focus,.fg select:focus,.fg textarea:focus{outline:none;border-color:var(--gold);}
+        .fg textarea{resize:vertical;min-height:90px;line-height:1.5;}
+        .fgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+        .fgrid .fg.s2{grid-column:span 2;}
+        .fgrid .fg.s3{grid-column:1/-1;}
+        .fdiv{font-size:0.78rem;font-weight:700;color:var(--gold2);text-transform:uppercase;letter-spacing:0.7px;margin:20px 0 12px;padding-bottom:7px;border-bottom:2px solid var(--gold-dim);grid-column:1/-1;display:flex;align-items:center;gap:8px;}
+        .fdiv::before{content:'';width:3px;height:14px;background:var(--gold);border-radius:2px;}
+        /* ── TOOLBAR ── */
+        .toolbar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;}
+        .toolbar input[type="text"]{flex:1;min-width:180px;padding:8px 12px;border:1.5px solid var(--border);border-radius:7px;font-size:0.87rem;font-family:inherit;color:var(--text);background:#fff;}
+        .toolbar input:focus{outline:none;border-color:var(--gold);}
+        .toolbar select{padding:8px 12px;border:1.5px solid var(--border);border-radius:7px;font-size:0.87rem;font-family:inherit;background:#fff;color:var(--text);cursor:pointer;}
+        /* ── STATS ── */
+        .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:22px;}
+        .stat-card{background:#fff;border:1px solid var(--border2);border-radius:var(--radius);padding:18px;text-align:center;box-shadow:var(--shadow);}
+        .stat-val{font-size:2rem;font-weight:800;color:var(--gold);line-height:1;margin-bottom:4px;}
+        .stat-lbl{font-size:0.74rem;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;}
+        /* ── RESEARCH CARDS ── */
+        .research-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
+        .research-card{background:#fff;border:1px solid var(--border2);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow);transition:box-shadow 0.15s,transform 0.12s;position:relative;}
+        .research-card:hover{box-shadow:0 6px 24px rgba(12,24,36,0.1);transform:translateY(-2px);}
+        .rc-cat{display:inline-block;padding:2px 9px;border-radius:4px;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;}
+        .rc-title{font-size:0.95rem;font-weight:700;color:var(--navy);margin-bottom:6px;line-height:1.3;}
+        .rc-content{font-size:0.83rem;color:var(--text2);line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;}
+        .rc-meta{font-size:0.74rem;color:var(--text3);margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+        .rc-actions{display:flex;gap:6px;margin-top:12px;}
+        .tag-pill{display:inline-block;padding:2px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;font-size:0.7rem;color:var(--text2);}
+        /* ── REPORT BUILDER ── */
+        .builder-steps{display:flex;gap:0;margin-bottom:28px;overflow-x:auto;scrollbar-width:none;}
+        .builder-steps::-webkit-scrollbar{display:none;}
+        .bstep{display:flex;align-items:center;gap:0;flex-shrink:0;}
+        .bstep-num{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.8rem;font-weight:700;background:var(--bg3);color:var(--text3);border:2px solid var(--border);transition:all 0.2s;flex-shrink:0;}
+        .bstep-lbl{font-size:0.78rem;font-weight:600;color:var(--text3);margin-left:8px;white-space:nowrap;transition:color 0.2s;}
+        .bstep-connector{width:28px;height:2px;background:var(--border);margin:0 4px;flex-shrink:0;}
+        .bstep.active .bstep-num{background:var(--gold);color:var(--navy);border-color:var(--gold);}
+        .bstep.active .bstep-lbl{color:var(--navy);font-weight:700;}
+        .bstep.done .bstep-num{background:var(--navy);color:#fff;border-color:var(--navy);}
+        .bstep.done .bstep-lbl{color:var(--text2);}
+        .step-pane{display:none;}.step-pane.active{display:block;}
+        /* Report type cards */
+        .rtype-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-top:6px;}
+        .rtype-card{border:2px solid var(--border);border-radius:var(--radius);padding:16px;cursor:pointer;transition:all 0.15s;background:#fff;}
+        .rtype-card:hover{border-color:var(--gold);background:var(--gold-dim);}
+        .rtype-card.selected{border-color:var(--gold);background:var(--gold-dim);box-shadow:0 0 0 3px rgba(201,150,58,0.15);}
+        .rtype-icon{font-size:1.6rem;margin-bottom:8px;}
+        .rtype-name{font-size:0.88rem;font-weight:700;color:var(--navy);margin-bottom:4px;}
+        .rtype-desc{font-size:0.75rem;color:var(--text2);line-height:1.4;}
+        /* Research selector */
+        .research-check-item{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1.5px solid var(--border);border-radius:7px;margin-bottom:8px;cursor:pointer;transition:all 0.13s;background:#fff;}
+        .research-check-item:hover{border-color:var(--gold);background:var(--gold-dim);}
+        .research-check-item.selected{border-color:var(--gold);background:var(--gold-dim);}
+        .research-check-item input[type="checkbox"]{margin-top:2px;accent-color:var(--gold);width:16px;height:16px;flex-shrink:0;}
+        /* Stream area */
+        .stream-area{background:var(--navy);border-radius:12px;padding:28px 32px;min-height:300px;font-family:Georgia,'Times New Roman',serif;font-size:1rem;line-height:1.75;color:#e8e0d0;position:relative;overflow:hidden;}
+        .stream-area .cursor{display:inline-block;width:2px;height:1.1em;background:var(--gold);animation:blink 0.7s steps(1) infinite;vertical-align:text-bottom;margin-left:1px;}
+        @keyframes blink{0%,100%{opacity:1;}50%{opacity:0;}}
+        .stream-placeholder{text-align:center;padding:60px 20px;color:rgba(255,255,255,0.3);}
+        .stream-placeholder-icon{font-size:3rem;margin-bottom:12px;}
+        /* ── REPORT LIBRARY ── */
+        .report-item{background:#fff;border:1px solid var(--border2);border-radius:var(--radius);padding:20px;margin-bottom:14px;box-shadow:var(--shadow);transition:box-shadow 0.15s;}
+        .report-item:hover{box-shadow:0 4px 20px rgba(12,24,36,0.1);}
+        .report-item-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+        .report-item-title{font-size:1rem;font-weight:700;color:var(--navy);}
+        .report-item-meta{font-size:0.78rem;color:var(--text3);margin-top:4px;}
+        .report-item-preview{font-size:0.85rem;color:var(--text2);margin-top:10px;line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+        .report-item-actions{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap;}
+        .report-type-badge{display:inline-block;padding:3px 10px;border-radius:5px;font-size:0.71rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;background:var(--navy);color:var(--gold);}
+        /* Report full view modal */
+        .modal-overlay{position:fixed;inset:0;background:rgba(12,24,36,0.6);display:flex;align-items:flex-start;justify-content:center;z-index:1000;opacity:0;pointer-events:none;transition:opacity 0.2s;padding:20px;overflow-y:auto;}
+        .modal-overlay.show{opacity:1;pointer-events:all;}
+        .modal{background:#fff;border-radius:14px;width:100%;max-width:860px;margin:auto;transform:scale(0.96);transition:transform 0.2s;}
+        .modal-overlay.show .modal{transform:scale(1);}
+        .modal-hdr{padding:24px 28px 16px;border-bottom:1px solid var(--border2);display:flex;align-items:flex-start;justify-content:space-between;gap:12px;}
+        .modal-hdr-title{font-size:1.15rem;font-weight:800;color:var(--navy);}
+        .modal-body{padding:28px;max-height:75vh;overflow-y:auto;}
+        .report-full-text{font-family:Georgia,serif;font-size:1rem;line-height:1.8;color:var(--text);white-space:pre-wrap;}
+        .modal-footer{padding:16px 28px;border-top:1px solid var(--border2);display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;}
+        /* ── PROFILE ── */
+        .profile-section{background:#fff;border:1px solid var(--border2);border-radius:var(--radius);padding:24px;margin-bottom:18px;box-shadow:var(--shadow);}
+        .profile-section-title{font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:var(--gold2);display:flex;align-items:center;gap:7px;margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid var(--gold-dim);}
+        .profile-section-title::before{content:'';width:3px;height:14px;background:var(--gold);border-radius:2px;}
+        /* Team member row */
+        .team-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border2);flex-wrap:wrap;}
+        .team-row:last-child{border-bottom:none;}
+        .team-avatar{width:36px;height:36px;border-radius:50%;background:var(--navy);color:var(--gold);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;flex-shrink:0;}
+        /* ── CAT COLORS ── */
+        .cat-market{background:#dbeafe;color:#1d4ed8;}
+        .cat-competitive{background:#f3e8ff;color:#6d28d9;}
+        .cat-financial{background:#dcfce7;color:#15803d;}
+        .cat-customer{background:#fef3c7;color:#92400e;}
+        .cat-internal{background:#f1f5f9;color:#475569;}
+        .cat-news{background:#ffe4e6;color:#be123c;}
+        .cat-regulatory{background:#fce7f3;color:#9d174d;}
+        .cat-technical{background:#ecfdf5;color:#065f46;}
+        .cat-other{background:#f5f3ef;color:var(--text2);}
+        /* ── TOAST ── */
+        .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--navy);color:#fff;padding:10px 20px;border-radius:8px;font-size:0.87rem;font-weight:500;opacity:0;transition:all 0.3s;z-index:9999;pointer-events:none;white-space:nowrap;max-width:90vw;}
+        .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+        .toast.ok{background:var(--success);}.toast.err{background:var(--danger);}
+        /* ── TABLE ── */
+        .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+        table{width:100%;border-collapse:collapse;font-size:0.85rem;}
+        thead th{background:var(--bg3);padding:10px 12px;text-align:left;font-size:0.73rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text2);border-bottom:2px solid var(--border);white-space:nowrap;}
+        tbody tr{border-bottom:1px solid var(--border2);transition:background 0.1s;}
+        tbody tr:hover{background:var(--gold-dim);}
+        tbody td{padding:10px 12px;vertical-align:middle;}
+        .empty{text-align:center;padding:48px 20px;color:var(--text3);}
+        .empty-icon{font-size:2.8rem;margin-bottom:12px;}
+        /* ── RESPONSIVE ── */
+        @media(max-width:760px){
+            header{flex-wrap:wrap;padding:10px 14px;gap:6px;}
+            .logo-area{flex:1;}
+            .header-right{flex-shrink:0;margin-left:auto;}
+            .user-badge{display:none;}
+            nav{order:3;width:100%;overflow-x:auto;scrollbar-width:none;padding:4px 0;border-top:1px solid rgba(255,255,255,0.08);}
+            nav button{padding:6px 10px;font-size:0.77rem;}
+            main{padding:12px 14px;}
+            .forte-hero{padding:22px 20px;}
+            .forte-hero-title{font-size:1.5rem;}
+            .forte-hero-stats{gap:20px;}
+            .fgrid{grid-template-columns:1fr 1fr;gap:12px;}
+            .fgrid .fg.s2{grid-column:span 1;}
+            .research-grid{grid-template-columns:1fr;}
+            .rtype-grid{grid-template-columns:repeat(2,1fr);}
+            .stream-area{padding:18px 16px;}
+            .modal{margin:0;border-radius:12px;}
+            .modal-body{padding:18px;}
+            .modal-hdr{padding:18px 18px 12px;}
+            .modal-footer{padding:12px 18px;}
+            input[type="text"],input[type="email"],input[type="number"],input[type="date"],input[type="tel"],select,textarea{font-size:16px;}
+        }
+        @media(max-width:600px){
+            .site-switcher{padding:4px 8px;gap:2px;}
+            .site-link{padding:5px 8px;font-size:0.72rem;}
+        }
+        @media(max-width:480px){
+            main{padding:10px;}
+            .fgrid{grid-template-columns:1fr;}
+            .fgrid .fg.s2,.fgrid .fg.s3{grid-column:1;}
+            .rtype-grid{grid-template-columns:1fr;}
+            .builder-steps{gap:0;}
+            .bstep-lbl{display:none;}
+            .stats-row{grid-template-columns:1fr 1fr;}
+        }
+        @media(max-width:360px){.stats-row{grid-template-columns:1fr;}}
+        @media print{
+            .site-switcher,header,nav,.modal-footer,.btn,.toast{display:none!important;}
+            .report-full-text{font-size:11pt;line-height:1.6;}
+            body{background:#fff;}
+        }
+    </style>
+</head>
+<body>
+
+<div class="site-switcher">
+    <a href="index.html" class="site-link">🏠 Headquarters</a>
+    <a href="armory.html" class="site-link">🔫 Armory</a>
+    <a href="machinery.html" class="site-link">🚜 Machinery</a>
+    <a href="automotive.html" class="site-link">🚗 Automotive</a>
+    <a href="livestock.html" class="site-link">🐄 Livestock</a>
+    <a href="timepieces.html" class="site-link">⌚ Timepieces</a>
+    <a href="knives.html" class="site-link">🔪 Knives</a>
+    <a href="pharmacy.html" class="site-link">💊 Pharmacy</a>
+    <a href="insurance.html" class="site-link">🛡 Insurance</a>
+    <a href="realestate.html" class="site-link">🏡 Real Estate</a>
+    <a href="forte.html" class="site-link active">✦ FORTÉ</a>
+    <a href="agents.html" class="site-link">🤖 Agents</a>
+</div>
+
+<!-- LOGIN -->
+<div id="login-screen">
+    <div class="login-site-links">
+        <a href="index.html">🏠 HQ</a><a href="armory.html">🔫 Armory</a>
+        <a href="machinery.html">🚜 Machinery</a><a href="automotive.html">🚗 Automotive</a>
+        <a href="livestock.html">🐄 Livestock</a><a href="timepieces.html">⌚ Timepieces</a>
+        <a href="knives.html">🔪 Knives</a><a href="pharmacy.html">💊 Pharmacy</a>
+        <a href="insurance.html">🛡 Insurance</a><a href="realestate.html">🏡 Real Estate</a>
+        <a href="forte.html" class="active">✦ FORTÉ</a><a href="agents.html">🤖 Agents</a>
+    </div>
+    <div class="login-box">
+        <div class="login-logo">F</div>
+        <h2>FORTÉ</h2>
+        <p class="login-sub">Company Intelligence &amp; Report Engine</p>
+        <div class="login-error" id="login-error"></div>
+        <form id="login-form">
+            <div class="fg"><label>Email</label><input type="email" id="login-email" placeholder="you@example.com" required autocomplete="username"></div>
+            <div class="fg"><label>Password</label><input type="password" id="login-password" placeholder="••••••••" required autocomplete="current-password"></div>
+            <button type="submit" class="btn btn-navy" style="width:100%;justify-content:center;" id="login-btn">Sign In</button>
+        </form>
+    </div>
+</div>
+
+<div id="loading-screen"><div class="spinner"></div><p style="color:var(--text2);font-size:0.9rem;">Loading FORTÉ…</p></div>
+
+<div id="app" style="display:flex;">
+<div style="display:flex;flex-direction:column;min-height:100vh;flex:1;">
+<header>
+    <div class="logo-area">
+        <div class="logo-mark">F</div>
+        <h1>FOR<span>TÉ</span></h1>
+    </div>
+    <nav>
+        <button class="active" onclick="showView('dashboard')">Dashboard</button>
+        <button onclick="showView('profile')">Company Profile</button>
+        <button onclick="showView('research')">Research</button>
+        <button onclick="showView('builder')">Build Report</button>
+        <button onclick="showView('library')">Report Library</button>
+        <button onclick="showView('settings')">Settings</button>
+    </nav>
+    <div class="header-right">
+        <div class="user-badge" id="user-email-hdr"></div>
+        <button class="btn-signout" onclick="doSignOut()">Sign Out</button>
+    </div>
+</header>
+<main>
+
+<!-- ════════════════════════════════════
+     DASHBOARD
+════════════════════════════════════ -->
+<div class="view active" id="view-dashboard">
+    <div class="forte-hero">
+        <div class="forte-hero-inner">
+            <div class="forte-eyebrow">Intelligence Platform</div>
+            <div class="forte-hero-title" id="hero-company-name">FORTÉ</div>
+            <div class="forte-hero-sub" id="hero-tagline">Your company intelligence &amp; report generation engine.</div>
+            <div class="forte-hero-stats">
+                <div class="forte-stat"><div class="forte-stat-val" id="hs-reports">—</div><div class="forte-stat-lbl">Reports</div></div>
+                <div class="forte-stat"><div class="forte-stat-val" id="hs-research">—</div><div class="forte-stat-lbl">Research Items</div></div>
+                <div class="forte-stat"><div class="forte-stat-val" id="hs-team">—</div><div class="forte-stat-lbl">Team Members</div></div>
+                <div class="forte-stat"><div class="forte-stat-val" id="hs-this-month">—</div><div class="forte-stat-lbl">Reports This Month</div></div>
+            </div>
+        </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:20px;" class="dash-cols">
+        <div>
+            <div class="card">
+                <div class="card-hdr">
+                    <div class="card-hdr-title">📄 Recent Reports <span class="tag">Latest 5</span></div>
+                    <button class="btn btn-ghost btn-sm" onclick="showView('library')">View All</button>
+                </div>
+                <div id="dash-recent-reports"><div class="empty"><div class="empty-icon">📄</div>No reports yet.</div></div>
+            </div>
+        </div>
+        <div>
+            <div class="card" style="margin-bottom:18px;">
+                <div class="card-hdr">
+                    <div class="card-hdr-title">🏢 Company Snapshot</div>
+                    <button class="btn btn-ghost btn-sm" onclick="showView('profile')">Edit</button>
+                </div>
+                <div id="dash-profile-snap"><div style="color:var(--text3);font-size:0.85rem;">No profile set up yet.</div></div>
+            </div>
+            <div class="card">
+                <div class="card-hdr">
+                    <div class="card-hdr-title">🔬 Research by Category</div>
+                </div>
+                <div id="dash-research-cats"><div style="color:var(--text3);font-size:0.85rem;">No research yet.</div></div>
+            </div>
+            <div class="card" style="margin-top:18px;">
+                <div class="card-hdr"><div class="card-hdr-title">⚡ Quick Actions</div></div>
+                <div style="display:flex;flex-direction:column;gap:8px;">
+                    <button class="btn btn-gold" style="width:100%;justify-content:center;" onclick="showView('builder')">✦ Build a Report</button>
+                    <button class="btn btn-navy" style="width:100%;justify-content:center;" onclick="showView('research');setTimeout(()=>document.getElementById('add-research-btn').click(),100)">＋ Add Research</button>
+                    <button class="btn btn-ghost" style="width:100%;justify-content:center;" onclick="showView('profile')">✏️ Edit Company Profile</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════
+     COMPANY PROFILE
+════════════════════════════════════ -->
+<div class="view" id="view-profile">
+    <div class="card">
+        <div class="card-hdr">
+            <div class="card-hdr-title">🏢 Company Profile <span class="tag">Used in Reports</span></div>
+            <button class="btn btn-gold btn-sm" id="save-profile-btn" onclick="saveProfile()">Save Profile</button>
+        </div>
+        <form id="profile-form" onsubmit="e=>e.preventDefault()">
+        <div class="fgrid">
+            <div class="fdiv">Identity</div>
+            <div class="fg s2"><label>Company Name</label><input type="text" id="p-company-name" placeholder="FORTÉ Industries LLC"></div>
+            <div class="fg"><label>Tagline</label><input type="text" id="p-tagline" placeholder="Short one-liner"></div>
+            <div class="fg s3"><label>Mission Statement</label><textarea id="p-mission" rows="2" placeholder="What the company exists to do..."></textarea></div>
+            <div class="fg s3"><label>Vision</label><textarea id="p-vision" rows="2" placeholder="Long-term vision..."></textarea></div>
+            <div class="fg s3"><label>Core Values</label><input type="text" id="p-values" placeholder="Integrity, Innovation, Excellence (comma-separated)"></div>
+
+            <div class="fdiv">Details</div>
+            <div class="fg"><label>Industry</label><input type="text" id="p-industry" placeholder="Agriculture / Technology"></div>
+            <div class="fg"><label>Founded</label><input type="text" id="p-founded" placeholder="2010"></div>
+            <div class="fg"><label>Headquarters</label><input type="text" id="p-location" placeholder="Chaska, MN"></div>
+            <div class="fg"><label>Website</label><input type="text" id="p-website" placeholder="https://forte.com"></div>
+            <div class="fg"><label>Phone</label><input type="tel" id="p-phone" placeholder="(612) 555-0000"></div>
+            <div class="fg"><label>Email</label><input type="email" id="p-email" placeholder="info@forte.com"></div>
+            <div class="fg"><label>Employees</label><input type="text" id="p-employees" placeholder="25"></div>
+            <div class="fg"><label>Entity Type</label>
+                <select id="p-entity"><option value="">—</option><option>LLC</option><option>S-Corp</option><option>C-Corp</option><option>Sole Proprietorship</option><option>Partnership</option><option>Nonprofit</option></select>
+            </div>
+            <div class="fg"><label>State of Formation</label><input type="text" id="p-state" placeholder="MN" maxlength="2"></div>
+
+            <div class="fdiv">Products &amp; Services</div>
+            <div class="fg s3"><label>Products / Services Description</label><textarea id="p-products" rows="3" placeholder="Describe your main products and services..."></textarea></div>
+            <div class="fg s3"><label>Target Market / Customers</label><textarea id="p-market" rows="2" placeholder="Who are your customers?"></textarea></div>
+            <div class="fg s3"><label>Competitive Advantage / Differentiators</label><textarea id="p-differentiators" rows="2" placeholder="What makes you different?"></textarea></div>
+
+            <div class="fdiv">Team</div>
+            <div class="fg s3">
+                <label>Team Members</label>
+                <div id="team-list" style="margin-bottom:8px;"></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end;">
+                    <div class="fg" style="margin:0;"><label>Name</label><input type="text" id="new-team-name" placeholder="Jane Doe"></div>
+                    <div class="fg" style="margin:0;"><label>Title</label><input type="text" id="new-team-title" placeholder="CEO"></div>
+                    <div class="fg" style="margin:0;"><label>Email</label><input type="email" id="new-team-email" placeholder="jane@forte.com"></div>
+                    <button type="button" class="btn btn-navy btn-sm" onclick="addTeamMember()" style="height:38px;">＋ Add</button>
+                </div>
+            </div>
+
+            <div class="fdiv">Financial Overview</div>
+            <div class="fg"><label>Annual Revenue (approx)</label><input type="text" id="p-revenue" placeholder="$2.4M"></div>
+            <div class="fg"><label>Fiscal Year End</label><input type="text" id="p-fiscal-year" placeholder="December 31"></div>
+            <div class="fg"><label>Key Financial Metrics</label><input type="text" id="p-fin-metrics" placeholder="e.g. 22% YoY growth"></div>
+
+            <div class="fdiv">Context for AI Reports</div>
+            <div class="fg s3"><label>Background Context <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:0.77rem;">(This is automatically included in every AI-generated report)</span></label>
+                <textarea id="p-context" rows="5" placeholder="Provide any background information the AI should always know when writing reports about your company — history, current projects, strategic priorities, key challenges, etc."></textarea>
+            </div>
+        </div>
+        </form>
+        <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="btn btn-gold" onclick="saveProfile()">💾 Save Profile</button>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════
+     RESEARCH
+════════════════════════════════════ -->
+<div class="view" id="view-research">
+    <div class="card" id="research-form-card" style="display:none;margin-bottom:20px;">
+        <div class="card-hdr">
+            <div class="card-hdr-title" id="research-form-title">＋ Add Research Item</div>
+            <button class="btn btn-ghost btn-sm" onclick="hideResearchForm()">✕ Cancel</button>
+        </div>
+        <div class="fgrid">
+            <div class="fg s2"><label>Title *</label><input type="text" id="rf-title" placeholder="Descriptive title for this research item"></div>
+            <div class="fg"><label>Category</label>
+                <select id="rf-cat">
+                    <option>Market Data</option><option>Competitive Intel</option><option>Financial</option>
+                    <option>Customer</option><option>Internal</option><option>News / Press</option>
+                    <option>Regulatory</option><option>Technical</option><option>Other</option>
+                </select>
+            </div>
+            <div class="fg s3"><label>Content / Notes</label><textarea id="rf-content" rows="6" placeholder="Paste data, notes, quotes, statistics, findings — anything relevant..."></textarea></div>
+            <div class="fg s2"><label>Source</label><input type="text" id="rf-source" placeholder="e.g. Bloomberg, Internal Report, Q3 Customer Survey"></div>
+            <div class="fg"><label>Source URL</label><input type="text" id="rf-source-url" placeholder="https://..."></div>
+            <div class="fg s3"><label>Tags <span style="font-weight:400;text-transform:none;">(comma-separated)</span></label><input type="text" id="rf-tags" placeholder="growth, midwest, Q4, competitor-X"></div>
+        </div>
+        <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="btn btn-gold" onclick="saveResearch()" id="research-save-btn">Save Research Item</button>
+            <button class="btn btn-ghost" onclick="hideResearchForm()">Cancel</button>
+            <button class="btn btn-danger btn-sm" id="research-delete-btn" style="display:none;margin-left:auto;" onclick="deleteResearch()">🗑 Delete</button>
+        </div>
+        <input type="hidden" id="rf-edit-id">
+    </div>
+
+    <div class="card">
+        <div class="card-hdr">
+            <div class="card-hdr-title">🔬 Research Library</div>
+            <button class="btn btn-gold btn-sm" id="add-research-btn" onclick="showResearchForm()">＋ Add Item</button>
+        </div>
+        <div class="toolbar">
+            <input type="text" id="research-search" placeholder="Search research..." oninput="renderResearch()">
+            <select id="research-cat-filter" onchange="renderResearch()">
+                <option value="">All Categories</option>
+                <option>Market Data</option><option>Competitive Intel</option><option>Financial</option>
+                <option>Customer</option><option>Internal</option><option>News / Press</option>
+                <option>Regulatory</option><option>Technical</option><option>Other</option>
+            </select>
+        </div>
+        <div id="research-count" style="font-size:0.82rem;color:var(--text3);margin-bottom:12px;"></div>
+        <div id="research-grid" class="research-grid"></div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════
+     REPORT BUILDER
+════════════════════════════════════ -->
+<div class="view" id="view-builder">
+    <div class="card">
+        <div class="card-hdr">
+            <div class="card-hdr-title">✦ Report Builder <span class="tag">AI-Powered</span></div>
+            <button class="btn btn-ghost btn-sm" onclick="resetBuilder()">↺ Reset</button>
+        </div>
+
+        <!-- Steps indicator -->
+        <div class="builder-steps">
+            <div class="bstep active" id="bs-1"><div class="bstep-num">1</div><div class="bstep-lbl">Report Type</div></div>
+            <div class="bstep-connector"></div>
+            <div class="bstep" id="bs-2"><div class="bstep-num">2</div><div class="bstep-lbl">Research</div></div>
+            <div class="bstep-connector"></div>
+            <div class="bstep" id="bs-3"><div class="bstep-num">3</div><div class="bstep-lbl">Context</div></div>
+            <div class="bstep-connector"></div>
+            <div class="bstep" id="bs-4"><div class="bstep-num">4</div><div class="bstep-lbl">Generate</div></div>
+            <div class="bstep-connector"></div>
+            <div class="bstep" id="bs-5"><div class="bstep-num">5</div><div class="bstep-lbl">Save</div></div>
+        </div>
+
+        <!-- Step 1: Report Type -->
+        <div class="step-pane active" id="step-1">
+            <p style="color:var(--text2);font-size:0.88rem;margin-bottom:14px;">Select the type of report you want to generate.</p>
+            <div class="rtype-grid" id="rtype-grid"></div>
+            <div style="margin-top:20px;display:flex;justify-content:flex-end;">
+                <button class="btn btn-gold" onclick="goStep(2)" id="step1-next" disabled>Next: Select Research →</button>
+            </div>
+        </div>
+
+        <!-- Step 2: Select Research -->
+        <div class="step-pane" id="step-2">
+            <p style="color:var(--text2);font-size:0.88rem;margin-bottom:14px;">Choose which research items to include in this report. Company profile is always included.</p>
+            <div class="toolbar" style="margin-bottom:14px;">
+                <input type="text" id="builder-research-search" placeholder="Filter research..." oninput="renderBuilderResearch()">
+                <select id="builder-cat-filter" onchange="renderBuilderResearch()">
+                    <option value="">All Categories</option>
+                    <option>Market Data</option><option>Competitive Intel</option><option>Financial</option>
+                    <option>Customer</option><option>Internal</option><option>News / Press</option>
+                    <option>Regulatory</option><option>Technical</option><option>Other</option>
+                </select>
+                <button class="btn btn-ghost btn-sm" onclick="selectAllResearch()">Select All</button>
+                <button class="btn btn-ghost btn-sm" onclick="clearResearchSelection()">Clear</button>
+            </div>
+            <div id="builder-research-list"></div>
+            <div style="margin-top:16px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;align-items:center;">
+                <div style="font-size:0.83rem;color:var(--text2);" id="selected-research-count">0 items selected</div>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn btn-ghost" onclick="goStep(1)">← Back</button>
+                    <button class="btn btn-gold" onclick="goStep(3)">Next: Add Context →</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 3: Context -->
+        <div class="step-pane" id="step-3">
+            <p style="color:var(--text2);font-size:0.88rem;margin-bottom:14px;">Add any specific instructions, focus areas, or additional context for this report.</p>
+            <div class="fg">
+                <label>Report Title (optional)</label>
+                <input type="text" id="b-title" placeholder="Leave blank to auto-generate">
+            </div>
+            <div class="fg">
+                <label>Tone</label>
+                <select id="b-tone">
+                    <option value="professional">Professional &amp; Formal</option>
+                    <option value="executive">Executive / C-Suite</option>
+                    <option value="analytical">Analytical &amp; Data-driven</option>
+                    <option value="persuasive">Persuasive / Sales</option>
+                    <option value="concise">Concise &amp; Bullet-heavy</option>
+                    <option value="narrative">Narrative / Story-driven</option>
+                </select>
+            </div>
+            <div class="fg">
+                <label>Target Audience</label>
+                <input type="text" id="b-audience" placeholder="e.g. Board of directors, investors, internal team, customers...">
+            </div>
+            <div class="fg">
+                <label>Specific Instructions / Focus Areas</label>
+                <textarea id="b-instructions" rows="4" placeholder="What should this report emphasize? Any specific questions to answer? Sections to include? Key points to make?"></textarea>
+            </div>
+            <div class="fg">
+                <label>Model</label>
+                <select id="b-model">
+                    <option value="claude-opus-4-5">Claude Opus 4.5 (Best Quality)</option>
+                    <option value="claude-sonnet-4-5" selected>Claude Sonnet 4.5 (Recommended)</option>
+                    <option value="claude-haiku-4-5">Claude Haiku 4.5 (Fast)</option>
+                </select>
+            </div>
+            <div style="margin-top:16px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                <button class="btn btn-ghost" onclick="goStep(2)">← Back</button>
+                <button class="btn btn-gold" onclick="goStep(4);startGeneration()">✦ Generate Report →</button>
+            </div>
+        </div>
+
+        <!-- Step 4: Generate -->
+        <div class="step-pane" id="step-4">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+                <div style="font-size:0.88rem;color:var(--text2);" id="gen-status-label">Generating report…</div>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn btn-danger btn-sm" id="stop-btn" onclick="stopGeneration()" style="display:none;">⏹ Stop</button>
+                    <button class="btn btn-ghost btn-sm" onclick="goStep(3)">← Back</button>
+                </div>
+            </div>
+            <div class="stream-area" id="stream-area">
+                <div class="stream-placeholder"><div class="stream-placeholder-icon">✦</div><div>Report will appear here…</div></div>
+            </div>
+            <div style="margin-top:16px;display:flex;justify-content:flex-end;">
+                <button class="btn btn-gold" id="step4-next" onclick="goStep(5)" disabled>Next: Save Report →</button>
+            </div>
+        </div>
+
+        <!-- Step 5: Save -->
+        <div class="step-pane" id="step-5">
+            <p style="color:var(--text2);font-size:0.88rem;margin-bottom:14px;">Your report is ready. Review, finalize the title, then save it to your Report Library.</p>
+            <div class="fg">
+                <label>Final Report Title</label>
+                <input type="text" id="final-title" placeholder="Report title">
+            </div>
+            <div class="stream-area" id="final-preview" style="max-height:380px;overflow-y:auto;font-size:0.92rem;"></div>
+            <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;justify-content:space-between;">
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <button class="btn btn-gold" onclick="saveReport()">💾 Save to Library</button>
+                    <button class="btn btn-ghost" onclick="printReport()">🖨 Print</button>
+                    <button class="btn btn-ghost" onclick="copyReport()">📋 Copy Text</button>
+                </div>
+                <button class="btn btn-ghost" onclick="goStep(3)">← Edit Context</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════
+     REPORT LIBRARY
+════════════════════════════════════ -->
+<div class="view" id="view-library">
+    <div class="card">
+        <div class="card-hdr">
+            <div class="card-hdr-title">📚 Report Library</div>
+            <button class="btn btn-gold btn-sm" onclick="showView('builder')">✦ New Report</button>
+        </div>
+        <div class="toolbar">
+            <input type="text" id="lib-search" placeholder="Search reports..." oninput="renderLibrary()">
+            <select id="lib-type-filter" onchange="renderLibrary()">
+                <option value="">All Types</option>
+            </select>
+        </div>
+        <div id="lib-count" style="font-size:0.82rem;color:var(--text3);margin-bottom:14px;"></div>
+        <div id="library-list"></div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════
+     SETTINGS
+════════════════════════════════════ -->
+<div class="view" id="view-settings">
+    <div class="card">
+        <div class="card-hdr"><div class="card-hdr-title">⚙️ API Settings</div></div>
+        <p style="font-size:0.85rem;color:var(--text2);margin-bottom:18px;line-height:1.5;">FORTÉ uses Claude AI to generate reports. Enter your Anthropic API key and Cloudflare Worker proxy URL below. These are stored in Firestore and never exposed publicly.</p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
+            <div class="fg" style="flex:1;min-width:260px;margin:0;">
+                <label>Anthropic API Key</label>
+                <input type="password" id="api-key-input" placeholder="sk-ant-…">
+            </div>
+            <button class="btn btn-navy" onclick="saveApiKey()" style="align-self:flex-end;height:42px;">Save Key</button>
+        </div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+            <div class="fg" style="flex:1;min-width:260px;margin:0;">
+                <label>Cloudflare Worker Proxy URL</label>
+                <input type="text" id="proxy-url-input" placeholder="https://your-worker.workers.dev">
+            </div>
+            <button class="btn btn-navy" onclick="saveProxy()" style="align-self:flex-end;height:42px;">Save URL</button>
+        </div>
+    </div>
+</div>
+
+</main>
+</div>
+</div><!-- #app -->
+
+<!-- REPORT FULL VIEW MODAL -->
+<div class="modal-overlay" id="report-modal">
+    <div class="modal">
+        <div class="modal-hdr">
+            <div>
+                <div class="modal-hdr-title" id="modal-report-title"></div>
+                <div style="font-size:0.8rem;color:var(--text3);margin-top:4px;" id="modal-report-meta"></div>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <pre class="report-full-text" id="modal-report-body"></pre>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-ghost btn-sm" onclick="printModalReport()">🖨 Print</button>
+            <button class="btn btn-ghost btn-sm" onclick="copyModalReport()">📋 Copy</button>
+            <button class="btn btn-danger btn-sm" id="modal-delete-btn" onclick="deleteReportFromModal()">🗑 Delete</button>
+            <button class="btn btn-navy btn-sm" onclick="closeModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- RESEARCH EXPAND MODAL -->
+<div class="modal-overlay" id="research-modal">
+    <div class="modal" style="max-width:700px;">
+        <div class="modal-hdr">
+            <div class="modal-hdr-title" id="rm-title"></div>
+            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('research-modal').classList.remove('show')">✕</button>
+        </div>
+        <div class="modal-body">
+            <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;" id="rm-meta"></div>
+            <div style="white-space:pre-wrap;font-size:0.9rem;line-height:1.65;color:var(--text);" id="rm-content"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-ghost btn-sm" id="rm-edit-btn">✏️ Edit</button>
+            <button class="btn btn-navy btn-sm" onclick="document.getElementById('research-modal').classList.remove('show')">Close</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+firebase.initializeApp({
+    apiKey:"AIzaSyB7c4urD9tJO80S7nADItxjwhSYVqlrkEU",
+    authDomain:"watchroom-714a0.firebaseapp.com",
+    projectId:"watchroom-714a0",
+    storageBucket:"watchroom-714a0.appspot.com",
+    messagingSenderId:"123456789",
+    appId:"1:123456789:web:abcdef"
+});
+const auth=firebase.auth(), db=firebase.firestore();
+
+// ── STATE ──
+let researchItems=[], reports=[], companyProfile={}, teamMembers=[];
+let unsubResearch=null, unsubReports=null;
+let apiKey='', proxyUrl='';
+let builderStep=1, selectedReportType=null, selectedResearchIds=new Set();
+let generatedText='', isGenerating=false, abortCtrl=null;
+let viewingReportId=null;
+
+// ── AUTH ──
+auth.onAuthStateChanged(u=>{
+    document.getElementById('loading-screen').style.display='none';
+    if(u){
+        document.getElementById('login-screen').style.display='none';
+        document.getElementById('app').style.display='flex';
+        document.getElementById('user-email-hdr').textContent=u.email;
+        startListening();
+    } else {
+        document.getElementById('app').style.display='none';
+        document.getElementById('login-screen').style.display='flex';
+        [unsubResearch,unsubReports].forEach(u=>{if(u)u();});
+    }
+});
+document.getElementById('loading-screen').style.display='flex';
+document.getElementById('login-screen').style.display='none';
+document.getElementById('login-form').addEventListener('submit',async e=>{
+    e.preventDefault();
+    const btn=document.getElementById('login-btn'); btn.disabled=true; btn.textContent='Signing in…';
+    try{ await auth.signInWithEmailAndPassword(document.getElementById('login-email').value.trim(),document.getElementById('login-password').value); }
+    catch(err){ document.getElementById('login-error').textContent=err.message; btn.disabled=false; btn.textContent='Sign In'; }
+});
+function doSignOut(){auth.signOut();}
+
+// ── LISTENERS ──
+function startListening(){
+    unsubResearch=db.collection('forte_research').orderBy('addedAt','desc').onSnapshot(snap=>{
+        researchItems=snap.docs.map(d=>({_id:d.id,...d.data()}));
+        renderResearch(); renderBuilderResearch(); renderDashboard();
+    },()=>{});
+    unsubReports=db.collection('forte_reports').orderBy('generatedAt','desc').onSnapshot(snap=>{
+        reports=snap.docs.map(d=>({_id:d.id,...d.data()}));
+        renderLibrary(); renderDashboard(); buildLibraryFilter();
+    },()=>{});
+    loadProfile();
+    loadSettings();
+}
+
+// ── NAV ──
+function showView(v){
+    document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+    document.getElementById('view-'+v).classList.add('active');
+    document.querySelectorAll('nav button').forEach((b,i)=>{
+        const map=['dashboard','profile','research','builder','library','settings'];
+        b.classList.toggle('active',map[i]===v);
+    });
+}
+
+// ── HELPERS ──
+let toastT;
+function toast(msg,type){
+    const t=document.getElementById('toast'); t.textContent=msg;
+    t.className='toast show'+(type==='ok'?' ok':type==='err'?' err':'');
+    clearTimeout(toastT); toastT=setTimeout(()=>t.className='toast',3200);
+}
+function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fmtDate(ts){
+    if(!ts) return '—';
+    const d=ts.toDate?ts.toDate():new Date(ts);
+    return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+}
+function catClass(cat){
+    const map={'Market Data':'cat-market','Competitive Intel':'cat-competitive','Financial':'cat-financial',
+        'Customer':'cat-customer','Internal':'cat-internal','News / Press':'cat-news',
+        'Regulatory':'cat-regulatory','Technical':'cat-technical','Other':'cat-other'};
+    return map[cat]||'cat-other';
+}
+function closeModal(){document.getElementById('report-modal').classList.remove('show');}
+
+// ── REPORT TYPES ──
+const REPORT_TYPES=[
+    {id:'executive-summary',icon:'📋',name:'Executive Summary',desc:'High-level overview of company status, priorities, and key metrics.',
+     prompt:'Write a comprehensive Executive Summary report. Cover company overview, current status, key achievements, strategic priorities, critical metrics, and near-term outlook. Format with clear sections and executive-ready language.'},
+    {id:'market-analysis',icon:'📊',name:'Market Analysis',desc:'In-depth look at market trends, size, opportunities, and competitive dynamics.',
+     prompt:'Write a thorough Market Analysis report. Cover market size & trends, growth drivers, customer segments, competitive landscape, opportunities, threats, and strategic implications. Use data from the research provided.'},
+    {id:'competitive-intel',icon:'🎯',name:'Competitive Intelligence',desc:'Detailed analysis of competitors, positioning, and strategic gaps.',
+     prompt:'Write a Competitive Intelligence report. Analyze the competitive landscape, key competitors, their strengths and weaknesses, market positioning, pricing, differentiation strategies, and recommendations for competitive advantage.'},
+    {id:'strategic-brief',icon:'♟️',name:'Strategic Brief',desc:'Clear strategic recommendations with rationale and action plan.',
+     prompt:'Write a Strategic Brief. Define the strategic situation, key insights, recommended strategic direction, supporting rationale, risks, and a prioritized action plan with timelines.'},
+    {id:'financial-overview',icon:'💰',name:'Financial Overview',desc:'Summary of financial position, performance, and key metrics.',
+     prompt:'Write a Financial Overview report. Cover revenue performance, key financial metrics, trends, cost structure insights, cash position, projections, and financial health summary. Present numbers clearly and add interpretive commentary.'},
+    {id:'status-update',icon:'📈',name:'Status / Progress Update',desc:'Clear summary of progress on goals, initiatives, and KPIs.',
+     prompt:'Write a Status & Progress Update report. Summarize progress against goals, highlight key accomplishments, address challenges and blockers, provide metrics against targets, and outline next steps.'},
+    {id:'swot',icon:'🔷',name:'SWOT Analysis',desc:'Strengths, Weaknesses, Opportunities, and Threats structured analysis.',
+     prompt:'Write a comprehensive SWOT Analysis. For each quadrant (Strengths, Weaknesses, Opportunities, Threats), provide detailed analysis with specific evidence from the research provided. End with strategic implications and priority action items.'},
+    {id:'press-release',icon:'📰',name:'Press Release',desc:'Professional press release draft for news or announcements.',
+     prompt:'Write a press release in proper AP Style format. Include headline, dateline, lead paragraph, supporting quotes, body paragraphs, boilerplate "About" section, and ### end mark. Make it newsworthy and ready for distribution.'},
+    {id:'business-proposal',icon:'🤝',name:'Business Proposal',desc:'Structured business proposal or pitch document.',
+     prompt:'Write a professional Business Proposal. Include executive summary, problem statement, proposed solution, value proposition, approach/methodology, qualifications, timeline, investment/pricing (if applicable), and call to action.'},
+    {id:'board-report',icon:'🏛️',name:'Board / Investor Report',desc:'Formal report suitable for board meetings or investor updates.',
+     prompt:'Write a formal Board Report. Cover the reporting period summary, financial performance, operational highlights, strategic initiatives progress, risks and mitigations, upcoming decisions needed, and forward outlook. Maintain formal, precise language.'},
+    {id:'custom',icon:'✏️',name:'Custom Report',desc:'Fully custom — describe exactly what you need in the next step.',
+     prompt:'Generate a professional report based on the specific instructions provided. Follow the instructions closely and use the research data to support all points made.'},
+];
+
+function buildReportTypes(){
+    document.getElementById('rtype-grid').innerHTML=REPORT_TYPES.map(t=>`
+        <div class="rtype-card" id="rtype-${t.id}" onclick="selectReportType('${t.id}')">
+            <div class="rtype-icon">${t.icon}</div>
+            <div class="rtype-name">${t.name}</div>
+            <div class="rtype-desc">${t.desc}</div>
+        </div>`).join('');
+    buildLibraryFilter();
+}
+function selectReportType(id){
+    selectedReportType=id;
+    document.querySelectorAll('.rtype-card').forEach(c=>c.classList.remove('selected'));
+    document.getElementById('rtype-'+id)?.classList.add('selected');
+    document.getElementById('step1-next').disabled=false;
+}
+function buildLibraryFilter(){
+    const sel=document.getElementById('lib-type-filter'); if(!sel) return;
+    const cur=sel.value;
+    sel.innerHTML='<option value="">All Types</option>'+
+        REPORT_TYPES.map(t=>`<option value="${t.id}">${t.name}</option>`).join('');
+    sel.value=cur;
+}
+
+// ── BUILDER STEPS ──
+function goStep(n){
+    builderStep=n;
+    document.querySelectorAll('.step-pane').forEach((p,i)=>{p.classList.toggle('active',i+1===n);});
+    for(let i=1;i<=5;i++){
+        const el=document.getElementById('bs-'+i);
+        if(!el) continue;
+        el.classList.remove('active','done');
+        if(i===n) el.classList.add('active');
+        else if(i<n) el.classList.add('done');
+    }
+    if(n===2) renderBuilderResearch();
+    if(n===5){
+        const t=REPORT_TYPES.find(x=>x.id===selectedReportType);
+        const title=document.getElementById('b-title').value.trim() || (t?t.name+' — '+new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'Report');
+        document.getElementById('final-title').value=title;
+        document.getElementById('final-preview').textContent=generatedText;
+    }
+}
+function resetBuilder(){
+    selectedReportType=null; selectedResearchIds.clear(); generatedText=''; builderStep=1;
+    document.querySelectorAll('.rtype-card').forEach(c=>c.classList.remove('selected'));
+    document.getElementById('step1-next').disabled=true;
+    document.getElementById('b-title').value='';
+    document.getElementById('b-instructions').value='';
+    document.getElementById('stream-area').innerHTML='<div class="stream-placeholder"><div class="stream-placeholder-icon">✦</div><div>Report will appear here…</div></div>';
+    document.getElementById('step4-next').disabled=true;
+    goStep(1);
+}
+function selectAllResearch(){researchItems.forEach(r=>selectedResearchIds.add(r._id)); renderBuilderResearch();}
+function clearResearchSelection(){selectedResearchIds.clear(); renderBuilderResearch();}
+function toggleResearchItem(id){
+    if(selectedResearchIds.has(id)) selectedResearchIds.delete(id);
+    else selectedResearchIds.add(id);
+    renderBuilderResearch();
+}
+function renderBuilderResearch(){
+    const search=(document.getElementById('builder-research-search')?.value||'').toLowerCase();
+    const cat=document.getElementById('builder-cat-filter')?.value||'';
+    const filtered=researchItems.filter(r=>{
+        if(cat && r.category!==cat) return false;
+        if(search && !((r.title||'')+(r.content||'')).toLowerCase().includes(search)) return false;
+        return true;
+    });
+    const el=document.getElementById('builder-research-list'); if(!el) return;
+    if(!filtered.length){ el.innerHTML='<div class="empty" style="padding:20px;">No research items found. <a href="#" onclick="showView(\'research\');return false;" style="color:var(--gold);">Add some →</a></div>'; return; }
+    el.innerHTML=filtered.map(r=>`
+        <div class="research-check-item${selectedResearchIds.has(r._id)?' selected':''}" onclick="toggleResearchItem('${r._id}')">
+            <input type="checkbox" ${selectedResearchIds.has(r._id)?'checked':''} onclick="event.stopPropagation();toggleResearchItem('${r._id}')">
+            <div style="flex:1;min-width:0;">
+                <div style="font-size:0.85rem;font-weight:600;color:var(--navy);">${esc(r.title)}</div>
+                <div style="font-size:0.78rem;color:var(--text2);margin-top:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${esc((r.content||'').slice(0,100))}…</div>
+                <span class="rc-cat ${catClass(r.category)}" style="margin-top:4px;">${esc(r.category||'')}</span>
+            </div>
+        </div>`).join('');
+    const cnt=document.getElementById('selected-research-count');
+    if(cnt) cnt.textContent=selectedResearchIds.size+' item'+(selectedResearchIds.size!==1?'s':'')+' selected';
+}
+
+// ── GENERATE REPORT ──
+async function startGeneration(){
+    if(!apiKey){ toast('Add API key in Settings first.','err'); showView('settings'); return; }
+    if(!proxyUrl){ toast('Add Proxy URL in Settings first.','err'); showView('settings'); return; }
+    if(!selectedReportType){ toast('Select a report type.','err'); goStep(1); return; }
+
+    const t=REPORT_TYPES.find(x=>x.id===selectedReportType);
+    const tone=document.getElementById('b-tone').value;
+    const audience=document.getElementById('b-audience').value.trim();
+    const instructions=document.getElementById('b-instructions').value.trim();
+    const model=document.getElementById('b-model').value;
+
+    // Build context string from profile + selected research
+    let context='';
+    if(companyProfile.companyName){
+        context+=`## COMPANY: ${companyProfile.companyName}\n`;
+        if(companyProfile.tagline) context+=`Tagline: ${companyProfile.tagline}\n`;
+        if(companyProfile.industry) context+=`Industry: ${companyProfile.industry}\n`;
+        if(companyProfile.location) context+=`Location: ${companyProfile.location}\n`;
+        if(companyProfile.mission) context+=`Mission: ${companyProfile.mission}\n`;
+        if(companyProfile.vision) context+=`Vision: ${companyProfile.vision}\n`;
+        if(companyProfile.products) context+=`Products/Services: ${companyProfile.products}\n`;
+        if(companyProfile.market) context+=`Target Market: ${companyProfile.market}\n`;
+        if(companyProfile.revenue) context+=`Revenue: ${companyProfile.revenue}\n`;
+        if(companyProfile.employees) context+=`Employees: ${companyProfile.employees}\n`;
+        if(companyProfile.bgContext) context+=`\nBackground Context:\n${companyProfile.bgContext}\n`;
+        if(teamMembers.length){
+            context+=`\nKey Team:\n`;
+            teamMembers.forEach(m=>{ context+=`- ${m.name}, ${m.title}${m.email?' ('+m.email+')':''}\n`; });
+        }
+        context+='\n';
+    }
+    const selected=researchItems.filter(r=>selectedResearchIds.has(r._id));
+    if(selected.length){
+        context+=`## RESEARCH DATA (${selected.length} items)\n\n`;
+        selected.forEach((r,i)=>{
+            context+=`### Research Item ${i+1}: ${r.title}\n`;
+            context+=`Category: ${r.category||'General'}\n`;
+            if(r.source) context+=`Source: ${r.source}\n`;
+            context+=`\n${r.content}\n\n`;
+        });
+    }
+
+    const systemPrompt=`You are an expert business intelligence analyst and report writer for ${companyProfile.companyName||'the company'}.
+You produce high-quality, professional reports based on company data and research.
+Always write in a structured, clear format with proper headings, supporting evidence, and actionable insights.
+Tone: ${tone}. ${audience?'Target audience: '+audience+'.':''}
+Use the company profile and research data provided to ground every claim in real information.`;
+
+    const userMsg=`${t.prompt}\n\n${instructions?'SPECIFIC INSTRUCTIONS:\n'+instructions+'\n\n':''}CONTEXT & DATA:\n${context}`;
+
+    const streamArea=document.getElementById('stream-area');
+    streamArea.innerHTML=''; generatedText='';
+    isGenerating=true;
+    abortCtrl=new AbortController();
+    document.getElementById('stop-btn').style.display='inline-flex';
+    document.getElementById('step4-next').disabled=true;
+    document.getElementById('gen-status-label').textContent='Generating report…';
+
+    const msgEl=document.createElement('div');
+    streamArea.appendChild(msgEl);
+    const cursor=document.createElement('span'); cursor.className='cursor'; streamArea.appendChild(cursor);
+
+    try{
+        const res=await fetch(proxyUrl,{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({apiKey,model,max_tokens:4096,system:systemPrompt,messages:[{role:'user',content:userMsg}],stream:true}),
+            signal:abortCtrl.signal
+        });
+        const ct=res.headers.get('content-type')||'';
+        if(ct.includes('event-stream')){
+            const reader=res.body.getReader(); const decoder=new TextDecoder();
+            let buf='';
+            while(true){
+                const {done,value}=await reader.read(); if(done) break;
+                buf+=decoder.decode(value,{stream:true});
+                const lines=buf.split('\n'); buf=lines.pop();
+                for(const line of lines){
+                    if(!line.startsWith('data:')) continue;
+                    const data=line.slice(5).trim(); if(data==='[DONE]') continue;
+                    try{
+                        const j=JSON.parse(data);
+                        const delta=j?.delta?.text||j?.choices?.[0]?.delta?.content||'';
+                        if(delta){ generatedText+=delta; msgEl.textContent=generatedText; streamArea.scrollTop=streamArea.scrollHeight; }
+                    }catch{}
+                }
+            }
+        } else {
+            const j=await res.json();
+            const full=j?.content?.[0]?.text||j?.choices?.[0]?.message?.content||'(No response)';
+            // simulate typing
+            let i=0;
+            const type=()=>{ if(i<full.length){ const chunk=full.slice(i,i+6); generatedText+=chunk; msgEl.textContent=generatedText; streamArea.scrollTop=streamArea.scrollHeight; i+=6; if(!abortCtrl.signal.aborted) setTimeout(type,8); else finish(); } else finish(); };
+            type(); return;
+        }
+    }catch(err){
+        if(err.name!=='AbortError'){ msgEl.textContent='Error: '+err.message; toast('Generation error: '+err.message,'err'); }
+        else { generatedText=msgEl.textContent; }
+    }
+    finish();
+    function finish(){
+        cursor.remove();
+        isGenerating=false;
+        document.getElementById('stop-btn').style.display='none';
+        document.getElementById('step4-next').disabled=false;
+        document.getElementById('gen-status-label').textContent=generatedText.length>10?'Report generated ✓':'Generation stopped.';
+    }
+}
+function stopGeneration(){if(abortCtrl) abortCtrl.abort();}
+
+async function saveReport(){
+    const title=document.getElementById('final-title').value.trim()||'Untitled Report';
+    const t=REPORT_TYPES.find(x=>x.id===selectedReportType);
+    if(!generatedText){ toast('Nothing to save.','err'); return; }
+    try{
+        await db.collection('forte_reports').add({
+            title, type:selectedReportType, typeName:t?.name||selectedReportType,
+            content:generatedText, tone:document.getElementById('b-tone').value,
+            audience:document.getElementById('b-audience').value.trim(),
+            instructions:document.getElementById('b-instructions').value.trim(),
+            researchCount:selectedResearchIds.size,
+            model:document.getElementById('b-model').value,
+            generatedAt:firebase.firestore.FieldValue.serverTimestamp()
+        });
+        toast('Report saved to library!','ok');
+        resetBuilder();
+        showView('library');
+    }catch(err){ toast('Error saving: '+err.message,'err'); }
+}
+function printReport(){const w=window.open(''); w.document.write('<pre style="font-family:Georgia,serif;font-size:11pt;line-height:1.6;padding:40px;max-width:800px;margin:0 auto;">'+generatedText.replace(/</g,'&lt;')+'</pre>'); w.document.close(); w.print();}
+function copyReport(){navigator.clipboard.writeText(generatedText).then(()=>toast('Copied!','ok'));}
+
+// ── RESEARCH ──
+function showResearchForm(id){
+    document.getElementById('research-form-card').style.display='block';
+    document.getElementById('rf-edit-id').value=id||'';
+    document.getElementById('research-save-btn').textContent=id?'Update Item':'Save Research Item';
+    document.getElementById('research-delete-btn').style.display=id?'inline-flex':'none';
+    document.getElementById('research-form-title').textContent=id?'✏️ Edit Research Item':'＋ Add Research Item';
+    if(id){
+        const r=researchItems.find(x=>x._id===id); if(!r) return;
+        document.getElementById('rf-title').value=r.title||'';
+        document.getElementById('rf-cat').value=r.category||'Other';
+        document.getElementById('rf-content').value=r.content||'';
+        document.getElementById('rf-source').value=r.source||'';
+        document.getElementById('rf-source-url').value=r.sourceUrl||'';
+        document.getElementById('rf-tags').value=(r.tags||[]).join(', ');
+    } else {
+        document.getElementById('rf-title').value='';
+        document.getElementById('rf-content').value='';
+        document.getElementById('rf-source').value='';
+        document.getElementById('rf-source-url').value='';
+        document.getElementById('rf-tags').value='';
+    }
+    document.getElementById('research-form-card').scrollIntoView({behavior:'smooth'});
+}
+function hideResearchForm(){document.getElementById('research-form-card').style.display='none';}
+async function saveResearch(){
+    const title=document.getElementById('rf-title').value.trim();
+    if(!title){ toast('Title is required.','err'); return; }
+    const id=document.getElementById('rf-edit-id').value;
+    const data={
+        title, category:document.getElementById('rf-cat').value,
+        content:document.getElementById('rf-content').value.trim(),
+        source:document.getElementById('rf-source').value.trim(),
+        sourceUrl:document.getElementById('rf-source-url').value.trim(),
+        tags:document.getElementById('rf-tags').value.split(',').map(t=>t.trim()).filter(Boolean),
+        updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+    };
+    if(!id) data.addedAt=firebase.firestore.FieldValue.serverTimestamp();
+    try{
+        if(id) await db.collection('forte_research').doc(id).update(data);
+        else await db.collection('forte_research').add(data);
+        toast(id?'Updated!':'Research item saved!','ok');
+        hideResearchForm();
+    }catch(err){ toast('Error: '+err.message,'err'); }
+}
+async function deleteResearch(){
+    const id=document.getElementById('rf-edit-id').value;
+    if(!id||!confirm('Delete this research item?')) return;
+    await db.collection('forte_research').doc(id).delete();
+    toast('Deleted.'); hideResearchForm();
+}
+function renderResearch(){
+    const search=(document.getElementById('research-search')?.value||'').toLowerCase();
+    const cat=document.getElementById('research-cat-filter')?.value||'';
+    const filtered=researchItems.filter(r=>{
+        if(cat && r.category!==cat) return false;
+        if(search && !((r.title||'')+(r.content||'')+(r.tags||[]).join(' ')).toLowerCase().includes(search)) return false;
+        return true;
+    });
+    const cnt=document.getElementById('research-count');
+    if(cnt) cnt.textContent=filtered.length+' item'+(filtered.length!==1?'s':'');
+    const grid=document.getElementById('research-grid'); if(!grid) return;
+    if(!filtered.length){ grid.innerHTML='<div class="empty"><div class="empty-icon">🔬</div>No research items yet.</div>'; return; }
+    grid.innerHTML=filtered.map(r=>`
+        <div class="research-card">
+            <span class="rc-cat ${catClass(r.category)}">${esc(r.category||'Other')}</span>
+            <div class="rc-title">${esc(r.title)}</div>
+            <div class="rc-content">${esc(r.content||'')}</div>
+            <div class="rc-meta">
+                ${r.source?`<span>📌 ${esc(r.source)}</span>`:''}
+                <span>${fmtDate(r.addedAt)}</span>
+                ${(r.tags||[]).map(t=>`<span class="tag-pill">${esc(t)}</span>`).join('')}
+            </div>
+            <div class="rc-actions">
+                <button class="btn btn-ghost btn-sm" onclick="openResearchModal('${r._id}')">Read More</button>
+                <button class="btn btn-ghost btn-sm" onclick="showResearchForm('${r._id}')">✏️ Edit</button>
+            </div>
+        </div>`).join('');
+}
+function openResearchModal(id){
+    const r=researchItems.find(x=>x._id===id); if(!r) return;
+    document.getElementById('rm-title').textContent=r.title||'';
+    document.getElementById('rm-content').textContent=r.content||'';
+    document.getElementById('rm-meta').innerHTML=`
+        <span class="rc-cat ${catClass(r.category)}">${esc(r.category||'')}</span>
+        ${r.source?`<span style="font-size:0.8rem;color:var(--text2);">📌 ${esc(r.source)}</span>`:''}
+        ${r.sourceUrl?`<a href="${esc(r.sourceUrl)}" target="_blank" style="font-size:0.8rem;color:var(--gold);">🔗 Source</a>`:''}
+        <span style="font-size:0.8rem;color:var(--text3);">${fmtDate(r.addedAt)}</span>`;
+    document.getElementById('rm-edit-btn').onclick=()=>{document.getElementById('research-modal').classList.remove('show'); showView('research'); showResearchForm(id);};
+    document.getElementById('research-modal').classList.add('show');
+}
+
+// ── REPORT LIBRARY ──
+function renderLibrary(){
+    const search=(document.getElementById('lib-search')?.value||'').toLowerCase();
+    const type=document.getElementById('lib-type-filter')?.value||'';
+    const filtered=reports.filter(r=>{
+        if(type && r.type!==type) return false;
+        if(search && !(r.title||'').toLowerCase().includes(search)) return false;
+        return true;
+    });
+    const cnt=document.getElementById('lib-count'); if(cnt) cnt.textContent=filtered.length+' report'+(filtered.length!==1?'s':'');
+    const list=document.getElementById('library-list'); if(!list) return;
+    if(!filtered.length){ list.innerHTML='<div class="empty"><div class="empty-icon">📚</div>No reports yet. <a href="#" onclick="showView(\'builder\');return false;" style="color:var(--gold);">Build one →</a></div>'; return; }
+    list.innerHTML=filtered.map(r=>`
+        <div class="report-item">
+            <div class="report-item-top">
+                <div>
+                    <div class="report-item-title">${esc(r.title)}</div>
+                    <div class="report-item-meta">
+                        <span class="report-type-badge">${esc(r.typeName||r.type)}</span>
+                        &nbsp;·&nbsp;${fmtDate(r.generatedAt)}&nbsp;·&nbsp;${r.researchCount||0} research items
+                        ${r.model?'&nbsp;·&nbsp;'+esc(r.model.replace('claude-','')):''}
+                    </div>
+                </div>
+            </div>
+            <div class="report-item-preview">${esc((r.content||'').slice(0,200))}…</div>
+            <div class="report-item-actions">
+                <button class="btn btn-navy btn-sm" onclick="openReport('${r._id}')">📄 Read Full Report</button>
+                <button class="btn btn-ghost btn-sm" onclick="printReportById('${r._id}')">🖨 Print</button>
+                <button class="btn btn-ghost btn-sm" onclick="copyReportById('${r._id}')">📋 Copy</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteReportById('${r._id}')">🗑</button>
+            </div>
+        </div>`).join('');
+}
+function openReport(id){
+    const r=reports.find(x=>x._id===id); if(!r) return;
+    viewingReportId=id;
+    document.getElementById('modal-report-title').textContent=r.title||'Report';
+    document.getElementById('modal-report-meta').innerHTML=`<span class="report-type-badge">${esc(r.typeName||r.type)}</span> · ${fmtDate(r.generatedAt)} · ${r.researchCount||0} research items`;
+    document.getElementById('modal-report-body').textContent=r.content||'';
+    document.getElementById('report-modal').classList.add('show');
+}
+function printModalReport(){const r=reports.find(x=>x._id===viewingReportId); if(!r) return; const w=window.open(''); w.document.write('<pre style="font-family:Georgia,serif;font-size:11pt;line-height:1.6;padding:40px;max-width:800px;margin:0 auto;">'+r.content.replace(/</g,'&lt;')+'</pre>'); w.document.close(); w.print();}
+function copyModalReport(){const r=reports.find(x=>x._id===viewingReportId); if(!r) return; navigator.clipboard.writeText(r.content).then(()=>toast('Copied!','ok'));}
+async function deleteReportFromModal(){
+    if(!viewingReportId||!confirm('Delete this report?')) return;
+    await db.collection('forte_reports').doc(viewingReportId).delete();
+    toast('Report deleted.'); closeModal();
+}
+async function deleteReportById(id){
+    if(!confirm('Delete this report?')) return;
+    await db.collection('forte_reports').doc(id).delete();
+    toast('Report deleted.');
+}
+function printReportById(id){const r=reports.find(x=>x._id===id); if(!r) return; const w=window.open(''); w.document.write('<pre style="font-family:Georgia,serif;font-size:11pt;line-height:1.6;padding:40px;max-width:800px;margin:0 auto;">'+r.content.replace(/</g,'&lt;')+'</pre>'); w.document.close(); w.print();}
+function copyReportById(id){const r=reports.find(x=>x._id===id); if(!r) return; navigator.clipboard.writeText(r.content).then(()=>toast('Copied!','ok'));}
+
+// ── PROFILE ──
+async function loadProfile(){
+    try{
+        const doc=await db.collection('forte_settings').doc('profile').get();
+        if(doc.exists){
+            companyProfile=doc.data();
+            teamMembers=companyProfile.team||[];
+            populateProfile();
+            renderDashboard();
+        }
+    }catch{}
+}
+function populateProfile(){
+    const p=companyProfile;
+    const sv=(id,v)=>{const el=document.getElementById(id); if(el) el.value=v||'';};
+    sv('p-company-name',p.companyName); sv('p-tagline',p.tagline); sv('p-mission',p.mission);
+    sv('p-vision',p.vision); sv('p-values',p.values); sv('p-industry',p.industry);
+    sv('p-founded',p.founded); sv('p-location',p.location); sv('p-website',p.website);
+    sv('p-phone',p.phone); sv('p-email',p.email); sv('p-employees',p.employees);
+    sv('p-entity',p.entity); sv('p-state',p.state);
+    sv('p-products',p.products); sv('p-market',p.market); sv('p-differentiators',p.differentiators);
+    sv('p-revenue',p.revenue); sv('p-fiscal-year',p.fiscalYear); sv('p-fin-metrics',p.finMetrics);
+    sv('p-context',p.bgContext);
+    renderTeamList();
+}
+async function saveProfile(){
+    const gv=id=>(document.getElementById(id)?.value||'').trim();
+    const data={
+        companyName:gv('p-company-name'), tagline:gv('p-tagline'), mission:gv('p-mission'),
+        vision:gv('p-vision'), values:gv('p-values'), industry:gv('p-industry'),
+        founded:gv('p-founded'), location:gv('p-location'), website:gv('p-website'),
+        phone:gv('p-phone'), email:gv('p-email'), employees:gv('p-employees'),
+        entity:gv('p-entity'), state:gv('p-state'),
+        products:gv('p-products'), market:gv('p-market'), differentiators:gv('p-differentiators'),
+        revenue:gv('p-revenue'), fiscalYear:gv('p-fiscal-year'), finMetrics:gv('p-fin-metrics'),
+        bgContext:gv('p-context'), team:teamMembers,
+        updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+    };
+    try{
+        await db.collection('forte_settings').doc('profile').set(data,{merge:true});
+        companyProfile=data; toast('Profile saved!','ok');
+        renderDashboard();
+    }catch(err){ toast('Error: '+err.message,'err'); }
+}
+function addTeamMember(){
+    const name=document.getElementById('new-team-name').value.trim();
+    const title=document.getElementById('new-team-title').value.trim();
+    const email=document.getElementById('new-team-email').value.trim();
+    if(!name){ toast('Name is required.','err'); return; }
+    teamMembers.push({name,title,email});
+    renderTeamList();
+    document.getElementById('new-team-name').value='';
+    document.getElementById('new-team-title').value='';
+    document.getElementById('new-team-email').value='';
+}
+function removeTeamMember(i){ teamMembers.splice(i,1); renderTeamList(); }
+function renderTeamList(){
+    const el=document.getElementById('team-list'); if(!el) return;
+    if(!teamMembers.length){ el.innerHTML='<div style="color:var(--text3);font-size:0.83rem;padding:6px 0;">No team members added yet.</div>'; return; }
+    el.innerHTML=teamMembers.map((m,i)=>`
+        <div class="team-row">
+            <div class="team-avatar">${(m.name||'?')[0].toUpperCase()}</div>
+            <div style="flex:1;min-width:0;">
+                <div style="font-weight:600;font-size:0.88rem;">${esc(m.name)}</div>
+                <div style="font-size:0.78rem;color:var(--text2);">${esc(m.title||'')} ${m.email?'· '+m.email:''}</div>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="removeTeamMember(${i})">✕</button>
+        </div>`).join('');
+}
+
+// ── DASHBOARD ──
+function renderDashboard(){
+    const now=new Date(); const mo=now.getMonth(), yr=now.getFullYear();
+    const thisMonth=reports.filter(r=>{
+        if(!r.generatedAt) return false;
+        const d=r.generatedAt.toDate?r.generatedAt.toDate():new Date(r.generatedAt);
+        return d.getMonth()===mo && d.getFullYear()===yr;
+    }).length;
+    document.getElementById('hs-reports').textContent=reports.length||'0';
+    document.getElementById('hs-research').textContent=researchItems.length||'0';
+    document.getElementById('hs-team').textContent=teamMembers.length||'0';
+    document.getElementById('hs-this-month').textContent=thisMonth||'0';
+    if(companyProfile.companyName){
+        document.getElementById('hero-company-name').textContent=companyProfile.companyName;
+        document.getElementById('hero-tagline').textContent=companyProfile.tagline||'Company Intelligence & Report Engine';
+    }
+    // Snapshot
+    const snap=document.getElementById('dash-profile-snap');
+    if(snap){
+        if(companyProfile.companyName){
+            snap.innerHTML=`
+                <div style="font-size:0.82rem;line-height:1.8;color:var(--text2);">
+                    ${companyProfile.industry?`<div><strong>Industry:</strong> ${esc(companyProfile.industry)}</div>`:''}
+                    ${companyProfile.location?`<div><strong>Location:</strong> ${esc(companyProfile.location)}</div>`:''}
+                    ${companyProfile.employees?`<div><strong>Employees:</strong> ${esc(companyProfile.employees)}</div>`:''}
+                    ${companyProfile.revenue?`<div><strong>Revenue:</strong> ${esc(companyProfile.revenue)}</div>`:''}
+                    ${companyProfile.mission?`<div style="margin-top:8px;padding:8px;background:var(--bg3);border-radius:6px;font-style:italic;">"${esc(companyProfile.mission.slice(0,100))}${companyProfile.mission.length>100?'…':''}"</div>`:''}
+                </div>`;
+        } else {
+            snap.innerHTML='<div style="color:var(--text3);font-size:0.85rem;">No profile set up. <a href="#" onclick="showView(\'profile\');return false;" style="color:var(--gold);">Set up now →</a></div>';
+        }
+    }
+    // Recent reports
+    const rr=document.getElementById('dash-recent-reports');
+    if(rr){
+        const recent=reports.slice(0,5);
+        rr.innerHTML=recent.length?recent.map(r=>`
+            <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border2);cursor:pointer;" onclick="openReport('${r._id}')">
+                <div style="width:32px;height:32px;background:var(--navy);border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--gold);font-size:0.9rem;flex-shrink:0;">📄</div>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:600;font-size:0.87rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(r.title)}</div>
+                    <div style="font-size:0.76rem;color:var(--text3);">${esc(r.typeName||r.type)} · ${fmtDate(r.generatedAt)}</div>
+                </div>
+            </div>`).join(''):'<div class="empty" style="padding:20px 0;">No reports yet.</div>';
+    }
+    // Research by category
+    const rcat=document.getElementById('dash-research-cats');
+    if(rcat){
+        const cats={};
+        researchItems.forEach(r=>{const c=r.category||'Other'; cats[c]=(cats[c]||0)+1;});
+        rcat.innerHTML=Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([c,n])=>`
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border2);">
+                <span class="rc-cat ${catClass(c)}">${esc(c)}</span>
+                <strong style="font-size:0.85rem;">${n}</strong>
+            </div>`).join('')||'<div style="color:var(--text3);font-size:0.85rem;">No research yet.</div>';
+    }
+}
+
+// ── SETTINGS ──
+async function loadSettings(){
+    try{
+        const kd=await db.collection('settings').doc('apikey').get();
+        if(kd.exists&&kd.data().key){ apiKey=kd.data().key; document.getElementById('api-key-input').value=apiKey; }
+        const pd=await db.collection('settings').doc('proxy').get();
+        if(pd.exists&&pd.data().url){ proxyUrl=pd.data().url; document.getElementById('proxy-url-input').value=proxyUrl; }
+    }catch{}
+}
+async function saveApiKey(){
+    const k=document.getElementById('api-key-input').value.trim();
+    if(!k){ toast('Enter an API key.','err'); return; }
+    await db.collection('settings').doc('apikey').set({key:k});
+    apiKey=k; toast('API key saved!','ok');
+}
+async function saveProxy(){
+    const u=document.getElementById('proxy-url-input').value.trim();
+    if(!u){ toast('Enter a proxy URL.','err'); return; }
+    await db.collection('settings').doc('proxy').set({url:u});
+    proxyUrl=u; toast('Proxy URL saved!','ok');
+}
+
+// ── INIT ──
+buildReportTypes();
+</script>
+</body>
+</html>

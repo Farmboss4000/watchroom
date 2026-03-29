@@ -144,6 +144,40 @@
         .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
         .toast.success{background:var(--success);}
         .toast.error{background:var(--danger);}
+        /* ── AUTO QUOTES ── */
+        .aq-vehicle-row{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1.5px solid var(--border);border-radius:8px;margin-bottom:8px;cursor:pointer;transition:all 0.13s;background:var(--bg-secondary);}
+        .aq-vehicle-row:hover{border-color:var(--accent);background:var(--accent-dim);}
+        .aq-vehicle-row.selected{border-color:var(--accent);background:var(--accent-dim);}
+        .aq-vehicle-row input[type="checkbox"]{width:17px;height:17px;accent-color:var(--accent);flex-shrink:0;}
+        .aq-veh-icon{font-size:1.4rem;flex-shrink:0;}
+        .aq-veh-info{flex:1;min-width:0;}
+        .aq-veh-name{font-weight:700;font-size:0.9rem;color:var(--text-primary);}
+        .aq-veh-detail{font-size:0.77rem;color:var(--text-secondary);margin-top:2px;}
+        .aq-veh-vin{font-family:monospace;font-size:0.75rem;color:var(--text-secondary);}
+        .quote-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;margin-bottom:20px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.06);}
+        .quote-card-header{background:linear-gradient(135deg,#0a1a0a 0%,#0f2510 100%);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+        .quote-card-veh{font-weight:700;font-size:1rem;color:#fff;}
+        .quote-card-vin{font-size:0.76rem;color:rgba(255,255,255,0.55);font-family:monospace;margin-top:2px;}
+        .quote-card-body{padding:20px;}
+        .quote-coverage-tabs{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap;}
+        .qct-btn{padding:6px 14px;border-radius:6px;border:1.5px solid var(--border);background:transparent;font-size:0.8rem;font-weight:600;cursor:pointer;transition:all 0.13s;color:var(--text-secondary);}
+        .qct-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+        .quote-coverage-pane{display:none;}.quote-coverage-pane.active{display:block;}
+        .carrier-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;}
+        .carrier-card{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:14px 12px;text-align:center;}
+        .carrier-name{font-size:0.78rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;}
+        .carrier-monthly{font-size:1.4rem;font-weight:800;color:var(--accent);line-height:1;}
+        .carrier-monthly-sub{font-size:0.72rem;color:var(--text-secondary);margin-top:2px;}
+        .carrier-annual{font-size:0.78rem;color:var(--text-secondary);margin-top:4px;}
+        .carrier-badge{display:inline-block;margin-top:6px;padding:2px 8px;border-radius:4px;font-size:0.68rem;font-weight:700;text-transform:uppercase;}
+        .carrier-badge-best{background:#dcfce7;color:#15803d;}
+        .carrier-badge-high{background:#fee2e2;color:#b91c1c;}
+        .quote-factors{background:var(--bg-card);border-radius:8px;padding:12px 14px;margin-top:14px;font-size:0.82rem;line-height:1.7;color:var(--text-secondary);}
+        .quote-disclaimer{font-size:0.74rem;color:var(--text-secondary);margin-top:12px;padding:8px 12px;background:var(--bg-card);border-radius:6px;border-left:3px solid var(--warning);}
+        .aq-loading{display:flex;align-items:center;gap:12px;padding:20px;color:var(--text-secondary);font-size:0.88rem;}
+        .aq-loading .spinner{width:24px;height:24px;border-width:3px;flex-shrink:0;}
+        .aq-existing-policy{display:flex;align-items:center;gap:8px;padding:8px 12px;background:#dcfce7;border:1px solid #86efac;border-radius:6px;margin-bottom:10px;font-size:0.82rem;}
+        .aq-settings-warn{background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:14px 16px;margin-bottom:16px;font-size:0.87rem;color:#92400e;display:flex;align-items:center;gap:10px;}
         @media(max-width:720px){
             header{flex-wrap:wrap;padding:10px 14px;gap:6px;}
             .logo-area{flex:1;min-width:0;overflow:hidden;}
@@ -250,6 +284,7 @@
         <button onclick="showView('add-item')">Add Policy</button>
         <button onclick="showView('policies')">All Policies</button>
         <button onclick="showView('contacts')">Contacts &amp; Agents</button>
+        <button onclick="showView('auto-quotes')">🚗 Auto Quotes</button>
         <button onclick="showView('recycle-bin')">🗑 Recycle Bin</button>
     </nav>
     <div class="header-right">
@@ -628,6 +663,78 @@
     </div>
 </div>
 
+<!-- AUTO QUOTES -->
+<div id="view-auto-quotes" class="view">
+    <div class="card" style="margin-bottom:18px;">
+        <div class="card-title">
+            <div class="card-title-left">🚗 Auto Insurance Quote Engine</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="btn btn-secondary btn-sm" onclick="refreshAutoVehicles()">🔄 Refresh Vehicles</button>
+                <button class="btn btn-primary" id="get-quotes-btn" onclick="getAutoQuotes()">🚗 Get Auto Quotes</button>
+            </div>
+        </div>
+        <div id="aq-settings-warn" class="aq-settings-warn" style="display:none;">
+            ⚠️ AI API key or proxy URL not configured. <a href="#" onclick="showAqSettings()" style="color:var(--warning);font-weight:700;margin-left:6px;">Set up now →</a>
+        </div>
+        <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:14px;line-height:1.5;">
+            Select vehicles from your <strong>Automotive database</strong> to get AI-estimated insurance quotes.
+            Quotes are generated based on VIN, year, make, model, mileage, and vehicle type.
+        </p>
+        <!-- Coverage options -->
+        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;padding:14px;background:var(--bg-card);border-radius:8px;border:1px solid var(--border);">
+            <div>
+                <label style="font-size:0.78rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.4px;display:block;margin-bottom:6px;">Coverage Type</label>
+                <select id="aq-coverage-type" style="padding:7px 11px;border:1px solid var(--border);border-radius:6px;font-size:0.85rem;font-family:inherit;background:#fff;">
+                    <option value="all">All Coverage Levels</option>
+                    <option value="liability">Liability Only</option>
+                    <option value="full">Full Coverage</option>
+                </select>
+            </div>
+            <div>
+                <label style="font-size:0.78rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.4px;display:block;margin-bottom:6px;">Driver Age (primary)</label>
+                <select id="aq-driver-age" style="padding:7px 11px;border:1px solid var(--border);border-radius:6px;font-size:0.85rem;font-family:inherit;background:#fff;">
+                    <option value="35">35–45 (Standard)</option>
+                    <option value="25">25–34</option>
+                    <option value="18">18–24 (Young driver)</option>
+                    <option value="50">50–64</option>
+                    <option value="65">65+ (Senior)</option>
+                </select>
+            </div>
+            <div>
+                <label style="font-size:0.78rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.4px;display:block;margin-bottom:6px;">Driving Record</label>
+                <select id="aq-record" style="padding:7px 11px;border:1px solid var(--border);border-radius:6px;font-size:0.85rem;font-family:inherit;background:#fff;">
+                    <option value="clean">Clean (no incidents)</option>
+                    <option value="minor">1 Minor incident</option>
+                    <option value="accident">At-fault accident</option>
+                    <option value="dui">DUI/DWI</option>
+                </select>
+            </div>
+            <div>
+                <label style="font-size:0.78rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.4px;display:block;margin-bottom:6px;">State</label>
+                <input type="text" id="aq-state" value="MN" maxlength="2" style="padding:7px 11px;border:1px solid var(--border);border-radius:6px;font-size:0.85rem;font-family:inherit;background:#fff;width:70px;text-transform:uppercase;">
+            </div>
+        </div>
+        <!-- Vehicle selector -->
+        <div style="font-size:0.82rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;">
+            <span>Select Vehicles</span>
+            <div style="display:flex;gap:6px;">
+                <button class="btn btn-ghost btn-sm" onclick="aqSelectAll()">Select All</button>
+                <button class="btn btn-ghost btn-sm" onclick="aqClearAll()">Clear All</button>
+            </div>
+        </div>
+        <div id="aq-vehicle-list"><div style="color:var(--text-secondary);font-size:0.85rem;padding:12px 0;">Loading vehicles from Automotive database…</div></div>
+    </div>
+
+    <!-- Quote results -->
+    <div id="aq-results" style="display:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+            <div style="font-size:1rem;font-weight:700;color:var(--text-primary);">📊 Quote Results</div>
+            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('aq-results').style.display='none'">✕ Clear Results</button>
+        </div>
+        <div id="aq-results-body"></div>
+    </div>
+</div>
+
 <!-- RECYCLE BIN -->
 <div id="view-recycle-bin" class="view">
     <div class="toolbar">
@@ -683,7 +790,7 @@ const TYPE_ICON={
     Home:'🏠',Renters:'🏢',Auto:'🚗',Health:'❤',Dental:'🦷',Vision:'👓',
     Life:'🌿',Farm:'🌾',Umbrella:'☂',Disability:'♿',Pet:'🐾',Travel:'✈',Other:'📋'
 };
-const VIEWS=['dashboard','add-item','policies','contacts','recycle-bin'];
+const VIEWS=['dashboard','add-item','policies','contacts','auto-quotes','recycle-bin'];
 
 auth.onAuthStateChanged(user=>{
     if(user){
@@ -1181,6 +1288,340 @@ function toast(msg,type=''){
     const t=document.getElementById('toast'); t.textContent=msg;
     t.className='toast'+(type?' '+type:''); t.classList.add('show');
     setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  AUTO QUOTE ENGINE
+// ══════════════════════════════════════════════════════════════════
+let aqVehicles = [];           // vehicles from automotive_items
+let aqSelectedIds = new Set(); // _docId of selected vehicles
+let aqApiKey = '';
+let aqProxyUrl = '';
+
+// Load on first visit to auto-quotes view
+async function refreshAutoVehicles() {
+    const listEl = document.getElementById('aq-vehicle-list');
+    if (!listEl) return;
+    listEl.innerHTML = '<div class="aq-loading"><div class="spinner"></div>Loading vehicles from Automotive database…</div>';
+    try {
+        const snap = await db.collection('automotive_items').get();
+        aqVehicles = snap.docs
+            .map(d => ({ _docId: d.id, ...d.data() }))
+            .filter(v => !v.deleted)
+            .sort((a, b) => {
+                const yr = (b.year || 0) - (a.year || 0);
+                if (yr !== 0) return yr;
+                return ((a.make || '') + (a.model || '')).localeCompare((b.make || '') + (b.model || ''));
+            });
+
+        if (!aqVehicles.length) {
+            listEl.innerHTML = '<div style="color:var(--text-secondary);padding:14px 0;font-size:0.87rem;">No vehicles found in the Automotive database. <a href="automotive.html" style="color:var(--accent);">Add vehicles →</a></div>';
+            return;
+        }
+        renderAqVehicleList();
+    } catch (err) {
+        listEl.innerHTML = `<div style="color:var(--danger);padding:12px;">${err.message}</div>`;
+    }
+
+    // Also load API settings
+    try {
+        const kd = await db.collection('settings').doc('apikey').get();
+        if (kd.exists && kd.data().key) aqApiKey = kd.data().key;
+        const pd = await db.collection('settings').doc('proxy').get();
+        if (pd.exists && pd.data().url) aqProxyUrl = pd.data().url;
+    } catch {}
+
+    const warn = document.getElementById('aq-settings-warn');
+    if (warn) warn.style.display = (!aqApiKey || !aqProxyUrl) ? 'flex' : 'none';
+}
+
+function renderAqVehicleList() {
+    const listEl = document.getElementById('aq-vehicle-list');
+    if (!listEl || !aqVehicles.length) return;
+    listEl.innerHTML = aqVehicles.map(v => {
+        const vLabel = [v.year, v.make, v.model].filter(Boolean).join(' ') || 'Unknown Vehicle';
+        const hasVin = !!(v.serialNumber || v.vin);
+        const vinDisplay = (v.serialNumber || v.vin || '').slice(0, 17);
+        const icon = vehicleIcon(v.category);
+        const isSelected = aqSelectedIds.has(v._docId);
+        return `<div class="aq-vehicle-row${isSelected ? ' selected' : ''}" onclick="aqToggle('${v._docId}')">
+            <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation();aqToggle('${v._docId}')">
+            <div class="aq-veh-icon">${icon}</div>
+            <div class="aq-veh-info">
+                <div class="aq-veh-name">${esc(vLabel)}</div>
+                <div class="aq-veh-detail">${esc(v.category || 'Vehicle')}${v.mileage ? ' · ' + Number(v.mileage).toLocaleString() + ' mi' : ''}${v.color ? ' · ' + v.color : ''}${v.defaultDriver ? ' · Driver: ' + v.defaultDriver : ''}</div>
+                ${hasVin ? `<div class="aq-veh-vin">VIN: ${esc(vinDisplay)}</div>` : '<div class="aq-veh-vin" style="color:var(--warning);">⚠ No VIN on file</div>'}
+            </div>
+            ${checkExistingAutoPolicy(v) ? '<span style="font-size:0.72rem;background:#dcfce7;color:#15803d;padding:2px 7px;border-radius:4px;font-weight:700;white-space:nowrap;">Active Policy ✓</span>' : ''}
+        </div>`;
+    }).join('');
+}
+
+function vehicleIcon(cat) {
+    const map = { 'Truck': '🛻', 'Pickup Truck': '🛻', 'Car': '🚗', 'SUV': '🚙', 'Van': '🚐', 'Minivan': '🚐',
+        'Motorcycle': '🏍️', 'ATV': '🏎️', 'UTV / Side-by-Side': '🏎️', 'Boat': '⛵', 'RV / Motorhome': '🚌',
+        'Truck - Semi': '🚛', 'Trailer': '🚚', 'Forklift': '🏗️', 'Tractor': '🚜' };
+    return map[cat] || '🚗';
+}
+
+function checkExistingAutoPolicy(v) {
+    const vLabel = [v.year, v.make, v.model].filter(Boolean).join(' ').toLowerCase();
+    return items.some(p => p.insType === 'Auto' && p.status !== 'Cancelled' &&
+        ((p.vehicles || '').toLowerCase().includes(v.make?.toLowerCase() || '') ||
+         (p.policyName || '').toLowerCase().includes(v.make?.toLowerCase() || '')));
+}
+
+function aqToggle(docId) {
+    if (aqSelectedIds.has(docId)) aqSelectedIds.delete(docId);
+    else aqSelectedIds.add(docId);
+    renderAqVehicleList();
+}
+function aqSelectAll() { aqVehicles.forEach(v => aqSelectedIds.add(v._docId)); renderAqVehicleList(); }
+function aqClearAll() { aqSelectedIds.clear(); renderAqVehicleList(); }
+function showAqSettings() {
+    // Prompt user to configure via agents/forte settings
+    const url = prompt('Enter your Cloudflare Worker proxy URL:');
+    if (url) { aqProxyUrl = url; db.collection('settings').doc('proxy').set({ url }); }
+}
+
+function esc(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+async function getAutoQuotes() {
+    const selected = aqVehicles.filter(v => aqSelectedIds.has(v._docId));
+    if (!selected.length) { toast('Select at least one vehicle first.', 'error'); return; }
+    if (!aqApiKey) { toast('API key not set. Configure in FORTÉ or Agents settings.', 'error'); return; }
+    if (!aqProxyUrl) { toast('Proxy URL not set. Configure in FORTÉ or Agents settings.', 'error'); return; }
+
+    const btn = document.getElementById('get-quotes-btn');
+    btn.disabled = true; btn.textContent = '⏳ Getting Quotes…';
+
+    const driverAge = document.getElementById('aq-driver-age').value;
+    const driverAgeLabel = document.getElementById('aq-driver-age').selectedOptions[0].text;
+    const record = document.getElementById('aq-record').value;
+    const recordLabel = document.getElementById('aq-record').selectedOptions[0].text;
+    const state = (document.getElementById('aq-state').value || 'MN').trim().toUpperCase();
+
+    const resultsDiv = document.getElementById('aq-results');
+    const bodyDiv = document.getElementById('aq-results-body');
+    resultsDiv.style.display = 'block';
+    bodyDiv.innerHTML = '';
+    resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    for (const v of selected) {
+        const cardId = 'qcard-' + v._docId;
+        const vLabel = [v.year, v.make, v.model].filter(Boolean).join(' ') || 'Unknown Vehicle';
+        const vinStr = v.serialNumber || v.vin || '';
+
+        // Insert loading card
+        bodyDiv.insertAdjacentHTML('beforeend', `
+            <div class="quote-card" id="${cardId}">
+                <div class="quote-card-header">
+                    <div>
+                        <div class="quote-card-veh">${vehicleIcon(v.category)} ${esc(vLabel)}</div>
+                        ${vinStr ? `<div class="quote-card-vin">VIN: ${esc(vinStr)}</div>` : ''}
+                    </div>
+                    <span style="font-size:0.78rem;color:rgba(255,255,255,0.5);">${esc(state)} · ${esc(driverAgeLabel)} · ${esc(recordLabel)}</span>
+                </div>
+                <div class="quote-card-body">
+                    <div class="aq-loading"><div class="spinner"></div>Analyzing vehicle and generating quotes…</div>
+                </div>
+            </div>`);
+
+        try {
+            const quotes = await fetchVehicleQuotes(v, state, driverAge, record);
+            renderQuoteCard(cardId, v, quotes, state, driverAgeLabel, recordLabel);
+        } catch (err) {
+            document.getElementById(cardId).querySelector('.quote-card-body').innerHTML =
+                `<div style="color:var(--danger);padding:14px;">${err.message}</div>`;
+        }
+    }
+
+    btn.disabled = false; btn.textContent = '🚗 Get Auto Quotes';
+    toast(`Quotes generated for ${selected.length} vehicle${selected.length > 1 ? 's' : ''}!`, 'success');
+}
+
+async function fetchVehicleQuotes(v, state, driverAge, record) {
+    const vLabel = [v.year, v.make, v.model].filter(Boolean).join(' ');
+    const vinStr = v.serialNumber || v.vin || '';
+    const mileage = v.mileage ? Number(v.mileage).toLocaleString() + ' miles' : 'unknown mileage';
+    const condition = v.condition || 'Good';
+    const category = v.category || 'Vehicle';
+
+    // Check for existing auto policy to include as comparison context
+    const existingPolicy = items.find(p => p.insType === 'Auto' && p.status !== 'Cancelled' &&
+        ((p.vehicles || '').toLowerCase().includes((v.make || '').toLowerCase()) ||
+         (p.policyName || '').toLowerCase().includes((v.make || '').toLowerCase())));
+
+    const systemPrompt = `You are an expert auto insurance analyst with deep knowledge of US insurance pricing across all major carriers. You provide highly accurate, realistic insurance rate estimates based on vehicle data, driver profiles, and state regulations. Always return valid JSON exactly as requested.`;
+
+    const userPrompt = `Generate realistic auto insurance quote estimates for the following vehicle and driver profile.
+
+VEHICLE:
+- Year/Make/Model: ${vLabel || 'Unknown'}
+- Type/Category: ${category}
+- VIN: ${vinStr || 'Not provided'}
+- Mileage: ${mileage}
+- Condition: ${condition}
+- Color: ${v.color || 'Unknown'}
+- Engine: ${v.engine || 'Unknown'}
+
+DRIVER PROFILE:
+- Primary driver age range: ${driverAge}
+- Driving record: ${record}
+- State: ${state}
+- Annual miles driven: approximately 12,000 (assumed)
+
+${existingPolicy ? `EXISTING POLICY ON FILE: Currently insured with ${existingPolicy.carrier || 'unknown carrier'} at $${existingPolicy.premium || '?'} / ${existingPolicy.premiumFreq || 'year'}. Include a "Current Policy" comparison.` : ''}
+
+Return ONLY this JSON structure (no other text):
+{
+  "vehicleSummary": "Brief 1-sentence summary of the vehicle from an insurance risk perspective",
+  "riskFactors": ["factor1", "factor2", "factor3"],
+  "savingsTips": ["tip1", "tip2"],
+  "liability": {
+    "description": "State minimum liability only (no collision/comprehensive)",
+    "carriers": [
+      {"name": "State Farm", "monthly": 85, "annual": 1020, "notes": ""},
+      {"name": "GEICO", "monthly": 72, "annual": 864, "notes": ""},
+      {"name": "Progressive", "monthly": 78, "annual": 936, "notes": ""},
+      {"name": "Allstate", "monthly": 95, "annual": 1140, "notes": ""},
+      {"name": "Farmers", "monthly": 88, "annual": 1056, "notes": ""},
+      {"name": "USAA", "monthly": 65, "annual": 780, "notes": "Military/eligible only"}
+    ]
+  },
+  "full500": {
+    "description": "Full coverage with $500 deductible (liability + collision + comprehensive)",
+    "carriers": [
+      {"name": "State Farm", "monthly": 145, "annual": 1740, "notes": ""},
+      {"name": "GEICO", "monthly": 128, "annual": 1536, "notes": ""},
+      {"name": "Progressive", "monthly": 138, "annual": 1656, "notes": "Snapshot discount available"},
+      {"name": "Allstate", "monthly": 162, "annual": 1944, "notes": ""},
+      {"name": "Farmers", "monthly": 155, "annual": 1860, "notes": ""},
+      {"name": "USAA", "monthly": 112, "annual": 1344, "notes": "Military/eligible only"}
+    ]
+  },
+  "full1000": {
+    "description": "Full coverage with $1,000 deductible (liability + collision + comprehensive)",
+    "carriers": [
+      {"name": "State Farm", "monthly": 118, "annual": 1416, "notes": ""},
+      {"name": "GEICO", "monthly": 104, "annual": 1248, "notes": ""},
+      {"name": "Progressive", "monthly": 112, "annual": 1344, "notes": ""},
+      {"name": "Allstate", "monthly": 132, "annual": 1584, "notes": ""},
+      {"name": "Farmers", "monthly": 126, "annual": 1512, "notes": ""},
+      {"name": "USAA", "monthly": 92, "annual": 1104, "notes": "Military/eligible only"}
+    ]
+  }
+}
+
+Make all numbers realistic and accurate for ${state} based on the vehicle type, age, driver profile, and current market rates. Adjust meaningfully for risk factors (sports cars cost more, older vehicles cost less for full coverage, young drivers cost more, DUI increases rates 60-100%, etc.).`;
+
+    const res = await fetch(aqProxyUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            apiKey: aqApiKey,
+            model: 'claude-sonnet-4-5',
+            max_tokens: 1800,
+            system: systemPrompt,
+            messages: [{ role: 'user', content: userPrompt }],
+            stream: false
+        })
+    });
+
+    if (!res.ok) throw new Error(`API error ${res.status}`);
+    const data = await res.json();
+    const text = data?.content?.[0]?.text || data?.choices?.[0]?.message?.content || '';
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('Could not parse quote data from AI response');
+    return JSON.parse(jsonMatch[0]);
+}
+
+function renderQuoteCard(cardId, v, quotes, state, driverAgeLabel, recordLabel) {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    const vLabel = [v.year, v.make, v.model].filter(Boolean).join(' ') || 'Unknown Vehicle';
+    const vinStr = v.serialNumber || v.vin || '';
+
+    const coverages = [
+        { key: 'liability', label: 'Liability Only' },
+        { key: 'full500',   label: 'Full · $500 Ded.' },
+        { key: 'full1000',  label: 'Full · $1,000 Ded.' },
+    ];
+
+    // Check for existing policy comparison
+    const existing = items.find(p => p.insType === 'Auto' && p.status !== 'Cancelled' &&
+        ((p.vehicles || '').toLowerCase().includes((v.make || '').toLowerCase()) ||
+         (p.policyName || '').toLowerCase().includes((v.make || '').toLowerCase())));
+
+    card.innerHTML = `
+        <div class="quote-card-header">
+            <div>
+                <div class="quote-card-veh">${vehicleIcon(v.category)} ${esc(vLabel)}</div>
+                ${vinStr ? `<div class="quote-card-vin">VIN: ${esc(vinStr)}</div>` : ''}
+                ${quotes.vehicleSummary ? `<div style="font-size:0.78rem;color:rgba(255,255,255,0.55);margin-top:4px;">${esc(quotes.vehicleSummary)}</div>` : ''}
+            </div>
+            <span style="font-size:0.78rem;color:rgba(255,255,255,0.5);text-align:right;">${esc(state)}<br>${esc(driverAgeLabel)}<br>${esc(recordLabel)}</span>
+        </div>
+        <div class="quote-card-body">
+            ${existing ? `<div class="aq-existing-policy">✅ <strong>Current policy:</strong>&nbsp;${esc(existing.carrier || 'Unknown carrier')} — ${fmtMoney(existing.premium)} / ${esc(existing.premiumFreq || 'year')}</div>` : ''}
+
+            <div class="quote-coverage-tabs">
+                ${coverages.map((c, i) => `<button class="qct-btn${i === 1 ? ' active' : ''}" onclick="switchCoverage('${cardId}','${c.key}',this)">${c.label}</button>`).join('')}
+            </div>
+
+            ${coverages.map((c, i) => {
+                const cov = quotes[c.key];
+                if (!cov || !cov.carriers) return `<div class="quote-coverage-pane${i === 1 ? ' active' : ''}" id="${cardId}-${c.key}"><div style="color:var(--text-secondary);padding:12px;">No data for this coverage level.</div></div>`;
+                const sorted = [...cov.carriers].sort((a, b) => a.monthly - b.monthly);
+                const cheapest = sorted[0]?.monthly;
+                const priciest = sorted[sorted.length - 1]?.monthly;
+                return `<div class="quote-coverage-pane${i === 1 ? ' active' : ''}" id="${cardId}-${c.key}">
+                    <div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:10px;">${esc(cov.description || '')}</div>
+                    <div class="carrier-grid">
+                        ${sorted.map((carrier, ci) => {
+                            const isBest = carrier.monthly === cheapest;
+                            const isHigh = carrier.monthly === priciest;
+                            return `<div class="carrier-card">
+                                <div class="carrier-name">${esc(carrier.name)}</div>
+                                <div class="carrier-monthly">$${carrier.monthly}<span style="font-size:0.8rem;font-weight:400;">/mo</span></div>
+                                <div class="carrier-annual">$${Number(carrier.annual).toLocaleString()}/yr</div>
+                                ${isBest ? '<span class="carrier-badge carrier-badge-best">Lowest</span>' : ''}
+                                ${isHigh ? '<span class="carrier-badge carrier-badge-high">Highest</span>' : ''}
+                                ${carrier.notes ? `<div style="font-size:0.68rem;color:var(--text-secondary);margin-top:4px;">${esc(carrier.notes)}</div>` : ''}
+                            </div>`;
+                        }).join('')}
+                    </div>
+                    <div style="display:flex;justify-content:space-between;margin-top:12px;padding:10px 14px;background:var(--bg-card);border-radius:7px;font-size:0.83rem;flex-wrap:wrap;gap:8px;">
+                        <span>Range: <strong>$${cheapest}–$${priciest}/mo</strong></span>
+                        <span>Annual: <strong>$${Number(cheapest*12).toLocaleString()}–$${Number(priciest*12).toLocaleString()}</strong></span>
+                    </div>
+                </div>`;
+            }).join('')}
+
+            ${quotes.riskFactors?.length ? `<div class="quote-factors">
+                <strong style="color:var(--text-primary);">📋 Rate Factors:</strong> ${quotes.riskFactors.map(f => esc(f)).join(' · ')}
+            </div>` : ''}
+            ${quotes.savingsTips?.length ? `<div class="quote-factors" style="margin-top:8px;">
+                <strong style="color:var(--accent);">💡 Ways to Save:</strong> ${quotes.savingsTips.map(t => esc(t)).join(' · ')}
+            </div>` : ''}
+            <div class="quote-disclaimer">⚠ Estimates only — based on typical market rates for the given profile. Contact carriers directly for binding quotes. Actual rates vary by credit score, exact address, coverage limits, and other factors.</div>
+        </div>`;
+}
+
+function switchCoverage(cardId, coverageKey, btn) {
+    const card = document.getElementById(cardId);
+    card.querySelectorAll('.quote-coverage-pane').forEach(p => p.classList.remove('active'));
+    card.querySelectorAll('.qct-btn').forEach(b => b.classList.remove('active'));
+    const pane = document.getElementById(cardId + '-' + coverageKey);
+    if (pane) pane.classList.add('active');
+    btn.classList.add('active');
+}
+
+// Auto-load vehicles when switching to the auto-quotes view
+const _origShowView = showView;
+function showView(v) {
+    _origShowView(v);
+    if (v === 'auto-quotes') refreshAutoVehicles();
 }
 </script>
 </body>

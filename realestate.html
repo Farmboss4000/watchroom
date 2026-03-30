@@ -183,6 +183,20 @@
         .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#1a1f2e;color:#fff;padding:10px 20px;border-radius:8px;font-size:0.87rem;font-weight:500;opacity:0;transition:all 0.3s;z-index:9999;pointer-events:none;white-space:nowrap;max-width:90vw;}
         .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
         .toast.success{background:var(--success);}.toast.error{background:var(--danger);}
+        /* ── PROPERTY SEARCH ── */
+        .ps-result-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:14px;transition:border-color 0.15s;}
+        .ps-result-card:hover{border-color:var(--accent);}
+        .ps-result-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap;}
+        .ps-address{font-size:1rem;font-weight:700;color:var(--text-primary);}
+        .ps-owner{font-size:0.83rem;color:var(--text-secondary);margin-top:2px;}
+        .ps-meta{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+        .ps-pill{background:var(--bg-card);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:0.76rem;color:var(--text-secondary);font-weight:500;}
+        .ps-pill span{color:var(--text-primary);font-weight:700;}
+        .ps-source{font-size:0.75rem;color:var(--text-secondary);margin-top:8px;}
+        .ps-source a{color:var(--accent);text-decoration:none;}
+        .ps-searching{text-align:center;padding:40px 20px;color:var(--text-secondary);}
+        .ps-searching .spinner{margin:0 auto 14px;}
+        .ps-no-results{text-align:center;padding:40px 20px;color:var(--text-secondary);background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;}
         /* ── RECYCLE BIN ── */
         .bin-item{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;}
         .bin-item:last-child{border-bottom:none;}
@@ -298,6 +312,7 @@
         <button class="active" onclick="showView('dashboard')">Dashboard</button>
         <button onclick="showView('properties')">Properties</button>
         <button onclick="showView('add-property')">＋ Add Property</button>
+        <button onclick="showView('property-search')">🔍 Property Search</button>
         <button onclick="showView('financial')">Financial</button>
         <button onclick="showView('reports')">Reports</button>
         <button onclick="showView('recycle-bin')">🗑 Recycle Bin</button>
@@ -546,6 +561,43 @@
 <!-- ══════════════════════════════════════
      RECYCLE BIN
 ══════════════════════════════════════ -->
+<!-- ══ PROPERTY SEARCH ══ -->
+<div class="view" id="view-property-search">
+    <div class="card" style="max-width:640px;">
+        <div class="card-title">
+            <div class="card-title-left">🔍 Property Search by Owner</div>
+        </div>
+        <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:18px;line-height:1.55;">Search public property records by owner name and state. Results are pulled from live web sources and can be added directly to your database.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
+            <div class="form-group" style="margin:0;">
+                <label>Owner Name *</label>
+                <input type="text" id="ps-owner" placeholder="e.g. John Smith" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:7px;font-size:0.9rem;font-family:inherit;color:var(--text-primary);background:var(--bg-secondary);">
+            </div>
+            <div class="form-group" style="margin:0;">
+                <label>State *</label>
+                <select id="ps-state" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:7px;font-size:0.9rem;font-family:inherit;color:var(--text-primary);background:var(--bg-secondary);">
+                    <option value="">Select state…</option>
+                    <option>Alabama</option><option>Alaska</option><option>Arizona</option><option>Arkansas</option><option>California</option>
+                    <option>Colorado</option><option>Connecticut</option><option>Delaware</option><option>Florida</option><option>Georgia</option>
+                    <option>Hawaii</option><option>Idaho</option><option>Illinois</option><option>Indiana</option><option>Iowa</option>
+                    <option>Kansas</option><option>Kentucky</option><option>Louisiana</option><option>Maine</option><option>Maryland</option>
+                    <option>Massachusetts</option><option>Michigan</option><option>Minnesota</option><option>Mississippi</option><option>Missouri</option>
+                    <option>Montana</option><option>Nebraska</option><option>Nevada</option><option>New Hampshire</option><option>New Jersey</option>
+                    <option>New Mexico</option><option>New York</option><option>North Carolina</option><option>North Dakota</option><option>Ohio</option>
+                    <option>Oklahoma</option><option>Oregon</option><option>Pennsylvania</option><option>Rhode Island</option><option>South Carolina</option>
+                    <option>South Dakota</option><option>Tennessee</option><option>Texas</option><option>Utah</option><option>Vermont</option>
+                    <option>Virginia</option><option>Washington</option><option>West Virginia</option><option>Wisconsin</option><option>Wyoming</option>
+                </select>
+            </div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;">
+            <button class="btn btn-primary" onclick="runPropertySearch()" id="ps-btn">🔍 Search Properties</button>
+            <div id="ps-status" style="font-size:0.83rem;color:var(--text-secondary);"></div>
+        </div>
+    </div>
+    <div id="ps-results"></div>
+</div>
+
 <div class="view" id="view-recycle-bin">
     <div class="card">
         <div class="card-title">
@@ -654,7 +706,7 @@ function showView(name) {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.getElementById('view-' + name).classList.add('active');
     document.querySelectorAll('nav button').forEach((b,i) => {
-        const map = ['dashboard','properties','add-property','financial','reports','recycle-bin'];
+        const map = ['dashboard','properties','add-property','property-search','financial','reports','recycle-bin'];
         b.classList.toggle('active', map[i] === name);
     });
     if (name === 'add-property' && !editingId) resetForm();
@@ -1264,6 +1316,140 @@ async function permanentDelete(id) {
 
 // INIT photo slots on load
 buildPhotoSlots();
+
+// ── PROPERTY SEARCH ──────────────────────────────────────────────
+let psApiKey = '', psProxyUrl = '';
+// Load API settings from shared Firestore settings docs
+async function loadApiSettings() {
+    try {
+        const kd = await db.collection('settings').doc('apikey').get();
+        if (kd.exists) psApiKey = kd.data().key || '';
+        const pd = await db.collection('settings').doc('proxy').get();
+        if (pd.exists) psProxyUrl = pd.data().url || '';
+    } catch(e) {}
+}
+loadApiSettings();
+
+async function runPropertySearch() {
+    const owner = document.getElementById('ps-owner').value.trim();
+    const state = document.getElementById('ps-state').value;
+    if (!owner || !state) { showToast('Enter owner name and select a state.', true); return; }
+    if (!psApiKey || !psProxyUrl) {
+        document.getElementById('ps-results').innerHTML = `<div class="ps-no-results">⚙️ API key and proxy URL not configured. Set them up in the <strong>Agents</strong> site under Settings.</div>`;
+        return;
+    }
+
+    const btn = document.getElementById('ps-btn');
+    const status = document.getElementById('ps-status');
+    btn.disabled = true; btn.textContent = 'Searching…';
+    status.textContent = 'Searching public records…';
+    document.getElementById('ps-results').innerHTML = `<div class="ps-searching"><div class="spinner"></div><div>Searching property records for <strong>${esc(owner)}</strong> in <strong>${esc(state)}</strong>…</div></div>`;
+
+    const systemPrompt = `You are a property records research assistant. Search public property records, county assessor databases, and real estate listing sites. Return ONLY a valid JSON array of properties found. Each object must have these fields (use null for unknown): address, city, county, state, zip, propertyType, acres, sqft, bedrooms, bathrooms, yearBuilt, assessedValue, marketValue, parcelNumber, ownerName, ownerAddress, taxAmount, lastSaleDate, lastSalePrice, sourceUrl, sourceNote. If no properties are found return an empty array []. Do not include any explanation or markdown — just the raw JSON array.`;
+
+    const userPrompt = `Search public property records, county assessor websites, and real estate databases for all properties owned by "${owner}" in ${state}. Include residential, farm/ranch, commercial, and vacant land. Return results as a JSON array.`;
+
+    try {
+        const res = await fetch(psProxyUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                apiKey: psApiKey,
+                model: 'claude-sonnet-4-6',
+                max_tokens: 4096,
+                system: systemPrompt,
+                messages: [{ role: 'user', content: userPrompt }],
+                stream: false,
+                tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 8 }]
+            })
+        });
+        const raw = await res.text();
+        const j = JSON.parse(raw);
+        const textBlocks = (j?.content || []).filter(b => b.type === 'text').map(b => b.text);
+        const text = textBlocks.join('') || j?.content?.[0]?.text || '';
+
+        // Extract JSON array from the response
+        const match = text.match(/\[[\s\S]*\]/);
+        if (!match) throw new Error('No property data returned');
+        const props = JSON.parse(match[0]);
+        renderSearchResults(props, owner, state);
+    } catch(err) {
+        document.getElementById('ps-results').innerHTML = `<div class="ps-no-results">⚠️ Search error: ${esc(err.message)}</div>`;
+    }
+    btn.disabled = false; btn.textContent = '🔍 Search Properties';
+    status.textContent = '';
+}
+
+function renderSearchResults(props, owner, state) {
+    const el = document.getElementById('ps-results');
+    if (!props.length) {
+        el.innerHTML = `<div class="ps-no-results"><div style="font-size:2rem;margin-bottom:10px;">🔎</div><div style="font-weight:600;margin-bottom:6px;">No properties found</div><div style="font-size:0.85rem;">No public records found for <strong>${esc(owner)}</strong> in <strong>${esc(state)}</strong>. Try a different name spelling or check county records directly.</div></div>`;
+        return;
+    }
+    el.innerHTML = `
+        <div style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:14px;font-weight:600;">${props.length} propert${props.length === 1 ? 'y' : 'ies'} found for <strong>${esc(owner)}</strong> in <strong>${esc(state)}</strong></div>
+        ${props.map((p, i) => `
+        <div class="ps-result-card">
+            <div class="ps-result-header">
+                <div>
+                    <div class="ps-address">${esc(p.address || 'Address unknown')}${p.city ? ', ' + esc(p.city) : ''}${p.state ? ', ' + esc(p.state) : ''}${p.zip ? ' ' + esc(p.zip) : ''}</div>
+                    <div class="ps-owner">Owner: ${esc(p.ownerName || owner)}${p.county ? ' · ' + esc(p.county) + ' County' : ''}</div>
+                </div>
+                <button class="btn btn-success btn-sm" onclick="prefillFromSearch(${i})">＋ Add to Database</button>
+            </div>
+            <div class="ps-meta">
+                ${p.propertyType ? `<div class="ps-pill">Type: <span>${esc(p.propertyType)}</span></div>` : ''}
+                ${p.acres ? `<div class="ps-pill">Acres: <span>${esc(String(p.acres))}</span></div>` : ''}
+                ${p.sqft ? `<div class="ps-pill">Sq Ft: <span>${Number(p.sqft).toLocaleString()}</span></div>` : ''}
+                ${p.bedrooms ? `<div class="ps-pill">Beds: <span>${esc(String(p.bedrooms))}</span></div>` : ''}
+                ${p.bathrooms ? `<div class="ps-pill">Baths: <span>${esc(String(p.bathrooms))}</span></div>` : ''}
+                ${p.yearBuilt ? `<div class="ps-pill">Built: <span>${esc(String(p.yearBuilt))}</span></div>` : ''}
+                ${p.assessedValue ? `<div class="ps-pill">Assessed: <span>$${Number(p.assessedValue).toLocaleString()}</span></div>` : ''}
+                ${p.marketValue ? `<div class="ps-pill">Market Value: <span>$${Number(p.marketValue).toLocaleString()}</span></div>` : ''}
+                ${p.parcelNumber ? `<div class="ps-pill">Parcel: <span>${esc(p.parcelNumber)}</span></div>` : ''}
+                ${p.lastSalePrice ? `<div class="ps-pill">Last Sale: <span>$${Number(p.lastSalePrice).toLocaleString()}</span></div>` : ''}
+                ${p.lastSaleDate ? `<div class="ps-pill">Sale Date: <span>${esc(p.lastSaleDate)}</span></div>` : ''}
+            </div>
+            ${p.sourceUrl || p.sourceNote ? `<div class="ps-source">Source: ${p.sourceUrl ? `<a href="${esc(p.sourceUrl)}" target="_blank">${esc(p.sourceNote || p.sourceUrl)}</a>` : esc(p.sourceNote)}</div>` : ''}
+        </div>`).join('')}`;
+    // Store results for prefill
+    window._psResults = props;
+}
+
+function prefillFromSearch(idx) {
+    const p = (window._psResults || [])[idx];
+    if (!p) return;
+
+    // Map property type
+    const typeMap = {
+        'residential':'Primary Home','single family':'Primary Home','house':'Primary Home',
+        'farm':'Farm','ranch':'Farm','agricultural':'Farm','land':'Land','vacant':'Land',
+        'commercial':'Commercial','rental':'Rental','vacation':'Vacation'
+    };
+    const typeKey = Object.keys(typeMap).find(k => (p.propertyType || '').toLowerCase().includes(k));
+    const mappedType = typeMap[typeKey] || 'Primary Home';
+
+    const address = [p.address, p.city, p.state, p.zip].filter(Boolean).join(', ');
+
+    showView('add-property');
+    // Wait for form to appear then fill it
+    setTimeout(() => {
+        const set = (id, val) => { const el = document.getElementById(id); if (el && val != null) el.value = val; };
+        set('f-address', address || '');
+        set('f-type', mappedType);
+        set('f-beds', p.bedrooms || '');
+        set('f-baths', p.bathrooms || '');
+        set('f-sqft', p.sqft || '');
+        set('f-lot-acres', p.acres || '');
+        set('f-year-built', p.yearBuilt || '');
+        set('f-parcel', p.parcelNumber || '');
+        set('f-purchase-price', p.lastSalePrice || '');
+        set('f-purchase-date', p.lastSaleDate || '');
+        set('f-current-value', p.marketValue || p.assessedValue || '');
+        set('f-tax-annual', p.taxAmount || '');
+        showToast('Form pre-filled from search results — review and save!');
+    }, 100);
+}
 </script>
 </body>
 </html>

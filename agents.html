@@ -463,40 +463,52 @@ async function runAgent(id, silent = false) {
             signal: abortCtrl.signal
         });
 
-        const ct = res.headers.get('content-type') || '';
-        if (ct.includes('event-stream')) {
-            const reader = res.body.getReader(), dec = new TextDecoder();
-            let buf = '';
-            while (true) {
-                const { done, value } = await reader.read(); if (done) break;
-                buf += dec.decode(value, { stream: true });
-                const lines = buf.split('\n'); buf = lines.pop();
-                for (const line of lines) {
-                    if (!line.startsWith('data:')) continue;
-                    const d = line.slice(5).trim(); if (d === '[DONE]') continue;
-                    try { const delta = JSON.parse(d)?.delta?.text || ''; fullText += delta; if (!silent) updateStream(fullText); } catch {}
-                }
-            }
-        } else {
-            const j = await res.json();
-            fullText = j?.content?.[0]?.text || j?.choices?.[0]?.message?.content || '(No response)';
+        if (!res.ok) {
+            let errMsg = `HTTP ${res.status}`;
+            try { const ej = await res.json(); errMsg = ej?.error?.message || ej?.error || errMsg; } catch {}
+            fullText = `⚠️ API Error (${res.status}): ${errMsg}`;
             if (!silent) updateStream(fullText);
+        } else {
+            const ct = res.headers.get('content-type') || '';
+            if (ct.includes('event-stream')) {
+                const reader = res.body.getReader(), dec = new TextDecoder();
+                let buf = '';
+                while (true) {
+                    const { done, value } = await reader.read(); if (done) break;
+                    buf += dec.decode(value, { stream: true });
+                    const lines = buf.split('\n'); buf = lines.pop();
+                    for (const line of lines) {
+                        if (!line.startsWith('data:')) continue;
+                        const d = line.slice(5).trim(); if (d === '[DONE]') continue;
+                        try { const delta = JSON.parse(d)?.delta?.text || ''; fullText += delta; if (!silent) updateStream(fullText); } catch {}
+                    }
+                }
+            } else {
+                const j = await res.json();
+                fullText = j?.content?.[0]?.text || j?.choices?.[0]?.message?.content || j?.error?.message || JSON.stringify(j);
+                if (!silent) updateStream(fullText);
+            }
         }
     } catch (err) {
-        if (err.name !== 'AbortError') { fullText = 'Error: ' + err.message; if (!silent) updateStream(fullText); }
+        if (err.name !== 'AbortError') {
+            fullText = `⚠️ Error: ${err.message || 'Network request failed. Check proxy URL.'}`;
+            if (!silent) updateStream(fullText);
+        }
     }
 
     if (!silent) finishStream();
 
     // Save report + update lastRunAt
-    if (fullText && fullText.length > 10) {
+    if (fullText) {
         await db.collection('agent_reports').add({
             agentId: agent._id, agentName: agent.name, agentIcon: agent.icon || '🤖',
             content: fullText, createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         await db.collection('agents').doc(agent._id).update({ lastRunAt: firebase.firestore.FieldValue.serverTimestamp() });
+        if (!silent) toast('Report saved!');
+    } else {
+        if (!silent) toast('No response received — check Settings.');
     }
-    if (!silent) toast('Report saved!');
 }
 
 function renderRunView(agent, content, streaming) {

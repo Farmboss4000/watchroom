@@ -463,14 +463,15 @@ async function runAgent(id, silent = false) {
             signal: abortCtrl.signal
         });
 
-        const ct = res.headers.get('content-type') || '';
-        if (ct.includes('event-stream') || ct.includes('text/')) {
-            // SSE streaming — process regardless of status code
-            const reader = res.body.getReader(), dec = new TextDecoder();
-            let buf = '';
-            while (true) {
-                const { done, value } = await reader.read(); if (done) break;
-                buf += dec.decode(value, { stream: true });
+        // Read body as text first, then auto-detect SSE vs JSON by content
+        const reader = res.body.getReader(), dec = new TextDecoder();
+        let buf = '', isSSE = null;
+        while (true) {
+            const { done, value } = await reader.read(); if (done) break;
+            buf += dec.decode(value, { stream: true });
+            // Auto-detect format on first chunk
+            if (isSSE === null) isSSE = /^(event:|data:)/.test(buf.trim());
+            if (isSSE) {
                 const lines = buf.split('\n'); buf = lines.pop();
                 for (const line of lines) {
                     if (!line.startsWith('data:')) continue;
@@ -478,15 +479,13 @@ async function runAgent(id, silent = false) {
                     try { const delta = JSON.parse(d)?.delta?.text || ''; fullText += delta; if (!silent) updateStream(fullText); } catch {}
                 }
             }
-        } else {
-            // JSON response (success or error)
-            const j = await res.json().catch(() => null);
-            if (!res.ok) {
-                const errMsg = j?.error?.message || j?.error || `HTTP ${res.status}`;
-                fullText = `⚠️ API Error (${res.status}): ${errMsg}`;
-            } else {
+        }
+        // If not SSE, parse entire buffer as JSON
+        if (!isSSE) {
+            try {
+                const j = JSON.parse(buf);
                 fullText = j?.content?.[0]?.text || j?.choices?.[0]?.message?.content || j?.error?.message || JSON.stringify(j);
-            }
+            } catch { fullText = buf || '(No response)'; }
             if (!silent) updateStream(fullText);
         }
     } catch (err) {

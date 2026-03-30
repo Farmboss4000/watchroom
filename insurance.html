@@ -838,6 +838,7 @@ function showView(v){
     const target=document.getElementById('view-'+v); if(target) target.classList.add('active');
     document.querySelectorAll('nav button').forEach((b,i)=>{ b.classList.toggle('active',VIEWS[i]===v); });
     if(v==='add-item'&&!document.getElementById('edit-doc-id').value) resetForm();
+    if(v==='auto-quotes') refreshAutoVehicles();
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────
@@ -1617,12 +1618,7 @@ function switchCoverage(cardId, coverageKey, btn) {
     btn.classList.add('active');
 }
 
-// Auto-load vehicles when switching to the auto-quotes view
-const _origShowView = showView;
-function showView(v) {
-    _origShowView(v);
-    if (v === 'auto-quotes') refreshAutoVehicles();
-}
+// auto-quotes vehicle load is handled in showView above
 </script>
 </body>
 </html>

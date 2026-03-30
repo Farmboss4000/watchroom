@@ -459,35 +459,23 @@ async function runAgent(id, silent = false) {
         const res = await fetch(proxyUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ apiKey, model: agent.model || 'claude-sonnet-4-6', max_tokens: 2048, system: systemPrompt, messages: [{ role: 'user', content: agent.prompt }], stream: true }),
+            body: JSON.stringify({ apiKey, model: agent.model || 'claude-sonnet-4-6', max_tokens: 2048, system: systemPrompt, messages: [{ role: 'user', content: agent.prompt }], stream: false }),
             signal: abortCtrl.signal
         });
 
-        // Read body as text first, then auto-detect SSE vs JSON by content
-        const reader = res.body.getReader(), dec = new TextDecoder();
-        let buf = '', isSSE = null;
-        while (true) {
-            const { done, value } = await reader.read(); if (done) break;
-            buf += dec.decode(value, { stream: true });
-            // Auto-detect format on first chunk
-            if (isSSE === null) isSSE = /^(event:|data:)/.test(buf.trim());
-            if (isSSE) {
-                const lines = buf.split('\n'); buf = lines.pop();
-                for (const line of lines) {
-                    if (!line.startsWith('data:')) continue;
-                    const d = line.slice(5).trim(); if (d === '[DONE]') continue;
-                    try { const delta = JSON.parse(d)?.delta?.text || ''; fullText += delta; if (!silent) updateStream(fullText); } catch {}
-                }
+        const text = await res.text();
+        try {
+            const j = JSON.parse(text);
+            if (!res.ok) {
+                fullText = `⚠️ Error: ${j?.error?.message || j?.error || 'HTTP ' + res.status}`;
+            } else {
+                fullText = j?.content?.[0]?.text || j?.choices?.[0]?.message?.content || j?.error?.message || text;
             }
+        } catch {
+            // Response wasn't JSON — show raw text for debugging
+            fullText = text || '(No response)';
         }
-        // If not SSE, parse entire buffer as JSON
-        if (!isSSE) {
-            try {
-                const j = JSON.parse(buf);
-                fullText = j?.content?.[0]?.text || j?.choices?.[0]?.message?.content || j?.error?.message || JSON.stringify(j);
-            } catch { fullText = buf || '(No response)'; }
-            if (!silent) updateStream(fullText);
-        }
+        if (!silent) updateStream(fullText);
     } catch (err) {
         if (err.name !== 'AbortError') {
             fullText = `⚠️ Error: ${err.message || 'Network request failed. Check proxy URL.'}`;

@@ -325,12 +325,13 @@
                 <!-- Row 1: Core identity -->
                 <div class="form-group span2">
                     <label>Medication Name (Brand) *</label>
-                    <input type="text" id="f-med-name" list="med-list" placeholder="e.g. Lipitor, Xanax, Metformin" autocomplete="off" required>
+                    <input type="text" id="f-med-name" list="med-list" placeholder="e.g. Lipitor, Xanax, Metformin" autocomplete="off" required oninput="autoFillGeneric(this.value)">
                     <datalist id="med-list"></datalist>
                 </div>
                 <div class="form-group">
                     <label>Generic Name</label>
-                    <input type="text" id="f-generic" placeholder="e.g. Atorvastatin">
+                    <input type="text" id="f-generic" list="generic-list" placeholder="e.g. Atorvastatin" autocomplete="off">
+                    <datalist id="generic-list"></datalist>
                 </div>
                 <!-- Row 2: Person & Doctor -->
                 <div class="form-group">
@@ -653,6 +654,137 @@ let formPhotos={
     pill:{file:null,base64:null,mimeType:null,existingUrl:null,deleted:false}
 };
 let personChartInst=null;
+
+// ── MEDICATION DICTIONARY (Brand → Generic) ───────────────────────
+const COMMON_MEDS = {
+  // Cardiovascular / Blood Pressure
+  'Accupril':'Quinapril','Accuretic':'Quinapril/Hydrochlorothiazide','Adalat':'Nifedipine',
+  'Altace':'Ramipril','Amlodipine':'Amlodipine','Atacand':'Candesartan','Avapro':'Irbesartan',
+  'Benicar':'Olmesartan','Bystolic':'Nebivolol','Caduet':'Amlodipine/Atorvastatin',
+  'Cardizem':'Diltiazem','Cardura':'Doxazosin','Coreg':'Carvedilol','Corgard':'Nadolol',
+  'Diovan':'Valsartan','Exforge':'Amlodipine/Valsartan','Hyzaar':'Losartan/HCTZ',
+  'Inderal':'Propranolol','Isoptin':'Verapamil','Lasix':'Furosemide','Lisinopril':'Lisinopril',
+  'Lopressor':'Metoprolol Tartrate','Losartan':'Losartan','Lotrel':'Amlodipine/Benazepril',
+  'Lotensin':'Benazepril','Mavik':'Trandolapril','Micardis':'Telmisartan',
+  'Minipress':'Prazosin','Monopril':'Fosinopril','Norvasc':'Amlodipine',
+  'Prinivil':'Lisinopril','Procardia':'Nifedipine','Tenormin':'Atenolol',
+  'Toprol XL':'Metoprolol Succinate','Tribenzor':'Olmesartan/Amlodipine/HCTZ',
+  'Twynsta':'Telmisartan/Amlodipine','Vasotec':'Enalapril','Zestril':'Lisinopril',
+  'Ziac':'Bisoprolol/HCTZ',
+  // Statins / Cholesterol
+  'Crestor':'Rosuvastatin','Lescol':'Fluvastatin','Lipitor':'Atorvastatin',
+  'Livalo':'Pitavastatin','Mevacor':'Lovastatin','Pravachol':'Pravastatin',
+  'Repatha':'Evolocumab','Tricor':'Fenofibrate','Vytorin':'Ezetimibe/Simvastatin',
+  'Welchol':'Colesevelam','Zetia':'Ezetimibe','Zocor':'Simvastatin',
+  // Blood Thinners / Anticoagulants
+  'Aggrenox':'Aspirin/Dipyridamole','Brilinta':'Ticagrelor','Coumadin':'Warfarin',
+  'Eliquis':'Apixaban','Lovenox':'Enoxaparin','Plavix':'Clopidogrel',
+  'Pradaxa':'Dabigatran','Savaysa':'Edoxaban','Xarelto':'Rivaroxaban',
+  // Diabetes
+  'Actos':'Pioglitazone','Avandia':'Rosiglitazone','Farxiga':'Dapagliflozin',
+  'Glucophage':'Metformin','Glucotrol':'Glipizide','Glipizide':'Glipizide',
+  'Humalog':'Insulin Lispro','Humulin':'Insulin Regular','Invokana':'Canagliflozin',
+  'Januvia':'Sitagliptin','Jardiance':'Empagliflozin','Lantus':'Insulin Glargine',
+  'Levemir':'Insulin Detemir','Metformin':'Metformin','Novolog':'Insulin Aspart',
+  'Ozempic':'Semaglutide','Rybelsus':'Semaglutide','Synjardy':'Empagliflozin/Metformin',
+  'Toujeo':'Insulin Glargine','Trulicity':'Dulaglutide','Victoza':'Liraglutide',
+  'Xigduo XR':'Dapagliflozin/Metformin',
+  // Mental Health / Antidepressants / Anxiety
+  'Abilify':'Aripiprazole','Ativan':'Lorazepam','Buspar':'Buspirone',
+  'Celexa':'Citalopram','Clonazepam':'Clonazepam','Cymbalta':'Duloxetine',
+  'Depakote':'Valproate','Effexor':'Venlafaxine','Geodon':'Ziprasidone',
+  'Klonopin':'Clonazepam','Lamictal':'Lamotrigine','Latuda':'Lurasidone',
+  'Lexapro':'Escitalopram','Lithium':'Lithium Carbonate','Luvox':'Fluvoxamine',
+  'Paxil':'Paroxetine','Pristiq':'Desvenlafaxine','Prozac':'Fluoxetine',
+  'Remeron':'Mirtazapine','Risperdal':'Risperidone','Rexulti':'Brexpiprazole',
+  'Seroquel':'Quetiapine','Symbyax':'Fluoxetine/Olanzapine','Trintellix':'Vortioxetine',
+  'Valium':'Diazepam','Viibryd':'Vilazodone','Wellbutrin':'Bupropion',
+  'Xanax':'Alprazolam','Zoloft':'Sertraline','Zyprexa':'Olanzapine',
+  // ADHD
+  'Adderall':'Amphetamine/Dextroamphetamine','Concerta':'Methylphenidate',
+  'Daytrana':'Methylphenidate','Focalin':'Dexmethylphenidate','Intuniv':'Guanfacine',
+  'Kapvay':'Clonidine','Metadate':'Methylphenidate','Quillivant':'Methylphenidate',
+  'Ritalin':'Methylphenidate','Strattera':'Atomoxetine','Vyvanse':'Lisdexamfetamine',
+  // Pain / Inflammation / Opioids
+  'Celebrex':'Celecoxib','Demerol':'Meperidine','Dilaudid':'Hydromorphone',
+  'Duragesic':'Fentanyl','Ibuprofen':'Ibuprofen','Motrin':'Ibuprofen',
+  'MS Contin':'Morphine Sulfate','Naproxen':'Naproxen','Norco':'Hydrocodone/Acetaminophen',
+  'OxyContin':'Oxycodone','Percocet':'Oxycodone/Acetaminophen','Roxicodone':'Oxycodone',
+  'Tylenol':'Acetaminophen','Ultram':'Tramadol','Vicodin':'Hydrocodone/Acetaminophen',
+  'Voltaren':'Diclofenac',
+  // Sleep
+  'Ambien':'Zolpidem','Belsomra':'Suvorexant','Doxepin':'Doxepin',
+  'Halcion':'Triazolam','Lunesta':'Eszopiclone','Restoril':'Temazepam',
+  'Rozerem':'Ramelteon','Silenor':'Doxepin','Sonata':'Zaleplon',
+  // Respiratory / Asthma / Allergy
+  'Advair':'Fluticasone/Salmeterol','Atrovent':'Ipratropium','Breo Ellipta':'Fluticasone/Vilanterol',
+  'Combivent':'Ipratropium/Albuterol','Dulera':'Mometasone/Formoterol','Flovent':'Fluticasone',
+  'Pulmicort':'Budesonide','Qvar':'Beclomethasone','Singulair':'Montelukast',
+  'Spiriva':'Tiotropium','Symbicort':'Budesonide/Formoterol','Trelegy':'Fluticasone/Umeclidinium/Vilanterol',
+  'Ventolin':'Albuterol','Xopenex':'Levalbuterol','Stiolto':'Tiotropium/Olodaterol',
+  // Allergies / Antihistamines
+  'Allegra':'Fexofenadine','Benadryl':'Diphenhydramine','Clarinex':'Desloratadine',
+  'Claritin':'Loratadine','Nasonex':'Mometasone','Patanase':'Olopatadine',
+  'Rhinocort':'Budesonide','Xyzal':'Levocetirizine','Zyrtec':'Cetirizine',
+  'Flonase':'Fluticasone',
+  // GI / Acid Reflux
+  'Aciphex':'Rabeprazole','Axid':'Nizatidine','Carafate':'Sucralfate',
+  'Dexilant':'Dexlansoprazole','Linzess':'Linaclotide','Miralax':'Polyethylene Glycol',
+  'Nexium':'Esomeprazole','Pepcid':'Famotidine','Prevacid':'Lansoprazole',
+  'Prilosec':'Omeprazole','Protonix':'Pantoprazole','Reglan':'Metoclopramide',
+  'Tagamet':'Cimetidine','Zantac':'Famotidine','Zofran':'Ondansetron',
+  // Thyroid
+  'Armour Thyroid':'Desiccated Thyroid','Cytomel':'Liothyronine',
+  'Levothroid':'Levothyroxine','Levoxyl':'Levothyroxine','Synthroid':'Levothyroxine',
+  'Tirosint':'Levothyroxine','Unithroid':'Levothyroxine',
+  // Antibiotics
+  'Amoxicillin':'Amoxicillin','Augmentin':'Amoxicillin/Clavulanate','Azithromycin':'Azithromycin',
+  'Bactrim':'Sulfamethoxazole/Trimethoprim','Biaxin':'Clarithromycin','Cipro':'Ciprofloxacin',
+  'Cleocin':'Clindamycin','Doxycycline':'Doxycycline','Flagyl':'Metronidazole',
+  'Keflex':'Cephalexin','Levaquin':'Levofloxacin','Macrobid':'Nitrofurantoin',
+  'Pen VK':'Penicillin V','Tetracycline':'Tetracycline','Vancomycin':'Vancomycin',
+  'Zithromax':'Azithromycin','Zosyn':'Piperacillin/Tazobactam',
+  // Antifungals / Antivirals
+  'Diflucan':'Fluconazole','Lamisil':'Terbinafine','Tamiflu':'Oseltamivir',
+  'Valtrex':'Valacyclovir','Zovirax':'Acyclovir',
+  // Hormones / Contraceptives / Osteoporosis
+  'Boniva':'Ibandronate','Evista':'Raloxifene','Fosamax':'Alendronate',
+  'Prempro':'Conjugated Estrogens/Medroxyprogesterone','Prolia':'Denosumab',
+  'Reclast':'Zoledronic Acid','Vivelle-Dot':'Estradiol',
+  // Neurological / Seizures / Migraines
+  'Depakene':'Valproic Acid','Dilantin':'Phenytoin','Imitrex':'Sumatriptan',
+  'Keppra':'Levetiracetam','Lyrica':'Pregabalin','Maxalt':'Rizatriptan',
+  'Neurontin':'Gabapentin','Relpax':'Eletriptan','Tegretol':'Carbamazepine',
+  'Topamax':'Topiramate','Trileptal':'Oxcarbazepine','Vimpat':'Lacosamide',
+  'Zonegran':'Zonisamide',
+  // Urological / BPH
+  'Cialis':'Tadalafil','Detrol':'Tolterodine','Flomax':'Tamsulosin',
+  'Myrbetriq':'Mirabegron','Proscar':'Finasteride','Rapaflo':'Silodosin',
+  'Viagra':'Sildenafil','Vesicare':'Solifenacin',
+  // Osteoporosis / Bone
+  'Actonel':'Risedronate','Atelvia':'Risedronate',
+  // Skin / Dermatology
+  'Elidel':'Pimecrolimus','Eucrisa':'Crisaborole','Protopic':'Tacrolimus',
+  'Retin-A':'Tretinoin','Tazorac':'Tazarotene',
+  // Immunosuppressants / Biologics
+  'Enbrel':'Etanercept','Humira':'Adalimumab','Otezla':'Apremilast',
+  'Remicade':'Infliximab','Skyrizi':'Risankizumab','Stelara':'Ustekinumab',
+  'Tremfya':'Guselkumab','Xeljanz':'Tofacitinib',
+  // Miscellaneous Common
+  'Amiodarone':'Amiodarone','Colchicine':'Colchicine','Digoxin':'Digoxin',
+  'Eliquis':'Apixaban','Glyburide':'Glyburide','Hydrochlorothiazide':'Hydrochlorothiazide',
+  'Hydroxychloroquine':'Hydroxychloroquine','Methotrexate':'Methotrexate',
+  'Nuvigil':'Armodafinil','Plaquenil':'Hydroxychloroquine','Provigil':'Modafinil',
+  'Spironolactone':'Spironolactone','Ursodiol':'Ursodiol'
+};
+
+function autoFillGeneric(brandName){
+    const gen = document.getElementById('f-generic');
+    if(!gen || gen.value) return; // don't overwrite if user already filled it
+    const match = Object.entries(COMMON_MEDS).find(([b])=>b.toLowerCase()===brandName.toLowerCase());
+    if(match) gen.value = match[1];
+}
+
 
 const VIEWS=['dashboard','add-item','inventory','refills','reports','settings','recycle-bin'];
 
@@ -1163,7 +1295,14 @@ function removePhoto(key){
 // ── DATA LISTS ────────────────────────────────────────────────────
 function populateDataLists(){
     const set=(id,vals)=>{ const dl=document.getElementById(id); if(dl){ dl.innerHTML=vals.map(v=>`<option value="${v}">`).join(''); } };
-    set('med-list',[...new Set(items.map(i=>i.medName).filter(Boolean))].sort());
+    // Merge user's existing med names with common brand names
+    const userMeds = items.map(i=>i.medName).filter(Boolean);
+    const allBrands = [...new Set([...Object.keys(COMMON_MEDS), ...userMeds])].sort();
+    set('med-list', allBrands);
+    // Generic names list: common generics + user's existing generics
+    const userGenerics = items.map(i=>i.genericName).filter(Boolean);
+    const allGenerics = [...new Set([...Object.values(COMMON_MEDS), ...userGenerics])].sort();
+    set('generic-list', allGenerics);
     set('person-list',[...new Set(items.map(i=>i.person).filter(Boolean))].sort());
     set('doctor-list',[...new Set(items.map(i=>i.doctor).filter(Boolean))].sort());
     set('pharmacy-list',[...new Set(items.map(i=>i.pharmacy).filter(Boolean))].sort());

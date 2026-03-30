@@ -248,6 +248,12 @@
                 <option value="claude-haiku-4-5-20251001">Claude Haiku (Fastest)</option>
             </select>
         </div>
+        <div class="fg" style="grid-column:1/-1;">
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;text-transform:none;font-size:0.86rem;font-weight:600;">
+                <input type="checkbox" id="f-web-search" style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer;">
+                🌐 Enable Web Search &nbsp;<span style="font-weight:400;color:var(--text2);font-size:0.78rem;">Agent will search the internet for current information before generating the report</span>
+            </label>
+        </div>
     </div>
     <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
         <button class="btn btn-primary" onclick="saveAgent()" id="agent-save-btn">Save Agent</button>
@@ -398,12 +404,13 @@ function agentCard(a) {
     const schedBadge = a.schedule === 'daily'
         ? `<span class="badge ${isDue ? 'badge-yellow' : 'badge-green'}">${isDue ? 'Due now' : 'Daily'}</span>`
         : `<span class="badge badge-gray">Manual</span>`;
+    const webBadge = a.webSearch ? `<span class="badge" style="background:rgba(14,165,233,0.15);color:#38bdf8;">🌐 Web</span>` : '';
     return `<div class="agent-card">
         <div class="ac-top">
             <div class="ac-icon">${a.icon || '🤖'}</div>
             <div style="flex:1;min-width:0;">
                 <div class="ac-name">${esc(a.name)}</div>
-                <div class="ac-sched">${schedBadge} &nbsp;Last run: ${lastRun}</div>
+                <div class="ac-sched">${schedBadge} ${webBadge} &nbsp;Last run: ${lastRun}</div>
             </div>
         </div>
         <div class="ac-prompt">${esc(a.prompt)}</div>
@@ -456,10 +463,23 @@ async function runAgent(id, silent = false) {
 
     try {
         abortCtrl = new AbortController();
+        const reqBody = {
+            apiKey,
+            model: agent.model || 'claude-sonnet-4-6',
+            max_tokens: 4096,
+            system: systemPrompt,
+            messages: [{ role: 'user', content: agent.prompt }],
+            stream: false
+        };
+        // Add Anthropic built-in web search tool if enabled
+        if (agent.webSearch) {
+            reqBody.tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }];
+        }
+
         const res = await fetch(proxyUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ apiKey, model: agent.model || 'claude-sonnet-4-6', max_tokens: 2048, system: systemPrompt, messages: [{ role: 'user', content: agent.prompt }], stream: false }),
+            body: JSON.stringify(reqBody),
             signal: abortCtrl.signal
         });
 
@@ -469,10 +489,11 @@ async function runAgent(id, silent = false) {
             if (!res.ok) {
                 fullText = `⚠️ Error: ${j?.error?.message || j?.error || 'HTTP ' + res.status}`;
             } else {
-                fullText = j?.content?.[0]?.text || j?.choices?.[0]?.message?.content || j?.error?.message || text;
+                // Extract all text blocks (web search responses have mixed content types)
+                const textBlocks = (j?.content || []).filter(b => b.type === 'text').map(b => b.text);
+                fullText = textBlocks.join('\n') || j?.choices?.[0]?.message?.content || j?.error?.message || text;
             }
         } catch {
-            // Response wasn't JSON — show raw text for debugging
             fullText = text || '(No response)';
         }
         if (!silent) updateStream(fullText);
@@ -597,14 +618,16 @@ function openAgentForm(id) {
             document.getElementById('f-icon').value = a.icon || '';
             document.getElementById('f-prompt').value = a.prompt || '';
             document.getElementById('f-schedule').value = a.schedule || 'daily';
-            document.getElementById('f-model').value = a.model || 'claude-sonnet-4-5';
+            document.getElementById('f-model').value = a.model || 'claude-sonnet-4-6';
+            document.getElementById('f-web-search').checked = a.webSearch || false;
         }
     } else {
         document.getElementById('f-name').value = '';
         document.getElementById('f-icon').value = '';
         document.getElementById('f-prompt').value = '';
         document.getElementById('f-schedule').value = 'daily';
-        document.getElementById('f-model').value = 'claude-sonnet-4-5';
+        document.getElementById('f-model').value = 'claude-sonnet-4-6';
+        document.getElementById('f-web-search').checked = false;
     }
     wrap.style.display = 'block';
     wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -621,6 +644,7 @@ async function saveAgent() {
         icon: document.getElementById('f-icon').value.trim() || '🤖',
         schedule: document.getElementById('f-schedule').value,
         model: document.getElementById('f-model').value,
+        webSearch: document.getElementById('f-web-search').checked,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
     if (!id) data.createdAt = firebase.firestore.FieldValue.serverTimestamp();

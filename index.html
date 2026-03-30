@@ -1442,8 +1442,9 @@
     // ── CLOCK ──
     function updateClock() {
         const now  = new Date();
-        const date = now.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
-        const time = now.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', hour12:false });
+        const tz   = wxTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const date = now.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric', timeZone: tz });
+        const time = now.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true, timeZone: tz });
         document.getElementById('dtw-clock').textContent = `${date}  ·  ${time}`;
     }
     function initClock() {
@@ -1452,7 +1453,7 @@
     }
 
     // ── WEATHER ──
-    let wxLat = 44.8247, wxLon = -93.6052, wxLocationLabel = 'Chaska, MN 55318';
+    let wxLat = 44.8247, wxLon = -93.6052, wxLocationLabel = 'Chaska, MN 55318', wxTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const DEFAULT_ZIP = '55318';
 
     function editZip() {
@@ -1483,10 +1484,12 @@
             const loc = gd.results[0];
             wxLat = loc.latitude;
             wxLon = loc.longitude;
+            wxTimezone = loc.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
             const city = loc.name || zip;
             const admin = loc.admin1 ? `, ${loc.admin1}` : '';
             wxLocationLabel = `${city}${admin} ${zip}`;
             document.getElementById('dtw-location-label').textContent = wxLocationLabel;
+            updateClock(); // refresh clock with new timezone
             await fetchWeather();
         } catch(e) {
             document.getElementById('dtw-location-label').textContent = `ZIP ${zip} — not found`;

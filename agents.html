@@ -463,31 +463,31 @@ async function runAgent(id, silent = false) {
             signal: abortCtrl.signal
         });
 
-        if (!res.ok) {
-            let errMsg = `HTTP ${res.status}`;
-            try { const ej = await res.json(); errMsg = ej?.error?.message || ej?.error || errMsg; } catch {}
-            fullText = `⚠️ API Error (${res.status}): ${errMsg}`;
-            if (!silent) updateStream(fullText);
-        } else {
-            const ct = res.headers.get('content-type') || '';
-            if (ct.includes('event-stream')) {
-                const reader = res.body.getReader(), dec = new TextDecoder();
-                let buf = '';
-                while (true) {
-                    const { done, value } = await reader.read(); if (done) break;
-                    buf += dec.decode(value, { stream: true });
-                    const lines = buf.split('\n'); buf = lines.pop();
-                    for (const line of lines) {
-                        if (!line.startsWith('data:')) continue;
-                        const d = line.slice(5).trim(); if (d === '[DONE]') continue;
-                        try { const delta = JSON.parse(d)?.delta?.text || ''; fullText += delta; if (!silent) updateStream(fullText); } catch {}
-                    }
+        const ct = res.headers.get('content-type') || '';
+        if (ct.includes('event-stream') || ct.includes('text/')) {
+            // SSE streaming — process regardless of status code
+            const reader = res.body.getReader(), dec = new TextDecoder();
+            let buf = '';
+            while (true) {
+                const { done, value } = await reader.read(); if (done) break;
+                buf += dec.decode(value, { stream: true });
+                const lines = buf.split('\n'); buf = lines.pop();
+                for (const line of lines) {
+                    if (!line.startsWith('data:')) continue;
+                    const d = line.slice(5).trim(); if (d === '[DONE]') continue;
+                    try { const delta = JSON.parse(d)?.delta?.text || ''; fullText += delta; if (!silent) updateStream(fullText); } catch {}
                 }
-            } else {
-                const j = await res.json();
-                fullText = j?.content?.[0]?.text || j?.choices?.[0]?.message?.content || j?.error?.message || JSON.stringify(j);
-                if (!silent) updateStream(fullText);
             }
+        } else {
+            // JSON response (success or error)
+            const j = await res.json().catch(() => null);
+            if (!res.ok) {
+                const errMsg = j?.error?.message || j?.error || `HTTP ${res.status}`;
+                fullText = `⚠️ API Error (${res.status}): ${errMsg}`;
+            } else {
+                fullText = j?.content?.[0]?.text || j?.choices?.[0]?.message?.content || j?.error?.message || JSON.stringify(j);
+            }
+            if (!silent) updateStream(fullText);
         }
     } catch (err) {
         if (err.name !== 'AbortError') {

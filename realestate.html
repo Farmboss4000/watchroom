@@ -1345,9 +1345,15 @@ async function runPropertySearch() {
     status.textContent = 'Searching public records…';
     document.getElementById('ps-results').innerHTML = `<div class="ps-searching"><div class="spinner"></div><div>Searching property records for <strong>${esc(owner)}</strong> in <strong>${esc(state)}</strong>…</div></div>`;
 
-    const systemPrompt = `You are a property records research assistant. Search public property records, county assessor databases, and real estate listing sites. Return ONLY a valid JSON array of properties found. Each object must have these fields (use null for unknown): address, city, county, state, zip, propertyType, acres, sqft, bedrooms, bathrooms, yearBuilt, assessedValue, marketValue, parcelNumber, ownerName, ownerAddress, taxAmount, lastSaleDate, lastSalePrice, sourceUrl, sourceNote. If no properties are found return an empty array []. Do not include any explanation or markdown — just the raw JSON array.`;
+    const systemPrompt = `You are a property records research assistant. Search public property records, county assessor databases, and real estate listing sites.
+Return ONLY a valid JSON array. STRICT RULES for the JSON:
+- All numeric fields (acres, sqft, bedrooms, bathrooms, yearBuilt, assessedValue, marketValue, taxAmount, lastSalePrice) must be plain numbers with NO commas, NO dollar signs, NO units — e.g. 250000 not $250,000 and not "250,000"
+- Use null (not "") for unknown values
+- String fields: address, city, county, state, zip, propertyType, parcelNumber, ownerName, ownerAddress, lastSaleDate (YYYY-MM-DD or null), sourceUrl, sourceNote
+- If no properties found return []
+- Output ONLY the raw JSON array, no explanation, no markdown fences`;
 
-    const userPrompt = `Search public property records, county assessor websites, and real estate databases for all properties owned by "${owner}" in ${state}. Include residential, farm/ranch, commercial, and vacant land. Return results as a JSON array.`;
+    const userPrompt = `Search public property records, county assessor websites, and real estate databases for all properties owned by "${owner}" in ${state}. Include residential, farm/ranch, commercial, and vacant land. Return a JSON array following the exact format in your instructions.`;
 
     try {
         const res = await fetch(psProxyUrl, {
@@ -1368,10 +1374,18 @@ async function runPropertySearch() {
         const textBlocks = (j?.content || []).filter(b => b.type === 'text').map(b => b.text);
         const text = textBlocks.join('') || j?.content?.[0]?.text || '';
 
-        // Extract JSON array from the response
-        const match = text.match(/\[[\s\S]*\]/);
-        if (!match) throw new Error('No property data returned');
-        const props = JSON.parse(match[0]);
+        // Extract JSON array — strip any markdown fences first
+        const cleaned = text.replace(/```json/gi,'').replace(/```/g,'').trim();
+        const match = cleaned.match(/\[[\s\S]*\]/);
+        if (!match) {
+            // No properties found or unexpected format — show empty state
+            renderSearchResults([], owner, state); return;
+        }
+        // Clean common JSON number formatting issues before parsing
+        const jsonStr = match[0]
+            .replace(/"(\d{1,3}(?:,\d{3})+(?:\.\d+)?)"/g, (_, n) => n.replace(/,/g,'')) // "1,234" → 1234
+            .replace(/:\s*\$?([\d,]+(?:\.\d+)?)\s*([,}\]])/g, (_, n, end) => ': ' + n.replace(/,/g,'') + end); // : $1,234, → : 1234,
+        const props = JSON.parse(jsonStr);
         renderSearchResults(props, owner, state);
     } catch(err) {
         document.getElementById('ps-results').innerHTML = `<div class="ps-no-results">⚠️ Search error: ${esc(err.message)}</div>`;

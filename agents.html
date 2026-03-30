@@ -315,7 +315,7 @@
             </div>
             <button class="btn btn-ghost btn-sm" onclick="closeModal()">✕</button>
         </div>
-        <div class="modal-body"><pre id="modal-body"></pre></div>
+        <div class="modal-body"><div id="modal-body" style="white-space:pre-wrap;font-family:inherit;font-size:0.9rem;line-height:1.75;color:var(--text);"></div></div>
         <div class="modal-footer">
             <button class="btn btn-ghost btn-sm" onclick="copyReport()">📋 Copy</button>
             <button class="btn btn-danger btn-sm" onclick="deleteReport()">🗑 Delete</button>
@@ -585,12 +585,38 @@ function viewAgentReports(agentId) {
     document.getElementById('report-filter').value = agentId;
     renderReports(); show('reports');
 }
+function renderMarkdown(text) {
+    if (!text) return '';
+    // Escape HTML first to prevent XSS
+    let h = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    // Headers: ## → <h3>, ### → <h4>
+    h = h.replace(/^#### (.+)$/gm, '<h4 style="font-size:0.88rem;font-weight:700;color:var(--text);margin:14px 0 4px;">$1</h4>');
+    h = h.replace(/^### (.+)$/gm,  '<h4 style="font-size:0.93rem;font-weight:700;color:var(--accent);margin:16px 0 5px;">$1</h4>');
+    h = h.replace(/^## (.+)$/gm,   '<h3 style="font-size:1rem;font-weight:700;color:var(--accent);margin:18px 0 6px;border-bottom:1px solid var(--border);padding-bottom:4px;">$1</h3>');
+    h = h.replace(/^# (.+)$/gm,    '<h2 style="font-size:1.1rem;font-weight:800;color:#fff;margin:20px 0 8px;">$1</h2>');
+    // Bold / italic
+    h = h.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+    h = h.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    h = h.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    // Inline code
+    h = h.replace(/`([^`]+)`/g, '<code style="background:rgba(139,92,246,0.15);padding:1px 5px;border-radius:3px;font-size:0.87em;">$1</code>');
+    // Markdown links [text](url)
+    h = h.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" style="color:#a78bfa;text-decoration:underline;">$1</a>');
+    // Bare URLs — make clickable (not already inside an href)
+    h = h.replace(/(?<!href=")(https?:\/\/[^\s<>"',\)]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:#a78bfa;text-decoration:underline;word-break:break-all;">$1</a>');
+    // Horizontal rules
+    h = h.replace(/^---+$/gm, '<hr style="border:none;border-top:1px solid var(--border);margin:14px 0;">');
+    // Bullet points
+    h = h.replace(/^[\*\-] (.+)$/gm, '<div style="padding-left:16px;margin:2px 0;">• $1</div>');
+    h = h.replace(/^\d+\. (.+)$/gm,  '<div style="padding-left:16px;margin:2px 0;">$1</div>');
+    return h;
+}
 function openReport(id) {
     const r = reports.find(x => x._id === id); if (!r) return;
     viewingReportId = id;
     document.getElementById('modal-title').textContent = (r.agentIcon || '🤖') + ' ' + (r.agentName || 'Report');
     document.getElementById('modal-meta').textContent = r.createdAt ? fmtDate(r.createdAt.toDate()) : '';
-    document.getElementById('modal-body').textContent = r.content || '';
+    document.getElementById('modal-body').innerHTML = renderMarkdown(r.content || '');
     document.getElementById('report-modal').classList.add('show');
 }
 function closeModal() { document.getElementById('report-modal').classList.remove('show'); }

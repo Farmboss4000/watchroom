@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Farmboss Globetrotting</title>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0;}
+        :root{
+            --bg-primary:#f0f7f8;--bg-secondary:#ffffff;--bg-card:#e0f0f4;
+            --accent:#0d9488;--accent-hover:#0f766e;--accent-dim:rgba(13,148,136,0.12);
+            --text-primary:#0c1e2e;--text-secondary:#3a5565;--border:#b0cdd6;
+            --success:#16a34a;--danger:#dc2626;--warning:#d97706;--info:#2563eb;
+            --hdr-bg:#061825;--gold:#d97706;
+        }
+        body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:var(--bg-primary);color:var(--text-primary);min-height:100vh;overflow-x:hidden;}
+
+        /* ── SITE SWITCHER ── */
+        .site-switcher{background:#111827;display:flex;align-items:center;padding:5px 18px;gap:4px;font-size:0.77rem;border-bottom:1px solid rgba(255,255,255,0.07);overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap;scrollbar-width:none;}
+        .site-switcher::-webkit-scrollbar{display:none;}
+        .site-link{text-decoration:none;color:#9ca3af;padding:4px 12px;border-radius:4px;display:flex;align-items:center;gap:6px;font-weight:500;transition:all 0.15s;white-space:nowrap;}
+        .site-link:hover{background:rgba(255,255,255,0.1);color:#e5e7eb;}
+        .site-link.active{background:rgba(255,255,255,0.13);color:#fff;font-weight:600;}
+
+        /* ── LOGIN ── */
+        #login-screen{position:fixed;inset:0;background:linear-gradient(135deg,#061825 0%,#0a2e3d 100%);display:flex;align-items:center;justify-content:center;z-index:9000;flex-direction:column;gap:12px;}
+        .login-site-links{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:620px;padding:0 16px;}
+        .login-site-links a{color:rgba(255,255,255,0.5);font-size:0.78rem;text-decoration:none;padding:4px 12px;border:1px solid rgba(255,255,255,0.2);border-radius:4px;transition:all 0.15s;}
+        .login-site-links a:hover{color:#fff;border-color:rgba(255,255,255,0.5);}
+        .login-site-links a.active{color:var(--accent);border-color:var(--accent);}
+        .login-box{background:#fff;border-radius:14px;padding:44px 40px;width:100%;max-width:400px;box-shadow:0 24px 64px rgba(0,0,0,0.4);}
+        .login-logo{width:56px;height:56px;background:var(--accent);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 16px;color:#fff;}
+        .login-box h2{text-align:center;font-size:1.5rem;color:#1a1f2e;margin-bottom:4px;}
+        .login-sub{text-align:center;font-size:0.85rem;color:#6b7280;margin-bottom:28px;}
+        .login-error{color:var(--danger);font-size:0.82rem;margin-bottom:12px;min-height:18px;text-align:center;}
+        .login-full{width:100%;justify-content:center;}
+        .form-group{margin-bottom:14px;}
+        .form-group label{display:block;font-size:0.8rem;font-weight:600;color:var(--text-secondary);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.4px;}
+        .form-group input,.form-group select,.form-group textarea{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:7px;font-size:0.9rem;font-family:inherit;color:var(--text-primary);background:var(--bg-secondary);transition:border-color 0.15s;}
+        .form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--accent);}
+        .form-group textarea{resize:vertical;line-height:1.5;}
+
+        /* ── LOADING ── */
+        #loading-screen{display:none;position:fixed;inset:0;background:var(--bg-primary);flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:8000;}
+        .spinner{width:44px;height:44px;border:4px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
+        @keyframes spin{to{transform:rotate(360deg);}}
+
+        /* ── APP LAYOUT ── */
+        #app{display:none;min-height:100vh;flex-direction:column;}
+        header{background:var(--hdr-bg);padding:0 20px;display:flex;align-items:center;gap:16px;min-height:56px;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,0.3);flex-wrap:wrap;}
+        .logo-area{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+        .logo-icon{width:32px;height:32px;background:var(--accent);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:17px;color:#fff;flex-shrink:0;}
+        header h1{font-size:1.15rem;font-weight:700;color:#fff;white-space:nowrap;}
+        header h1 span{color:var(--accent);}
+        nav{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;flex-shrink:0;}
+        nav::-webkit-scrollbar{display:none;}
+        nav button{background:transparent;border:none;color:#9ca3af;padding:8px 13px;border-radius:6px;cursor:pointer;font-size:0.83rem;transition:all 0.15s;white-space:nowrap;}
+        nav button:hover{background:rgba(13,148,136,0.25);color:#fff;}
+        nav button.active{background:var(--accent);color:#fff;font-weight:600;}
+        .header-right{display:flex;align-items:center;gap:10px;margin-left:auto;}
+        .user-badge{font-size:0.78rem;color:#9ca3af;background:rgba(255,255,255,0.08);padding:4px 10px;border-radius:5px;}
+        .btn-signout{background:transparent;border:1px solid rgba(255,255,255,0.2);color:#9ca3af;padding:5px 12px;border-radius:5px;cursor:pointer;font-size:0.78rem;transition:all 0.15s;}
+        .btn-signout:hover{border-color:var(--danger);color:var(--danger);}
+
+        main{padding:20px;max-width:1200px;margin:0 auto;flex:1;width:100%;}
+        .view{display:none;}.view.active{display:block;}
+
+        /* ── BUTTONS ── */
+        .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:7px;font-size:0.85rem;font-weight:600;cursor:pointer;border:none;transition:all 0.15s;font-family:inherit;}
+        .btn-primary{background:var(--accent);color:#fff;}.btn-primary:hover{background:var(--accent-hover);}
+        .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text-primary);}.btn-ghost:hover{background:var(--bg-card);}
+        .btn-danger{background:var(--danger);color:#fff;}.btn-danger:hover{opacity:0.85;}
+        .btn-success{background:var(--success);color:#fff;}.btn-success:hover{opacity:0.85;}
+        .btn-sm{padding:5px 10px;font-size:0.78rem;}
+        .btn:disabled{opacity:0.45;cursor:not-allowed;}
+
+        /* ── STATS ── */
+        .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:20px;}
+        .stat-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:18px 16px;text-align:center;}
+        .stat-value{font-size:2rem;font-weight:800;color:var(--accent);line-height:1;margin-bottom:4px;}
+        .stat-label{font-size:0.77rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;}
+
+        /* ── CARDS ── */
+        .card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:22px;margin-bottom:20px;}
+        .card-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:10px;flex-wrap:wrap;}
+        .card-title-left{font-size:1rem;font-weight:700;color:var(--text-primary);}
+
+        /* ── TRIP CARDS ── */
+        .trips-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;}
+        .trip-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:20px;transition:box-shadow 0.2s,border-color 0.15s;}
+        .trip-card:hover{box-shadow:0 4px 18px rgba(13,148,136,0.12);border-color:var(--accent);}
+        .trip-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px;}
+        .trip-card-name{font-size:1rem;font-weight:700;color:var(--text-primary);}
+        .trip-card-dates{font-size:0.8rem;color:var(--text-secondary);margin-bottom:10px;}
+        .trip-card-dests{margin-bottom:12px;min-height:28px;}
+        .trip-card-actions{display:flex;gap:6px;flex-wrap:wrap;}
+        .trip-card-footer{display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:0.8rem;color:var(--text-secondary);}
+
+        /* ── DEST PILLS ── */
+        .dest-pill{display:inline-flex;align-items:center;gap:4px;background:var(--accent-dim);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:0.78rem;margin:2px;}
+
+        /* ── STATUS BADGES ── */
+        .badge{display:inline-block;padding:3px 9px;border-radius:5px;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;white-space:nowrap;}
+        .badge-planned{background:rgba(37,99,235,0.12);color:#2563eb;}
+        .badge-completed{background:rgba(13,148,136,0.15);color:#0d9488;}
+        .badge-in-progress{background:rgba(217,119,6,0.15);color:#d97706;}
+
+        /* ── TOOLBAR ── */
+        .toolbar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;}
+        .toolbar input[type="text"]{flex:1;min-width:180px;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:0.87rem;font-family:inherit;background:var(--bg-secondary);color:var(--text-primary);}
+        .toolbar input:focus{outline:none;border-color:var(--accent);}
+        .toolbar select{padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:0.87rem;font-family:inherit;background:var(--bg-secondary);color:var(--text-primary);cursor:pointer;}
+
+        /* ── FORM LAYOUT ── */
+        .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;}
+        .form-group.full-width{grid-column:1/-1;}
+        .form-actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+        .section-divider{font-size:0.82rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin:22px 0 12px;padding-bottom:6px;border-bottom:2px solid var(--border);}
+        .duration-hint{font-size:0.82rem;color:var(--accent);font-weight:600;margin-top:6px;}
+
+        /* ── DESTINATIONS ROW ── */
+        .dest-row{display:grid;grid-template-columns:1fr 1fr 1fr auto auto;gap:8px;align-items:center;padding:10px;background:var(--bg-card);border-radius:8px;margin-bottom:8px;}
+        .dest-row input{padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.85rem;font-family:inherit;background:var(--bg-secondary);color:var(--text-primary);}
+        .dest-row input:focus{outline:none;border-color:var(--accent);}
+        .geocode-status{font-size:0.8rem;color:var(--accent);min-width:20px;text-align:center;}
+
+        /* ── SCAN DROP ── */
+        .scan-drop{border:2px dashed var(--border);border-radius:12px;padding:48px 20px;text-align:center;cursor:pointer;transition:all 0.2s;}
+        .scan-drop:hover,.scan-drop.dragover{border-color:var(--accent);background:var(--accent-dim);}
+        .scan-drop-icon{font-size:2.5rem;margin-bottom:10px;}
+        .scan-drop-text{font-size:0.9rem;color:var(--text-secondary);}
+        .scan-preview{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:14px;display:flex;align-items:center;gap:12px;}
+        .scan-preview img{max-height:80px;border-radius:6px;border:1px solid var(--border);}
+        .scan-preview-name{font-size:0.88rem;font-weight:600;color:var(--text-primary);}
+        .scan-preview-type{font-size:0.78rem;color:var(--text-secondary);}
+        .scan-result{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:16px;margin-top:14px;}
+        .scan-result-title{font-size:0.85rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:10px;}
+        .scan-result pre{font-family:monospace;font-size:0.83rem;white-space:pre-wrap;word-break:break-word;color:var(--text-primary);}
+
+        /* ── MAP CONTAINERS ── */
+        #world-map-container,#us-map-container{border-radius:10px;border:1px solid var(--border);}
+        #world-map-container{height:70vh;}
+        #us-map-container{height:60vh;}
+        .map-stats{background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:10px 16px;margin-bottom:12px;font-size:0.88rem;color:var(--text-secondary);display:flex;align-items:center;gap:8px;}
+        .map-stats strong{color:var(--text-primary);}
+
+        /* ── US MAP TWO PANEL ── */
+        .us-map-layout{display:grid;grid-template-columns:1fr 320px;gap:16px;align-items:start;}
+        .state-badges-panel{background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:16px;}
+        .state-badges-title{font-size:0.85rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:12px;}
+        .state-badge{display:inline-block;padding:3px 7px;border-radius:5px;font-size:0.75rem;font-weight:700;margin:2px;}
+        .state-visited{background:var(--accent);color:#fff;}
+        .state-not-visited{background:var(--bg-card);color:var(--text-secondary);border:1px solid var(--border);}
+
+        /* ── RECYCLE BIN ── */
+        .bin-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+        .bin-card-info{flex:1;min-width:0;}
+        .bin-card-name{font-size:0.95rem;font-weight:700;color:var(--text-primary);}
+        .bin-card-meta{font-size:0.8rem;color:var(--text-secondary);margin-top:2px;}
+
+        /* ── EMPTY STATE ── */
+        .empty{text-align:center;padding:48px 20px;color:var(--text-secondary);}
+        .empty-icon{font-size:3rem;margin-bottom:12px;}
+
+        /* ── RECENT TRIPS (DASHBOARD) ── */
+        .recent-trip-item{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);gap:10px;cursor:pointer;transition:background 0.1s;}
+        .recent-trip-item:last-child{border-bottom:none;}
+        .recent-trip-item:hover{background:var(--accent-dim);margin:0 -8px;padding:12px 8px;border-radius:6px;}
+        .rti-name{font-size:0.9rem;font-weight:600;color:var(--text-primary);}
+        .rti-meta{font-size:0.78rem;color:var(--text-secondary);margin-top:2px;}
+        .rti-right{display:flex;align-items:center;gap:8px;}
+
+        /* ── MODAL ── */
+        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:flex-start;justify-content:center;z-index:2000;opacity:0;pointer-events:none;transition:opacity 0.2s;padding:20px;overflow-y:auto;}
+        .modal-overlay.show{opacity:1;pointer-events:all;}
+        .modal{background:#fff;border-radius:14px;padding:28px 24px;width:100%;max-width:680px;margin:auto;transform:scale(0.95);transition:transform 0.2s;}
+        .modal-overlay.show .modal{transform:scale(1);}
+        .modal-hdr{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:20px;}
+        .modal-title{font-size:1.15rem;font-weight:700;color:var(--text-primary);}
+        .modal-close{background:none;border:none;cursor:pointer;font-size:1.3rem;color:var(--text-secondary);padding:2px 6px;border-radius:4px;line-height:1;}
+        .modal-close:hover{background:var(--bg-card);}
+        .modal-section{margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border);}
+        .modal-section:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0;}
+        .modal-section-title{font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary);margin-bottom:8px;}
+        .modal-kv{display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:0.88rem;}
+        .modal-kv-lbl{color:var(--text-secondary);font-size:0.75rem;text-transform:uppercase;letter-spacing:0.3px;}
+        .modal-kv-val{font-weight:600;color:var(--text-primary);}
+        .modal-actions{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;}
+
+        /* ── TOAST ── */
+        .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#1a2e3e;color:#fff;padding:10px 20px;border-radius:8px;font-size:0.87rem;font-weight:500;opacity:0;transition:all 0.3s;z-index:9999;pointer-events:none;white-space:nowrap;max-width:90vw;}
+        .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+        .toast.error{background:var(--danger);}
+
+        /* ── RESPONSIVE ── */
+        @media(max-width:900px){
+            .us-map-layout{grid-template-columns:1fr;}
+        }
+        @media(max-width:720px){
+            header{flex-wrap:wrap;padding:10px 14px;gap:6px;}
+            .logo-area{flex:1;}
+            .header-right{flex-shrink:0;margin-left:auto;}
+            .user-badge{display:none;}
+            nav{order:3;width:100%;border-top:1px solid rgba(255,255,255,0.08);padding-top:4px;}
+            nav button{padding:6px 10px;font-size:0.77rem;}
+            main{padding:12px;}
+            .trips-grid{grid-template-columns:1fr;}
+            .dest-row{grid-template-columns:1fr 1fr;gap:6px;}
+            .dest-row .geocode-status{display:none;}
+            input,select,textarea{font-size:16px !important;}
+        }
+        @media(max-width:600px){
+            .site-switcher{padding:4px 8px;gap:2px;}
+            .site-link{padding:5px 8px;font-size:0.72rem;}
+            .login-box{padding:32px 22px;}
+        }
+    </style>
+</head>
+<body>
+
+<!-- ═══ SITE SWITCHER ═══ -->
+<div class="site-switcher">
+    <a href="index.html" class="site-link">🏠 HQ</a>
+    <a href="armory.html" class="site-link">🔫 Armory</a>
+    <a href="machinery.html" class="site-link">🚜 Machinery</a>
+    <a href="automotive.html" class="site-link">🚗 Automotive</a>
+    <a href="livestock.html" class="site-link">🐄 Livestock</a>
+    <a href="pharmacy.html" class="site-link">💊 Pharmacy</a>
+    <a href="insurance.html" class="site-link">🛡️ Insurance</a>
+    <a href="realestate.html" class="site-link">🏡 Real Estate</a>
+    <a href="forte.html" class="site-link">✦ FORTÉ</a>
+    <a href="agents.html" class="site-link">🤖 Agents</a>
+    <a href="globetrotting.html" class="site-link active">✈️ Globetrotting</a>
+</div>
+
+<!-- ═══ LOGIN SCREEN ═══ -->
+<div id="login-screen">
+    <div class="login-site-links">
+        <a href="index.html">🏠 HQ</a>
+        <a href="armory.html">🔫 Armory</a>
+        <a href="machinery.html">🚜 Machinery</a>
+        <a href="automotive.html">🚗 Automotive</a>
+        <a href="livestock.html">🐄 Livestock</a>
+        <a href="pharmacy.html">💊 Pharmacy</a>
+        <a href="insurance.html">🛡️ Insurance</a>
+        <a href="realestate.html">🏡 Real Estate</a>
+        <a href="forte.html">✦ FORTÉ</a>
+        <a href="agents.html">🤖 Agents</a>
+        <a href="globetrotting.html" class="active">✈️ Globetrotting</a>
+    </div>
+    <div class="login-box">
+        <div class="login-logo">✈️</div>
+        <h2>Farmboss Globetrotting</h2>
+        <p class="login-sub">Travel tracker &amp; journey journal</p>
+        <div class="login-error" id="login-error"></div>
+        <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="login-email" autocomplete="email" placeholder="you@example.com">
+        </div>
+        <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="login-password" autocomplete="current-password" placeholder="••••••••">
+        </div>
+        <button class="btn btn-primary login-full" onclick="doLogin()">Sign In</button>
+    </div>
+</div>
+
+<!-- ═══ LOADING SCREEN ═══ -->
+<div id="loading-screen" style="display:flex;">
+    <div class="spinner"></div>
+</div>
+
+<!-- ═══ MAIN APP ═══ -->
+<div id="app" style="display:flex;">
+    <header>
+        <div class="logo-area">
+            <div class="logo-icon">✈️</div>
+            <h1>Farmboss <span>Globetrotting</span></h1>
+        </div>
+        <nav id="main-nav">
+            <button onclick="showView('dashboard')">Dashboard</button>
+            <button onclick="showView('trips')">My Trips</button>
+            <button onclick="showView('add-trip')">＋ Add Trip</button>
+            <button onclick="showView('scan')">🔍 Scan Itinerary</button>
+            <button onclick="showView('world-map')">🌍 World Map</button>
+            <button onclick="showView('us-map')">🇺🇸 US Map</button>
+            <button onclick="showView('recycle-bin')">🗑 Recycle Bin</button>
+        </nav>
+        <div class="header-right">
+            <span class="user-badge" id="user-badge"></span>
+            <button class="btn-signout" onclick="doSignOut()">Sign Out</button>
+        </div>
+    </header>
+
+    <main>
+        <!-- ── DASHBOARD ── -->
+        <div class="view" id="view-dashboard">
+            <div class="stats-grid" id="dash-stats"></div>
+            <div class="card">
+                <div class="card-title">
+                    <span class="card-title-left">Recent Trips</span>
+                    <button class="btn btn-primary btn-sm" onclick="showView('add-trip')">＋ Add Trip</button>
+                </div>
+                <div id="dash-recent"></div>
+            </div>
+        </div>
+
+        <!-- ── MY TRIPS ── -->
+        <div class="view" id="view-trips">
+            <div class="toolbar">
+                <input type="text" id="trips-search" placeholder="Search by destination or name…" oninput="renderTrips()">
+                <select id="trips-year-filter" onchange="renderTrips()">
+                    <option value="">All Years</option>
+                </select>
+                <select id="trips-status-filter" onchange="renderTrips()">
+                    <option value="">All Statuses</option>
+                    <option value="planned">Planned</option>
+                    <option value="in-progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                </select>
+            </div>
+            <div class="trips-grid" id="trips-grid"></div>
+        </div>
+
+        <!-- ── ADD / EDIT TRIP ── -->
+        <div class="view" id="view-add-trip">
+            <div class="card">
+                <div class="card-title">
+                    <span class="card-title-left" id="form-title">Add New Trip</span>
+                </div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Trip Name</label>
+                        <input type="text" id="f-name" placeholder="Europe Summer 2024">
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select id="f-status">
+                            <option value="planned">Planned</option>
+                            <option value="in-progress">In Progress</option>
+                            <option value="completed">Completed</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Departure Date</label>
+                        <input type="date" id="f-dep" onchange="updateDuration()">
+                    </div>
+                    <div class="form-group">
+                        <label>Return Date</label>
+                        <input type="date" id="f-ret" onchange="updateDuration()">
+                    </div>
+                    <div class="form-group full-width" id="duration-row" style="display:none;">
+                        <div class="duration-hint" id="duration-hint"></div>
+                    </div>
+                    <div class="form-group full-width">
+                        <label>Notes</label>
+                        <textarea id="f-notes" rows="3" placeholder="Packing lists, reminders, highlights…"></textarea>
+                    </div>
+                </div>
+
+                <div class="section-divider">Destinations</div>
+                <div id="dests-container"></div>
+                <button class="btn btn-ghost btn-sm" onclick="addDestRow()" style="margin-top:8px;">＋ Add Destination</button>
+
+                <div class="form-actions">
+                    <button class="btn btn-primary" onclick="saveTrip()">💾 Save Trip</button>
+                    <button class="btn btn-ghost" onclick="cancelForm()">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── SCAN ITINERARY ── -->
+        <div class="view" id="view-scan">
+            <div class="card">
+                <div class="card-title">
+                    <span class="card-title-left">🔍 Scan Itinerary</span>
+                </div>
+                <p style="font-size:0.87rem;color:var(--text-secondary);margin-bottom:16px;">Upload an itinerary image or PDF and let AI extract your trip details automatically.</p>
+                <div class="scan-drop" id="scan-drop" onclick="document.getElementById('scan-file-input').click()"
+                     ondragover="scanDragOver(event)" ondragleave="scanDragLeave(event)" ondrop="scanDrop(event)">
+                    <div class="scan-drop-icon">📄</div>
+                    <div class="scan-drop-text">Drop your itinerary here or <strong>click to browse</strong></div>
+                    <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:6px;">Supports JPG, PNG, PDF</div>
+                </div>
+                <input type="file" id="scan-file-input" accept=".jpg,.jpeg,.png,.pdf" style="display:none;" onchange="handleScanFile(this.files[0])">
+                <div id="scan-preview-area" style="display:none;"></div>
+                <div id="scan-actions" style="display:none;margin-top:14px;">
+                    <button class="btn btn-primary" onclick="runScan()">🔍 Extract with AI</button>
+                    <button class="btn btn-ghost btn-sm" onclick="clearScan()" style="margin-left:8px;">✕ Clear</button>
+                </div>
+                <div id="scan-result-area" style="display:none;"></div>
+            </div>
+        </div>
+
+        <!-- ── WORLD MAP ── -->
+        <div class="view" id="view-world-map">
+            <div class="map-stats" id="world-map-stats">Loading destinations…</div>
+            <div id="world-map-container"></div>
+        </div>
+
+        <!-- ── US MAP ── -->
+        <div class="view" id="view-us-map">
+            <div class="map-stats" id="us-map-stats">Loading states…</div>
+            <div class="us-map-layout">
+                <div>
+                    <div id="us-map-container"></div>
+                </div>
+                <div class="state-badges-panel">
+                    <div class="state-badges-title">States Visited</div>
+                    <div id="state-badges-grid"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── RECYCLE BIN ── -->
+        <div class="view" id="view-recycle-bin">
+            <div class="card">
+                <div class="card-title">
+                    <span class="card-title-left">🗑 Recycle Bin</span>
+                </div>
+                <div id="bin-list"></div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- ═══ TRIP DETAIL MODAL ═══ -->
+<div class="modal-overlay" id="trip-modal-overlay" onclick="closeModal(event)">
+    <div class="modal" id="trip-modal-box">
+        <div class="modal-hdr">
+            <div class="modal-title" id="modal-trip-name"></div>
+            <button class="modal-close" onclick="closeModal()">✕</button>
+        </div>
+        <div id="modal-trip-body"></div>
+        <div class="modal-actions">
+            <button class="btn btn-primary btn-sm" id="modal-edit-btn" onclick="modalEdit()">✏️ Edit Trip</button>
+            <button class="btn btn-ghost btn-sm" onclick="closeModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ TOAST ═══ -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  FIREBASE INIT
+// ═══════════════════════════════════════════════
+firebase.initializeApp({
+    apiKey:"AIzaSyB7c4urD9tJO80S7nADItxjwhSYVqlrkEU",
+    authDomain:"watchroom-714a0.firebaseapp.com",
+    projectId:"watchroom-714a0",
+    storageBucket:"watchroom-714a0.appspot.com",
+    messagingSenderId:"911514107783",
+    appId:"1:911514107783:web:20e8a729fd66577c28dd22"
+});
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+// ═══════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════
+let trips = [];
+let editingId = null;
+let formDests = [];
+let scanFile = null;
+let scanExtracted = null;
+let apiKey = '';
+let proxyUrl = '';
+let worldMapInst = null;
+let usMapInst = null;
+let worldMapInit = false;
+let usMapInit = false;
+let usGeoJSON = null;
+let worldMarkers = [];
+let usGeoLayer = null;
+let activeView = 'dashboard';
+let modalTripId = null;
+
+const VIEWS = ['dashboard','trips','add-trip','scan','world-map','us-map','recycle-bin'];
+
+// ═══════════════════════════════════════════════
+//  AUTH
+// ═══════════════════════════════════════════════
+auth.onAuthStateChanged(async user => {
+    document.getElementById('loading-screen').style.display = 'none';
+    if (user) {
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('app').style.display = 'flex';
+        document.getElementById('user-badge').textContent = user.email;
+        await loadSettings();
+        await loadTrips();
+        renderAll();
+        showView('dashboard');
+    } else {
+        document.getElementById('login-screen').style.display = 'flex';
+        document.getElementById('app').style.display = 'none';
+    }
+});
+
+async function doLogin() {
+    const email = document.getElementById('login-email').value.trim();
+    const pass = document.getElementById('login-password').value;
+    document.getElementById('login-error').textContent = '';
+    try {
+        await auth.signInWithEmailAndPassword(email, pass);
+    } catch(e) {
+        document.getElementById('login-error').textContent = e.message;
+    }
+}
+
+async function doSignOut() {
+    await auth.signOut();
+}
+
+document.getElementById('login-password').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doLogin();
+});
+
+// ═══════════════════════════════════════════════
+//  SETTINGS
+// ═══════════════════════════════════════════════
+async function loadSettings() {
+    const kd = await db.collection('settings').doc('apikey').get().catch(() => null);
+    if (kd?.exists) apiKey = kd.data().key || '';
+    const pd = await db.collection('settings').doc('proxy').get().catch(() => null);
+    if (pd?.exists) proxyUrl = pd.data().url || '';
+}
+
+// ═══════════════════════════════════════════════
+//  DATA LOADING
+// ═══════════════════════════════════════════════
+async function loadTrips() {
+    const snap = await db.collection('globetrotting_trips').orderBy('createdAt','desc').get().catch(() => null);
+    if (!snap) { trips = []; return; }
+    trips = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+}
+
+// ═══════════════════════════════════════════════
+//  VIEW ROUTING
+// ═══════════════════════════════════════════════
+function showView(v) {
+    activeView = v;
+    VIEWS.forEach(name => {
+        const el = document.getElementById('view-' + name);
+        if (el) el.classList.toggle('active', name === v);
+    });
+    const navBtns = document.querySelectorAll('#main-nav button');
+    const navIdx = {'dashboard':0,'trips':1,'add-trip':2,'scan':3,'world-map':4,'us-map':5,'recycle-bin':6};
+    navBtns.forEach((b,i) => b.classList.toggle('active', i === navIdx[v]));
+
+    if (v === 'dashboard') renderDashboard();
+    if (v === 'trips') renderTrips();
+    if (v === 'world-map') renderWorldMap();
+    if (v === 'us-map') renderUSMap();
+    if (v === 'recycle-bin') renderBin();
+}
+
+function renderAll() {
+    renderDashboard();
+    renderTrips();
+    populateYearFilter();
+}
+
+// ═══════════════════════════════════════════════
+//  DASHBOARD
+// ═══════════════════════════════════════════════
+function renderDashboard() {
+    const active = trips.filter(t => !t.deleted);
+    const countries = getVisitedCountries(active);
+    const states = getVisitedStates(active);
+    const cities = new Set();
+    active.forEach(t => (t.destinations||[]).forEach(d => { if(d.city) cities.add(d.city.toLowerCase()); }));
+    let days = 0;
+    active.forEach(t => { const d = tripDuration(t.departureDate, t.returnDate); if(d>0) days+=d; });
+
+    document.getElementById('dash-stats').innerHTML = `
+        <div class="stat-card"><div class="stat-value">${active.length}</div><div class="stat-label">Total Trips</div></div>
+        <div class="stat-card"><div class="stat-value">${countries.size}</div><div class="stat-label">Countries Visited</div></div>
+        <div class="stat-card"><div class="stat-value">${states.size}</div><div class="stat-label">US States</div></div>
+        <div class="stat-card"><div class="stat-value">${cities.size}</div><div class="stat-label">Cities Visited</div></div>
+        <div class="stat-card"><div class="stat-value">${days}</div><div class="stat-label">Days Traveled</div></div>
+    `;
+
+    const recent = active.slice(0, 5);
+    if (!recent.length) {
+        document.getElementById('dash-recent').innerHTML = `<div class="empty"><div class="empty-icon">✈️</div>No trips yet. Add your first adventure!</div>`;
+        return;
+    }
+    document.getElementById('dash-recent').innerHTML = recent.map(t => `
+        <div class="recent-trip-item" onclick="openTripDetail('${t._id}')">
+            <div>
+                <div class="rti-name">${esc(t.name)}</div>
+                <div class="rti-meta">${fmtDate(t.departureDate)} — ${fmtDate(t.returnDate)} · ${(t.destinations||[]).length} destination${(t.destinations||[]).length!==1?'s':''}</div>
+            </div>
+            <div class="rti-right">${statusBadge(t.status)}</div>
+        </div>
+    `).join('');
+}
+
+// ═══════════════════════════════════════════════
+//  MY TRIPS
+// ═══════════════════════════════════════════════
+function populateYearFilter() {
+    const years = new Set();
+    trips.filter(t=>!t.deleted).forEach(t => {
+        if (t.departureDate) years.add(t.departureDate.substring(0,4));
+    });
+    const sel = document.getElementById('trips-year-filter');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">All Years</option>' + [...years].sort().reverse().map(y=>`<option value="${y}"${y===cur?' selected':''}>${y}</option>`).join('');
+}
+
+function renderTrips() {
+    const query = (document.getElementById('trips-search').value || '').toLowerCase();
+    const year = document.getElementById('trips-year-filter').value;
+    const status = document.getElementById('trips-status-filter').value;
+
+    let filtered = trips.filter(t => !t.deleted);
+    if (query) {
+        filtered = filtered.filter(t => {
+            const inName = t.name && t.name.toLowerCase().includes(query);
+            const inDests = (t.destinations||[]).some(d =>
+                (d.city||'').toLowerCase().includes(query) ||
+                (d.country||'').toLowerCase().includes(query) ||
+                (d.state||'').toLowerCase().includes(query)
+            );
+            return inName || inDests;
+        });
+    }
+    if (year) filtered = filtered.filter(t => t.departureDate && t.departureDate.startsWith(year));
+    if (status) filtered = filtered.filter(t => t.status === status);
+
+    if (!filtered.length) {
+        document.getElementById('trips-grid').innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="empty-icon">🗺️</div>No trips found.</div>`;
+        return;
+    }
+    document.getElementById('trips-grid').innerHTML = filtered.map(t => {
+        const dur = tripDuration(t.departureDate, t.returnDate);
+        const dests = (t.destinations||[]).slice(0,4).map(d => `<span class="dest-pill">${countryFlag(d.country)} ${esc(d.city||d.country||'')}</span>`).join('');
+        const more = (t.destinations||[]).length > 4 ? `<span class="dest-pill">+${(t.destinations||[]).length-4} more</span>` : '';
+        return `<div class="trip-card">
+            <div class="trip-card-top">
+                <div class="trip-card-name">${esc(t.name)}</div>
+                ${statusBadge(t.status)}
+            </div>
+            <div class="trip-card-dates">${fmtDate(t.departureDate)} – ${fmtDate(t.returnDate)}${dur>0?' · '+dur+' day'+(dur!==1?'s':''):''}</div>
+            <div class="trip-card-dests">${dests}${more}</div>
+            <div class="trip-card-actions">
+                <button class="btn btn-ghost btn-sm" onclick="openTripDetail('${t._id}')">👁 View</button>
+                <button class="btn btn-ghost btn-sm" onclick="loadFormForEdit('${t._id}')">✏️ Edit</button>
+                <button class="btn btn-danger btn-sm" onclick="softDelete('${t._id}')">🗑 Delete</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// ═══════════════════════════════════════════════
+//  ADD / EDIT FORM
+// ═══════════════════════════════════════════════
+function resetForm() {
+    editingId = null;
+    formDests = [];
+    document.getElementById('form-title').textContent = 'Add New Trip';
+    document.getElementById('f-name').value = '';
+    document.getElementById('f-status').value = 'planned';
+    document.getElementById('f-dep').value = '';
+    document.getElementById('f-ret').value = '';
+    document.getElementById('f-notes').value = '';
+    document.getElementById('duration-row').style.display = 'none';
+    renderDestRows();
+}
+
+function cancelForm() {
+    resetForm();
+    showView(editingId ? 'trips' : 'dashboard');
+}
+
+function loadFormForEdit(id) {
+    const t = trips.find(x => x._id === id);
+    if (!t) return;
+    editingId = id;
+    formDests = (t.destinations || []).map(d => ({...d}));
+    document.getElementById('form-title').textContent = 'Edit Trip';
+    document.getElementById('f-name').value = t.name || '';
+    document.getElementById('f-status').value = t.status || 'planned';
+    document.getElementById('f-dep').value = t.departureDate || '';
+    document.getElementById('f-ret').value = t.returnDate || '';
+    document.getElementById('f-notes').value = t.notes || '';
+    updateDuration();
+    renderDestRows();
+    showView('add-trip');
+    closeModal();
+}
+
+function updateDuration() {
+    const dep = document.getElementById('f-dep').value;
+    const ret = document.getElementById('f-ret').value;
+    const dur = tripDuration(dep, ret);
+    const row = document.getElementById('duration-row');
+    if (dur > 0) {
+        row.style.display = 'block';
+        document.getElementById('duration-hint').textContent = `Trip duration: ${dur} day${dur!==1?'s':''}`;
+    } else {
+        row.style.display = 'none';
+    }
+}
+
+function renderDestRows() {
+    document.getElementById('dests-container').innerHTML = formDests.map((d,i) => `
+        <div class="dest-row" id="dest-row-${i}">
+            <input type="text" placeholder="City" value="${esc(d.city||'')}" oninput="formDests[${i}].city=this.value">
+            <input type="text" placeholder="State (optional)" value="${esc(d.state||'')}" oninput="formDests[${i}].state=this.value">
+            <input type="text" placeholder="Country" value="${esc(d.country||'')}" oninput="formDests[${i}].country=this.value">
+            <button class="btn btn-ghost btn-sm" onclick="geocodeDest(${i})" title="Geocode">📍</button>
+            <span class="geocode-status" id="geo-status-${i}">${d.lat?'✓':''}</span>
+            <button class="btn btn-danger btn-sm" onclick="removeDestRow(${i})" title="Remove">✕</button>
+        </div>
+    `).join('');
+}
+
+function addDestRow() {
+    formDests.push({city:'',state:'',country:'',lat:null,lon:null});
+    renderDestRows();
+    // Focus the new city input
+    setTimeout(() => {
+        const rows = document.querySelectorAll('.dest-row');
+        if (rows.length) rows[rows.length-1].querySelector('input')?.focus();
+    }, 50);
+}
+
+function removeDestRow(i) {
+    formDests.splice(i, 1);
+    renderDestRows();
+}
+
+async function geocodeDest(i) {
+    const d = formDests[i];
+    const q = [d.city, d.country].filter(Boolean).join(' ');
+    if (!q) { showToast('Enter city and country first', true); return; }
+    const statusEl = document.getElementById('geo-status-' + i);
+    statusEl.textContent = '…';
+    try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`);
+        const data = await res.json();
+        if (data && data.length) {
+            formDests[i].lat = parseFloat(data[0].lat);
+            formDests[i].lon = parseFloat(data[0].lon);
+            statusEl.textContent = '✓';
+        } else {
+            statusEl.textContent = '?';
+            showToast('Location not found', true);
+        }
+    } catch {
+        statusEl.textContent = '!';
+        showToast('Geocoding failed', true);
+    }
+}
+
+async function saveTrip() {
+    const name = document.getElementById('f-name').value.trim();
+    if (!name) { showToast('Trip name is required', true); return; }
+    const data = {
+        name,
+        status: document.getElementById('f-status').value,
+        departureDate: document.getElementById('f-dep').value || null,
+        returnDate: document.getElementById('f-ret').value || null,
+        notes: document.getElementById('f-notes').value.trim(),
+        destinations: formDests.filter(d => d.city || d.country),
+        deleted: false
+    };
+    try {
+        if (editingId) {
+            await db.collection('globetrotting_trips').doc(editingId).update(data);
+            showToast('Trip updated!');
+        } else {
+            data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+            await db.collection('globetrotting_trips').add(data);
+            showToast('Trip saved!');
+        }
+        await loadTrips();
+        renderAll();
+        if (activeView === 'world-map') renderWorldMap();
+        if (activeView === 'us-map') renderUSMap();
+        resetForm();
+        showView('trips');
+    } catch(e) {
+        showToast('Save failed: ' + e.message, true);
+    }
+}
+
+async function softDelete(id) {
+    if (!confirm('Move this trip to the recycle bin?')) return;
+    await db.collection('globetrotting_trips').doc(id).update({ deleted: true });
+    await loadTrips();
+    renderAll();
+    showToast('Trip moved to recycle bin');
+}
+
+// Pre-fill form from scanned data
+function prefillForm(data) {
+    resetForm();
+    document.getElementById('f-name').value = data.name || '';
+    document.getElementById('f-dep').value = data.departureDate || '';
+    document.getElementById('f-ret').value = data.returnDate || '';
+    document.getElementById('f-notes').value = data.notes || '';
+    formDests = (data.destinations || []).map(d => ({city:d.city||'',state:d.state||'',country:d.country||'',lat:null,lon:null}));
+    updateDuration();
+    renderDestRows();
+}
+
+// ═══════════════════════════════════════════════
+//  SCAN ITINERARY
+// ═══════════════════════════════════════════════
+function scanDragOver(e) { e.preventDefault(); document.getElementById('scan-drop').classList.add('dragover'); }
+function scanDragLeave() { document.getElementById('scan-drop').classList.remove('dragover'); }
+function scanDrop(e) {
+    e.preventDefault();
+    document.getElementById('scan-drop').classList.remove('dragover');
+    const f = e.dataTransfer.files[0];
+    if (f) handleScanFile(f);
+}
+
+async function handleScanFile(file) {
+    if (!file) return;
+    scanFile = file;
+    scanExtracted = null;
+    document.getElementById('scan-result-area').style.display = 'none';
+
+    const previewArea = document.getElementById('scan-preview-area');
+    previewArea.style.display = 'block';
+
+    if (file.type.startsWith('image/')) {
+        const url = URL.createObjectURL(file);
+        previewArea.innerHTML = `<div class="scan-preview"><img src="${url}"><div><div class="scan-preview-name">${esc(file.name)}</div><div class="scan-preview-type">${file.type} · ${(file.size/1024).toFixed(1)} KB</div></div></div>`;
+    } else {
+        previewArea.innerHTML = `<div class="scan-preview"><div style="font-size:2rem;">📄</div><div><div class="scan-preview-name">${esc(file.name)}</div><div class="scan-preview-type">${file.type} · ${(file.size/1024).toFixed(1)} KB</div></div></div>`;
+    }
+    document.getElementById('scan-actions').style.display = 'block';
+}
+
+function clearScan() {
+    scanFile = null;
+    scanExtracted = null;
+    document.getElementById('scan-preview-area').style.display = 'none';
+    document.getElementById('scan-actions').style.display = 'none';
+    document.getElementById('scan-result-area').style.display = 'none';
+    document.getElementById('scan-file-input').value = '';
+}
+
+async function runScan() {
+    if (!scanFile) return;
+    if (!apiKey || !proxyUrl) { showToast('Set API key & proxy in Agents → Settings first', true); return; }
+
+    const resultArea = document.getElementById('scan-result-area');
+    resultArea.style.display = 'block';
+    resultArea.innerHTML = `<div class="scan-result"><div class="scan-result-title">Extracting…</div><div style="display:flex;justify-content:center;padding:20px;"><div class="spinner"></div></div></div>`;
+
+    try {
+        const base64 = await fileToBase64(scanFile);
+        const isImage = scanFile.type.startsWith('image/');
+        const isPDF = scanFile.type === 'application/pdf';
+
+        let contentBlock;
+        if (isImage) {
+            contentBlock = { type: 'image', source: { type: 'base64', media_type: scanFile.type, data: base64 } };
+        } else if (isPDF) {
+            contentBlock = { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } };
+        } else {
+            showToast('Unsupported file type', true);
+            return;
+        }
+
+        const reqBody = {
+            apiKey,
+            model: 'claude-opus-4-5',
+            max_tokens: 1024,
+            stream: false,
+            system: 'You are a travel itinerary parser. Extract trip information and return ONLY a JSON object: {name, departureDate (YYYY-MM-DD or null), returnDate (YYYY-MM-DD or null), destinations:[{city,state,country}], notes}. No explanation, just JSON.',
+            messages: [{ role: 'user', content: [contentBlock, { type: 'text', text: 'Parse this travel itinerary and return the JSON.' }] }]
+        };
+
+        const res = await fetch(proxyUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(reqBody)
+        });
+        const text = await res.text();
+        const j = JSON.parse(text);
+        if (!res.ok) throw new Error(j?.error?.message || 'API error ' + res.status);
+        const rawText = (j?.content || []).filter(b=>b.type==='text').map(b=>b.text).join('') || '';
+
+        // Extract JSON from response
+        const match = rawText.match(/\{[\s\S]*\}/);
+        if (!match) throw new Error('No JSON found in response');
+        const extracted = JSON.parse(match[0]);
+        scanExtracted = extracted;
+
+        // Auto-geocode destinations
+        if (extracted.destinations && extracted.destinations.length) {
+            for (let i = 0; i < extracted.destinations.length; i++) {
+                const d = extracted.destinations[i];
+                const q = [d.city, d.country].filter(Boolean).join(' ');
+                if (q) {
+                    try {
+                        const gr = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`);
+                        const gd = await gr.json();
+                        if (gd && gd.length) { d.lat = parseFloat(gd[0].lat); d.lon = parseFloat(gd[0].lon); }
+                    } catch {}
+                }
+            }
+        }
+
+        resultArea.innerHTML = `
+            <div class="scan-result">
+                <div class="scan-result-title">Extracted Data</div>
+                <pre>${esc(JSON.stringify(extracted, null, 2))}</pre>
+                <div style="margin-top:14px;">
+                    <button class="btn btn-success" onclick="applyScannedTrip()">✅ Use This Trip</button>
+                </div>
+            </div>`;
+    } catch(e) {
+        resultArea.innerHTML = `<div class="scan-result"><div class="scan-result-title" style="color:var(--danger);">Error</div><pre style="color:var(--danger);">${esc(e.message)}</pre></div>`;
+    }
+}
+
+async function applyScannedTrip() {
+    if (!scanExtracted) return;
+    prefillForm(scanExtracted);
+    // Apply geocoded lat/lon
+    if (scanExtracted.destinations) {
+        formDests = scanExtracted.destinations.map(d => ({
+            city: d.city||'', state: d.state||'', country: d.country||'',
+            lat: d.lat||null, lon: d.lon||null
+        }));
+    }
+    renderDestRows();
+    clearScan();
+    showView('add-trip');
+    showToast('Trip data loaded into form!');
+}
+
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => {
+            const dataUrl = e.target.result;
+            const base64 = dataUrl.split(',')[1];
+            resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+// ═══════════════════════════════════════════════
+//  WORLD MAP
+// ═══════════════════════════════════════════════
+function renderWorldMap() {
+    const active = trips.filter(t => !t.deleted);
+    const allDests = [];
+    active.forEach(t => (t.destinations||[]).forEach(d => {
+        if (d.lat && d.lon) allDests.push({...d, tripName: t.name, tripDates: `${fmtDate(t.departureDate)} – ${fmtDate(t.returnDate)}`});
+    }));
+
+    const countries = new Set(allDests.map(d => d.country).filter(Boolean));
+    document.getElementById('world-map-stats').innerHTML = `<strong>${allDests.length}</strong> destination${allDests.length!==1?'s':''} across <strong>${countries.size}</strong> countr${countries.size!==1?'ies':'y'}`;
+
+    if (!worldMapInit) {
+        worldMapInst = L.map('world-map-container').setView([20, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 18
+        }).addTo(worldMapInst);
+        worldMapInit = true;
+    } else {
+        // Invalidate size in case container was hidden
+        setTimeout(() => worldMapInst.invalidateSize(), 50);
+    }
+
+    // Clear old markers
+    worldMarkers.forEach(m => worldMapInst.removeLayer(m));
+    worldMarkers = [];
+
+    allDests.forEach(d => {
+        const m = L.circleMarker([d.lat, d.lon], {
+            radius: 8, color: '#0d9488', fillColor: '#0d9488',
+            fillOpacity: 0.7, weight: 2
+        }).addTo(worldMapInst);
+        m.bindPopup(`<strong>${esc(d.city||'')}</strong>${d.country?', '+esc(d.country):''}<br>${esc(d.tripName)}<br><small>${d.tripDates}</small>`);
+        worldMarkers.push(m);
+    });
+
+    setTimeout(() => worldMapInst.invalidateSize(), 100);
+}
+
+// ═══════════════════════════════════════════════
+//  US MAP
+// ═══════════════════════════════════════════════
+const STATE_NAMES = {
+    'AL':'Alabama','AK':'Alaska','AZ':'Arizona','AR':'Arkansas','CA':'California',
+    'CO':'Colorado','CT':'Connecticut','DE':'Delaware','FL':'Florida','GA':'Georgia',
+    'HI':'Hawaii','ID':'Idaho','IL':'Illinois','IN':'Indiana','IA':'Iowa',
+    'KS':'Kansas','KY':'Kentucky','LA':'Louisiana','ME':'Maine','MD':'Maryland',
+    'MA':'Massachusetts','MI':'Michigan','MN':'Minnesota','MS':'Mississippi','MO':'Missouri',
+    'MT':'Montana','NE':'Nebraska','NV':'Nevada','NH':'New Hampshire','NJ':'New Jersey',
+    'NM':'New Mexico','NY':'New York','NC':'North Carolina','ND':'North Dakota','OH':'Ohio',
+    'OK':'Oklahoma','OR':'Oregon','PA':'Pennsylvania','RI':'Rhode Island','SC':'South Carolina',
+    'SD':'South Dakota','TN':'Tennessee','TX':'Texas','UT':'Utah','VT':'Vermont',
+    'VA':'Virginia','WA':'Washington','WV':'West Virginia','WI':'Wisconsin','WY':'Wyoming',
+    'DC':'District of Columbia'
+};
+const ABBR_MAP = {};
+Object.entries(STATE_NAMES).forEach(([abbr,name]) => { ABBR_MAP[name.toLowerCase()] = abbr; ABBR_MAP[abbr.toLowerCase()] = abbr; });
+
+function normalizeState(s) {
+    if (!s) return null;
+    return ABBR_MAP[s.trim().toLowerCase()] || null;
+}
+
+function getVisitedStates(tripArr) {
+    const arr = tripArr || trips.filter(t=>!t.deleted);
+    const states = new Set();
+    arr.forEach(t => (t.destinations||[]).forEach(d => {
+        const c = (d.country||'').toLowerCase();
+        if (c === 'usa' || c === 'us' || c === 'united states' || c === 'united states of america') {
+            const abbr = normalizeState(d.state);
+            if (abbr) states.add(abbr);
+        }
+    }));
+    return states;
+}
+
+async function renderUSMap() {
+    const visitedStates = getVisitedStates();
+    const stateCount = {};
+    trips.filter(t=>!t.deleted).forEach(t => (t.destinations||[]).forEach(d => {
+        const c = (d.country||'').toLowerCase();
+        if (c === 'usa' || c === 'us' || c === 'united states' || c === 'united states of america') {
+            const abbr = normalizeState(d.state);
+            if (abbr) stateCount[abbr] = (stateCount[abbr]||0) + 1;
+        }
+    }));
+
+    document.getElementById('us-map-stats').innerHTML = `<strong>${visitedStates.size}</strong> / 50 states visited`;
+
+    // State badges
+    const allAbbrs = Object.keys(STATE_NAMES).filter(a => a !== 'DC');
+    document.getElementById('state-badges-grid').innerHTML = allAbbrs.map(a =>
+        visitedStates.has(a)
+            ? `<span class="state-badge state-visited" title="${STATE_NAMES[a]}">${a}</span>`
+            : `<span class="state-badge state-not-visited" title="${STATE_NAMES[a]}">${a}</span>`
+    ).join('');
+
+    if (!usMapInit) {
+        usMapInst = L.map('us-map-container').setView([39, -96], 4);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 18
+        }).addTo(usMapInst);
+        usMapInit = true;
+    } else {
+        setTimeout(() => usMapInst.invalidateSize(), 50);
+    }
+
+    // Remove old GeoJSON layer
+    if (usGeoLayer) { usMapInst.removeLayer(usGeoLayer); usGeoLayer = null; }
+
+    // Load GeoJSON
+    if (!usGeoJSON) {
+        try {
+            const res = await fetch('https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json');
+            usGeoJSON = await res.json();
+        } catch { showToast('Failed to load US states map', true); return; }
+    }
+
+    usGeoLayer = L.geoJSON(usGeoJSON, {
+        style: feature => {
+            const name = feature.properties.name || '';
+            const abbr = ABBR_MAP[name.toLowerCase()] || null;
+            const visited = abbr && visitedStates.has(abbr);
+            return {
+                fillColor: visited ? '#0d9488' : '#d1e8ee',
+                fillOpacity: visited ? 0.65 : 0.4,
+                color: '#b0cdd6', weight: 1
+            };
+        },
+        onEachFeature: (feature, layer) => {
+            const name = feature.properties.name || '';
+            const abbr = ABBR_MAP[name.toLowerCase()] || null;
+            const visits = abbr ? (stateCount[abbr] || 0) : 0;
+            layer.bindPopup(`<strong>${name}</strong><br>${visits ? visits + ' visit' + (visits!==1?'s':'') : 'Not yet visited'}`);
+        }
+    }).addTo(usMapInst);
+
+    setTimeout(() => usMapInst.invalidateSize(), 100);
+}
+
+// ═══════════════════════════════════════════════
+//  RECYCLE BIN
+// ═══════════════════════════════════════════════
+async function renderBin() {
+    const deleted = trips.filter(t => t.deleted);
+    if (!deleted.length) {
+        document.getElementById('bin-list').innerHTML = `<div class="empty"><div class="empty-icon">🗑️</div>Recycle bin is empty.</div>`;
+        return;
+    }
+    document.getElementById('bin-list').innerHTML = deleted.map(t => `
+        <div class="bin-card">
+            <div class="bin-card-info">
+                <div class="bin-card-name">${esc(t.name)}</div>
+                <div class="bin-card-meta">${fmtDate(t.departureDate)} – ${fmtDate(t.returnDate)} · ${statusBadge(t.status)}</div>
+            </div>
+            <div style="display:flex;gap:8px;flex-shrink:0;">
+                <button class="btn btn-success btn-sm" onclick="restoreTrip('${t._id}')">↩️ Restore</button>
+                <button class="btn btn-danger btn-sm" onclick="permDelete('${t._id}')">🗑 Delete Forever</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function restoreTrip(id) {
+    await db.collection('globetrotting_trips').doc(id).update({ deleted: false });
+    await loadTrips();
+    renderAll();
+    renderBin();
+    showToast('Trip restored!');
+}
+
+async function permDelete(id) {
+    if (!confirm('Permanently delete this trip? This cannot be undone.')) return;
+    await db.collection('globetrotting_trips').doc(id).delete();
+    await loadTrips();
+    renderAll();
+    renderBin();
+    showToast('Trip permanently deleted');
+}
+
+// ═══════════════════════════════════════════════
+//  TRIP DETAIL MODAL
+// ═══════════════════════════════════════════════
+function openTripDetail(id) {
+    const t = trips.find(x => x._id === id);
+    if (!t) return;
+    modalTripId = id;
+    document.getElementById('modal-trip-name').innerHTML = `${esc(t.name)} ${statusBadge(t.status)}`;
+    const dur = tripDuration(t.departureDate, t.returnDate);
+    const dests = (t.destinations||[]).map(d =>
+        `<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:0.88rem;">
+            ${countryFlag(d.country)} <strong>${esc(d.city||'')}</strong>${d.state?', '+esc(d.state):''}${d.country?', '+esc(d.country):''}
+            ${d.lat?`<span style="color:var(--text-secondary);font-size:0.75rem;margin-left:8px;">(${d.lat.toFixed(4)}, ${d.lon.toFixed(4)})</span>`:''}
+        </div>`
+    ).join('') || '<div style="color:var(--text-secondary);font-size:0.88rem;">No destinations added.</div>';
+
+    document.getElementById('modal-trip-body').innerHTML = `
+        <div class="modal-section">
+            <div class="modal-section-title">Dates</div>
+            <div class="modal-kv">
+                <div><div class="modal-kv-lbl">Departure</div><div class="modal-kv-val">${fmtDate(t.departureDate)}</div></div>
+                <div><div class="modal-kv-lbl">Return</div><div class="modal-kv-val">${fmtDate(t.returnDate)}</div></div>
+                <div><div class="modal-kv-lbl">Duration</div><div class="modal-kv-val">${dur>0?dur+' day'+(dur!==1?'s':''):'—'}</div></div>
+            </div>
+        </div>
+        <div class="modal-section">
+            <div class="modal-section-title">Destinations (${(t.destinations||[]).length})</div>
+            ${dests}
+        </div>
+        ${t.notes?`<div class="modal-section"><div class="modal-section-title">Notes</div><div style="font-size:0.88rem;line-height:1.6;white-space:pre-wrap;">${esc(t.notes)}</div></div>`:''}
+    `;
+    document.getElementById('trip-modal-overlay').classList.add('show');
+}
+
+function closeModal(e) {
+    if (e && e.target !== document.getElementById('trip-modal-overlay')) return;
+    document.getElementById('trip-modal-overlay').classList.remove('show');
+    modalTripId = null;
+}
+
+function modalEdit() {
+    if (modalTripId) loadFormForEdit(modalTripId);
+}
+
+// ═══════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════
+function esc(s) {
+    if (!s) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function fmtDate(s) {
+    if (!s) return '—';
+    try {
+        const [y,m,d] = s.split('-');
+        return new Date(+y,+m-1,+d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    } catch { return s; }
+}
+
+function tripDuration(dep, ret) {
+    if (!dep || !ret) return 0;
+    try {
+        const a = new Date(dep), b = new Date(ret);
+        const diff = Math.round((b - a) / (1000*60*60*24));
+        return diff > 0 ? diff : 0;
+    } catch { return 0; }
+}
+
+function getVisitedCountries(tripArr) {
+    const arr = tripArr || trips.filter(t=>!t.deleted);
+    const countries = new Set();
+    arr.forEach(t => (t.destinations||[]).forEach(d => { if(d.country) countries.add(d.country.trim().toLowerCase()); }));
+    return countries;
+}
+
+function statusBadge(s) {
+    const map = {
+        'planned': ['badge-planned','Planned'],
+        'in-progress': ['badge-in-progress','In Progress'],
+        'completed': ['badge-completed','Completed']
+    };
+    const [cls, label] = map[s] || ['badge-planned','Planned'];
+    return `<span class="badge ${cls}">${label}</span>`;
+}
+
+function countryFlag(country) {
+    if (!country) return '';
+    const c = country.trim().toLowerCase();
+    // Simple mapping for common countries
+    const flags = {
+        'united states':'🇺🇸','usa':'🇺🇸','us':'🇺🇸','canada':'🇨🇦','mexico':'🇲🇽',
+        'united kingdom':'🇬🇧','uk':'🇬🇧','france':'🇫🇷','germany':'🇩🇪','italy':'🇮🇹',
+        'spain':'🇪🇸','portugal':'🇵🇹','netherlands':'🇳🇱','greece':'🇬🇷','switzerland':'🇨🇭',
+        'austria':'🇦🇹','belgium':'🇧🇪','sweden':'🇸🇪','norway':'🇳🇴','denmark':'🇩🇰',
+        'finland':'🇫🇮','ireland':'🇮🇪','poland':'🇵🇱','czech republic':'🇨🇿','czechia':'🇨🇿',
+        'hungary':'🇭🇺','croatia':'🇭🇷','iceland':'🇮🇸','turkey':'🇹🇷','japan':'🇯🇵',
+        'china':'🇨🇳','south korea':'🇰🇷','korea':'🇰🇷','india':'🇮🇳','thailand':'🇹🇭',
+        'vietnam':'🇻🇳','indonesia':'🇮🇩','singapore':'🇸🇬','malaysia':'🇲🇾','philippines':'🇵🇭',
+        'australia':'🇦🇺','new zealand':'🇳🇿','brazil':'🇧🇷','argentina':'🇦🇷','colombia':'🇨🇴',
+        'peru':'🇵🇪','chile':'🇨🇱','costa rica':'🇨🇷','cuba':'🇨🇺','jamaica':'🇯🇲',
+        'egypt':'🇪🇬','south africa':'🇿🇦','kenya':'🇰🇪','morocco':'🇲🇦','tanzania':'🇹🇿',
+        'israel':'🇮🇱','uae':'🇦🇪','united arab emirates':'🇦🇪','saudi arabia':'🇸🇦',
+        'jordan':'🇯🇴','russia':'🇷🇺','ukraine':'🇺🇦'
+    };
+    return flags[c] || '🌍';
+}
+
+function showToast(msg, isErr) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast' + (isErr ? ' error' : '') + ' show';
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ═══════════════════════════════════════════════
+//  KEYBOARD SHORTCUTS
+// ═══════════════════════════════════════════════
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeModal();
+});
+
+// ═══════════════════════════════════════════════
+//  INIT (reset form on page load)
+// ═══════════════════════════════════════════════
+resetForm();
+</script>
+</body>
+</html>

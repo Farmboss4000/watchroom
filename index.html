@@ -950,6 +950,7 @@
         </div>
         <div class="hero-text">
             <div class="hero-title">FARMBOSS<br><span>HEADQUARTERS</span></div>
+            <div class="hero-tagline" style="font-size:1rem;color:rgba(255,255,255,0.7);margin-top:8px;font-style:italic;">a place to keep track of my sh&amp;t…</div>
         </div>
     </div>
 
@@ -1213,7 +1214,7 @@
         </div>
 
         <!-- FAMOUS ONE LINERS SECTION -->
-        <div class="section-title" style="margin-top:32px;">⚡ Famous One Liners</div>
+        <div class="section-title" style="margin-top:32px;">⚡ Classic One Liners</div>
         <div class="oneliners-section">
 
             <!-- Add One Liner Row -->
@@ -1444,7 +1445,7 @@
         const now  = new Date();
         const tz   = wxTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
         const date = now.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric', timeZone: tz });
-        const time = now.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true, timeZone: tz });
+        const time = now.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', hour12:false, timeZone: tz });
         document.getElementById('dtw-clock').textContent = `${date}  ·  ${time}`;
     }
     function initClock() {

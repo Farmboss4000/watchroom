@@ -783,6 +783,35 @@
             transition: color 0.15s; line-height: 1;
         }
         .oneliner-del:hover { color: #f87171; }
+        .oneliner-edit {
+            background: none; border: none; color: #475569;
+            cursor: pointer; font-size: 0.88rem; padding: 0 2px;
+            transition: color 0.15s; line-height: 1;
+        }
+        .oneliner-edit:hover { color: #f59e0b; }
+        .oneliner-edit-form { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+        .oneliner-edit-form input {
+            width: 100%; padding: 7px 10px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid #f59e0b44;
+            border-radius: 6px; color: var(--text-primary);
+            font-size: 0.88rem; font-family: inherit;
+            box-sizing: border-box;
+        }
+        .oneliner-edit-form input:focus { outline: none; border-color: #f59e0b; }
+        .oneliner-edit-btns { display: flex; gap: 6px; }
+        .oneliner-save-btn {
+            padding: 5px 14px; background: #f59e0b; color: #1a1a2e;
+            border: none; border-radius: 6px; font-size: 0.8rem;
+            font-weight: 700; cursor: pointer; transition: opacity 0.15s;
+        }
+        .oneliner-save-btn:hover { opacity: 0.85; }
+        .oneliner-cancel-btn {
+            padding: 5px 12px; background: transparent;
+            border: 1px solid rgba(255,255,255,0.15); color: var(--text-secondary);
+            border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: color 0.15s;
+        }
+        .oneliner-cancel-btn:hover { color: #fff; }
         .oneliner-text {
             color: var(--text-primary);
             font-size: 0.93rem;
@@ -1706,13 +1735,16 @@
             return;
         }
         list.innerHTML = oneLiners.map((ol, i) => `
-            <div class="oneliner-item">
+            <div class="oneliner-item" id="ol-card-${ol._docId}">
                 <div class="oneliner-header">
                     <span class="oneliner-num">⚡ ${i + 1}</span>
-                    <button class="oneliner-del" onclick="deleteOneLiner('${ol._docId}')" title="Delete">🗑</button>
+                    <div style="display:flex;gap:4px;align-items:center;">
+                        <button class="oneliner-edit" onclick="startEditOneLiner('${ol._docId}')" title="Edit">✏️</button>
+                        <button class="oneliner-del" onclick="deleteOneLiner('${ol._docId}')" title="Delete">🗑</button>
+                    </div>
                 </div>
-                <div class="oneliner-text">${escHtml(ol.text || '')}</div>
-                ${ol.source ? `<div class="oneliner-source">— ${escHtml(ol.source)}</div>` : ''}
+                <div class="oneliner-text" id="ol-text-${ol._docId}">${escHtml(ol.text || '')}</div>
+                ${ol.source ? `<div class="oneliner-source" id="ol-src-${ol._docId}">— ${escHtml(ol.source)}</div>` : `<div class="oneliner-source" id="ol-src-${ol._docId}" style="display:none;"></div>`}
             </div>`).join('');
     }
 
@@ -1736,6 +1768,53 @@
             showToast('One liner deleted.');
         } catch(e) {
             showToast('Error deleting one liner.', true);
+        }
+    }
+
+    function startEditOneLiner(docId) {
+        const ol = oneLiners.find(o => o._docId === docId);
+        if (!ol) return;
+        const card = document.getElementById(`ol-card-${docId}`);
+        if (!card) return;
+        // Hide display elements
+        document.getElementById(`ol-text-${docId}`).style.display = 'none';
+        document.getElementById(`ol-src-${docId}`).style.display = 'none';
+        // Hide edit/delete buttons
+        card.querySelector('.oneliner-header div').style.display = 'none';
+        // Inject edit form
+        const form = document.createElement('div');
+        form.className = 'oneliner-edit-form';
+        form.id = `ol-form-${docId}`;
+        form.innerHTML = `
+            <input type="text" id="ol-edit-text-${docId}" value="${escHtml(ol.text || '')}" placeholder="One liner text...">
+            <input type="text" id="ol-edit-src-${docId}" value="${escHtml(ol.source || '')}" placeholder="— Attribution (optional)">
+            <div class="oneliner-edit-btns">
+                <button class="oneliner-save-btn" onclick="saveOneLiner('${docId}')">💾 Save</button>
+                <button class="oneliner-cancel-btn" onclick="cancelEditOneLiner('${docId}')">Cancel</button>
+            </div>`;
+        card.appendChild(form);
+        document.getElementById(`ol-edit-text-${docId}`).focus();
+    }
+
+    function cancelEditOneLiner(docId) {
+        const card = document.getElementById(`ol-card-${docId}`);
+        if (!card) return;
+        const form = document.getElementById(`ol-form-${docId}`);
+        if (form) form.remove();
+        document.getElementById(`ol-text-${docId}`).style.display = '';
+        document.getElementById(`ol-src-${docId}`).style.display = '';
+        card.querySelector('.oneliner-header div').style.display = '';
+    }
+
+    async function saveOneLiner(docId) {
+        const newText = document.getElementById(`ol-edit-text-${docId}`).value.trim();
+        const newSrc  = document.getElementById(`ol-edit-src-${docId}`).value.trim();
+        if (!newText) { showToast('One liner text cannot be empty.', true); return; }
+        try {
+            await db.collection('one_liners').doc(docId).update({ text: newText, source: newSrc });
+            showToast('One liner updated! ⚡');
+        } catch(e) {
+            showToast('Error saving one liner.', true);
         }
     }
 

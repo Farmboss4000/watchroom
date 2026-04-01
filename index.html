@@ -1480,6 +1480,26 @@
 
         </div>
 
+        <!-- HEADQUARTERS ANALYTICS -->
+        <div class="section-title" style="margin-top:32px;">Headquarters Analytics</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:32px;" id="analytics-grid">
+            <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:20px;">
+                <div style="font-size:0.78rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;">Inventory Distribution</div>
+                <div style="position:relative;height:280px;">
+                    <canvas id="chart-inventory-donut"></canvas>
+                </div>
+            </div>
+            <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:20px;">
+                <div style="font-size:0.78rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;">Collection Size Comparison</div>
+                <div style="position:relative;height:280px;">
+                    <canvas id="chart-collection-bar"></canvas>
+                </div>
+            </div>
+        </div>
+        <style>
+            @media (max-width: 800px) { #analytics-grid { grid-template-columns: 1fr !important; } }
+        </style>
+
     </div><!-- /main-content -->
 
     <!-- FOOTER -->
@@ -1597,10 +1617,11 @@
     }
 
     // ── LIVE COUNTS ──
-    const counts = { armory:0, machinery:0, automotive:0, livestock:0, timepieces:0, knives:0 };
+    const counts = { armory:0, machinery:0, automotive:0, livestock:0, timepieces:0, knives:0, pharmacy:0, insurance:0, realestate:0, agents:0 };
+    let analyticsDonut = null, analyticsBar = null;
 
     function updateCounts() {
-        ['armory','machinery','automotive','livestock','timepieces','knives'].forEach(k => {
+        ['armory','machinery','automotive','livestock','timepieces','knives','pharmacy','insurance','realestate','agents'].forEach(k => {
             const v = counts[k];
             const statEl = document.getElementById('stat-' + k);
             if (statEl) statEl.textContent = v;
@@ -1609,6 +1630,61 @@
             const metaEl = document.getElementById('meta-' + k);
             if (metaEl) metaEl.textContent = v;
         });
+        updateAnalyticsCharts();
+    }
+
+    function updateAnalyticsCharts() {
+        const labels = ['Armory','Machinery','Automotive','Livestock','Timepieces','Knives','Pharmacy','Insurance','Real Estate','Agents'];
+        const keys   = ['armory','machinery','automotive','livestock','timepieces','knives','pharmacy','insurance','realestate','agents'];
+        const data   = keys.map(k => counts[k] || 0);
+        const colors = ['#c8a96e','#d4941a','#3b82f6','#22c55e','#d97706','#dc2626','#0ea5e9','#16a34a','#0891b2','#8b5cf6'];
+
+        const total = data.reduce((s,v) => s + v, 0);
+        if (total === 0) return; // no data yet
+
+        // Doughnut chart
+        const donutCtx = document.getElementById('chart-inventory-donut');
+        if (donutCtx) {
+            if (analyticsDonut) {
+                analyticsDonut.data.datasets[0].data = data;
+                analyticsDonut.update();
+            } else {
+                analyticsDonut = new Chart(donutCtx, {
+                    type: 'doughnut',
+                    data: { labels, datasets: [{ data, backgroundColor: colors, borderColor: '#0f172a', borderWidth: 2 }] },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position:'right', labels: { color:'#94a3b8', font:{size:11}, padding:10, usePointStyle:true, pointStyleWidth:10 } },
+                            tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.parsed} items (${Math.round(ctx.parsed/total*100)}%)` } }
+                        },
+                        cutout: '55%'
+                    }
+                });
+            }
+        }
+
+        // Bar chart
+        const barCtx = document.getElementById('chart-collection-bar');
+        if (barCtx) {
+            if (analyticsBar) {
+                analyticsBar.data.datasets[0].data = data;
+                analyticsBar.update();
+            } else {
+                analyticsBar = new Chart(barCtx, {
+                    type: 'bar',
+                    data: { labels, datasets: [{ label:'Items', data, backgroundColor: colors, borderRadius: 6 }] },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { ticks: { color:'#94a3b8', font:{size:10}, maxRotation:45 }, grid: { display:false } },
+                            y: { ticks: { color:'#94a3b8', font:{size:10} }, grid: { color:'rgba(255,255,255,0.05)' }, beginAtZero: true }
+                        }
+                    }
+                });
+            }
+        }
     }
 
     function initLiveCounts() {

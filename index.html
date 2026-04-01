@@ -1133,9 +1133,24 @@
                 <div class="wx-report-value" id="wxr-rain-year">--</div>
                 <div class="wx-report-label">Rain — Year to Date</div>
             </div>
+            <div class="wx-report-card" onclick="openWxDetail('rain-event')">
+                <div class="wx-report-value" id="wxr-rain-event">--</div>
+                <div class="wx-report-label">Event Rain</div>
+                <div class="wx-report-sub" id="wxr-rain-event-sub">Since last dry period</div>
+            </div>
+            <div class="wx-report-card" onclick="openWxDetail('last-rain')">
+                <div class="wx-report-value" id="wxr-last-rain">--</div>
+                <div class="wx-report-label">Last Detected Rain</div>
+                <div class="wx-report-sub" id="wxr-last-rain-sub"></div>
+            </div>
             <div class="wx-report-card wind" onclick="openWxDetail('wind-gust-today')">
                 <div class="wx-report-value" id="wxr-wind-gust">--</div>
                 <div class="wx-report-label">Max Wind Gust Today</div>
+            </div>
+            <div class="wx-report-card wind" onclick="openWxDetail('wind-avg')">
+                <div class="wx-report-value" id="wxr-wind-avg10">--</div>
+                <div class="wx-report-label">10-Min Avg Wind</div>
+                <div class="wx-report-sub" id="wxr-wind-avg10-sub"></div>
             </div>
             <div class="wx-report-card conditions" onclick="openWxDetail('temp-high')">
                 <div class="wx-report-value" id="wxr-temp-high-7d">--</div>
@@ -1796,6 +1811,33 @@
 
             document.getElementById('wxr-wind-gust').textContent = d.maxdailygust != null ? `${Math.round(d.maxdailygust)} mph` : '--';
 
+            // Event rain
+            document.getElementById('wxr-rain-event').textContent = fmtRain(d.eventrainin);
+            document.getElementById('wxr-rain-event-sub').textContent = d.eventrainin != null ? 'Since last dry period' : '';
+
+            // Last detected rain
+            if (d.lastRain) {
+                const lr = new Date(d.lastRain);
+                const now = new Date();
+                const diffMs = now - lr;
+                const diffHrs = Math.floor(diffMs / 3600000);
+                const diffDays = Math.floor(diffHrs / 24);
+                let ago = '';
+                if (diffDays > 0) ago = `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+                else if (diffHrs > 0) ago = `${diffHrs} hr${diffHrs > 1 ? 's' : ''} ago`;
+                else ago = 'Just now';
+                document.getElementById('wxr-last-rain').textContent = ago;
+                document.getElementById('wxr-last-rain-sub').textContent = lr.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' });
+            } else {
+                document.getElementById('wxr-last-rain').textContent = '--';
+            }
+
+            // 10-minute average wind
+            document.getElementById('wxr-wind-avg10').textContent = d.windspdmph_avg10m != null ? `${Math.round(d.windspdmph_avg10m)} mph` : '--';
+            if (d.winddir_avg10m != null) {
+                document.getElementById('wxr-wind-avg10-sub').textContent = `Direction: ${degToCompass(d.winddir_avg10m)} (${Math.round(d.winddir_avg10m)}°)`;
+            }
+
             // Barometric pressure
             document.getElementById('wxr-pressure').textContent = d.baromrelin != null ? `${d.baromrelin.toFixed(2)}` : '--';
             if (d.baromrelin != null) {
@@ -2075,6 +2117,66 @@
             dayKeys.forEach((day,i) => {
                 const h = highs[i], l = lows[i];
                 tableHTML += `<tr><td>${day}</td><td>${h != null ? h+'°F' : '--'}</td><td>${l != null ? l+'°F' : '--'}</td><td>${h != null && l != null ? (h-l)+'°' : '--'}</td></tr>`;
+            });
+            tableHTML += '</tbody></table>';
+
+        } else if (metric === 'rain-event') {
+            titleEl.textContent = 'Event Rain — Current Rain Event';
+            // Show same daily rain chart as rain-today
+            const todayKey = dayKeys[0];
+            const todayRecs = todayKey ? days[todayKey] : [];
+            const labels = [], vals = [];
+            todayRecs.slice().reverse().forEach(r => {
+                labels.push(new Date(r.dateutc).toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' }));
+                vals.push(r.hourlyrainin || 0);
+            });
+            chartConfig = { type:'bar', data:{
+                labels, datasets:[{ label:'Rain Rate (in/hr)', data:vals, backgroundColor:chartColors.blue }]
+            }, options: chartDefaults };
+            const eventTotal = wxCurrentData?.eventrainin;
+            tableHTML = `<p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:12px;">Event rain measures total accumulation since the last dry period. Current event total: <strong style="color:var(--text-primary);">${eventTotal != null ? eventTotal.toFixed(2)+'"' : '--'}</strong></p>`;
+            tableHTML += `<table class="wx-modal-table"><thead><tr><th>Time</th><th>Rain Rate</th></tr></thead><tbody>`;
+            todayRecs.slice().reverse().forEach(r => {
+                const t = new Date(r.dateutc).toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+                tableHTML += `<tr><td>${t}</td><td>${(r.hourlyrainin||0).toFixed(2)}"/hr</td></tr>`;
+            });
+            tableHTML += '</tbody></table>';
+
+        } else if (metric === 'last-rain') {
+            titleEl.textContent = 'Last Detected Rain';
+            document.getElementById('wx-detail-chart').style.display = 'none';
+            const lr = wxCurrentData?.lastRain ? new Date(wxCurrentData.lastRain) : null;
+            tableHTML = `<table class="wx-modal-table"><thead><tr><th>Detail</th><th>Value</th></tr></thead><tbody>`;
+            tableHTML += `<tr><td>Last Rain Detected</td><td>${lr ? lr.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' }) : '--'}</td></tr>`;
+            tableHTML += `<tr><td>Time</td><td>${lr ? lr.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' }) : '--'}</td></tr>`;
+            if (lr) {
+                const diffMs = Date.now() - lr;
+                const diffHrs = Math.floor(diffMs / 3600000);
+                const diffDays = Math.floor(diffHrs / 24);
+                tableHTML += `<tr><td>Time Since Last Rain</td><td>${diffDays > 0 ? diffDays+' day'+(diffDays>1?'s':'') : diffHrs+' hour'+(diffHrs>1?'s':'')}</td></tr>`;
+            }
+            tableHTML += `<tr><td>Daily Rain Today</td><td>${wxCurrentData?.dailyrainin != null ? wxCurrentData.dailyrainin.toFixed(2)+'"' : '--'}</td></tr>`;
+            tableHTML += `<tr><td>Event Rain</td><td>${wxCurrentData?.eventrainin != null ? wxCurrentData.eventrainin.toFixed(2)+'"' : '--'}</td></tr>`;
+            tableHTML += `<tr><td>Weekly Rain</td><td>${wxCurrentData?.weeklyrainin != null ? wxCurrentData.weeklyrainin.toFixed(2)+'"' : '--'}</td></tr>`;
+            tableHTML += '</tbody></table>';
+
+        } else if (metric === 'wind-avg') {
+            titleEl.textContent = '10-Min Average Wind — 7-Day History';
+            const avgSpeeds = [];
+            dayKeys.forEach(day => {
+                const recs = days[day].filter(r => r.windspdmph_avg10m != null);
+                if (!recs.length) { avgSpeeds.push(null); return; }
+                avgSpeeds.push(Math.round(recs.reduce((s,r) => s + r.windspdmph_avg10m, 0) / recs.length * 10) / 10);
+            });
+            chartConfig = { type:'line', data:{
+                labels: dayKeys,
+                datasets:[{ label:'10-Min Avg Wind (mph)', data:avgSpeeds, borderColor:chartColors.purple, backgroundColor:'rgba(139,92,246,0.1)', fill:true, tension:0.3 }]
+            }, options: chartDefaults };
+            tableHTML = `<table class="wx-modal-table"><thead><tr><th>Date</th><th>Avg Wind</th><th>Avg Direction</th></tr></thead><tbody>`;
+            dayKeys.forEach((day,i) => {
+                const recs = days[day].filter(r => r.winddir_avg10m != null);
+                const avgDir = recs.length ? Math.round(recs.reduce((s,r) => s + r.winddir_avg10m, 0) / recs.length) : null;
+                tableHTML += `<tr><td>${day}</td><td>${avgSpeeds[i] != null ? avgSpeeds[i]+' mph':'--'}</td><td>${avgDir != null ? degToCompass(avgDir)+' ('+avgDir+'°)' : '--'}</td></tr>`;
             });
             tableHTML += '</tbody></table>';
 

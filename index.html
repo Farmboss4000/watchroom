@@ -1162,11 +1162,6 @@
                 <div class="wx-report-label">7-Day Low Temp</div>
                 <div class="wx-report-sub" id="wxr-temp-low-7d-sub"></div>
             </div>
-            <div class="wx-report-card conditions" onclick="openWxDetail('dewpoint')">
-                <div class="wx-report-value" id="wxr-dewpoint">--</div>
-                <div class="wx-report-label">Dew Point</div>
-                <div class="wx-report-sub" id="wxr-dewpoint-sub"></div>
-            </div>
             <div class="wx-report-card conditions" onclick="openWxDetail('battery')">
                 <div class="wx-report-value" id="wxr-battery">--</div>
                 <div class="wx-report-label">Battery Status</div>
@@ -1876,28 +1871,17 @@
             document.getElementById('wxr-rain-event').textContent = fmtRain(d.eventrainin);
             document.getElementById('wxr-rain-event-sub').textContent = d.eventrainin != null ? 'Since last dry period' : '';
 
-            // Last detected rain
-            console.log('lastRain raw value:', d.lastRain, typeof d.lastRain);
-            if (d.lastRain) {
-                // lastRain can be a UTC ms timestamp or an ISO string
-                const lr = typeof d.lastRain === 'number' ? new Date(d.lastRain) : new Date(d.lastRain);
-                if (!isNaN(lr.getTime())) {
-                    const now = new Date();
-                    const diffMs = now - lr;
-                    const diffHrs = Math.floor(diffMs / 3600000);
-                    const diffDays = Math.floor(diffHrs / 24);
-                    let ago = '';
-                    if (diffDays > 0) ago = `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-                    else if (diffHrs > 0) ago = `${diffHrs} hr${diffHrs > 1 ? 's' : ''} ago`;
-                    else ago = 'Just now';
-                    document.getElementById('wxr-last-rain').textContent = ago;
-                    document.getElementById('wxr-last-rain-sub').textContent = lr.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }) + ' ' + lr.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
-                } else {
-                    document.getElementById('wxr-last-rain').textContent = String(d.lastRain);
-                    document.getElementById('wxr-last-rain-sub').textContent = 'Raw value — could not parse';
-                }
+            // Last detected rain — calculated from current data, not stale lastRain field
+            if (d.hourlyrainin > 0) {
+                document.getElementById('wxr-last-rain').textContent = 'Raining Now';
+                document.getElementById('wxr-last-rain-sub').textContent = `${d.hourlyrainin.toFixed(2)}"/hr`;
+            } else if (d.dailyrainin > 0) {
+                document.getElementById('wxr-last-rain').textContent = 'Today';
+                document.getElementById('wxr-last-rain-sub').textContent = `${d.dailyrainin.toFixed(2)}" so far today`;
             } else {
-                document.getElementById('wxr-last-rain').textContent = '--';
+                // Will be updated by fetch7DayHistory with more precise data
+                document.getElementById('wxr-last-rain').textContent = 'Checking...';
+                document.getElementById('wxr-last-rain-sub').textContent = 'Scanning history...';
             }
 
             // 10-minute average wind (fallback chain: 10m avg → 2m avg → instant)
@@ -1907,13 +1891,6 @@
             document.getElementById('wxr-wind-avg10').textContent = avgWind != null ? `${Math.round(avgWind)} mph` : '--';
             if (avgDir != null) {
                 document.getElementById('wxr-wind-avg10-sub').textContent = `${avgLabel} · ${degToCompass(avgDir)} (${Math.round(avgDir)}°)`;
-            }
-
-            // Dew Point
-            document.getElementById('wxr-dewpoint').textContent = d.dewPoint != null ? `${Math.round(d.dewPoint)}°F` : '--';
-            if (d.dewPoint != null) {
-                const comfort = d.dewPoint >= 70 ? 'Oppressive' : d.dewPoint >= 65 ? 'Muggy' : d.dewPoint >= 60 ? 'Humid' : d.dewPoint >= 55 ? 'Comfortable' : 'Dry';
-                document.getElementById('wxr-dewpoint-sub').textContent = comfort;
             }
 
             // Battery status
@@ -1998,6 +1975,34 @@
             document.getElementById('wxr-temp-low-7d').textContent = lowTemp < Infinity ? `${Math.round(lowTemp)}°F` : '--';
             if (lowTempDate) {
                 document.getElementById('wxr-temp-low-7d-sub').textContent = `on ${lowTempDate.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' })}`;
+            }
+
+            // Find last rain from history (records are newest-first)
+            let lastRainRec = null;
+            for (const rec of records) {
+                if (rec.hourlyrainin > 0 || rec.dailyrainin > 0) {
+                    lastRainRec = rec;
+                    break;
+                }
+            }
+            const lrEl = document.getElementById('wxr-last-rain');
+            const lrSub = document.getElementById('wxr-last-rain-sub');
+            if (lrEl.textContent === 'Checking...') {
+                if (lastRainRec && lastRainRec.dateutc) {
+                    const lr = new Date(lastRainRec.dateutc);
+                    const now = new Date();
+                    const diffHrs = Math.floor((now - lr) / 3600000);
+                    const diffDays = Math.floor(diffHrs / 24);
+                    let ago = '';
+                    if (diffDays > 0) ago = `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+                    else if (diffHrs > 0) ago = `${diffHrs} hr${diffHrs > 1 ? 's' : ''} ago`;
+                    else ago = 'Just now';
+                    lrEl.textContent = ago;
+                    lrSub.textContent = lr.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }) + ' ' + lr.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+                } else {
+                    lrEl.textContent = 'None in 7 days';
+                    lrSub.textContent = 'No rain detected in history';
+                }
             }
         } catch(e) {
             console.error('7-day history fetch error:', e);

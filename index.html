@@ -1141,6 +1141,11 @@
                 <div class="wx-report-label">7-Day Low Temp</div>
                 <div class="wx-report-sub" id="wxr-temp-low-7d-sub"></div>
             </div>
+            <div class="wx-report-card conditions" onclick="openWxDetail('battery')">
+                <div class="wx-report-value" id="wxr-battery">--</div>
+                <div class="wx-report-label">Battery Status</div>
+                <div class="wx-report-sub" id="wxr-battery-sub"></div>
+            </div>
         </div>
 
         <!-- 3-DAY FORECAST -->
@@ -1659,6 +1664,7 @@
     let wxHistoryRecords = [];  // stored globally for modal drill-downs
     let wxCurrentData = null;   // latest device data
     let wxDetailChart = null;   // current Chart.js instance
+    let wxBatteryItems = [];    // battery status for all sensors
 
     function degToCompass(deg) {
         const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
@@ -1742,6 +1748,20 @@
             document.getElementById('wxr-wind-gust').textContent = d.maxdailygust != null ? `${Math.round(d.maxdailygust)} mph` : '--';
 
             document.getElementById('wxr-humidity').textContent = d.humidity != null ? `${d.humidity}%` : '--';
+
+            // Battery status
+            const batteryItems = [];
+            if (d.battout != null) batteryItems.push({ name:'Outdoor', ok: d.battout === 1 });
+            if (d.battin != null) batteryItems.push({ name:'Indoor', ok: d.battin === 1 });
+            for (let i = 1; i <= 10; i++) { if (d[`batt${i}`] != null) batteryItems.push({ name:`Sensor ${i}`, ok: d[`batt${i}`] === 1 }); }
+            if (d.batt_25 != null) batteryItems.push({ name:'PM2.5', ok: d.batt_25 === 1 });
+            if (d.batt_lightning != null) batteryItems.push({ name:'Lightning', ok: d.batt_lightning === 0 }); // inverted: 1=Low
+            const allOk = batteryItems.length > 0 && batteryItems.every(b => b.ok);
+            const lowCount = batteryItems.filter(b => !b.ok).length;
+            document.getElementById('wxr-battery').textContent = batteryItems.length === 0 ? '--' : allOk ? 'All OK' : `${lowCount} Low`;
+            document.getElementById('wxr-battery').style.color = allOk ? '#22c55e' : (lowCount > 0 ? '#ef4444' : 'var(--accent)');
+            document.getElementById('wxr-battery-sub').textContent = batteryItems.length > 0 ? `${batteryItems.length} sensor${batteryItems.length > 1 ? 's' : ''} monitored` : '';
+            wxBatteryItems = batteryItems;
 
             // Fetch 7-day historical data after a delay (rate limit: 1 req/sec)
             const macAddress = device.macAddress;
@@ -1980,9 +2000,25 @@
                 tableHTML += `<tr><td>${day}</td><td>${h != null ? h+'°F' : '--'}</td><td>${l != null ? l+'°F' : '--'}</td><td>${h != null && l != null ? (h-l)+'°' : '--'}</td></tr>`;
             });
             tableHTML += '</tbody></table>';
+
+        } else if (metric === 'battery') {
+            titleEl.textContent = 'Battery Status — All Sensors';
+            // No chart for battery — just a status table
+            document.getElementById('wx-detail-chart').style.display = 'none';
+            tableHTML = `<table class="wx-modal-table"><thead><tr><th>Sensor</th><th>Status</th></tr></thead><tbody>`;
+            if (wxBatteryItems.length === 0) {
+                tableHTML += '<tr><td colspan="2">No battery data available</td></tr>';
+            } else {
+                wxBatteryItems.forEach(b => {
+                    const status = b.ok ? '<span style="color:#22c55e;font-weight:600;">OK</span>' : '<span style="color:#ef4444;font-weight:600;">LOW</span>';
+                    tableHTML += `<tr><td>${b.name}</td><td>${status}</td></tr>`;
+                });
+            }
+            tableHTML += '</tbody></table>';
         }
 
         if (chartConfig) {
+            document.getElementById('wx-detail-chart').style.display = '';
             wxDetailChart = new Chart(ctx, chartConfig);
         }
         tableWrap.innerHTML = tableHTML || '<p style="color:var(--text-secondary);font-size:0.85rem;">No historical data available yet.</p>';

@@ -424,6 +424,46 @@
         .dtw-weather-icon { font-size: 2.2rem; line-height: 1; }
         .dtw-temp { font-size: 1.6rem; font-weight: 700; color: var(--accent); }
         .dtw-details { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.7; }
+        .dtw-station-label { font-size: 0.68rem; color: var(--text-secondary); margin-top: 4px; opacity: 0.7; }
+
+        /* ── WEATHER REPORTS ── */
+        .wx-reports-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 14px;
+            margin-bottom: 32px;
+        }
+        @media (max-width: 800px) { .wx-reports-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 480px) { .wx-reports-grid { grid-template-columns: 1fr; } }
+        .wx-report-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-left: 4px solid #3b82f6;
+            border-radius: 10px;
+            padding: 18px 20px;
+        }
+        .wx-report-card.wind { border-left-color: #8b5cf6; }
+        .wx-report-card.conditions { border-left-color: var(--accent); }
+        .wx-report-value {
+            font-size: 2rem;
+            font-weight: 800;
+            color: #3b82f6;
+            line-height: 1;
+            margin-bottom: 6px;
+        }
+        .wx-report-card.wind .wx-report-value { color: #8b5cf6; }
+        .wx-report-card.conditions .wx-report-value { color: var(--accent); }
+        .wx-report-label {
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        .wx-report-sub {
+            font-size: 0.72rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+            opacity: 0.7;
+        }
 
         /* ── QUOTE ── */
         .dashboard-quote {
@@ -991,20 +1031,60 @@
         <div class="dtw-bar">
             <div class="dtw-clock-area">
                 <div class="dtw-clock" id="dtw-clock">Loading...</div>
-                <div class="dtw-location" id="dtw-location-display" style="display:flex;align-items:center;gap:6px;">
-                    <span id="dtw-location-label">Loading…</span>
-                    <button onclick="editZip()" title="Change location" style="background:none;border:none;cursor:pointer;color:var(--text-secondary);font-size:0.78rem;padding:0;opacity:0.7;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.7">✏️</button>
+                <div class="dtw-location" id="dtw-location-display">
+                    <span id="dtw-location-label">Loading station…</span>
                 </div>
-                <div id="dtw-zip-edit" style="display:none;margin-top:4px;display:none;">
-                    <input type="text" id="dtw-zip-input" maxlength="10" placeholder="Enter ZIP code" style="padding:4px 8px;border:1px solid var(--border);border-radius:5px;font-size:0.82rem;width:120px;font-family:inherit;">
-                    <button onclick="saveZip()" style="padding:4px 10px;background:var(--accent);color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:0.82rem;margin-left:4px;">Save</button>
-                    <button onclick="cancelZip()" style="padding:4px 8px;background:transparent;border:1px solid var(--border);border-radius:5px;cursor:pointer;font-size:0.82rem;margin-left:2px;">✕</button>
-                </div>
+                <div class="dtw-station-label" id="dtw-station-label"></div>
             </div>
             <div class="dtw-weather" id="dtw-weather">
                 <div class="dtw-weather-icon" id="wx-icon">⏳</div>
                 <div class="dtw-temp" id="wx-temp">--°F</div>
                 <div class="dtw-details" id="wx-details">Loading weather...</div>
+            </div>
+        </div>
+
+        <!-- WEATHER REPORTS -->
+        <div class="section-title">Weather Station Reports</div>
+        <div class="wx-reports-grid" id="wx-reports-grid">
+            <div class="wx-report-card conditions">
+                <div class="wx-report-value" id="wxr-pressure">--</div>
+                <div class="wx-report-label">Barometric Pressure</div>
+                <div class="wx-report-sub" id="wxr-pressure-sub">inHg</div>
+            </div>
+            <div class="wx-report-card conditions">
+                <div class="wx-report-value" id="wxr-uv">--</div>
+                <div class="wx-report-label">UV Index</div>
+                <div class="wx-report-sub" id="wxr-solar-sub"></div>
+            </div>
+            <div class="wx-report-card">
+                <div class="wx-report-value" id="wxr-rain-today">--</div>
+                <div class="wx-report-label">Rain Today</div>
+                <div class="wx-report-sub" id="wxr-rain-rate-sub"></div>
+            </div>
+            <div class="wx-report-card">
+                <div class="wx-report-value" id="wxr-rain-week">--</div>
+                <div class="wx-report-label">Rain — Week to Date</div>
+            </div>
+            <div class="wx-report-card">
+                <div class="wx-report-value" id="wxr-rain-month">--</div>
+                <div class="wx-report-label">Rain — Month to Date</div>
+            </div>
+            <div class="wx-report-card">
+                <div class="wx-report-value" id="wxr-rain-year">--</div>
+                <div class="wx-report-label">Rain — Year to Date</div>
+            </div>
+            <div class="wx-report-card wind">
+                <div class="wx-report-value" id="wxr-wind-gust">--</div>
+                <div class="wx-report-label">Max Wind Gust Today</div>
+            </div>
+            <div class="wx-report-card wind">
+                <div class="wx-report-value" id="wxr-dewpoint">--</div>
+                <div class="wx-report-label">Dew Point</div>
+            </div>
+            <div class="wx-report-card conditions">
+                <div class="wx-report-value" id="wxr-indoor">--</div>
+                <div class="wx-report-label">Indoor Temp</div>
+                <div class="wx-report-sub" id="wxr-indoor-sub"></div>
             </div>
         </div>
 
@@ -1483,90 +1563,102 @@
         setInterval(updateClock, 1000);
     }
 
-    // ── WEATHER ──
-    let wxLat = 44.8247, wxLon = -93.6052, wxLocationLabel = 'Chaska, MN 55318', wxTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const DEFAULT_ZIP = '55318';
+    // ── WEATHER (Ambient Weather API) ──
+    const AW_APP_KEY = 'ed3453a598a248be87cb2836aea2bf918390dd846403432495ac6f011f9dce22';
+    const AW_API_KEY = 'd3aec6b75c1e473db864148979922da490632d1e364141449a0b60eb11e9dd88';
+    let wxTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-    function editZip() {
-        const input = document.getElementById('dtw-zip-input');
-        const editDiv = document.getElementById('dtw-zip-edit');
-        input.value = localStorage.getItem('wx_zip') || DEFAULT_ZIP;
-        editDiv.style.display = 'flex';
-        editDiv.style.alignItems = 'center';
-        input.focus(); input.select();
+    function degToCompass(deg) {
+        const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+        return dirs[Math.round(deg / 22.5) % 16];
     }
-    function cancelZip() { document.getElementById('dtw-zip-edit').style.display = 'none'; }
-    async function saveZip() {
-        const zip = document.getElementById('dtw-zip-input').value.trim();
-        if (!zip) return;
-        localStorage.setItem('wx_zip', zip);
-        cancelZip();
-        document.getElementById('dtw-location-label').textContent = 'Loading…';
-        document.getElementById('wx-details').textContent = 'Updating weather…';
-        await loadWeatherByZip(zip);
+
+    function deriveWeatherIcon(d) {
+        if (d.hourlyrainin > 0.1) return '🌧️';
+        if (d.hourlyrainin > 0)   return '🌦️';
+        if (d.tempf <= 32)        return '❄️';
+        if (d.uv >= 8)            return '☀️';
+        if (d.uv >= 3)            return '🌤️';
+        if (d.humidity >= 90)     return '🌫️';
+        if (d.solarradiation < 50) return '☁️';
+        if (d.solarradiation < 200) return '⛅';
+        return '☀️';
     }
-    async function loadWeatherByZip(zip) {
-        try {
-            // Geocode the zip using Open-Meteo geocoding (free, no key)
-            const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(zip)}&count=1&language=en&format=json`;
-            const gr = await fetch(geoUrl);
-            const gd = await gr.json();
-            if (!gd.results?.length) throw new Error('ZIP not found');
-            const loc = gd.results[0];
-            wxLat = loc.latitude;
-            wxLon = loc.longitude;
-            wxTimezone = loc.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
-            const city = loc.name || zip;
-            const admin = loc.admin1 ? `, ${loc.admin1}` : '';
-            wxLocationLabel = `${city}${admin} ${zip}`;
-            document.getElementById('dtw-location-label').textContent = wxLocationLabel;
-            updateClock(); // refresh clock with new timezone
-            await fetchWeather();
-        } catch(e) {
-            document.getElementById('dtw-location-label').textContent = `ZIP ${zip} — not found`;
-        }
+
+    function deriveConditionDesc(d) {
+        if (d.hourlyrainin > 0.3) return 'Heavy Rain';
+        if (d.hourlyrainin > 0.1) return 'Rain';
+        if (d.hourlyrainin > 0)   return 'Light Rain';
+        if (d.tempf <= 32 && d.humidity > 80) return 'Freezing';
+        if (d.humidity >= 95)     return 'Fog / Mist';
+        if (d.solarradiation < 50) return 'Overcast';
+        if (d.solarradiation < 200) return 'Partly Cloudy';
+        if (d.uv >= 8)            return 'Clear / Sunny';
+        if (d.uv >= 3)            return 'Mostly Clear';
+        return 'Clear';
     }
+
+    function fmtRain(val) {
+        return val != null ? `${val.toFixed(2)}"` : '--';
+    }
+
     async function initWeather() {
-        const zip = localStorage.getItem('wx_zip') || DEFAULT_ZIP;
-        await loadWeatherByZip(zip);
+        await fetchWeather();
     }
-
-    const WX_CODE_MAP = {
-        0:'☀️',1:'🌤️',2:'⛅',3:'☁️',
-        45:'🌫️',48:'🌫️',
-        51:'🌦️',53:'🌦️',55:'🌧️',
-        61:'🌧️',63:'🌧️',65:'🌧️',
-        71:'🌨️',73:'🌨️',75:'❄️',77:'🌨️',
-        80:'🌦️',81:'🌧️',82:'⛈️',
-        85:'🌨️',86:'❄️',
-        95:'⛈️',96:'⛈️',99:'⛈️'
-    };
-    const WX_DESC_MAP = {
-        0:'Clear',1:'Mostly Clear',2:'Partly Cloudy',3:'Overcast',
-        45:'Fog',48:'Icy Fog',
-        51:'Light Drizzle',53:'Drizzle',55:'Heavy Drizzle',
-        61:'Light Rain',63:'Rain',65:'Heavy Rain',
-        71:'Light Snow',73:'Snow',75:'Heavy Snow',77:'Snow Grains',
-        80:'Showers',81:'Rain Showers',82:'Heavy Showers',
-        85:'Snow Showers',86:'Heavy Snow Showers',
-        95:'Thunderstorm',96:'Thunderstorm w/ Hail',99:'Severe Thunderstorm'
-    };
 
     async function fetchWeather() {
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${wxLat}&longitude=${wxLon}&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,relative_humidity_2m&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto`;
+        const url = `https://rt.ambientweather.net/v1/devices?applicationKey=${AW_APP_KEY}&apiKey=${AW_API_KEY}`;
         try {
             const r = await fetch(url);
-            const d = await r.json();
-            const c = d.current;
-            const code = c.weather_code;
-            document.getElementById('wx-icon').textContent    = WX_CODE_MAP[code] || '🌡️';
-            document.getElementById('wx-temp').textContent    = `${Math.round(c.temperature_2m)}°F`;
-            document.getElementById('wx-details').innerHTML   =
-                `${WX_DESC_MAP[code] || 'Unknown'}<br>` +
-                `Feels like ${Math.round(c.apparent_temperature)}°F<br>` +
-                `Wind ${Math.round(c.wind_speed_10m)} mph &nbsp;·&nbsp; Humidity ${c.relative_humidity_2m}%`;
+            if (r.status === 429) throw new Error('Rate limited');
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            const devices = await r.json();
+            if (!devices.length) throw new Error('No devices found');
+
+            const device = devices[0];
+            const d = device.lastData;
+            const stationName = device.info?.name || 'Ambient Weather Station';
+
+            // Station label
+            document.getElementById('dtw-location-label').textContent = stationName;
+            const lastUpdate = d.dateutc ? new Date(d.dateutc).toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' }) : '';
+            document.getElementById('dtw-station-label').textContent = lastUpdate ? `Last update: ${lastUpdate}  ·  Powered by Ambient Weather` : 'Powered by Ambient Weather';
+
+            // Current conditions bar
+            const icon = deriveWeatherIcon(d);
+            const desc = deriveConditionDesc(d);
+            document.getElementById('wx-icon').textContent = icon;
+            document.getElementById('wx-temp').textContent = `${Math.round(d.tempf)}°F`;
+            const windDir = d.winddir != null ? ` ${degToCompass(d.winddir)}` : '';
+            document.getElementById('wx-details').innerHTML =
+                `${desc}<br>` +
+                `Feels like ${Math.round(d.feelsLike)}°F<br>` +
+                `Wind ${Math.round(d.windspeedmph)} mph${windDir} &nbsp;·&nbsp; Humidity ${d.humidity}%`;
+
+            // Weather report cards
+            document.getElementById('wxr-pressure').textContent = d.baromrelin != null ? d.baromrelin.toFixed(2) : '--';
+            document.getElementById('wxr-pressure-sub').textContent = d.baromrelin != null ? 'inHg' : '';
+
+            document.getElementById('wxr-uv').textContent = d.uv != null ? d.uv : '--';
+            document.getElementById('wxr-solar-sub').textContent = d.solarradiation != null ? `Solar: ${d.solarradiation} W/m²` : '';
+
+            document.getElementById('wxr-rain-today').textContent = fmtRain(d.dailyrainin);
+            document.getElementById('wxr-rain-rate-sub').textContent = d.hourlyrainin != null ? `Rate: ${d.hourlyrainin.toFixed(2)}"/hr` : '';
+
+            document.getElementById('wxr-rain-week').textContent = fmtRain(d.weeklyrainin);
+            document.getElementById('wxr-rain-month').textContent = fmtRain(d.monthlyrainin);
+            document.getElementById('wxr-rain-year').textContent = fmtRain(d.yearlyrainin);
+
+            document.getElementById('wxr-wind-gust').textContent = d.maxdailygust != null ? `${Math.round(d.maxdailygust)} mph` : '--';
+            document.getElementById('wxr-dewpoint').textContent = d.dewPoint != null ? `${Math.round(d.dewPoint)}°F` : '--';
+
+            document.getElementById('wxr-indoor').textContent = d.tempinf != null ? `${Math.round(d.tempinf)}°F` : '--';
+            document.getElementById('wxr-indoor-sub').textContent = d.humidityin != null ? `Humidity: ${d.humidityin}%` : '';
+
         } catch(e) {
+            console.error('Weather fetch error:', e);
             document.getElementById('wx-details').textContent = 'Weather unavailable';
+            document.getElementById('dtw-station-label').textContent = 'Could not reach Ambient Weather API';
         }
         // refresh every 10 minutes
         setTimeout(fetchWeather, 10 * 60 * 1000);

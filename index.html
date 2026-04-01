@@ -1162,25 +1162,10 @@
                 <div class="wx-report-label">7-Day Low Temp</div>
                 <div class="wx-report-sub" id="wxr-temp-low-7d-sub"></div>
             </div>
-            <div class="wx-report-card conditions" onclick="openWxDetail('pressure')">
-                <div class="wx-report-value" id="wxr-pressure">--</div>
-                <div class="wx-report-label">Barometric Pressure</div>
-                <div class="wx-report-sub" id="wxr-pressure-sub"></div>
-            </div>
-            <div class="wx-report-card conditions" onclick="openWxDetail('uv')">
-                <div class="wx-report-value" id="wxr-uv">--</div>
-                <div class="wx-report-label">UV Index</div>
-                <div class="wx-report-sub" id="wxr-solar-sub"></div>
-            </div>
             <div class="wx-report-card conditions" onclick="openWxDetail('dewpoint')">
                 <div class="wx-report-value" id="wxr-dewpoint">--</div>
                 <div class="wx-report-label">Dew Point</div>
                 <div class="wx-report-sub" id="wxr-dewpoint-sub"></div>
-            </div>
-            <div class="wx-report-card conditions" onclick="openWxDetail('indoor')">
-                <div class="wx-report-value" id="wxr-indoor">--</div>
-                <div class="wx-report-label">Indoor Conditions</div>
-                <div class="wx-report-sub" id="wxr-indoor-sub"></div>
             </div>
             <div class="wx-report-card conditions" onclick="openWxDetail('battery')">
                 <div class="wx-report-value" id="wxr-battery">--</div>
@@ -1908,25 +1893,13 @@
                 document.getElementById('wxr-last-rain').textContent = '--';
             }
 
-            // 10-minute average wind
-            document.getElementById('wxr-wind-avg10').textContent = d.windspdmph_avg10m != null ? `${Math.round(d.windspdmph_avg10m)} mph` : '--';
-            if (d.winddir_avg10m != null) {
-                document.getElementById('wxr-wind-avg10-sub').textContent = `Direction: ${degToCompass(d.winddir_avg10m)} (${Math.round(d.winddir_avg10m)}°)`;
-            }
-
-            // Barometric pressure
-            document.getElementById('wxr-pressure').textContent = d.baromrelin != null ? `${d.baromrelin.toFixed(2)}` : '--';
-            if (d.baromrelin != null) {
-                const trend = d.baromrelin >= 30.2 ? 'High' : d.baromrelin <= 29.8 ? 'Low' : 'Normal';
-                document.getElementById('wxr-pressure-sub').textContent = `${trend} · inHg`;
-            }
-
-            // UV Index + Solar Radiation
-            document.getElementById('wxr-uv').textContent = d.uv != null ? d.uv : '--';
-            if (d.uv != null) {
-                const uvLevel = d.uv >= 11 ? 'Extreme' : d.uv >= 8 ? 'Very High' : d.uv >= 6 ? 'High' : d.uv >= 3 ? 'Moderate' : 'Low';
-                const solar = d.solarradiation != null ? ` · ${d.solarradiation} W/m²` : '';
-                document.getElementById('wxr-solar-sub').textContent = `${uvLevel}${solar}`;
+            // 10-minute average wind (fallback chain: 10m avg → 2m avg → instant)
+            const avgWind = d.windspdmph_avg10m ?? d.windspdmph_avg2m ?? d.windspeedmph;
+            const avgDir = d.winddir_avg10m ?? d.winddir_avg2m ?? d.winddir;
+            const avgLabel = d.windspdmph_avg10m != null ? '10-min avg' : d.windspdmph_avg2m != null ? '2-min avg' : 'Current';
+            document.getElementById('wxr-wind-avg10').textContent = avgWind != null ? `${Math.round(avgWind)} mph` : '--';
+            if (avgDir != null) {
+                document.getElementById('wxr-wind-avg10-sub').textContent = `${avgLabel} · ${degToCompass(avgDir)} (${Math.round(avgDir)}°)`;
             }
 
             // Dew Point
@@ -1935,10 +1908,6 @@
                 const comfort = d.dewPoint >= 70 ? 'Oppressive' : d.dewPoint >= 65 ? 'Muggy' : d.dewPoint >= 60 ? 'Humid' : d.dewPoint >= 55 ? 'Comfortable' : 'Dry';
                 document.getElementById('wxr-dewpoint-sub').textContent = comfort;
             }
-
-            // Indoor Conditions
-            document.getElementById('wxr-indoor').textContent = d.tempinf != null ? `${Math.round(d.tempinf)}°F` : '--';
-            document.getElementById('wxr-indoor-sub').textContent = d.humidityin != null ? `Humidity: ${d.humidityin}%` : '';
 
             // Battery status
             const batteryItems = [];
@@ -1985,8 +1954,10 @@
                 setTimeout(() => fetch7DayHistory(mac, retryCount + 1), 3000);
                 return;
             }
-            if (!r.ok) { console.error('History API:', r.status); return; }
+            if (!r.ok) { console.error('History API:', r.status, await r.text()); return; }
             const records = await r.json();
+            console.log(`Weather history: ${records.length} records loaded`);
+            if (records.length > 0) console.log('Sample record keys:', Object.keys(records[0]).join(', '));
             wxHistoryRecords = records; // store globally for modals
 
             let maxGust = 0, maxGustDate = null;

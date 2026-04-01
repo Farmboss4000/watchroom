@@ -1046,15 +1046,15 @@
         <!-- WEATHER REPORTS -->
         <div class="section-title">Weather Station Reports</div>
         <div class="wx-reports-grid" id="wx-reports-grid">
-            <div class="wx-report-card conditions">
-                <div class="wx-report-value" id="wxr-pressure">--</div>
-                <div class="wx-report-label">Barometric Pressure</div>
-                <div class="wx-report-sub" id="wxr-pressure-sub">inHg</div>
+            <div class="wx-report-card wind">
+                <div class="wx-report-value" id="wxr-wind-current">--</div>
+                <div class="wx-report-label">Current Wind</div>
+                <div class="wx-report-sub" id="wxr-wind-current-sub"></div>
             </div>
-            <div class="wx-report-card conditions">
-                <div class="wx-report-value" id="wxr-uv">--</div>
-                <div class="wx-report-label">UV Index</div>
-                <div class="wx-report-sub" id="wxr-solar-sub"></div>
+            <div class="wx-report-card wind">
+                <div class="wx-report-value" id="wxr-wind-week">--</div>
+                <div class="wx-report-label">Max Wind Gust — 7 Days</div>
+                <div class="wx-report-sub" id="wxr-wind-week-sub"></div>
             </div>
             <div class="wx-report-card">
                 <div class="wx-report-value" id="wxr-rain-today">--</div>
@@ -1077,14 +1077,39 @@
                 <div class="wx-report-value" id="wxr-wind-gust">--</div>
                 <div class="wx-report-label">Max Wind Gust Today</div>
             </div>
-            <div class="wx-report-card wind">
-                <div class="wx-report-value" id="wxr-dewpoint">--</div>
-                <div class="wx-report-label">Dew Point</div>
+            <div class="wx-report-card conditions">
+                <div class="wx-report-value" id="wxr-humidity">--</div>
+                <div class="wx-report-label">Current Humidity</div>
             </div>
             <div class="wx-report-card conditions">
-                <div class="wx-report-value" id="wxr-indoor">--</div>
-                <div class="wx-report-label">Indoor Temp</div>
-                <div class="wx-report-sub" id="wxr-indoor-sub"></div>
+                <div class="wx-report-value" id="wxr-temp-high-7d">--</div>
+                <div class="wx-report-label">7-Day High Temp</div>
+                <div class="wx-report-sub" id="wxr-temp-high-7d-sub"></div>
+            </div>
+            <div class="wx-report-card conditions">
+                <div class="wx-report-value" id="wxr-temp-low-7d">--</div>
+                <div class="wx-report-label">7-Day Low Temp</div>
+                <div class="wx-report-sub" id="wxr-temp-low-7d-sub"></div>
+            </div>
+        </div>
+
+        <!-- 3-DAY FORECAST -->
+        <div class="section-title">3-Day Forecast</div>
+        <div class="wx-reports-grid" id="wx-forecast-grid">
+            <div class="wx-report-card conditions" id="wx-forecast-0">
+                <div class="wx-report-value" id="wxf-day-0">--</div>
+                <div class="wx-report-label" id="wxf-label-0">Loading...</div>
+                <div class="wx-report-sub" id="wxf-sub-0"></div>
+            </div>
+            <div class="wx-report-card conditions" id="wx-forecast-1">
+                <div class="wx-report-value" id="wxf-day-1">--</div>
+                <div class="wx-report-label" id="wxf-label-1">Loading...</div>
+                <div class="wx-report-sub" id="wxf-sub-1"></div>
+            </div>
+            <div class="wx-report-card conditions" id="wx-forecast-2">
+                <div class="wx-report-value" id="wxf-day-2">--</div>
+                <div class="wx-report-label" id="wxf-label-2">Loading...</div>
+                <div class="wx-report-sub" id="wxf-sub-2"></div>
             </div>
         </div>
 
@@ -1636,11 +1661,9 @@
                 `Wind ${Math.round(d.windspeedmph)} mph${windDir} &nbsp;·&nbsp; Humidity ${d.humidity}%`;
 
             // Weather report cards
-            document.getElementById('wxr-pressure').textContent = d.baromrelin != null ? d.baromrelin.toFixed(2) : '--';
-            document.getElementById('wxr-pressure-sub').textContent = d.baromrelin != null ? 'inHg' : '';
-
-            document.getElementById('wxr-uv').textContent = d.uv != null ? d.uv : '--';
-            document.getElementById('wxr-solar-sub').textContent = d.solarradiation != null ? `Solar: ${d.solarradiation} W/m²` : '';
+            const windCompass = d.winddir != null ? degToCompass(d.winddir) : '';
+            document.getElementById('wxr-wind-current').textContent = d.windspeedmph != null ? `${Math.round(d.windspeedmph)} mph` : '--';
+            document.getElementById('wxr-wind-current-sub').textContent = windCompass ? `Direction: ${windCompass} (${Math.round(d.winddir)}°)` : '';
 
             document.getElementById('wxr-rain-today').textContent = fmtRain(d.dailyrainin);
             document.getElementById('wxr-rain-rate-sub').textContent = d.hourlyrainin != null ? `Rate: ${d.hourlyrainin.toFixed(2)}"/hr` : '';
@@ -1650,10 +1673,24 @@
             document.getElementById('wxr-rain-year').textContent = fmtRain(d.yearlyrainin);
 
             document.getElementById('wxr-wind-gust').textContent = d.maxdailygust != null ? `${Math.round(d.maxdailygust)} mph` : '--';
-            document.getElementById('wxr-dewpoint').textContent = d.dewPoint != null ? `${Math.round(d.dewPoint)}°F` : '--';
 
-            document.getElementById('wxr-indoor').textContent = d.tempinf != null ? `${Math.round(d.tempinf)}°F` : '--';
-            document.getElementById('wxr-indoor-sub').textContent = d.humidityin != null ? `Humidity: ${d.humidityin}%` : '';
+            document.getElementById('wxr-humidity').textContent = d.humidity != null ? `${d.humidity}%` : '--';
+
+            // Fetch 7-day historical data (max wind, high/low temps)
+            const macAddress = device.macAddress;
+            if (macAddress) {
+                fetch7DayHistory(macAddress);
+            }
+
+            // Fetch 3-day forecast using Open-Meteo (free, uses station coords)
+            if (d.lat != null && d.lon != null) {
+                fetch3DayForecast(d.lat, d.lon);
+            } else if (device.info?.coords?.coords?.lat != null) {
+                fetch3DayForecast(device.info.coords.coords.lat, device.info.coords.coords.lon);
+            } else {
+                // Fallback: Chaska, MN
+                fetch3DayForecast(44.8247, -93.6052);
+            }
 
         } catch(e) {
             console.error('Weather fetch error:', e);
@@ -1662,6 +1699,113 @@
         }
         // refresh every 10 minutes
         setTimeout(fetchWeather, 10 * 60 * 1000);
+    }
+
+    async function fetch7DayHistory(mac) {
+        try {
+            const now = Date.now();
+            // Ambient Weather API returns max 288 records per call
+            const url = `https://rt.ambientweather.net/v1/devices/${encodeURIComponent(mac)}?applicationKey=${AW_APP_KEY}&apiKey=${AW_API_KEY}&endDate=${now}&limit=288`;
+            const r = await fetch(url);
+            if (!r.ok) return;
+            const records = await r.json();
+
+            let maxGust = 0, maxGustDate = null;
+            let highTemp = -Infinity, highTempDate = null;
+            let lowTemp = Infinity, lowTempDate = null;
+
+            for (const rec of records) {
+                // Max wind gust
+                const gust = rec.maxdailygust || rec.windgustmph || 0;
+                if (gust > maxGust) {
+                    maxGust = gust;
+                    maxGustDate = rec.dateutc ? new Date(rec.dateutc) : null;
+                }
+                // High temp
+                if (rec.tempf != null && rec.tempf > highTemp) {
+                    highTemp = rec.tempf;
+                    highTempDate = rec.dateutc ? new Date(rec.dateutc) : null;
+                }
+                // Low temp
+                if (rec.tempf != null && rec.tempf < lowTemp) {
+                    lowTemp = rec.tempf;
+                    lowTempDate = rec.dateutc ? new Date(rec.dateutc) : null;
+                }
+            }
+
+            // Max wind gust 7 days
+            document.getElementById('wxr-wind-week').textContent = maxGust > 0 ? `${Math.round(maxGust)} mph` : '--';
+            if (maxGustDate) {
+                document.getElementById('wxr-wind-week-sub').textContent = `on ${maxGustDate.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' })}`;
+            }
+
+            // 7-day high temp
+            document.getElementById('wxr-temp-high-7d').textContent = highTemp > -Infinity ? `${Math.round(highTemp)}°F` : '--';
+            if (highTempDate) {
+                document.getElementById('wxr-temp-high-7d-sub').textContent = `on ${highTempDate.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' })}`;
+            }
+
+            // 7-day low temp
+            document.getElementById('wxr-temp-low-7d').textContent = lowTemp < Infinity ? `${Math.round(lowTemp)}°F` : '--';
+            if (lowTempDate) {
+                document.getElementById('wxr-temp-low-7d-sub').textContent = `on ${lowTempDate.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' })}`;
+            }
+        } catch(e) {
+            console.error('7-day history fetch error:', e);
+        }
+    }
+
+    const FORECAST_ICONS = {
+        0:'☀️',1:'🌤️',2:'⛅',3:'☁️',
+        45:'🌫️',48:'🌫️',
+        51:'🌦️',53:'🌦️',55:'🌧️',
+        61:'🌧️',63:'🌧️',65:'🌧️',
+        71:'🌨️',73:'🌨️',75:'❄️',77:'🌨️',
+        80:'🌦️',81:'🌧️',82:'⛈️',
+        85:'🌨️',86:'❄️',
+        95:'⛈️',96:'⛈️',99:'⛈️'
+    };
+    const FORECAST_DESC = {
+        0:'Clear',1:'Mostly Clear',2:'Partly Cloudy',3:'Overcast',
+        45:'Fog',48:'Icy Fog',
+        51:'Light Drizzle',53:'Drizzle',55:'Heavy Drizzle',
+        61:'Light Rain',63:'Rain',65:'Heavy Rain',
+        71:'Light Snow',73:'Snow',75:'Heavy Snow',77:'Snow Grains',
+        80:'Showers',81:'Rain Showers',82:'Heavy Showers',
+        85:'Snow Showers',86:'Heavy Snow Showers',
+        95:'Thunderstorm',96:'Thunderstorm w/ Hail',99:'Severe Thunderstorm'
+    };
+
+    async function fetch3DayForecast(lat, lon) {
+        try {
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto&forecast_days=4`;
+            const r = await fetch(url);
+            if (!r.ok) return;
+            const data = await r.json();
+            const daily = data.daily;
+            // Skip today (index 0), show next 3 days
+            for (let i = 0; i < 3; i++) {
+                const idx = i + 1;
+                if (idx >= daily.time.length) break;
+                const date = new Date(daily.time[idx] + 'T12:00:00');
+                const dayName = date.toLocaleDateString('en-US', { weekday:'long', month:'short', day:'numeric' });
+                const code = daily.weather_code[idx];
+                const icon = FORECAST_ICONS[code] || '🌡️';
+                const desc = FORECAST_DESC[code] || 'Unknown';
+                const high = Math.round(daily.temperature_2m_max[idx]);
+                const low = Math.round(daily.temperature_2m_min[idx]);
+                const precip = daily.precipitation_sum[idx];
+                const wind = Math.round(daily.wind_speed_10m_max[idx]);
+
+                document.getElementById(`wxf-day-${i}`).textContent = `${icon} ${high}° / ${low}°`;
+                document.getElementById(`wxf-label-${i}`).textContent = dayName;
+                const details = [`${desc}`, `Wind up to ${wind} mph`];
+                if (precip > 0) details.push(`Precip: ${precip.toFixed(2)}"`);
+                document.getElementById(`wxf-sub-${i}`).textContent = details.join('  ·  ');
+            }
+        } catch(e) {
+            console.error('Forecast fetch error:', e);
+        }
     }
 
     // ── QUOTES ──

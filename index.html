@@ -1933,28 +1933,23 @@
 
     async function fetch7DayHistory(mac, retryCount = 0) {
         try {
-            console.log('Fetching history for MAC:', mac);
-            // Try with colons first (raw MAC), then without if 0 records
-            let url = `https://rt.ambientweather.net/v1/devices/${mac}?applicationKey=${AW_APP_KEY}&apiKey=${AW_API_KEY}&limit=288`;
-            let r = await fetch(url);
-            if (!r.ok && r.status === 429 && retryCount < 2) {
-                console.warn('History API rate limited, retrying in 3s...');
-                setTimeout(() => fetch7DayHistory(mac, retryCount + 1), 3000);
+            // Ambient Weather API needs MAC without colons in URL path
+            const macClean = mac.replace(/:/g, '');
+            console.log('Fetching history for MAC:', macClean, '(retry:', retryCount + ')');
+            const url = `https://rt.ambientweather.net/v1/devices/${macClean}?applicationKey=${AW_APP_KEY}&apiKey=${AW_API_KEY}&limit=288`;
+            const r = await fetch(url);
+            console.log('History response:', r.status);
+            if (r.status === 429 && retryCount < 3) {
+                const delay = (retryCount + 1) * 3000;
+                console.warn(`History rate limited, retry ${retryCount + 1} in ${delay/1000}s...`);
+                setTimeout(() => fetch7DayHistory(mac, retryCount + 1), delay);
                 return;
             }
-            if (!r.ok) { console.error('History API:', r.status); return; }
-            let records = await r.json();
-            // If 0 records with colons, try without colons
-            if (records.length === 0) {
-                const macClean = mac.replace(/:/g, '');
-                console.log('Retrying with MAC without colons:', macClean);
-                await new Promise(resolve => setTimeout(resolve, 1500)); // rate limit pause
-                url = `https://rt.ambientweather.net/v1/devices/${macClean}?applicationKey=${AW_APP_KEY}&apiKey=${AW_API_KEY}&limit=288`;
-                r = await fetch(url);
-                if (r.ok) records = await r.json();
-            }
+            if (!r.ok) { console.error('History API error:', r.status, await r.text()); return; }
+            const records = await r.json();
             console.log(`Weather history: ${records.length} records loaded`);
             if (records.length > 0) console.log('Sample record:', JSON.stringify(records[0]).substring(0, 300));
+            if (records.length === 0) console.warn('History returned empty — your Ambient Weather plan may not include API history access');
             wxHistoryRecords = records; // store globally for modals
 
             let maxGust = 0, maxGustDate = null;

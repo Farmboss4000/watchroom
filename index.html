@@ -1147,6 +1147,26 @@
                 <div class="wx-report-label">7-Day Low Temp</div>
                 <div class="wx-report-sub" id="wxr-temp-low-7d-sub"></div>
             </div>
+            <div class="wx-report-card conditions" onclick="openWxDetail('pressure')">
+                <div class="wx-report-value" id="wxr-pressure">--</div>
+                <div class="wx-report-label">Barometric Pressure</div>
+                <div class="wx-report-sub" id="wxr-pressure-sub"></div>
+            </div>
+            <div class="wx-report-card conditions" onclick="openWxDetail('uv')">
+                <div class="wx-report-value" id="wxr-uv">--</div>
+                <div class="wx-report-label">UV Index</div>
+                <div class="wx-report-sub" id="wxr-solar-sub"></div>
+            </div>
+            <div class="wx-report-card conditions" onclick="openWxDetail('dewpoint')">
+                <div class="wx-report-value" id="wxr-dewpoint">--</div>
+                <div class="wx-report-label">Dew Point</div>
+                <div class="wx-report-sub" id="wxr-dewpoint-sub"></div>
+            </div>
+            <div class="wx-report-card conditions" onclick="openWxDetail('indoor')">
+                <div class="wx-report-value" id="wxr-indoor">--</div>
+                <div class="wx-report-label">Indoor Conditions</div>
+                <div class="wx-report-sub" id="wxr-indoor-sub"></div>
+            </div>
             <div class="wx-report-card conditions" onclick="openWxDetail('battery')">
                 <div class="wx-report-value" id="wxr-battery">--</div>
                 <div class="wx-report-label">Battery Status</div>
@@ -1776,6 +1796,32 @@
 
             document.getElementById('wxr-wind-gust').textContent = d.maxdailygust != null ? `${Math.round(d.maxdailygust)} mph` : '--';
 
+            // Barometric pressure
+            document.getElementById('wxr-pressure').textContent = d.baromrelin != null ? `${d.baromrelin.toFixed(2)}` : '--';
+            if (d.baromrelin != null) {
+                const trend = d.baromrelin >= 30.2 ? 'High' : d.baromrelin <= 29.8 ? 'Low' : 'Normal';
+                document.getElementById('wxr-pressure-sub').textContent = `${trend} · inHg`;
+            }
+
+            // UV Index + Solar Radiation
+            document.getElementById('wxr-uv').textContent = d.uv != null ? d.uv : '--';
+            if (d.uv != null) {
+                const uvLevel = d.uv >= 11 ? 'Extreme' : d.uv >= 8 ? 'Very High' : d.uv >= 6 ? 'High' : d.uv >= 3 ? 'Moderate' : 'Low';
+                const solar = d.solarradiation != null ? ` · ${d.solarradiation} W/m²` : '';
+                document.getElementById('wxr-solar-sub').textContent = `${uvLevel}${solar}`;
+            }
+
+            // Dew Point
+            document.getElementById('wxr-dewpoint').textContent = d.dewPoint != null ? `${Math.round(d.dewPoint)}°F` : '--';
+            if (d.dewPoint != null) {
+                const comfort = d.dewPoint >= 70 ? 'Oppressive' : d.dewPoint >= 65 ? 'Muggy' : d.dewPoint >= 60 ? 'Humid' : d.dewPoint >= 55 ? 'Comfortable' : 'Dry';
+                document.getElementById('wxr-dewpoint-sub').textContent = comfort;
+            }
+
+            // Indoor Conditions
+            document.getElementById('wxr-indoor').textContent = d.tempinf != null ? `${Math.round(d.tempinf)}°F` : '--';
+            document.getElementById('wxr-indoor-sub').textContent = d.humidityin != null ? `Humidity: ${d.humidityin}%` : '';
+
             // Battery status
             const batteryItems = [];
             if (d.battout != null) batteryItems.push({ name:'Outdoor', ok: d.battout === 1 });
@@ -2029,6 +2075,104 @@
             dayKeys.forEach((day,i) => {
                 const h = highs[i], l = lows[i];
                 tableHTML += `<tr><td>${day}</td><td>${h != null ? h+'°F' : '--'}</td><td>${l != null ? l+'°F' : '--'}</td><td>${h != null && l != null ? (h-l)+'°' : '--'}</td></tr>`;
+            });
+            tableHTML += '</tbody></table>';
+
+        } else if (metric === 'pressure') {
+            titleEl.textContent = 'Barometric Pressure — 7-Day History';
+            const vals = [];
+            dayKeys.forEach(day => {
+                const recs = days[day].filter(r => r.baromrelin != null);
+                if (!recs.length) { vals.push(null); return; }
+                vals.push(Math.round(recs.reduce((s,r) => s + r.baromrelin, 0) / recs.length * 100) / 100);
+            });
+            chartConfig = { type:'line', data:{
+                labels: dayKeys,
+                datasets:[{ label:'Pressure (inHg)', data:vals, borderColor:chartColors.gold, backgroundColor:'rgba(200,169,110,0.1)', fill:true, tension:0.3 }]
+            }, options: chartDefaults };
+            tableHTML = `<table class="wx-modal-table"><thead><tr><th>Date</th><th>Avg Pressure</th><th>Trend</th></tr></thead><tbody>`;
+            dayKeys.forEach((day,i) => {
+                const v = vals[i];
+                const trend = v == null ? '--' : v >= 30.2 ? 'High' : v <= 29.8 ? 'Low' : 'Normal';
+                tableHTML += `<tr><td>${day}</td><td>${v != null ? v.toFixed(2)+' inHg' : '--'}</td><td>${trend}</td></tr>`;
+            });
+            tableHTML += '</tbody></table>';
+
+        } else if (metric === 'uv') {
+            titleEl.textContent = 'UV Index & Solar Radiation — 7-Day History';
+            const uvMax = [], solarMax = [];
+            dayKeys.forEach(day => {
+                const recs = days[day];
+                uvMax.push(Math.max(...recs.map(r => r.uv || 0)));
+                solarMax.push(Math.max(...recs.map(r => r.solarradiation || 0)));
+            });
+            chartConfig = { type:'bar', data:{
+                labels: dayKeys,
+                datasets:[
+                    { label:'Max UV Index', data:uvMax, backgroundColor:'rgba(234,179,8,0.7)' },
+                    { label:'Max Solar (W/m²)', data:solarMax, backgroundColor:'rgba(200,169,110,0.3)', yAxisID:'y1' }
+                ]
+            }, options: { ...chartDefaults, scales: {
+                ...chartDefaults.scales,
+                y1: { position:'right', ticks:{ color:'#94a3b8', font:{size:10} }, grid:{ display:false } }
+            }}};
+            tableHTML = `<table class="wx-modal-table"><thead><tr><th>Date</th><th>Max UV</th><th>UV Level</th><th>Max Solar</th></tr></thead><tbody>`;
+            dayKeys.forEach((day,i) => {
+                const uv = uvMax[i];
+                const level = uv >= 11 ? 'Extreme' : uv >= 8 ? 'Very High' : uv >= 6 ? 'High' : uv >= 3 ? 'Moderate' : 'Low';
+                tableHTML += `<tr><td>${day}</td><td>${uv}</td><td>${level}</td><td>${solarMax[i]} W/m²</td></tr>`;
+            });
+            tableHTML += '</tbody></table>';
+
+        } else if (metric === 'dewpoint') {
+            titleEl.textContent = 'Dew Point — 7-Day History';
+            const avgs = [], mins = [], maxs = [];
+            dayKeys.forEach(day => {
+                const recs = days[day].filter(r => r.dewPoint != null);
+                if (!recs.length) { avgs.push(null); mins.push(null); maxs.push(null); return; }
+                avgs.push(Math.round(recs.reduce((s,r) => s + r.dewPoint, 0) / recs.length));
+                mins.push(Math.round(Math.min(...recs.map(r => r.dewPoint))));
+                maxs.push(Math.round(Math.max(...recs.map(r => r.dewPoint))));
+            });
+            chartConfig = { type:'line', data:{
+                labels: dayKeys,
+                datasets:[
+                    { label:'Avg Dew Point (°F)', data:avgs, borderColor:chartColors.blue, tension:0.3, fill:false },
+                    { label:'Min', data:mins, borderColor:chartColors.green, borderDash:[4,4], tension:0.3, fill:false },
+                    { label:'Max', data:maxs, borderColor:chartColors.red, borderDash:[4,4], tension:0.3, fill:false }
+                ]
+            }, options: chartDefaults };
+            tableHTML = `<table class="wx-modal-table"><thead><tr><th>Date</th><th>Avg</th><th>Min</th><th>Max</th><th>Comfort</th></tr></thead><tbody>`;
+            dayKeys.forEach((day,i) => {
+                const a = avgs[i];
+                const comfort = a == null ? '--' : a >= 70 ? 'Oppressive' : a >= 65 ? 'Muggy' : a >= 60 ? 'Humid' : a >= 55 ? 'Comfortable' : 'Dry';
+                tableHTML += `<tr><td>${day}</td><td>${a != null ? a+'°F':'--'}</td><td>${mins[i] != null ? mins[i]+'°F':'--'}</td><td>${maxs[i] != null ? maxs[i]+'°F':'--'}</td><td>${comfort}</td></tr>`;
+            });
+            tableHTML += '</tbody></table>';
+
+        } else if (metric === 'indoor') {
+            titleEl.textContent = 'Indoor Conditions — 7-Day History';
+            const temps = [], hums = [];
+            dayKeys.forEach(day => {
+                const recs = days[day];
+                const tRecs = recs.filter(r => r.tempinf != null);
+                const hRecs = recs.filter(r => r.humidityin != null);
+                temps.push(tRecs.length ? Math.round(tRecs.reduce((s,r) => s + r.tempinf, 0) / tRecs.length) : null);
+                hums.push(hRecs.length ? Math.round(hRecs.reduce((s,r) => s + r.humidityin, 0) / hRecs.length) : null);
+            });
+            chartConfig = { type:'line', data:{
+                labels: dayKeys,
+                datasets:[
+                    { label:'Avg Temp (°F)', data:temps, borderColor:chartColors.gold, tension:0.3 },
+                    { label:'Avg Humidity (%)', data:hums, borderColor:chartColors.blue, tension:0.3, yAxisID:'y1' }
+                ]
+            }, options: { ...chartDefaults, scales: {
+                ...chartDefaults.scales,
+                y1: { position:'right', ticks:{ color:'#94a3b8', font:{size:10} }, grid:{ display:false } }
+            }}};
+            tableHTML = `<table class="wx-modal-table"><thead><tr><th>Date</th><th>Avg Temp</th><th>Avg Humidity</th></tr></thead><tbody>`;
+            dayKeys.forEach((day,i) => {
+                tableHTML += `<tr><td>${day}</td><td>${temps[i] != null ? temps[i]+'°F':'--'}</td><td>${hums[i] != null ? hums[i]+'%':'--'}</td></tr>`;
             });
             tableHTML += '</tbody></table>';
 

@@ -7,6 +7,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -463,6 +464,59 @@
             color: var(--text-secondary);
             margin-top: 4px;
             opacity: 0.7;
+        }
+        .wx-report-card {
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .wx-report-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+
+        /* ── WEATHER DETAIL MODAL ── */
+        .wx-modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1000; opacity: 0; pointer-events: none; transition: opacity 0.2s;
+        }
+        .wx-modal-overlay.show { opacity: 1; pointer-events: all; }
+        .wx-modal {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 14px; padding: 28px 24px; width: 100%; max-width: 720px;
+            margin: 16px; max-height: 90vh; overflow-y: auto;
+            transform: scale(0.95); transition: transform 0.2s;
+        }
+        .wx-modal-overlay.show .wx-modal { transform: scale(1); }
+        .wx-modal-title {
+            font-size: 1.15rem; font-weight: 700; color: var(--text-primary); margin-bottom: 16px;
+        }
+        .wx-modal-chart-container {
+            position: relative; width: 100%; height: 260px; margin-bottom: 20px;
+        }
+        .wx-modal-table {
+            width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-bottom: 16px;
+        }
+        .wx-modal-table th {
+            text-align: left; padding: 8px 10px; color: var(--accent);
+            border-bottom: 2px solid var(--border); font-weight: 600; font-size: 0.72rem;
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .wx-modal-table td {
+            padding: 7px 10px; color: var(--text-primary); border-bottom: 1px solid var(--border);
+        }
+        .wx-modal-table tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+        .wx-modal-actions {
+            display: flex; justify-content: flex-end; margin-top: 12px;
+        }
+        .wx-modal-close {
+            padding: 8px 20px; background: var(--accent); color: #fff; border: none;
+            border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: 600;
+        }
+        .wx-modal-close:hover { background: var(--accent-hover); }
+        @media (max-width: 480px) {
+            .wx-modal { padding: 20px 16px; }
+            .wx-modal-chart-container { height: 200px; }
         }
 
         /* ── QUOTE ── */
@@ -1046,47 +1100,43 @@
         <!-- WEATHER REPORTS -->
         <div class="section-title">Weather Station Reports</div>
         <div class="wx-reports-grid" id="wx-reports-grid">
-            <div class="wx-report-card wind">
+            <div class="wx-report-card wind" onclick="openWxDetail('wind-current')">
                 <div class="wx-report-value" id="wxr-wind-current">--</div>
                 <div class="wx-report-label">Current Wind</div>
                 <div class="wx-report-sub" id="wxr-wind-current-sub"></div>
             </div>
-            <div class="wx-report-card wind">
+            <div class="wx-report-card wind" onclick="openWxDetail('wind-week')">
                 <div class="wx-report-value" id="wxr-wind-week">--</div>
                 <div class="wx-report-label">Max Wind Gust — 7 Days</div>
                 <div class="wx-report-sub" id="wxr-wind-week-sub"></div>
             </div>
-            <div class="wx-report-card">
+            <div class="wx-report-card" onclick="openWxDetail('rain-today')">
                 <div class="wx-report-value" id="wxr-rain-today">--</div>
                 <div class="wx-report-label">Rain Today</div>
                 <div class="wx-report-sub" id="wxr-rain-rate-sub"></div>
             </div>
-            <div class="wx-report-card">
+            <div class="wx-report-card" onclick="openWxDetail('rain-week')">
                 <div class="wx-report-value" id="wxr-rain-week">--</div>
                 <div class="wx-report-label">Rain — Week to Date</div>
             </div>
-            <div class="wx-report-card">
-                <div class="wx-report-value" id="wxr-rain-month">--</div>
-                <div class="wx-report-label">Rain — Month to Date</div>
-            </div>
-            <div class="wx-report-card">
+            <div class="wx-report-card" onclick="openWxDetail('rain-year')">
                 <div class="wx-report-value" id="wxr-rain-year">--</div>
                 <div class="wx-report-label">Rain — Year to Date</div>
             </div>
-            <div class="wx-report-card wind">
+            <div class="wx-report-card wind" onclick="openWxDetail('wind-gust-today')">
                 <div class="wx-report-value" id="wxr-wind-gust">--</div>
                 <div class="wx-report-label">Max Wind Gust Today</div>
             </div>
-            <div class="wx-report-card conditions">
+            <div class="wx-report-card conditions" onclick="openWxDetail('humidity')">
                 <div class="wx-report-value" id="wxr-humidity">--</div>
                 <div class="wx-report-label">Current Humidity</div>
             </div>
-            <div class="wx-report-card conditions">
+            <div class="wx-report-card conditions" onclick="openWxDetail('temp-high')">
                 <div class="wx-report-value" id="wxr-temp-high-7d">--</div>
                 <div class="wx-report-label">7-Day High Temp</div>
                 <div class="wx-report-sub" id="wxr-temp-high-7d-sub"></div>
             </div>
-            <div class="wx-report-card conditions">
+            <div class="wx-report-card conditions" onclick="openWxDetail('temp-low')">
                 <div class="wx-report-value" id="wxr-temp-low-7d">--</div>
                 <div class="wx-report-label">7-Day Low Temp</div>
                 <div class="wx-report-sub" id="wxr-temp-low-7d-sub"></div>
@@ -1391,6 +1441,20 @@
 
 </div><!-- /app-screen -->
 
+<!-- WEATHER DETAIL MODAL -->
+<div class="wx-modal-overlay" id="wx-modal-overlay" onclick="if(event.target===this)closeWxModal()">
+    <div class="wx-modal">
+        <div class="wx-modal-title" id="wx-modal-title">Weather Detail</div>
+        <div class="wx-modal-chart-container">
+            <canvas id="wx-detail-chart"></canvas>
+        </div>
+        <div id="wx-modal-table-wrap"></div>
+        <div class="wx-modal-actions">
+            <button class="wx-modal-close" onclick="closeWxModal()">Close</button>
+        </div>
+    </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -1592,6 +1656,9 @@
     const AW_APP_KEY = 'ed3453a598a248be87cb2836aea2bf918390dd846403432495ac6f011f9dce22';
     const AW_API_KEY = 'd3aec6b75c1e473db864148979922da490632d1e364141449a0b60eb11e9dd88';
     let wxTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    let wxHistoryRecords = [];  // stored globally for modal drill-downs
+    let wxCurrentData = null;   // latest device data
+    let wxDetailChart = null;   // current Chart.js instance
 
     function degToCompass(deg) {
         const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
@@ -1642,6 +1709,7 @@
 
             const device = devices[0];
             const d = device.lastData;
+            wxCurrentData = d;
             const stationName = device.info?.name || 'Ambient Weather Station';
 
             // Station label
@@ -1669,26 +1737,22 @@
             document.getElementById('wxr-rain-rate-sub').textContent = d.hourlyrainin != null ? `Rate: ${d.hourlyrainin.toFixed(2)}"/hr` : '';
 
             document.getElementById('wxr-rain-week').textContent = fmtRain(d.weeklyrainin);
-            document.getElementById('wxr-rain-month').textContent = fmtRain(d.monthlyrainin);
-            document.getElementById('wxr-rain-year').textContent = fmtRain(d.yearlyrainin);
+            document.getElementById('wxr-rain-year').textContent = fmtRain(d.yearlyrainin != null ? d.yearlyrainin : d.totalrainin);
 
             document.getElementById('wxr-wind-gust').textContent = d.maxdailygust != null ? `${Math.round(d.maxdailygust)} mph` : '--';
 
             document.getElementById('wxr-humidity').textContent = d.humidity != null ? `${d.humidity}%` : '--';
 
-            // Fetch 7-day historical data (max wind, high/low temps)
+            // Fetch 7-day historical data after a delay (rate limit: 1 req/sec)
             const macAddress = device.macAddress;
             if (macAddress) {
-                fetch7DayHistory(macAddress);
+                setTimeout(() => fetch7DayHistory(macAddress), 1500);
             }
 
             // Fetch 3-day forecast using Open-Meteo (free, uses station coords)
-            if (d.lat != null && d.lon != null) {
-                fetch3DayForecast(d.lat, d.lon);
-            } else if (device.info?.coords?.coords?.lat != null) {
+            if (device.info?.coords?.coords?.lat != null) {
                 fetch3DayForecast(device.info.coords.coords.lat, device.info.coords.coords.lon);
             } else {
-                // Fallback: Chaska, MN
                 fetch3DayForecast(44.8247, -93.6052);
             }
 
@@ -1704,48 +1768,40 @@
     async function fetch7DayHistory(mac) {
         try {
             const now = Date.now();
-            // Ambient Weather API returns max 288 records per call
             const url = `https://rt.ambientweather.net/v1/devices/${encodeURIComponent(mac)}?applicationKey=${AW_APP_KEY}&apiKey=${AW_API_KEY}&endDate=${now}&limit=288`;
             const r = await fetch(url);
-            if (!r.ok) return;
+            if (!r.ok) { console.error('History API:', r.status); return; }
             const records = await r.json();
+            wxHistoryRecords = records; // store globally for modals
 
             let maxGust = 0, maxGustDate = null;
             let highTemp = -Infinity, highTempDate = null;
             let lowTemp = Infinity, lowTempDate = null;
 
             for (const rec of records) {
-                // Max wind gust
                 const gust = rec.maxdailygust || rec.windgustmph || 0;
                 if (gust > maxGust) {
                     maxGust = gust;
                     maxGustDate = rec.dateutc ? new Date(rec.dateutc) : null;
                 }
-                // High temp
                 if (rec.tempf != null && rec.tempf > highTemp) {
                     highTemp = rec.tempf;
                     highTempDate = rec.dateutc ? new Date(rec.dateutc) : null;
                 }
-                // Low temp
                 if (rec.tempf != null && rec.tempf < lowTemp) {
                     lowTemp = rec.tempf;
                     lowTempDate = rec.dateutc ? new Date(rec.dateutc) : null;
                 }
             }
 
-            // Max wind gust 7 days
             document.getElementById('wxr-wind-week').textContent = maxGust > 0 ? `${Math.round(maxGust)} mph` : '--';
             if (maxGustDate) {
                 document.getElementById('wxr-wind-week-sub').textContent = `on ${maxGustDate.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' })}`;
             }
-
-            // 7-day high temp
             document.getElementById('wxr-temp-high-7d').textContent = highTemp > -Infinity ? `${Math.round(highTemp)}°F` : '--';
             if (highTempDate) {
                 document.getElementById('wxr-temp-high-7d-sub').textContent = `on ${highTempDate.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' })}`;
             }
-
-            // 7-day low temp
             document.getElementById('wxr-temp-low-7d').textContent = lowTemp < Infinity ? `${Math.round(lowTemp)}°F` : '--';
             if (lowTempDate) {
                 document.getElementById('wxr-temp-low-7d-sub').textContent = `on ${lowTempDate.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' })}`;
@@ -1755,6 +1811,185 @@
         }
     }
 
+    // ── WEATHER DETAIL MODAL ──
+    function closeWxModal() {
+        document.getElementById('wx-modal-overlay').classList.remove('show');
+    }
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeWxModal(); });
+
+    function groupByDay(records) {
+        const days = {};
+        for (const rec of records) {
+            if (!rec.dateutc) continue;
+            const d = new Date(rec.dateutc);
+            const key = d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+            if (!days[key]) days[key] = [];
+            days[key].push(rec);
+        }
+        return days;
+    }
+
+    function openWxDetail(metric) {
+        if (wxDetailChart) { wxDetailChart.destroy(); wxDetailChart = null; }
+        const overlay = document.getElementById('wx-modal-overlay');
+        const titleEl = document.getElementById('wx-modal-title');
+        const tableWrap = document.getElementById('wx-modal-table-wrap');
+        const ctx = document.getElementById('wx-detail-chart').getContext('2d');
+        const records = wxHistoryRecords;
+        const days = groupByDay(records);
+        const dayKeys = Object.keys(days);
+        const chartColors = { blue:'#3b82f6', purple:'#8b5cf6', gold:'#c8a96e', green:'#22c55e', red:'#ef4444' };
+
+        const chartDefaults = {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { labels: { color:'#94a3b8', font:{size:11} } } },
+            scales: {
+                x: { ticks: { color:'#94a3b8', font:{size:10} }, grid: { color:'rgba(255,255,255,0.05)' } },
+                y: { ticks: { color:'#94a3b8', font:{size:10} }, grid: { color:'rgba(255,255,255,0.05)' } }
+            }
+        };
+
+        let chartConfig = null;
+        let tableHTML = '';
+
+        if (metric === 'wind-current' || metric === 'wind-week') {
+            titleEl.textContent = metric === 'wind-current' ? 'Wind Speed — 7-Day History' : 'Wind Gusts — 7-Day History';
+            const avgSpeeds = [], maxGusts = [];
+            dayKeys.forEach(day => {
+                const recs = days[day];
+                const avg = recs.reduce((s,r) => s + (r.windspeedmph||0), 0) / recs.length;
+                const maxG = Math.max(...recs.map(r => r.windgustmph || r.maxdailygust || 0));
+                avgSpeeds.push(Math.round(avg * 10) / 10);
+                maxGusts.push(Math.round(maxG));
+            });
+            chartConfig = { type:'line', data:{
+                labels: dayKeys,
+                datasets: [
+                    { label:'Avg Wind (mph)', data:avgSpeeds, borderColor:chartColors.blue, backgroundColor:'rgba(59,130,246,0.1)', fill:true, tension:0.3 },
+                    { label:'Max Gust (mph)', data:maxGusts, borderColor:chartColors.purple, backgroundColor:'rgba(139,92,246,0.1)', fill:true, tension:0.3 }
+                ]
+            }, options: chartDefaults };
+            tableHTML = `<table class="wx-modal-table"><thead><tr><th>Date</th><th>Avg Wind</th><th>Max Gust</th></tr></thead><tbody>`;
+            dayKeys.forEach((day,i) => { tableHTML += `<tr><td>${day}</td><td>${avgSpeeds[i]} mph</td><td>${maxGusts[i]} mph</td></tr>`; });
+            tableHTML += '</tbody></table>';
+
+        } else if (metric === 'wind-gust-today') {
+            titleEl.textContent = 'Wind Gusts — Today';
+            const todayKey = dayKeys[0];
+            const todayRecs = todayKey ? days[todayKey] : [];
+            const labels = [], gusts = [];
+            todayRecs.slice().reverse().forEach(r => {
+                const t = new Date(r.dateutc).toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+                labels.push(t);
+                gusts.push(r.windgustmph || 0);
+            });
+            chartConfig = { type:'line', data:{
+                labels, datasets:[{ label:'Gust (mph)', data:gusts, borderColor:chartColors.purple, tension:0.3 }]
+            }, options: chartDefaults };
+            tableHTML = `<table class="wx-modal-table"><thead><tr><th>Time</th><th>Gust</th><th>Direction</th></tr></thead><tbody>`;
+            todayRecs.slice().reverse().forEach(r => {
+                const t = new Date(r.dateutc).toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+                const dir = r.winddir != null ? degToCompass(r.winddir) : '--';
+                tableHTML += `<tr><td>${t}</td><td>${Math.round(r.windgustmph||0)} mph</td><td>${dir}</td></tr>`;
+            });
+            tableHTML += '</tbody></table>';
+
+        } else if (metric.startsWith('rain')) {
+            const titles = { 'rain-today':'Rainfall — Today', 'rain-week':'Rainfall — Week to Date', 'rain-year':'Rainfall — Year to Date' };
+            titleEl.textContent = titles[metric] || 'Rainfall Detail';
+            if (metric === 'rain-today') {
+                const todayKey = dayKeys[0];
+                const todayRecs = todayKey ? days[todayKey] : [];
+                const labels = [], vals = [];
+                todayRecs.slice().reverse().forEach(r => {
+                    labels.push(new Date(r.dateutc).toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' }));
+                    vals.push(r.hourlyrainin || 0);
+                });
+                chartConfig = { type:'bar', data:{
+                    labels, datasets:[{ label:'Rain Rate (in/hr)', data:vals, backgroundColor:chartColors.blue }]
+                }, options: chartDefaults };
+                tableHTML = `<table class="wx-modal-table"><thead><tr><th>Time</th><th>Rain Rate</th></tr></thead><tbody>`;
+                todayRecs.slice().reverse().forEach(r => {
+                    const t = new Date(r.dateutc).toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+                    tableHTML += `<tr><td>${t}</td><td>${(r.hourlyrainin||0).toFixed(2)}"/hr</td></tr>`;
+                });
+                tableHTML += '</tbody></table>';
+            } else {
+                const dailyRain = [], cumulative = [];
+                let cum = 0;
+                dayKeys.slice().reverse().forEach(day => {
+                    const maxDaily = Math.max(...days[day].map(r => r.dailyrainin || 0));
+                    dailyRain.push(Math.round(maxDaily * 100) / 100);
+                    cum += maxDaily;
+                    cumulative.push(Math.round(cum * 100) / 100);
+                });
+                const labels = dayKeys.slice().reverse();
+                chartConfig = { type:'bar', data:{
+                    labels,
+                    datasets:[
+                        { label:'Daily Rain (in)', data:dailyRain, backgroundColor:chartColors.blue },
+                        { label:'Cumulative (in)', data:cumulative, type:'line', borderColor:chartColors.gold, backgroundColor:'transparent', tension:0.3, yAxisID:'y' }
+                    ]
+                }, options: chartDefaults };
+                tableHTML = `<table class="wx-modal-table"><thead><tr><th>Date</th><th>Daily Rain</th><th>Cumulative</th></tr></thead><tbody>`;
+                labels.forEach((day,i) => { tableHTML += `<tr><td>${day}</td><td>${dailyRain[i].toFixed(2)}"</td><td>${cumulative[i].toFixed(2)}"</td></tr>`; });
+                tableHTML += '</tbody></table>';
+            }
+
+        } else if (metric === 'humidity') {
+            titleEl.textContent = 'Humidity — 7-Day History';
+            const avgs = [], mins = [], maxs = [];
+            dayKeys.forEach(day => {
+                const recs = days[day].filter(r => r.humidity != null);
+                if (!recs.length) { avgs.push(0); mins.push(0); maxs.push(0); return; }
+                avgs.push(Math.round(recs.reduce((s,r) => s + r.humidity, 0) / recs.length));
+                mins.push(Math.min(...recs.map(r => r.humidity)));
+                maxs.push(Math.max(...recs.map(r => r.humidity)));
+            });
+            chartConfig = { type:'line', data:{
+                labels: dayKeys,
+                datasets:[
+                    { label:'Avg %', data:avgs, borderColor:chartColors.blue, tension:0.3, fill:false },
+                    { label:'Min %', data:mins, borderColor:chartColors.green, borderDash:[4,4], tension:0.3, fill:false },
+                    { label:'Max %', data:maxs, borderColor:chartColors.red, borderDash:[4,4], tension:0.3, fill:false }
+                ]
+            }, options: chartDefaults };
+            tableHTML = `<table class="wx-modal-table"><thead><tr><th>Date</th><th>Avg</th><th>Min</th><th>Max</th></tr></thead><tbody>`;
+            dayKeys.forEach((day,i) => { tableHTML += `<tr><td>${day}</td><td>${avgs[i]}%</td><td>${mins[i]}%</td><td>${maxs[i]}%</td></tr>`; });
+            tableHTML += '</tbody></table>';
+
+        } else if (metric === 'temp-high' || metric === 'temp-low') {
+            titleEl.textContent = metric === 'temp-high' ? 'Temperature Highs — 7-Day History' : 'Temperature Lows — 7-Day History';
+            const highs = [], lows = [];
+            dayKeys.forEach(day => {
+                const recs = days[day].filter(r => r.tempf != null);
+                if (!recs.length) { highs.push(null); lows.push(null); return; }
+                highs.push(Math.round(Math.max(...recs.map(r => r.tempf))));
+                lows.push(Math.round(Math.min(...recs.map(r => r.tempf))));
+            });
+            chartConfig = { type:'line', data:{
+                labels: dayKeys,
+                datasets:[
+                    { label:'High °F', data:highs, borderColor:chartColors.red, backgroundColor:'rgba(239,68,68,0.1)', fill:true, tension:0.3 },
+                    { label:'Low °F', data:lows, borderColor:chartColors.blue, backgroundColor:'rgba(59,130,246,0.1)', fill:true, tension:0.3 }
+                ]
+            }, options: chartDefaults };
+            tableHTML = `<table class="wx-modal-table"><thead><tr><th>Date</th><th>High</th><th>Low</th><th>Range</th></tr></thead><tbody>`;
+            dayKeys.forEach((day,i) => {
+                const h = highs[i], l = lows[i];
+                tableHTML += `<tr><td>${day}</td><td>${h != null ? h+'°F' : '--'}</td><td>${l != null ? l+'°F' : '--'}</td><td>${h != null && l != null ? (h-l)+'°' : '--'}</td></tr>`;
+            });
+            tableHTML += '</tbody></table>';
+        }
+
+        if (chartConfig) {
+            wxDetailChart = new Chart(ctx, chartConfig);
+        }
+        tableWrap.innerHTML = tableHTML || '<p style="color:var(--text-secondary);font-size:0.85rem;">No historical data available yet.</p>';
+        overlay.classList.add('show');
+    }
+
+    // ── FORECAST ──
     const FORECAST_ICONS = {
         0:'☀️',1:'🌤️',2:'⛅',3:'☁️',
         45:'🌫️',48:'🌫️',
@@ -1783,7 +2018,6 @@
             if (!r.ok) return;
             const data = await r.json();
             const daily = data.daily;
-            // Skip today (index 0), show next 3 days
             for (let i = 0; i < 3; i++) {
                 const idx = i + 1;
                 if (idx >= daily.time.length) break;

@@ -700,6 +700,21 @@
         .form-btn:hover { background: var(--accent-hover); }
 
         /* ── QUOTES SECTION ── */
+        .collapsible-header {
+            display: flex; align-items: center; justify-content: space-between; cursor: pointer;
+            user-select: none;
+        }
+        .collapsible-header .toggle-icon {
+            font-size: 0.8rem; color: var(--text-secondary); transition: transform 0.2s;
+        }
+        .collapsible-header.expanded .toggle-icon { transform: rotate(90deg); }
+        .collapsible-body {
+            overflow: hidden; max-height: 0; opacity: 0; transition: max-height 0.35s ease, opacity 0.25s ease, margin 0.25s ease;
+            margin-top: 0;
+        }
+        .collapsible-body.expanded {
+            max-height: 5000px; opacity: 1; margin-top: 8px;
+        }
         .quotes-section {
             background: rgba(255,255,255,0.03);
             border: 1px solid var(--border);
@@ -1100,11 +1115,6 @@
         <!-- WEATHER REPORTS -->
         <div class="section-title">Weather Station Reports</div>
         <div class="wx-reports-grid" id="wx-reports-grid">
-            <div class="wx-report-card wind" onclick="openWxDetail('wind-current')">
-                <div class="wx-report-value" id="wxr-wind-current">--</div>
-                <div class="wx-report-label">Current Wind</div>
-                <div class="wx-report-sub" id="wxr-wind-current-sub"></div>
-            </div>
             <div class="wx-report-card wind" onclick="openWxDetail('wind-week')">
                 <div class="wx-report-value" id="wxr-wind-week">--</div>
                 <div class="wx-report-label">Max Wind Gust — 7 Days</div>
@@ -1126,10 +1136,6 @@
             <div class="wx-report-card wind" onclick="openWxDetail('wind-gust-today')">
                 <div class="wx-report-value" id="wxr-wind-gust">--</div>
                 <div class="wx-report-label">Max Wind Gust Today</div>
-            </div>
-            <div class="wx-report-card conditions" onclick="openWxDetail('humidity')">
-                <div class="wx-report-value" id="wxr-humidity">--</div>
-                <div class="wx-report-label">Current Humidity</div>
             </div>
             <div class="wx-report-card conditions" onclick="openWxDetail('temp-high')">
                 <div class="wx-report-value" id="wxr-temp-high-7d">--</div>
@@ -1374,8 +1380,11 @@
         </div>
 
         <!-- QUOTES SECTION -->
-        <div class="section-title">📚 Quote Collection</div>
-        <div class="quotes-section">
+        <div class="section-title collapsible-header" onclick="toggleSection(this, 'quotes-body')">
+            📚 Quote Collection
+            <span class="toggle-icon">&#9654;</span>
+        </div>
+        <div class="quotes-section collapsible-body" id="quotes-body">
 
             <!-- Add Quote Row -->
             <div class="quotes-add-row">
@@ -1404,8 +1413,11 @@
         </div>
 
         <!-- FAMOUS ONE LINERS SECTION -->
-        <div class="section-title" style="margin-top:32px;">⚡ Classic One Liners</div>
-        <div class="oneliners-section">
+        <div class="section-title collapsible-header" style="margin-top:32px;" onclick="toggleSection(this, 'oneliners-body')">
+            ⚡ Classic One Liners
+            <span class="toggle-icon">&#9654;</span>
+        </div>
+        <div class="oneliners-section collapsible-body" id="oneliners-body">
 
             <!-- Add One Liner Row -->
             <div class="oneliners-add-row">
@@ -1518,6 +1530,27 @@
 
     // ── INIT APP ──
     let unsubbers = [];
+    // ── COLLAPSIBLE SECTIONS ──
+    function toggleSection(header, bodyId) {
+        const body = document.getElementById(bodyId);
+        const expanded = body.classList.toggle('expanded');
+        header.classList.toggle('expanded', expanded);
+        localStorage.setItem('collapse_' + bodyId, expanded ? '1' : '0');
+    }
+    function restoreCollapsibles() {
+        ['quotes-body', 'oneliners-body'].forEach(id => {
+            const state = localStorage.getItem('collapse_' + id);
+            // Default collapsed (state is null or '0')
+            if (state === '1') {
+                const body = document.getElementById(id);
+                const header = body.previousElementSibling;
+                body.classList.add('expanded');
+                header.classList.add('expanded');
+            }
+        });
+    }
+    restoreCollapsibles();
+
     function initApp() {
         showScreen('app');
         initLiveCounts();
@@ -1735,10 +1768,6 @@
                 `Wind ${Math.round(d.windspeedmph)} mph${windDir} &nbsp;·&nbsp; Humidity ${d.humidity}%`;
 
             // Weather report cards
-            const windCompass = d.winddir != null ? degToCompass(d.winddir) : '';
-            document.getElementById('wxr-wind-current').textContent = d.windspeedmph != null ? `${Math.round(d.windspeedmph)} mph` : '--';
-            document.getElementById('wxr-wind-current-sub').textContent = windCompass ? `Direction: ${windCompass} (${Math.round(d.winddir)}°)` : '';
-
             document.getElementById('wxr-rain-today').textContent = fmtRain(d.dailyrainin);
             document.getElementById('wxr-rain-rate-sub').textContent = d.hourlyrainin != null ? `Rate: ${d.hourlyrainin.toFixed(2)}"/hr` : '';
 
@@ -1746,8 +1775,6 @@
             document.getElementById('wxr-rain-year').textContent = fmtRain(d.yearlyrainin != null ? d.yearlyrainin : d.totalrainin);
 
             document.getElementById('wxr-wind-gust').textContent = d.maxdailygust != null ? `${Math.round(d.maxdailygust)} mph` : '--';
-
-            document.getElementById('wxr-humidity').textContent = d.humidity != null ? `${d.humidity}%` : '--';
 
             // Battery status
             const batteryItems = [];
@@ -1766,7 +1793,7 @@
             // Fetch 7-day historical data after a delay (rate limit: 1 req/sec)
             const macAddress = device.macAddress;
             if (macAddress) {
-                setTimeout(() => fetch7DayHistory(macAddress), 1500);
+                setTimeout(() => fetch7DayHistory(macAddress), 2500);
             }
 
             // Fetch 3-day forecast using Open-Meteo (free, uses station coords)
@@ -1785,11 +1812,15 @@
         setTimeout(fetchWeather, 10 * 60 * 1000);
     }
 
-    async function fetch7DayHistory(mac) {
+    async function fetch7DayHistory(mac, retryCount = 0) {
         try {
-            const now = Date.now();
-            const url = `https://rt.ambientweather.net/v1/devices/${encodeURIComponent(mac)}?applicationKey=${AW_APP_KEY}&apiKey=${AW_API_KEY}&endDate=${now}&limit=288`;
+            const url = `https://rt.ambientweather.net/v1/devices/${encodeURIComponent(mac)}?applicationKey=${AW_APP_KEY}&apiKey=${AW_API_KEY}&limit=288`;
             const r = await fetch(url);
+            if (r.status === 429 && retryCount < 2) {
+                console.warn('History API rate limited, retrying in 3s...');
+                setTimeout(() => fetch7DayHistory(mac, retryCount + 1), 3000);
+                return;
+            }
             if (!r.ok) { console.error('History API:', r.status); return; }
             const records = await r.json();
             wxHistoryRecords = records; // store globally for modals

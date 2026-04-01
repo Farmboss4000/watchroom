@@ -1115,11 +1115,6 @@
         <!-- WEATHER REPORTS -->
         <div class="section-title">Weather Station Reports</div>
         <div class="wx-reports-grid" id="wx-reports-grid">
-            <div class="wx-report-card wind" onclick="openWxDetail('wind-week')">
-                <div class="wx-report-value" id="wxr-wind-week">--</div>
-                <div class="wx-report-label">Max Wind Gust — 7 Days</div>
-                <div class="wx-report-sub" id="wxr-wind-week-sub"></div>
-            </div>
             <div class="wx-report-card" onclick="openWxDetail('rain-today')">
                 <div class="wx-report-value" id="wxr-rain-today">--</div>
                 <div class="wx-report-label">Rain Today</div>
@@ -1151,16 +1146,6 @@
                 <div class="wx-report-value" id="wxr-wind-avg10">--</div>
                 <div class="wx-report-label">10-Min Avg Wind</div>
                 <div class="wx-report-sub" id="wxr-wind-avg10-sub"></div>
-            </div>
-            <div class="wx-report-card conditions" onclick="openWxDetail('temp-high')">
-                <div class="wx-report-value" id="wxr-temp-high-7d">--</div>
-                <div class="wx-report-label">7-Day High Temp</div>
-                <div class="wx-report-sub" id="wxr-temp-high-7d-sub"></div>
-            </div>
-            <div class="wx-report-card conditions" onclick="openWxDetail('temp-low')">
-                <div class="wx-report-value" id="wxr-temp-low-7d">--</div>
-                <div class="wx-report-label">7-Day Low Temp</div>
-                <div class="wx-report-sub" id="wxr-temp-low-7d-sub"></div>
             </div>
             <div class="wx-report-card conditions" onclick="openWxDetail('battery')">
                 <div class="wx-report-value" id="wxr-battery">--</div>
@@ -1462,7 +1447,7 @@
 
         <!-- HEADQUARTERS ANALYTICS -->
         <div class="section-title" style="margin-top:32px;">Headquarters Analytics</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:32px;" id="analytics-grid">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px;" id="analytics-grid">
             <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:20px;">
                 <div style="font-size:0.78rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;">Inventory Distribution</div>
                 <div style="position:relative;height:280px;">
@@ -1476,8 +1461,35 @@
                 </div>
             </div>
         </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px;" id="analytics-grid-2">
+            <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:20px;">
+                <div style="font-size:0.78rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;">Asset Coverage by Category</div>
+                <div style="position:relative;height:280px;">
+                    <canvas id="chart-radar"></canvas>
+                </div>
+            </div>
+            <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:20px;">
+                <div style="font-size:0.78rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;">Portfolio Composition</div>
+                <div style="position:relative;height:280px;">
+                    <canvas id="chart-polar"></canvas>
+                </div>
+            </div>
+        </div>
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:32px;">
+            <div style="font-size:0.78rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;">Total Assets Under Management</div>
+            <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:16px;">
+                <span id="total-asset-count" style="font-size:2.8rem;font-weight:800;color:var(--accent);line-height:1;">0</span>
+                <span style="font-size:0.9rem;color:var(--text-secondary);">items tracked across all collections</span>
+            </div>
+            <div style="position:relative;height:200px;">
+                <canvas id="chart-horizontal-bar"></canvas>
+            </div>
+        </div>
         <style>
-            @media (max-width: 800px) { #analytics-grid { grid-template-columns: 1fr !important; } }
+            @media (max-width: 800px) {
+                #analytics-grid { grid-template-columns: 1fr !important; }
+                #analytics-grid-2 { grid-template-columns: 1fr !important; }
+            }
         </style>
 
     </div><!-- /main-content -->
@@ -1598,7 +1610,7 @@
 
     // ── LIVE COUNTS ──
     const counts = { armory:0, machinery:0, automotive:0, livestock:0, timepieces:0, knives:0, pharmacy:0, insurance:0, realestate:0, agents:0 };
-    let analyticsDonut = null, analyticsBar = null;
+    let analyticsDonut = null, analyticsBar = null, analyticsRadar = null, analyticsPolar = null, analyticsHBar = null;
 
     function updateCounts() {
         ['armory','machinery','automotive','livestock','timepieces','knives','pharmacy','insurance','realestate','agents'].forEach(k => {
@@ -1660,6 +1672,112 @@
                         scales: {
                             x: { ticks: { color:'#94a3b8', font:{size:10}, maxRotation:45 }, grid: { display:false } },
                             y: { ticks: { color:'#94a3b8', font:{size:10} }, grid: { color:'rgba(255,255,255,0.05)' }, beginAtZero: true }
+                        }
+                    }
+                });
+            }
+        }
+
+        // Total asset count
+        const totalEl = document.getElementById('total-asset-count');
+        if (totalEl) totalEl.textContent = total.toLocaleString();
+
+        // Radar chart — asset coverage
+        const radarCtx = document.getElementById('chart-radar');
+        if (radarCtx) {
+            const maxVal = Math.max(...data, 1);
+            const normalized = data.map(v => Math.round(v / maxVal * 100));
+            if (analyticsRadar) {
+                analyticsRadar.data.datasets[0].data = normalized;
+                analyticsRadar.update();
+            } else {
+                analyticsRadar = new Chart(radarCtx, {
+                    type: 'radar',
+                    data: {
+                        labels: labels.map(l => l.length > 8 ? l.substring(0,8)+'.' : l),
+                        datasets: [{
+                            label: 'Coverage %', data: normalized,
+                            backgroundColor: 'rgba(200,169,110,0.15)', borderColor: '#c8a96e', borderWidth: 2,
+                            pointBackgroundColor: colors, pointBorderColor: '#0f172a', pointRadius: 5, pointHoverRadius: 7
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            r: {
+                                beginAtZero: true, max: 100,
+                                ticks: { display: false, stepSize: 25 },
+                                grid: { color: 'rgba(255,255,255,0.08)' },
+                                angleLines: { color: 'rgba(255,255,255,0.08)' },
+                                pointLabels: { color: '#94a3b8', font: { size: 10 } }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        // Polar area chart — portfolio composition
+        const polarCtx = document.getElementById('chart-polar');
+        if (polarCtx) {
+            if (analyticsPolar) {
+                analyticsPolar.data.datasets[0].data = data;
+                analyticsPolar.update();
+            } else {
+                analyticsPolar = new Chart(polarCtx, {
+                    type: 'polarArea',
+                    data: {
+                        labels,
+                        datasets: [{ data, backgroundColor: colors.map(c => c + '99'), borderColor: '#0f172a', borderWidth: 1 }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.parsed.r} items (${Math.round(ctx.parsed.r/total*100)}%)` } }
+                        },
+                        scales: {
+                            r: {
+                                ticks: { color: '#94a3b8', font: { size: 9 }, backdropColor: 'transparent' },
+                                grid: { color: 'rgba(255,255,255,0.06)' }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        // Horizontal bar — sorted by size (largest first)
+        const hBarCtx = document.getElementById('chart-horizontal-bar');
+        if (hBarCtx) {
+            const sorted = labels.map((l, i) => ({ label: l, value: data[i], color: colors[i] }))
+                .filter(d => d.value > 0)
+                .sort((a, b) => b.value - a.value);
+            if (analyticsHBar) {
+                analyticsHBar.data.labels = sorted.map(d => d.label);
+                analyticsHBar.data.datasets[0].data = sorted.map(d => d.value);
+                analyticsHBar.data.datasets[0].backgroundColor = sorted.map(d => d.color);
+                analyticsHBar.update();
+            } else {
+                analyticsHBar = new Chart(hBarCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: sorted.map(d => d.label),
+                        datasets: [{
+                            label: 'Items', data: sorted.map(d => d.value),
+                            backgroundColor: sorted.map(d => d.color), borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: { callbacks: { label: ctx => `${ctx.parsed.x} items (${Math.round(ctx.parsed.x/total*100)}%)` } }
+                        },
+                        scales: {
+                            x: { ticks: { color:'#94a3b8', font:{size:10} }, grid: { color:'rgba(255,255,255,0.05)' }, beginAtZero: true },
+                            y: { ticks: { color:'#94a3b8', font:{size:11} }, grid: { display:false } }
                         }
                     }
                 });
@@ -1879,9 +1997,8 @@
                 document.getElementById('wxr-last-rain').textContent = 'Today';
                 document.getElementById('wxr-last-rain-sub').textContent = `${d.dailyrainin.toFixed(2)}" so far today`;
             } else {
-                // Will be updated by fetch7DayHistory with more precise data
-                document.getElementById('wxr-last-rain').textContent = 'Checking...';
-                document.getElementById('wxr-last-rain-sub').textContent = 'Scanning history...';
+                document.getElementById('wxr-last-rain').textContent = 'Not today';
+                document.getElementById('wxr-last-rain-sub').textContent = 'No rain detected today';
             }
 
             // 10-minute average wind (fallback chain: 10m avg → 2m avg → instant)
@@ -1909,12 +2026,6 @@
 
             // Fetch 7-day historical data after a delay (rate limit: 1 req/sec)
             const macAddress = device.macAddress;
-            console.log('Device object keys:', Object.keys(device).join(', '));
-            console.log('macAddress:', macAddress);
-            if (macAddress) {
-                setTimeout(() => fetch7DayHistory(macAddress), 2500);
-            }
-
             // Fetch 3-day forecast using Open-Meteo (free, uses station coords)
             if (device.info?.coords?.coords?.lat != null) {
                 fetch3DayForecast(device.info.coords.coords.lat, device.info.coords.coords.lon);
@@ -1929,92 +2040,6 @@
         }
         // refresh every 10 minutes
         setTimeout(fetchWeather, 10 * 60 * 1000);
-    }
-
-    async function fetch7DayHistory(mac, retryCount = 0) {
-        try {
-            // Ambient Weather API needs MAC without colons in URL path
-            const macClean = mac.replace(/:/g, '');
-            console.log('Fetching history for MAC:', macClean, '(retry:', retryCount + ')');
-            const url = `https://rt.ambientweather.net/v1/devices/${macClean}?applicationKey=${AW_APP_KEY}&apiKey=${AW_API_KEY}&limit=288`;
-            const r = await fetch(url);
-            console.log('History response:', r.status);
-            if (r.status === 429 && retryCount < 3) {
-                const delay = (retryCount + 1) * 3000;
-                console.warn(`History rate limited, retry ${retryCount + 1} in ${delay/1000}s...`);
-                setTimeout(() => fetch7DayHistory(mac, retryCount + 1), delay);
-                return;
-            }
-            if (!r.ok) { console.error('History API error:', r.status, await r.text()); return; }
-            const records = await r.json();
-            console.log(`Weather history: ${records.length} records loaded`);
-            if (records.length > 0) console.log('Sample record:', JSON.stringify(records[0]).substring(0, 300));
-            if (records.length === 0) console.warn('History returned empty — your Ambient Weather plan may not include API history access');
-            wxHistoryRecords = records; // store globally for modals
-
-            let maxGust = 0, maxGustDate = null;
-            let highTemp = -Infinity, highTempDate = null;
-            let lowTemp = Infinity, lowTempDate = null;
-
-            for (const rec of records) {
-                const gust = rec.maxdailygust || rec.windgustmph || 0;
-                if (gust > maxGust) {
-                    maxGust = gust;
-                    maxGustDate = rec.dateutc ? new Date(rec.dateutc) : null;
-                }
-                if (rec.tempf != null && rec.tempf > highTemp) {
-                    highTemp = rec.tempf;
-                    highTempDate = rec.dateutc ? new Date(rec.dateutc) : null;
-                }
-                if (rec.tempf != null && rec.tempf < lowTemp) {
-                    lowTemp = rec.tempf;
-                    lowTempDate = rec.dateutc ? new Date(rec.dateutc) : null;
-                }
-            }
-
-            document.getElementById('wxr-wind-week').textContent = maxGust > 0 ? `${Math.round(maxGust)} mph` : '--';
-            if (maxGustDate) {
-                document.getElementById('wxr-wind-week-sub').textContent = `on ${maxGustDate.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' })}`;
-            }
-            document.getElementById('wxr-temp-high-7d').textContent = highTemp > -Infinity ? `${Math.round(highTemp)}°F` : '--';
-            if (highTempDate) {
-                document.getElementById('wxr-temp-high-7d-sub').textContent = `on ${highTempDate.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' })}`;
-            }
-            document.getElementById('wxr-temp-low-7d').textContent = lowTemp < Infinity ? `${Math.round(lowTemp)}°F` : '--';
-            if (lowTempDate) {
-                document.getElementById('wxr-temp-low-7d-sub').textContent = `on ${lowTempDate.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' })}`;
-            }
-
-            // Find last rain from history (records are newest-first)
-            let lastRainRec = null;
-            for (const rec of records) {
-                if (rec.hourlyrainin > 0 || rec.dailyrainin > 0) {
-                    lastRainRec = rec;
-                    break;
-                }
-            }
-            const lrEl = document.getElementById('wxr-last-rain');
-            const lrSub = document.getElementById('wxr-last-rain-sub');
-            if (lrEl.textContent === 'Checking...') {
-                if (lastRainRec && lastRainRec.dateutc) {
-                    const lr = new Date(lastRainRec.dateutc);
-                    const now = new Date();
-                    const diffHrs = Math.floor((now - lr) / 3600000);
-                    const diffDays = Math.floor(diffHrs / 24);
-                    let ago = '';
-                    if (diffDays > 0) ago = `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-                    else if (diffHrs > 0) ago = `${diffHrs} hr${diffHrs > 1 ? 's' : ''} ago`;
-                    else ago = 'Just now';
-                    lrEl.textContent = ago;
-                    lrSub.textContent = lr.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }) + ' ' + lr.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
-                } else {
-                    lrEl.textContent = 'None in 7 days';
-                    lrSub.textContent = 'No rain detected in history';
-                }
-            }
-        } catch(e) {
-            console.error('7-day history fetch error:', e);
-        }
     }
 
     // ── WEATHER DETAIL MODAL ──

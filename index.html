@@ -1909,6 +1909,8 @@
 
             // Fetch 7-day historical data after a delay (rate limit: 1 req/sec)
             const macAddress = device.macAddress;
+            console.log('Device object keys:', Object.keys(device).join(', '));
+            console.log('macAddress:', macAddress);
             if (macAddress) {
                 setTimeout(() => fetch7DayHistory(macAddress), 2500);
             }
@@ -1931,8 +1933,11 @@
 
     async function fetch7DayHistory(mac, retryCount = 0) {
         try {
+            console.log('Fetching history for MAC:', mac);
             const url = `https://rt.ambientweather.net/v1/devices/${encodeURIComponent(mac)}?applicationKey=${AW_APP_KEY}&apiKey=${AW_API_KEY}&limit=288`;
+            console.log('History URL:', url.replace(AW_API_KEY, '***').replace(AW_APP_KEY, '***'));
             const r = await fetch(url);
+            console.log('History response status:', r.status);
             if (r.status === 429 && retryCount < 2) {
                 console.warn('History API rate limited, retrying in 3s...');
                 setTimeout(() => fetch7DayHistory(mac, retryCount + 1), 3000);
@@ -1941,7 +1946,7 @@
             if (!r.ok) { console.error('History API:', r.status, await r.text()); return; }
             const records = await r.json();
             console.log(`Weather history: ${records.length} records loaded`);
-            if (records.length > 0) console.log('Sample record keys:', Object.keys(records[0]).join(', '));
+            if (records.length > 0) console.log('Sample record:', JSON.stringify(records[0]).substring(0, 300));
             wxHistoryRecords = records; // store globally for modals
 
             let maxGust = 0, maxGustDate = null;

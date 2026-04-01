@@ -1877,18 +1877,25 @@
             document.getElementById('wxr-rain-event-sub').textContent = d.eventrainin != null ? 'Since last dry period' : '';
 
             // Last detected rain
+            console.log('lastRain raw value:', d.lastRain, typeof d.lastRain);
             if (d.lastRain) {
-                const lr = new Date(d.lastRain);
-                const now = new Date();
-                const diffMs = now - lr;
-                const diffHrs = Math.floor(diffMs / 3600000);
-                const diffDays = Math.floor(diffHrs / 24);
-                let ago = '';
-                if (diffDays > 0) ago = `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-                else if (diffHrs > 0) ago = `${diffHrs} hr${diffHrs > 1 ? 's' : ''} ago`;
-                else ago = 'Just now';
-                document.getElementById('wxr-last-rain').textContent = ago;
-                document.getElementById('wxr-last-rain-sub').textContent = lr.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' });
+                // lastRain can be a UTC ms timestamp or an ISO string
+                const lr = typeof d.lastRain === 'number' ? new Date(d.lastRain) : new Date(d.lastRain);
+                if (!isNaN(lr.getTime())) {
+                    const now = new Date();
+                    const diffMs = now - lr;
+                    const diffHrs = Math.floor(diffMs / 3600000);
+                    const diffDays = Math.floor(diffHrs / 24);
+                    let ago = '';
+                    if (diffDays > 0) ago = `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+                    else if (diffHrs > 0) ago = `${diffHrs} hr${diffHrs > 1 ? 's' : ''} ago`;
+                    else ago = 'Just now';
+                    document.getElementById('wxr-last-rain').textContent = ago;
+                    document.getElementById('wxr-last-rain-sub').textContent = lr.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }) + ' ' + lr.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+                } else {
+                    document.getElementById('wxr-last-rain').textContent = String(d.lastRain);
+                    document.getElementById('wxr-last-rain-sub').textContent = 'Raw value — could not parse';
+                }
             } else {
                 document.getElementById('wxr-last-rain').textContent = '--';
             }

@@ -158,6 +158,31 @@
         .setup-steps li{counter-increment:steps;padding:10px 12px 10px 44px;position:relative;border-bottom:1px solid var(--border);font-size:0.875rem;color:var(--text-secondary);}
         .setup-steps li::before{content:counter(steps);position:absolute;left:10px;top:50%;transform:translateY(-50%);width:22px;height:22px;background:var(--accent);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;}
         .code-block{background:#1a1a2e;color:#60a5fa;padding:16px;border-radius:8px;font-family:monospace;font-size:0.78rem;margin-top:12px;overflow-x:auto;white-space:pre;}
+        /* ── BULK UPLOAD ── */
+        .bulk-drop-zone{border:2px dashed var(--border);border-radius:12px;padding:48px 20px;text-align:center;cursor:pointer;transition:all 0.2s;background:var(--bg-card);margin-bottom:20px;}
+        .bulk-drop-zone:hover,.bulk-drop-zone.dragover{border-color:var(--accent);background:var(--accent-dim);}
+        .bulk-drop-icon{font-size:3rem;margin-bottom:8px;}
+        .bulk-drop-title{font-size:1.1rem;font-weight:700;color:var(--text-primary);margin-bottom:4px;}
+        .bulk-drop-sub{font-size:0.85rem;color:var(--text-secondary);}
+        .bulk-queue{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-top:20px;}
+        .bulk-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;overflow:hidden;position:relative;transition:box-shadow 0.15s;}
+        .bulk-card.done{border-color:var(--success);opacity:0.7;}
+        .bulk-card.error{border-color:var(--danger);}
+        .bulk-card-img{width:100%;height:180px;object-fit:cover;display:block;background:var(--bg-card);}
+        .bulk-card-img-placeholder{width:100%;height:180px;display:flex;align-items:center;justify-content:center;font-size:3rem;background:var(--bg-card);}
+        .bulk-card-body{padding:12px 14px;}
+        .bulk-card-status{font-size:0.78rem;font-weight:700;padding:3px 10px;border-radius:20px;display:inline-block;margin-bottom:8px;}
+        .status-pending{background:rgba(100,100,100,0.15);color:var(--text-secondary);}
+        .status-scanning{background:rgba(37,99,235,0.15);color:var(--info);}
+        .status-ready{background:rgba(22,163,74,0.15);color:var(--success);}
+        .status-saved{background:rgba(22,163,74,0.3);color:var(--success);}
+        .status-error{background:rgba(220,38,38,0.15);color:var(--danger);}
+        .bulk-card-field{font-size:0.82rem;color:var(--text-secondary);margin-bottom:3px;}
+        .bulk-card-field strong{color:var(--text-primary);}
+        .bulk-card-remove{position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.55);border:none;color:#fff;width:24px;height:24px;border-radius:50%;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;}
+        .bulk-progress-bar{height:4px;background:var(--bg-card);border-radius:2px;margin-bottom:16px;overflow:hidden;}
+        .bulk-progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width 0.3s;}
+        .bulk-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px;}
         .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#1a1f2e;color:#fff;padding:10px 20px;border-radius:8px;font-size:0.87rem;font-weight:500;opacity:0;transition:all 0.3s;z-index:9999;pointer-events:none;white-space:nowrap;max-width:90vw;display:flex;align-items:center;gap:6px;}
         .toast.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:all;}
         .toast.success{background:var(--success);}
@@ -272,6 +297,7 @@
         <button onclick="showView('reports')">Reports</button>
         <button onclick="showView('categories')">Categories</button>
         <button onclick="showView('settings')">⚙ Settings</button>
+        <button onclick="showView('bulk-upload')">📸 Bulk Upload</button>
         <button onclick="showView('recycle-bin')">🗑 Recycle Bin</button>
     </nav>
     <div class="header-right">
@@ -618,6 +644,39 @@
     </div>
 </div>
 
+<!-- BULK UPLOAD -->
+<div id="view-bulk-upload" class="view">
+    <div class="card">
+        <div class="card-title">
+            <span class="card-title-left">📸 Bulk Upload &amp; AI Identify</span>
+            <span id="bulk-count-label" style="font-size:0.82rem;color:var(--text-secondary);"></span>
+        </div>
+
+        <!-- Drop zone -->
+        <div class="bulk-drop-zone" id="bulk-drop-zone" onclick="document.getElementById('bulk-file-input').click()"
+             ondragover="event.preventDefault();this.classList.add('dragover')"
+             ondragleave="this.classList.remove('dragover')"
+             ondrop="event.preventDefault();this.classList.remove('dragover');handleBulkDrop(event.dataTransfer.files)">
+            <div class="bulk-drop-icon">📷</div>
+            <div class="bulk-drop-title">Drop watch photos here or click to browse</div>
+            <div class="bulk-drop-sub">Select multiple images — each will get its own inventory listing via AI</div>
+            <input type="file" id="bulk-file-input" accept="image/*" multiple style="display:none" onchange="handleBulkFiles(this.files)">
+        </div>
+
+        <!-- Actions bar -->
+        <div class="bulk-actions" id="bulk-actions" style="display:none;">
+            <div class="bulk-progress-bar" style="flex:1;min-width:120px;"><div class="bulk-progress-fill" id="bulk-progress-fill" style="width:0%"></div></div>
+            <span id="bulk-status-label" style="font-size:0.82rem;color:var(--text-secondary);white-space:nowrap;"></span>
+            <button class="btn btn-primary" id="btn-bulk-scan" onclick="runBulkScan()">🤖 Identify All with AI</button>
+            <button class="btn btn-ghost" id="btn-bulk-save-all" onclick="saveBulkAll()" style="display:none;">💾 Save All to Inventory</button>
+            <button class="btn btn-ghost btn-sm" onclick="clearBulkQueue()" style="margin-left:auto;">✕ Clear All</button>
+        </div>
+
+        <!-- Card grid -->
+        <div class="bulk-queue" id="bulk-queue"></div>
+    </div>
+</div>
+
 <!-- RECYCLE BIN -->
 <div id="view-recycle-bin" class="view">
     <div class="toolbar">
@@ -679,7 +738,7 @@ const DEFAULT_MOVEMENTS=['Automatic','Manual Wind','Quartz','Solar','Kinetic','S
 const DEFAULT_CASE_MATS=['Ceramic','Gold - Rose','Gold - White','Gold - Yellow','PVD Coated','Stainless Steel','Titanium','Two-Tone','Other'];
 const DEFAULT_BRACELETS=['Bracelet - Gold','Bracelet - Stainless Steel','Bracelet - Two-Tone','Fabric / NATO Strap','Leather Strap','Metal Mesh','Rubber / Silicone Strap','Other'];
 let nextId=3001, invSortField='id', invSortDir='asc', activeBcId=null, unsubItems=null;
-let apiKey='', proxyUrl='', aiModel='claude-sonnet-4-6';
+let apiKey='', proxyUrl='', aiModel='claude-sonnet-4-5';
 let scannerStream=null, scannerActive=false;
 let formDocs=[];
 let formPhotos={
@@ -688,7 +747,7 @@ let formPhotos={
     caseback:{file:null,base64:null,mimeType:null,existingUrl:null,deleted:false},
     papers:{file:null,base64:null,mimeType:null,existingUrl:null,deleted:false}
 };
-const VIEWS=['dashboard','add-item','inventory','reports','categories','settings','recycle-bin'];
+const VIEWS=['dashboard','add-item','inventory','reports','categories','settings','bulk-upload','recycle-bin'];
 
 auth.onAuthStateChanged(user=>{
     if(user){
@@ -778,6 +837,7 @@ function showView(v){
     if(v==='categories') renderCatTags();
     if(v==='add-item'){populateCatSelect();populateMovementList();populateCaseMatList();populateBraceletList();}
     if(v==='recycle-bin') loadRecycleBin();
+    if(v==='bulk-upload'){ document.getElementById('bulk-actions').style.display=bulkQueue.length?'flex':'none'; renderBulkQueue(); updateBulkCountLabel(); }
 }
 
 function renderDashboard(){
@@ -893,6 +953,159 @@ async function identifyItem(){
         status.style.color=filled.length?'var(--success)':'var(--text-secondary)';
     }catch(err){status.textContent='❌ Error: '+err.message;status.style.color='var(--danger)';}
     finally{btn.disabled=false;btn.classList.remove('scanning');btn.innerHTML='🤖 Identify Watch with AI';}
+}
+
+// ── BULK UPLOAD ──
+let bulkQueue = []; // [{id, file, base64, mimeType, status, result}]
+
+function handleBulkFiles(files) {
+    const imgs = Array.from(files).filter(f => f.type.startsWith('image/'));
+    if (!imgs.length) { toast('Please select image files.', 'error'); return; }
+    imgs.forEach(file => {
+        bulkQueue.push({ id: Date.now() + Math.random(), file, base64: null, mimeType: 'image/jpeg', status: 'pending', result: null });
+    });
+    renderBulkQueue();
+    document.getElementById('bulk-actions').style.display = 'flex';
+    document.getElementById('btn-bulk-save-all').style.display = 'none';
+    updateBulkCountLabel();
+}
+
+function handleBulkDrop(files) { handleBulkFiles(files); }
+
+function clearBulkQueue() {
+    bulkQueue = [];
+    document.getElementById('bulk-queue').innerHTML = '';
+    document.getElementById('bulk-actions').style.display = 'none';
+    document.getElementById('bulk-count-label').textContent = '';
+}
+
+function removeBulkItem(id) {
+    bulkQueue = bulkQueue.filter(q => q.id !== id);
+    renderBulkQueue();
+    updateBulkCountLabel();
+    if (!bulkQueue.length) document.getElementById('bulk-actions').style.display = 'none';
+}
+
+function updateBulkCountLabel() {
+    const total = bulkQueue.length;
+    const done = bulkQueue.filter(q => q.status === 'saved').length;
+    const ready = bulkQueue.filter(q => q.status === 'ready').length;
+    document.getElementById('bulk-count-label').textContent =
+        total ? `${total} photo${total>1?'s':''} · ${done} saved · ${ready} ready` : '';
+}
+
+function renderBulkQueue() {
+    const grid = document.getElementById('bulk-queue');
+    if (!bulkQueue.length) { grid.innerHTML = ''; return; }
+    grid.innerHTML = bulkQueue.map(q => {
+        const imgSrc = q.base64 ? `data:image/jpeg;base64,${q.base64}` : null;
+        const imgHtml = imgSrc
+            ? `<img class="bulk-card-img" src="${imgSrc}">`
+            : `<div class="bulk-card-img-placeholder">📷</div>`;
+        const statusClass = {pending:'status-pending',scanning:'status-scanning',ready:'status-ready',saved:'status-saved',error:'status-error'}[q.status]||'status-pending';
+        const statusLabel = {pending:'Pending',scanning:'Scanning…',ready:'Ready to Save',saved:'Saved ✓',error:'Error'}[q.status]||'Pending';
+        const r = q.result || {};
+        const details = q.status === 'ready' || q.status === 'saved' ? `
+            <div class="bulk-card-field"><strong>${esc(r.brand||'—')}</strong> ${esc(r.model||'')}</div>
+            <div class="bulk-card-field">Ref: ${esc(r.reference||'—')} &nbsp;|&nbsp; ${esc(r.movement||'—')}</div>
+            <div class="bulk-card-field">${esc(r.caseMaterial||'')} ${r.caseSize?r.caseSize+'mm':''} &nbsp;${esc(r.dialColor||'')}</div>
+            <div class="bulk-card-field">${esc(r.category||'')}</div>` : (q.status==='error'?`<div class="bulk-card-field" style="color:var(--danger);">${esc(q.error||'AI identification failed')}</div>`:'');
+        const saveBtn = q.status === 'ready'
+            ? `<button class="btn btn-primary btn-sm" style="margin-top:8px;width:100%;" onclick="saveBulkItem('${q.id}')">💾 Save to Inventory</button>` : '';
+        return `<div class="bulk-card ${q.status==='saved'?'done':q.status==='error'?'error':''}" id="bulk-card-${q.id}">
+            <button class="bulk-card-remove" onclick="removeBulkItem(${q.id})" title="Remove">✕</button>
+            ${imgHtml}
+            <div class="bulk-card-body">
+                <span class="bulk-card-status ${statusClass}">${statusLabel}</span>
+                ${details}
+                ${saveBtn}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+async function runBulkScan() {
+    if (!apiKey) { toast('Set your API key in Settings first.', 'error'); return; }
+    const pending = bulkQueue.filter(q => q.status === 'pending' || q.status === 'error');
+    if (!pending.length) { toast('Nothing to scan.', 'error'); return; }
+    const btn = document.getElementById('btn-bulk-scan');
+    btn.disabled = true; btn.textContent = '⏳ Scanning…';
+    const fill = document.getElementById('bulk-progress-fill');
+    const statusLbl = document.getElementById('bulk-status-label');
+    let done = 0;
+    for (const q of pending) {
+        q.status = 'scanning';
+        renderBulkQueue();
+        try {
+            // Compress image to base64
+            if (!q.base64) {
+                const dataUrl = await compressImage(q.file) || await new Promise(r => { const fr = new FileReader(); fr.onload = e => r(e.target.result); fr.readAsDataURL(q.file); });
+                q.base64 = dataUrl.split(',')[1];
+            }
+            const prompt = `You are a luxury watch expert and horologist. Identify this timepiece from the photo. Return ONLY a valid JSON object with these exact keys: brand, model, reference, movement, caseMaterial, caseSize, dialColor, bracelet, category. Values should be strings; use empty string if unknown. Example: {"brand":"Rolex","model":"Submariner","reference":"126610LN","movement":"Automatic","caseMaterial":"Stainless Steel","caseSize":"41","dialColor":"Black","bracelet":"Bracelet - Stainless Steel","category":"Dive Watch"}`;
+            const raw = await callClaude(q.base64, q.mimeType, prompt);
+            const jsonMatch = raw && raw.match(/\{[\s\S]*\}/);
+            if (!jsonMatch) throw new Error('Could not parse AI response');
+            q.result = JSON.parse(jsonMatch[0]);
+            q.status = 'ready';
+        } catch(err) {
+            q.status = 'error'; q.error = err.message;
+        }
+        done++;
+        fill.style.width = Math.round(done / pending.length * 100) + '%';
+        statusLbl.textContent = `${done} / ${pending.length} scanned`;
+        renderBulkQueue();
+        updateBulkCountLabel();
+    }
+    btn.disabled = false; btn.textContent = '🤖 Identify All with AI';
+    const readyCount = bulkQueue.filter(q => q.status === 'ready').length;
+    if (readyCount) document.getElementById('btn-bulk-save-all').style.display = '';
+    toast(`Scan complete — ${readyCount} ready to save.`, 'success');
+}
+
+async function saveBulkItem(id) {
+    const q = bulkQueue.find(x => x.id === id); if (!q || q.status !== 'ready') return;
+    const card = document.getElementById(`bulk-card-${id}`);
+    const saveBtn = card ? card.querySelector('.btn-primary') : null;
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
+    try {
+        const r = q.result || {};
+        const data = {
+            category: r.category || '', brand: r.brand || '', model: r.model || '',
+            reference: r.reference || '', serial: '', movement: r.movement || '',
+            caseMaterial: r.caseMaterial || '', caseSize: r.caseSize || '',
+            dialColor: r.dialColor || '', bracelet: r.bracelet || '',
+            condition: '', purchaseDate: '', price: '', vendor: '', location: '', notes: '',
+            documents: []
+        };
+        const photos = [{ slot: 'main', base64: q.base64, mimeType: q.mimeType }];
+        // Upload photo to Firebase Storage
+        const uploadedPhotos = [];
+        try {
+            const blob = await fetch('data:image/jpeg;base64,' + q.base64).then(r => r.blob());
+            const url = await uploadPhoto('main', blob);
+            uploadedPhotos.push({ slot: 'main', url });
+        } catch(ue) { /* save without photo url if upload fails */ }
+        await dbAddItem(data, uploadedPhotos.length ? uploadedPhotos : photos);
+        q.status = 'saved';
+        renderBulkQueue();
+        updateBulkCountLabel();
+        toast(`${r.brand||'Watch'} ${r.model||''} saved!`, 'success');
+    } catch(err) {
+        q.status = 'error'; q.error = err.message;
+        renderBulkQueue();
+        toast('Save failed: ' + err.message, 'error');
+    }
+}
+
+async function saveBulkAll() {
+    const ready = bulkQueue.filter(q => q.status === 'ready');
+    if (!ready.length) { toast('No items ready to save.', 'error'); return; }
+    const btn = document.getElementById('btn-bulk-save-all');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    for (const q of ready) await saveBulkItem(q.id);
+    btn.disabled = false; btn.textContent = '💾 Save All to Inventory';
+    document.getElementById('btn-bulk-save-all').style.display = 'none';
 }
 
 async function addDocFiles(input){

@@ -726,6 +726,14 @@ function renderTrips() {
     if (year) filtered = filtered.filter(t => t.departureDate && t.departureDate.startsWith(year));
     if (status) filtered = filtered.filter(t => t.status === status);
 
+    // Sort: upcoming nearest-first, then completed newest-to-oldest
+    const now = new Date();
+    const future = filtered.filter(t => !t.returnDate || new Date(t.returnDate + 'T23:59:59') >= now)
+        .sort((a, b) => (a.departureDate || '').localeCompare(b.departureDate || ''));
+    const completed = filtered.filter(t => t.returnDate && new Date(t.returnDate + 'T23:59:59') < now)
+        .sort((a, b) => (b.returnDate || '').localeCompare(a.returnDate || ''));
+    filtered = [...future, ...completed];
+
     if (!filtered.length) {
         document.getElementById('trips-grid').innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="empty-icon">🗺️</div>No trips found.</div>`;
         return;

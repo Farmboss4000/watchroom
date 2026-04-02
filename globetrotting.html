@@ -637,12 +637,19 @@ function renderDashboard() {
         <div class="stat-card"><div class="stat-value">${days}</div><div class="stat-label">Days Traveled</div></div>
     `;
 
-    const recent = active.slice(0, 5);
-    if (!recent.length) {
+    const now = new Date();
+    const future = active
+        .filter(t => !t.returnDate || new Date(t.returnDate + 'T23:59:59') >= now)
+        .sort((a, b) => (b.departureDate || '').localeCompare(a.departureDate || ''));
+    const completed = active
+        .filter(t => t.returnDate && new Date(t.returnDate + 'T23:59:59') < now)
+        .sort((a, b) => (b.returnDate || '').localeCompare(a.returnDate || ''));
+    const sorted = [...future, ...completed];
+    if (!sorted.length) {
         document.getElementById('dash-recent').innerHTML = `<div class="empty"><div class="empty-icon">✈️</div>No trips yet. Add your first adventure!</div>`;
         return;
     }
-    document.getElementById('dash-recent').innerHTML = recent.map(t => `
+    document.getElementById('dash-recent').innerHTML = sorted.map(t => `
         <div class="recent-trip-item" onclick="openTripDetail('${t._id}')">
             <div>
                 <div class="rti-name">${esc(t.name)}</div>

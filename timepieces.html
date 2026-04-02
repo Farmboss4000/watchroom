@@ -563,6 +563,14 @@
 
 <!-- REPORTS -->
 <div id="view-reports" class="view">
+    <div class="card" style="margin-bottom:20px;">
+        <div class="card-title">
+            <div class="card-title-left">📈 Collection Value Over Time</div>
+            <span id="mvc-last-snap" style="font-size:0.8rem;color:var(--text-secondary);"></span>
+        </div>
+        <div id="mvc-empty" style="color:var(--text-secondary);font-size:0.88rem;padding:20px 0;text-align:center;display:none;">No value history yet — refresh market values to start tracking.</div>
+        <canvas id="mvc-chart" style="max-height:280px;"></canvas>
+    </div>
     <div class="card">
         <div class="card-title">
             <div class="card-title-left">📋 Reports</div>
@@ -854,7 +862,7 @@ function showView(v){
     document.querySelectorAll('nav button').forEach((btn,i)=>btn.classList.toggle('active',VIEWS[i]===v));
     if(v==='dashboard') renderDashboard();
     if(v==='inventory'){syncCatFilters();renderInventory();}
-    if(v==='reports'){syncCatFilters();renderReport();}
+    if(v==='reports'){syncCatFilters();renderReport();loadValueHistory('timepiece_value_snapshots','mvc-chart','mvc-empty','mvc-last-snap');}
     if(v==='categories') renderCatTags();
     if(v==='add-item'){populateCatSelect();populateMovementList();populateCaseMatList();populateBraceletList();}
     if(v==='recycle-bin') loadRecycleBin();
@@ -1514,7 +1522,92 @@ async function refreshMarketValue(docId){
         if(!val||val<10)throw new Error('Could not parse value');
         await db.collection('timepiece_items').doc(docId).update({marketValue:val,marketValueDate:new Date().toISOString()});
         toast(`Market value updated: $${val.toLocaleString()}`);
+        saveValueSnapshot('timepiece_value_snapshots');
     }catch(err){toast('Value estimate failed: '+err.message,'error');const it2=items.find(i=>i._docId===docId);const cell2=document.getElementById('mv-cell-'+docId);if(cell2&&it2)cell2.innerHTML=marketValueCell(it2);}
+}
+
+// ── VALUE HISTORY ──
+let mvcChartInstance = null;
+
+async function saveValueSnapshot(collection) {
+    try {
+        const valued = items.filter(i => i.marketValue && Number(i.marketValue) > 0);
+        const totalValue = valued.reduce((s, i) => s + (Number(i.marketValue) || 0), 0);
+        if (!totalValue) return;
+        const today = new Date().toISOString().slice(0, 10);
+        await db.collection(collection).doc(today).set({
+            date: today,
+            totalValue,
+            itemCount: valued.length,
+            recordedAt: new Date().toISOString()
+        });
+    } catch(e) { console.warn('Snapshot save failed', e); }
+}
+
+async function loadValueHistory(collection, canvasId, emptyId, labelId) {
+    const canvas = document.getElementById(canvasId);
+    const emptyEl = document.getElementById(emptyId);
+    const labelEl = document.getElementById(labelId);
+    if (!canvas) return;
+    try {
+        const snap = await db.collection(collection).orderBy('date', 'asc').get();
+        const docs = snap.docs.map(d => d.data()).filter(d => d.date && d.totalValue);
+        if (!docs.length) {
+            canvas.style.display = 'none';
+            if (emptyEl) emptyEl.style.display = 'block';
+            return;
+        }
+        canvas.style.display = '';
+        if (emptyEl) emptyEl.style.display = 'none';
+        if (labelEl) {
+            const last = docs[docs.length - 1];
+            labelEl.textContent = `Last snapshot: ${last.date} · $${Number(last.totalValue).toLocaleString()} across ${last.itemCount} item${last.itemCount !== 1 ? 's' : ''}`;
+        }
+        const labels = docs.map(d => d.date);
+        const values = docs.map(d => Number(d.totalValue));
+        if (mvcChartInstance) { mvcChartInstance.destroy(); mvcChartInstance = null; }
+        mvcChartInstance = new Chart(canvas, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Total Collection Value',
+                    data: values,
+                    borderColor: '#d97706',
+                    backgroundColor: 'rgba(217,119,6,0.1)',
+                    borderWidth: 2.5,
+                    pointRadius: docs.length > 60 ? 2 : 4,
+                    pointBackgroundColor: '#d97706',
+                    tension: 0.3,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => ` $${Number(ctx.parsed.y).toLocaleString()}`
+                        }
+                    }
+                },
+                scales: {
+                    x: { ticks: { maxTicksLimit: 10, color: '#6b7280' }, grid: { color: 'rgba(0,0,0,0.06)' } },
+                    y: {
+                        ticks: {
+                            color: '#6b7280',
+                            callback: v => '$' + Number(v).toLocaleString()
+                        },
+                        grid: { color: 'rgba(0,0,0,0.06)' }
+                    }
+                }
+            }
+        });
+    } catch(e) {
+        if (emptyEl) { emptyEl.textContent = '⚠️ Could not load history.'; emptyEl.style.display = 'block'; }
+        if (canvas) canvas.style.display = 'none';
+    }
 }
 
 async function updateAllValues(){
@@ -1555,6 +1648,7 @@ async function updateAllValues(){
     const totalVal=valued.length?'$'+valued.reduce((s,i)=>s+(Number(i.marketValue)||0),0).toLocaleString():'—';
     const el=document.getElementById('dash-total-val'); if(el)el.textContent=totalVal;
     toast(`Values updated: ${succeeded} succeeded${failed?', '+failed+' failed':''}!`,'success');
+    await saveValueSnapshot('timepiece_value_snapshots');
 }
 
 let recycleBinItems=[];

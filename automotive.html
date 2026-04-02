@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Farmboss Automotive</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -829,6 +830,14 @@
 
 <!-- ══ REPORTS ══ -->
 <div id="view-reports" class="view">
+    <div class="card" style="margin-bottom:20px;">
+        <div class="card-title">
+            <div class="card-title-left">📈 Fleet Value Over Time</div>
+            <span id="avc-last-snap" style="font-size:0.8rem;color:var(--text-secondary);"></span>
+        </div>
+        <div id="avc-empty" style="color:var(--text-secondary);font-size:0.88rem;padding:20px 0;text-align:center;display:none;">No value history yet — refresh market values to start tracking.</div>
+        <canvas id="avc-chart" style="max-height:280px;"></canvas>
+    </div>
     <div class="card">
         <div class="card-title">
             <div class="card-title-left">📋 Reports</div>
@@ -1284,7 +1293,7 @@ function showView(v) {
     document.querySelectorAll('nav button').forEach((btn,i) => btn.classList.toggle('active', VIEWS[i]===v));
     if (v==='dashboard')  renderDashboard();
     if (v==='inventory')  { syncCatFilters(); renderInventory(); }
-    if (v==='reports')    { syncCatFilters(); renderReport(); }
+    if (v==='reports')    { syncCatFilters(); renderReport(); loadValueHistory('automotive_value_snapshots','avc-chart','avc-empty','avc-last-snap'); }
     if (v==='categories') renderCatTags();
     if (v==='add-item')   populateCatSelect();
     if (v==='recycle-bin') loadRecycleBin();
@@ -2934,6 +2943,7 @@ ${it.transmission ? 'Transmission: ' + it.transmission : ''}`;
             marketValueDate: new Date().toISOString()
         });
         toast(`Market value updated: $${val.toLocaleString()}`);
+        saveValueSnapshot('automotive_value_snapshots');
         // items array will update via onSnapshot; dashboard re-renders automatically
     } catch(err) {
         toast('Value estimate failed: ' + err.message, true);
@@ -2941,6 +2951,76 @@ ${it.transmission ? 'Transmission: ' + it.transmission : ''}`;
         const it2 = items.find(i => i._docId === docId);
         const cell2 = document.getElementById('mv-cell-' + docId);
         if (cell2 && it2) cell2.innerHTML = marketValueCell(it2);
+    }
+}
+
+// ── VALUE HISTORY ──
+let avcChartInstance = null;
+
+async function saveValueSnapshot(collection) {
+    try {
+        const valued = items.filter(i => i.marketValue && Number(i.marketValue) > 0);
+        const totalValue = valued.reduce((s, i) => s + (Number(i.marketValue) || 0), 0);
+        if (!totalValue) return;
+        const today = new Date().toISOString().slice(0, 10);
+        await db.collection(collection).doc(today).set({
+            date: today, totalValue, itemCount: valued.length,
+            recordedAt: new Date().toISOString()
+        });
+    } catch(e) { console.warn('Snapshot save failed', e); }
+}
+
+async function loadValueHistory(collection, canvasId, emptyId, labelId) {
+    const canvas = document.getElementById(canvasId);
+    const emptyEl = document.getElementById(emptyId);
+    const labelEl = document.getElementById(labelId);
+    if (!canvas) return;
+    try {
+        const snap = await db.collection(collection).orderBy('date', 'asc').get();
+        const docs = snap.docs.map(d => d.data()).filter(d => d.date && d.totalValue);
+        if (!docs.length) {
+            canvas.style.display = 'none';
+            if (emptyEl) emptyEl.style.display = 'block';
+            return;
+        }
+        canvas.style.display = '';
+        if (emptyEl) emptyEl.style.display = 'none';
+        if (labelEl) {
+            const last = docs[docs.length - 1];
+            labelEl.textContent = `Last snapshot: ${last.date} · $${Number(last.totalValue).toLocaleString()} across ${last.itemCount} item${last.itemCount !== 1 ? 's' : ''}`;
+        }
+        if (avcChartInstance) { avcChartInstance.destroy(); avcChartInstance = null; }
+        avcChartInstance = new Chart(canvas, {
+            type: 'line',
+            data: {
+                labels: docs.map(d => d.date),
+                datasets: [{
+                    label: 'Total Fleet Value',
+                    data: docs.map(d => Number(d.totalValue)),
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59,130,246,0.1)',
+                    borderWidth: 2.5,
+                    pointRadius: docs.length > 60 ? 2 : 4,
+                    pointBackgroundColor: '#3b82f6',
+                    tension: 0.3,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: ctx => ` $${Number(ctx.parsed.y).toLocaleString()}` } }
+                },
+                scales: {
+                    x: { ticks: { maxTicksLimit: 10, color: '#6b7280' }, grid: { color: 'rgba(0,0,0,0.06)' } },
+                    y: { ticks: { color: '#6b7280', callback: v => '$' + Number(v).toLocaleString() }, grid: { color: 'rgba(0,0,0,0.06)' } }
+                }
+            }
+        });
+    } catch(e) {
+        if (emptyEl) { emptyEl.textContent = '⚠️ Could not load history.'; emptyEl.style.display = 'block'; }
+        if (canvas) canvas.style.display = 'none';
     }
 }
 
@@ -2961,6 +3041,7 @@ async function refreshAllMarketValues() {
 
     if (btn) { btn.disabled = false; btn.textContent = '💲 Refresh All Values'; }
     toast(`✅ Market values updated for ${eligible.length} vehicle${eligible.length !== 1 ? 's' : ''}`);
+    await saveValueSnapshot('automotive_value_snapshots');
 }
 
 // Auto-refresh stale or missing values on page load (if API key is set)

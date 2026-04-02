@@ -689,6 +689,23 @@
 </main>
 </div><!-- /app -->
 
+<!-- WATCH OVERVIEW MODAL -->
+<div class="modal-overlay" id="overview-modal">
+    <div class="modal" style="max-width:780px;background:#fff;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:6px;">
+            <div>
+                <div class="modal-title" id="ov-title">Watch Overview</div>
+                <div class="modal-sub" id="ov-sub"></div>
+            </div>
+            <button onclick="closeOverviewModal()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--text-secondary);line-height:1;flex-shrink:0;">✕</button>
+        </div>
+        <div id="ov-body" style="font-size:0.9rem;line-height:1.7;color:var(--text-primary);max-height:70vh;overflow-y:auto;padding-right:4px;"></div>
+        <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="closeOverviewModal()">Close</button>
+        </div>
+    </div>
+</div>
+
 <!-- BARCODE MODAL -->
 <div class="modal-overlay" id="barcode-modal">
     <div class="modal">
@@ -1364,6 +1381,7 @@ function renderInventory(){
             <td style="white-space:nowrap;min-width:110px;" id="mv-cell-${it._docId}">${marketValueCell(it)}</td>
             <td style="white-space:nowrap;">
                 <button class="btn btn-info btn-sm" onclick="showBarcode('${it._docId}')" title="Barcode">▣</button>
+                <button class="btn btn-sm" onclick="openWatchOverview('${it._docId}')" style="background:#d97706;color:#fff;border:none;" title="AI Research Overview">📖</button>
                 <button class="btn btn-primary btn-sm" onclick="editItem('${it._docId}')" style="background:#7c3aed;border-color:#7c3aed;">✏️ Edit</button>
                 <button class="btn btn-danger btn-sm" onclick="deleteItem('${it._docId}')">✗</button>
             </td></tr>`;
@@ -1529,6 +1547,60 @@ function showBarcode(docId){
 }
 function closeModal(){document.getElementById('barcode-modal').classList.remove('show');activeBcId=null;}
 document.getElementById('barcode-modal').addEventListener('click',e=>{if(e.target===document.getElementById('barcode-modal'))closeModal();});
+
+// ── WATCH OVERVIEW ──
+function renderOverviewMarkdown(text){
+    if(!text)return'';
+    let h=text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    h=h.replace(/^### (.+)$/gm,'<h4 style="font-size:0.95rem;font-weight:700;color:var(--accent);margin:16px 0 4px;">$1</h4>');
+    h=h.replace(/^## (.+)$/gm,'<h3 style="font-size:1.05rem;font-weight:700;color:var(--text-primary);margin:18px 0 6px;border-bottom:1px solid var(--border);padding-bottom:4px;">$1</h3>');
+    h=h.replace(/^# (.+)$/gm,'<h2 style="font-size:1.15rem;font-weight:800;color:var(--text-primary);margin:0 0 12px;">$1</h2>');
+    h=h.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+    h=h.replace(/\*(.+?)\*/g,'<em>$1</em>');
+    h=h.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g,'<a href="$2" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline;">$1</a>');
+    h=h.replace(/(?<!href=")(https?:\/\/[^\s<>"',\)]+)/g,'<a href="$1" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline;word-break:break-all;">$1</a>');
+    h=h.replace(/^[-•] (.+)$/gm,'<li style="margin-left:16px;margin-bottom:3px;">$1</li>');
+    h=h.replace(/(<li[\s\S]*?<\/li>\n?)+/g,'<ul style="margin:6px 0 10px;">$&</ul>');
+    h=h.replace(/\n{2,}/g,'</p><p style="margin:0 0 8px;">');
+    h=h.replace(/\n/g,'<br>');
+    return '<p style="margin:0 0 8px;">'+h+'</p>';
+}
+
+async function openWatchOverview(docId){
+    const it=items.find(i=>i._docId===docId); if(!it)return;
+    const label=`${it.brand||''} ${it.model||''}`.trim()||'Unknown Watch';
+    const ref=it.reference?` (Ref. ${it.reference})`:'';
+    document.getElementById('ov-title').textContent=label+ref;
+    document.getElementById('ov-sub').textContent=`${it.movement||''}${it.caseMaterial?' · '+it.caseMaterial:''}${it.caseSize?' · '+it.caseSize+'mm':''}`.replace(/^ · /,'');
+    const body=document.getElementById('ov-body');
+    body.innerHTML='<div style="display:flex;align-items:center;gap:10px;padding:30px 0;color:var(--text-secondary);"><div class="spinner" style="width:28px;height:28px;border-width:3px;"></div><span>Researching with AI…</span></div>';
+    document.getElementById('overview-modal').classList.add('show');
+    if(!apiKey){body.innerHTML='<p style="color:var(--danger);">⚠️ Set your Anthropic API key in Settings first.</p>';return;}
+    try{
+        const watchDesc=[it.brand,it.model,it.reference,it.movement,it.caseMaterial,it.caseSize?it.caseSize+'mm':null,it.dialColor,it.bracelet,it.category].filter(Boolean).join(', ');
+        const prompt=`You are a master horologist and watch historian. Write a comprehensive overview of the following timepiece from my personal collection:\n\n${watchDesc}\n\nPlease cover:\n## History & Heritage\nBrand history, when this model was introduced, what era it represents.\n\n## Model Overview\nKey specifications, what makes this reference notable, design evolution.\n\n## Production Details\nApproximate production numbers if known, years of production, variants and dial/bracelet options.\n\n## Movement\nMovement details, caliber, features, accuracy, service intervals.\n\n## Collector & Market Standing\nCollectibility, notable owners or appearances, auction results or market value trends, what makes this watch desirable.\n\n## Reviews & Reception\nHow watch critics and the enthusiast community have received this model. Notable reviews.\n\n## Fun Facts\n2-3 interesting or lesser-known facts about this watch.\n\nBe thorough, accurate, and enthusiastic. Write in a style that would appeal to a serious watch collector.`;
+        const msgPayload={
+            model:aiModel, max_tokens:2048, stream:false,
+            tools:[{type:'web_search_20250305',name:'web_search',max_uses:5}],
+            messages:[{role:'user',content:[{type:'text',text:prompt}]}]
+        };
+        let res;
+        if(proxyUrl){res=await fetch(proxyUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...msgPayload,apiKey})});}
+        else{res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',mode:'cors',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-beta':'interleaved-thinking-2025-05-14','anthropic-dangerous-direct-browser-calls':'true'},body:JSON.stringify(msgPayload)});}
+        if(!res.ok){let e=`API error ${res.status}`;try{const d=await res.json();e=d.error?.message||e;}catch(x){}throw new Error(e);}
+        const data=await res.json();
+        const text=(data?.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n');
+        if(!text)throw new Error('No response from AI');
+        body.innerHTML=renderOverviewMarkdown(text);
+    }catch(err){
+        body.innerHTML=`<p style="color:var(--danger);">❌ ${esc(err.message)}</p>`;
+    }
+}
+
+function closeOverviewModal(){
+    document.getElementById('overview-modal').classList.remove('show');
+}
+document.getElementById('overview-modal').addEventListener('click',e=>{if(e.target===document.getElementById('overview-modal'))closeOverviewModal();});
 function printBarcode(){
     if(!activeBcId)return;
     const it=items.find(i=>i._docId===activeBcId); if(!it)return;

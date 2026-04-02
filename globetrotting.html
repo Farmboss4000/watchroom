@@ -150,6 +150,12 @@
         .form-drop{border:2px dashed var(--border);border-radius:10px;padding:24px 16px;text-align:center;cursor:pointer;transition:all 0.2s;margin-bottom:10px;}
         .form-drop:hover,.form-drop.dragover{border-color:var(--accent);background:var(--accent-dim);}
         .form-drop-text{font-size:0.85rem;color:var(--text-secondary);}
+        .photo-scan-drop{border:2px dashed var(--border);border-radius:12px;padding:32px 20px;text-align:center;cursor:pointer;transition:all 0.2s;background:var(--bg-card);}
+        .photo-scan-drop:hover,.photo-scan-drop.dragover{border-color:var(--accent);background:var(--accent-dim);}
+        .photo-scan-thumb{width:72px;height:72px;object-fit:cover;border-radius:8px;border:2px solid var(--border);cursor:pointer;position:relative;}
+        .photo-scan-thumb-wrap{position:relative;display:inline-block;}
+        .photo-scan-thumb-remove{position:absolute;top:-6px;right:-6px;background:var(--danger);color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;}
+        #photo-scan-actions{display:none;}
         .form-merge-note{font-size:0.78rem;color:var(--text-secondary);margin-bottom:8px;font-style:italic;}
         .trip-doc-item{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:12px;margin-bottom:6px;}
         .trip-doc-icon{font-size:1.4rem;flex-shrink:0;}
@@ -354,6 +360,33 @@
 
         <!-- ── ADD / EDIT TRIP ── -->
         <div class="view" id="view-add-trip">
+            <!-- PHOTO SCAN CARD -->
+            <div class="card" id="photo-scan-card" style="margin-bottom:16px;">
+                <div class="card-title" style="cursor:pointer;margin-bottom:0;" onclick="togglePhotoScanPanel()">
+                    <span class="card-title-left">📸 Create from Vacation Photos</span>
+                    <span id="photo-scan-toggle-icon" style="font-size:0.85rem;color:var(--text-secondary);">▼ expand</span>
+                </div>
+                <div id="photo-scan-panel" style="display:none;margin-top:16px;">
+                    <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:12px;">Drop your vacation photos and AI will read landmarks, signs, and visible dates to fill in the trip details automatically.</p>
+                    <div class="photo-scan-drop" id="photo-scan-drop"
+                         onclick="document.getElementById('photo-scan-input').click()"
+                         ondragover="event.preventDefault();this.classList.add('dragover')"
+                         ondragleave="this.classList.remove('dragover')"
+                         ondrop="event.preventDefault();this.classList.remove('dragover');handlePhotoScanDrop(event.dataTransfer.files)">
+                        <div style="font-size:2.2rem;margin-bottom:6px;">📷</div>
+                        <div style="font-weight:600;margin-bottom:4px;">Drop vacation photos here or click to browse</div>
+                        <div style="font-size:0.78rem;color:var(--text-secondary);">JPG, PNG — select multiple photos from your trip</div>
+                    </div>
+                    <input type="file" id="photo-scan-input" accept="image/jpeg,image/png,image/jpg,image/webp" multiple style="display:none;" onchange="addPhotoScanFiles(this.files)">
+                    <div id="photo-scan-thumbs" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;"></div>
+                    <div id="photo-scan-actions" style="display:none;margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                        <button class="btn btn-primary" id="btn-photo-scan-run" onclick="runPhotoScan()">🔍 Detect Locations &amp; Dates</button>
+                        <button class="btn btn-ghost btn-sm" onclick="clearPhotoScan()">✕ Clear Photos</button>
+                        <span id="photo-scan-status" style="font-size:0.82rem;color:var(--text-secondary);"></span>
+                    </div>
+                </div>
+            </div>
+
             <div class="card">
                 <div class="card-title">
                     <span class="card-title-left" id="form-title">Add New Trip</span>
@@ -640,7 +673,7 @@ function renderDashboard() {
     const now = new Date();
     const future = active
         .filter(t => !t.returnDate || new Date(t.returnDate + 'T23:59:59') >= now)
-        .sort((a, b) => (b.departureDate || '').localeCompare(a.departureDate || ''));
+        .sort((a, b) => (a.departureDate || '').localeCompare(b.departureDate || ''));
     const completed = active
         .filter(t => t.returnDate && new Date(t.returnDate + 'T23:59:59') < now)
         .sort((a, b) => (b.returnDate || '').localeCompare(a.returnDate || ''));
@@ -1193,6 +1226,118 @@ async function resummarizeTrip() {
         statusEl.innerHTML = `<div class="scan-result"><div class="scan-result-title" style="color:var(--success);">Re-summarized</div><p style="font-size:0.85rem;color:var(--text-secondary);">Trip details updated from all ${tripDocuments.length} document${tripDocuments.length!==1?'s':''}. Review the form above and save when ready.</p></div>`;
     } catch(e) {
         statusEl.innerHTML = `<div class="scan-result"><div class="scan-result-title" style="color:var(--danger);">Error</div><pre style="color:var(--danger);">${esc(e.message)}</pre></div>`;
+    }
+}
+
+// ── PHOTO SCAN ──
+let photoScanFiles = [];
+
+function togglePhotoScanPanel() {
+    const panel = document.getElementById('photo-scan-panel');
+    const icon  = document.getElementById('photo-scan-toggle-icon');
+    const open  = panel.style.display === 'none' || panel.style.display === '';
+    panel.style.display = open ? 'block' : 'none';
+    icon.textContent = open ? '▲ collapse' : '▼ expand';
+}
+
+function handlePhotoScanDrop(files) { addPhotoScanFiles(files); }
+
+function addPhotoScanFiles(files) {
+    Array.from(files).filter(f => f.type.startsWith('image/')).forEach(f => photoScanFiles.push(f));
+    renderPhotoScanThumbs();
+}
+
+function renderPhotoScanThumbs() {
+    const box = document.getElementById('photo-scan-thumbs');
+    const act = document.getElementById('photo-scan-actions');
+    if (!photoScanFiles.length) { box.innerHTML = ''; act.style.display = 'none'; return; }
+    act.style.display = 'flex';
+    box.innerHTML = photoScanFiles.map((f, i) => {
+        const url = URL.createObjectURL(f);
+        return `<div class="photo-scan-thumb-wrap">
+            <img class="photo-scan-thumb" src="${url}" title="${esc(f.name)}">
+            <button class="photo-scan-thumb-remove" onclick="removePhotoScanFile(${i})" title="Remove">✕</button>
+        </div>`;
+    }).join('');
+}
+
+function removePhotoScanFile(idx) {
+    photoScanFiles.splice(idx, 1);
+    renderPhotoScanThumbs();
+}
+
+function clearPhotoScan() {
+    photoScanFiles = [];
+    renderPhotoScanThumbs();
+    document.getElementById('photo-scan-status').textContent = '';
+}
+
+async function runPhotoScan() {
+    if (!photoScanFiles.length) return;
+    if (!apiKey || !proxyUrl) { showToast('Set API key & proxy in Agents → Settings first', true); return; }
+    const btn = document.getElementById('btn-photo-scan-run');
+    const status = document.getElementById('photo-scan-status');
+    btn.disabled = true; btn.textContent = '⏳ Analyzing…';
+    status.textContent = `Reading ${photoScanFiles.length} photo${photoScanFiles.length > 1 ? 's' : ''}…`;
+    try {
+        const contentBlocks = [];
+        for (const f of photoScanFiles) {
+            const base64 = await fileToBase64(f);
+            contentBlocks.push({ type: 'image', source: { type: 'base64', media_type: f.type || 'image/jpeg', data: base64 } });
+        }
+        const photoCount = photoScanFiles.length;
+        contentBlocks.push({ type: 'text', text: `I have ${photoCount} vacation photo${photoCount > 1 ? 's' : ''}. Please analyze ${photoCount > 1 ? 'all of them' : 'it'} and identify: 1) Where each photo was taken (look for landmarks, signs, architecture, geography, cultural cues), 2) Any visible dates, timestamps, or seasonal clues. Return ONLY a JSON object: {"name": "descriptive trip name based on locations", "departureDate": "YYYY-MM-DD or null", "returnDate": "YYYY-MM-DD or null", "destinations": [{"city": "", "state": "", "country": ""}], "notes": "brief summary of what you identified and confidence level"}. Merge duplicate locations. No explanation, just JSON.` });
+
+        const res = await fetch(proxyUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ apiKey, model: 'claude-opus-4-6', max_tokens: 1024, stream: false,
+                system: 'You are an expert travel photo analyst. Identify locations from visual cues in photos: landmarks, signs, architecture, geography, cultural elements, license plates, menus, and any visible text. Also extract any dates from visible timestamps, watermarks, or contextual clues.',
+                messages: [{ role: 'user', content: contentBlocks }] })
+        });
+        const j = JSON.parse(await res.text());
+        if (!res.ok) throw new Error(j?.error?.message || 'API error ' + res.status);
+        const rawText = (j?.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+        const match = rawText.match(/\{[\s\S]*\}/);
+        if (!match) throw new Error('Could not parse AI response');
+        const extracted = JSON.parse(match[0]);
+
+        // Geocode destinations
+        if (extracted.destinations?.length) {
+            for (const d of extracted.destinations) {
+                const q = [d.city, d.country].filter(Boolean).join(' ');
+                if (q) {
+                    try {
+                        const gr = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`);
+                        const gd = await gr.json();
+                        if (gd?.length) { d.lat = parseFloat(gd[0].lat); d.lon = parseFloat(gd[0].lon); }
+                    } catch {}
+                }
+            }
+        }
+
+        // Pre-fill form
+        prefillForm(extracted);
+        if (extracted.destinations) {
+            formDests = extracted.destinations.map(d => ({ city: d.city||'', state: d.state||'', country: d.country||'', lat: d.lat||null, lon: d.lon||null }));
+            renderDestRows();
+        }
+
+        const destSummary = (extracted.destinations||[]).map(d => [d.city, d.country].filter(Boolean).join(', ')).join(' · ') || 'unknown locations';
+        status.style.color = 'var(--success)';
+        status.textContent = `✅ Found: ${destSummary}`;
+        showToast('Trip details filled from your photos!');
+        clearPhotoScan();
+
+        // Collapse the panel
+        document.getElementById('photo-scan-panel').style.display = 'none';
+        document.getElementById('photo-scan-toggle-icon').textContent = '▼ expand';
+
+    } catch(e) {
+        status.style.color = 'var(--danger)';
+        status.textContent = '❌ ' + e.message;
+    } finally {
+        btn.disabled = false; btn.textContent = '🔍 Detect Locations & Dates';
     }
 }
 

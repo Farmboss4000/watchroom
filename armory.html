@@ -127,6 +127,9 @@
             padding:18px 16px; text-align:center; }
         .stat-value { font-size:2rem; font-weight:800; color:var(--accent); line-height:1; margin-bottom:4px; }
         .stat-label { font-size:0.77rem; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; font-weight:600; }
+        .stat-value-blurred { filter:blur(7px); cursor:pointer; user-select:none; transition:filter 0.25s; }
+        .stat-value-blurred:hover { filter:blur(4px); }
+        .reveal-hint { font-size:0.68rem; color:var(--text-secondary); margin-top:4px; opacity:0.7; cursor:pointer; }
 
         /* ── CARDS ── */
         .card { background:var(--bg-secondary); border:1px solid var(--border); border-radius:12px; padding:22px; margin-bottom:20px; }
@@ -1468,6 +1471,14 @@ function showView(v) {
 
 // ═══════════════════════════════════════
 //  DASHBOARD
+function toggleBlur(id) {
+    const el = document.getElementById(id);
+    const hint = document.getElementById(id + '-hint');
+    if (!el) return;
+    const revealed = el.classList.toggle('stat-value-blurred') === false;
+    if (hint) hint.textContent = revealed ? '👁 Click to hide' : '👁 Click to reveal';
+}
+
 // ═══════════════════════════════════════
 function renderDashboard() {
     const totalLines = items.length;
@@ -1493,8 +1504,16 @@ function renderDashboard() {
         <div class="stat-card"><div class="stat-value">${categories.length}</div><div class="stat-label">Categories</div></div>
         <div class="stat-card"><div class="stat-value">${recent}</div><div class="stat-label">Added This Month</div></div>
         <div class="stat-card" style="border-color:#a78bfa;"><div class="stat-value" style="color:#a78bfa;">${totalFirearms}</div><div class="stat-label">Total Firearms<div style="font-size:0.65rem;opacity:0.55;font-weight:400;margin-top:2px;">Pistol · Rifle · Revolver · Shotgun</div></div></div>
-        <div class="stat-card" style="border-color:#60a5fa;"><div class="stat-value" style="color:#60a5fa;font-size:1.4rem;">${totalPurchase}</div><div class="stat-label">${priceLabel}</div></div>
-        <div class="stat-card" style="border-color:#22c55e;"><div class="stat-value" style="color:#22c55e;font-size:1.4rem;">${totalVal}</div><div class="stat-label">Est. Collection Value</div></div>`;
+        <div class="stat-card" style="border-color:#60a5fa;" onclick="toggleBlur('dash-purchase')" title="Click to reveal">
+            <div class="stat-value stat-value-blurred" id="dash-purchase" style="color:#60a5fa;font-size:1.4rem;">${totalPurchase}</div>
+            <div class="stat-label">${priceLabel}</div>
+            <div class="reveal-hint" id="dash-purchase-hint">👁 Click to reveal</div>
+        </div>
+        <div class="stat-card" style="border-color:#22c55e;" onclick="toggleBlur('dash-totalval')" title="Click to reveal">
+            <div class="stat-value stat-value-blurred" id="dash-totalval" style="color:#22c55e;font-size:1.4rem;">${totalVal}</div>
+            <div class="stat-label">Est. Collection Value</div>
+            <div class="reveal-hint" id="dash-totalval-hint">👁 Click to reveal</div>
+        </div>`;
 
     const counts = {};
     items.forEach(it => { counts[it.category]=(counts[it.category]||0)+1; });

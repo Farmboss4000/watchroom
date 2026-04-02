@@ -138,6 +138,27 @@
         .scan-preview img{max-height:80px;border-radius:6px;border:1px solid var(--border);}
         .scan-preview-name{font-size:0.88rem;font-weight:600;color:var(--text-primary);}
         .scan-preview-type{font-size:0.78rem;color:var(--text-secondary);}
+        .scan-file-list{display:flex;flex-direction:column;gap:8px;margin-top:14px;}
+        .scan-file-item{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:12px;}
+        .scan-file-item img{max-height:56px;border-radius:6px;border:1px solid var(--border);}
+        .scan-file-info{flex:1;min-width:0;}
+        .scan-file-name{font-size:0.86rem;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+        .scan-file-meta{font-size:0.76rem;color:var(--text-secondary);}
+        .scan-file-remove{background:none;border:none;color:var(--danger);cursor:pointer;font-size:1.1rem;padding:4px 8px;border-radius:6px;transition:background 0.15s;}
+        .scan-file-remove:hover{background:rgba(220,38,38,0.1);}
+        .scan-file-count{font-size:0.82rem;color:var(--text-secondary);font-weight:600;margin-top:10px;}
+        .form-drop{border:2px dashed var(--border);border-radius:10px;padding:24px 16px;text-align:center;cursor:pointer;transition:all 0.2s;margin-bottom:10px;}
+        .form-drop:hover,.form-drop.dragover{border-color:var(--accent);background:var(--accent-dim);}
+        .form-drop-text{font-size:0.85rem;color:var(--text-secondary);}
+        .form-merge-note{font-size:0.78rem;color:var(--text-secondary);margin-bottom:8px;font-style:italic;}
+        .trip-doc-item{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:12px;margin-bottom:6px;}
+        .trip-doc-icon{font-size:1.4rem;flex-shrink:0;}
+        .trip-doc-info{flex:1;min-width:0;}
+        .trip-doc-name{font-size:0.85rem;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+        .trip-doc-meta{font-size:0.74rem;color:var(--text-secondary);}
+        .trip-doc-empty{font-size:0.85rem;color:var(--text-secondary);padding:12px 0;font-style:italic;}
+        .trip-docs-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+        .trip-docs-count{font-size:0.78rem;color:var(--text-secondary);font-weight:600;}
         .scan-result{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:16px;margin-top:14px;}
         .scan-result-title{font-size:0.85rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:10px;}
         .scan-result pre{font-family:monospace;font-size:0.83rem;white-space:pre-wrap;word-break:break-word;color:var(--text-primary);}
@@ -230,6 +251,8 @@
     <a href="machinery.html" class="site-link">🚜 Machinery</a>
     <a href="automotive.html" class="site-link">🚗 Automotive</a>
     <a href="livestock.html" class="site-link">🐄 Livestock</a>
+    <a href="timepieces.html" class="site-link">⌚ Timepieces</a>
+    <a href="knives.html" class="site-link">🔪 Knives</a>
     <a href="pharmacy.html" class="site-link">💊 Pharmacy</a>
     <a href="insurance.html" class="site-link">🛡️ Insurance</a>
     <a href="realestate.html" class="site-link">🏡 Real Estate</a>
@@ -246,6 +269,8 @@
         <a href="machinery.html">🚜 Machinery</a>
         <a href="automotive.html">🚗 Automotive</a>
         <a href="livestock.html">🐄 Livestock</a>
+        <a href="timepieces.html">⌚ Timepieces</a>
+        <a href="knives.html">🔪 Knives</a>
         <a href="pharmacy.html">💊 Pharmacy</a>
         <a href="insurance.html">🛡️ Insurance</a>
         <a href="realestate.html">🏡 Real Estate</a>
@@ -367,6 +392,29 @@
                 <div id="dests-container"></div>
                 <button class="btn btn-ghost btn-sm" onclick="addDestRow()" style="margin-top:8px;">＋ Add Destination</button>
 
+                <div class="section-divider">Trip Documents</div>
+                <div class="trip-docs-header">
+                    <p class="form-merge-note" style="margin:0;">Upload plane tickets, itineraries, or confirmations. AI can re-summarize your trip from all documents.</p>
+                    <div class="trip-docs-count" id="trip-docs-count"></div>
+                </div>
+                <div id="trip-docs-list"></div>
+                <div class="form-drop" id="form-drop" onclick="document.getElementById('form-file-input').click()"
+                     ondragover="formDragOver(event)" ondragleave="formDragLeave(event)" ondrop="formDropFiles(event)">
+                    <div style="font-size:1.6rem;margin-bottom:4px;">📄</div>
+                    <div class="form-drop-text">Drop new documents here or <strong>click to browse</strong></div>
+                    <div style="font-size:0.75rem;color:var(--text-secondary);margin-top:4px;">JPG, PNG, PDF — multiple files supported</div>
+                </div>
+                <input type="file" id="form-file-input" accept=".jpg,.jpeg,.png,.pdf" multiple style="display:none;" onchange="handleFormFiles(this.files)">
+                <div id="form-file-list" style="display:none;"></div>
+                <div id="form-file-actions" style="display:none;margin-top:10px;margin-bottom:10px;">
+                    <button class="btn btn-primary btn-sm" onclick="uploadFormDocs()">📤 Upload Documents</button>
+                    <button class="btn btn-ghost btn-sm" onclick="clearFormFiles()" style="margin-left:8px;">✕ Clear</button>
+                </div>
+                <div id="form-resummarize" style="display:none;margin-top:10px;margin-bottom:10px;">
+                    <button class="btn btn-primary btn-sm" style="background:var(--info);" onclick="resummarizeTrip()">🤖 Re-summarize Trip with AI</button>
+                </div>
+                <div id="form-scan-status" style="display:none;"></div>
+
                 <div class="form-actions">
                     <button class="btn btn-primary" onclick="saveTrip()">💾 Save Trip</button>
                     <button class="btn btn-ghost" onclick="cancelForm()">Cancel</button>
@@ -380,18 +428,18 @@
                 <div class="card-title">
                     <span class="card-title-left">🔍 Scan Itinerary</span>
                 </div>
-                <p style="font-size:0.87rem;color:var(--text-secondary);margin-bottom:16px;">Upload an itinerary image or PDF and let AI extract your trip details automatically.</p>
+                <p style="font-size:0.87rem;color:var(--text-secondary);margin-bottom:16px;">Upload one or more documents — plane tickets, itineraries, hotel confirmations — and AI will combine them into a single trip summary.</p>
                 <div class="scan-drop" id="scan-drop" onclick="document.getElementById('scan-file-input').click()"
                      ondragover="scanDragOver(event)" ondragleave="scanDragLeave(event)" ondrop="scanDrop(event)">
                     <div class="scan-drop-icon">📄</div>
-                    <div class="scan-drop-text">Drop your itinerary here or <strong>click to browse</strong></div>
-                    <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:6px;">Supports JPG, PNG, PDF</div>
+                    <div class="scan-drop-text">Drop documents here or <strong>click to browse</strong></div>
+                    <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:6px;">Supports JPG, PNG, PDF — select multiple files</div>
                 </div>
-                <input type="file" id="scan-file-input" accept=".jpg,.jpeg,.png,.pdf" style="display:none;" onchange="handleScanFile(this.files[0])">
+                <input type="file" id="scan-file-input" accept=".jpg,.jpeg,.png,.pdf" multiple style="display:none;" onchange="handleScanFiles(this.files)">
                 <div id="scan-preview-area" style="display:none;"></div>
                 <div id="scan-actions" style="display:none;margin-top:14px;">
-                    <button class="btn btn-primary" onclick="runScan()">🔍 Extract with AI</button>
-                    <button class="btn btn-ghost btn-sm" onclick="clearScan()" style="margin-left:8px;">✕ Clear</button>
+                    <button class="btn btn-primary" onclick="runScan()">🔍 Extract & Combine with AI</button>
+                    <button class="btn btn-ghost btn-sm" onclick="clearScan()" style="margin-left:8px;">✕ Clear All</button>
                 </div>
                 <div id="scan-result-area" style="display:none;"></div>
             </div>
@@ -468,8 +516,10 @@ const db = firebase.firestore();
 let trips = [];
 let editingId = null;
 let formDests = [];
-let scanFile = null;
+let scanFiles = [];
 let scanExtracted = null;
+let formFiles = [];
+let tripDocuments = [];
 let apiKey = '';
 let proxyUrl = '';
 let worldMapInst = null;
@@ -598,7 +648,7 @@ function renderDashboard() {
                 <div class="rti-name">${esc(t.name)}</div>
                 <div class="rti-meta">${fmtDate(t.departureDate)} — ${fmtDate(t.returnDate)} · ${(t.destinations||[]).length} destination${(t.destinations||[]).length!==1?'s':''}</div>
             </div>
-            <div class="rti-right">${statusBadge(t.status)}</div>
+            <div class="rti-right">${statusBadge(t.status, t.returnDate)}</div>
         </div>
     `).join('');
 }
@@ -647,13 +697,14 @@ function renderTrips() {
         return `<div class="trip-card">
             <div class="trip-card-top">
                 <div class="trip-card-name">${esc(t.name)}</div>
-                ${statusBadge(t.status)}
+                ${statusBadge(t.status, t.returnDate)}
             </div>
             <div class="trip-card-dates">${fmtDate(t.departureDate)} – ${fmtDate(t.returnDate)}${dur>0?' · '+dur+' day'+(dur!==1?'s':''):''}</div>
             <div class="trip-card-dests">${dests}${more}</div>
             <div class="trip-card-actions">
                 <button class="btn btn-ghost btn-sm" onclick="openTripDetail('${t._id}')">👁 View</button>
                 <button class="btn btn-ghost btn-sm" onclick="loadFormForEdit('${t._id}')">✏️ Edit</button>
+                <button class="btn btn-ghost btn-sm" onclick="addDocsToTrip('${t._id}')">📄 Add Docs</button>
                 <button class="btn btn-danger btn-sm" onclick="softDelete('${t._id}')">🗑 Delete</button>
             </div>
         </div>`;
@@ -666,6 +717,11 @@ function renderTrips() {
 function resetForm() {
     editingId = null;
     formDests = [];
+    tripDocuments = [];
+    clearFormFiles();
+    document.getElementById('form-scan-status').style.display = 'none';
+    document.getElementById('form-resummarize').style.display = 'none';
+    renderTripDocsList();
     document.getElementById('form-title').textContent = 'Add New Trip';
     document.getElementById('f-name').value = '';
     document.getElementById('f-status').value = 'planned';
@@ -694,6 +750,9 @@ function loadFormForEdit(id) {
     document.getElementById('f-notes').value = t.notes || '';
     updateDuration();
     renderDestRows();
+    clearFormFiles();
+    document.getElementById('form-scan-status').style.display = 'none';
+    loadTripDocuments(id);
     showView('add-trip');
     closeModal();
 }
@@ -822,30 +881,55 @@ function scanDragLeave() { document.getElementById('scan-drop').classList.remove
 function scanDrop(e) {
     e.preventDefault();
     document.getElementById('scan-drop').classList.remove('dragover');
-    const f = e.dataTransfer.files[0];
-    if (f) handleScanFile(f);
+    if (e.dataTransfer.files.length) handleScanFiles(e.dataTransfer.files);
 }
 
-async function handleScanFile(file) {
-    if (!file) return;
-    scanFile = file;
+function handleScanFiles(fileList) {
+    if (!fileList || !fileList.length) return;
+    const validTypes = ['image/jpeg','image/png','image/jpg','application/pdf'];
+    for (const f of fileList) {
+        if (validTypes.includes(f.type)) scanFiles.push(f);
+    }
     scanExtracted = null;
     document.getElementById('scan-result-area').style.display = 'none';
+    renderScanFileList();
+    document.getElementById('scan-actions').style.display = scanFiles.length ? 'block' : 'none';
+}
 
-    const previewArea = document.getElementById('scan-preview-area');
-    previewArea.style.display = 'block';
-
-    if (file.type.startsWith('image/')) {
-        const url = URL.createObjectURL(file);
-        previewArea.innerHTML = `<div class="scan-preview"><img src="${url}"><div><div class="scan-preview-name">${esc(file.name)}</div><div class="scan-preview-type">${file.type} · ${(file.size/1024).toFixed(1)} KB</div></div></div>`;
-    } else {
-        previewArea.innerHTML = `<div class="scan-preview"><div style="font-size:2rem;">📄</div><div><div class="scan-preview-name">${esc(file.name)}</div><div class="scan-preview-type">${file.type} · ${(file.size/1024).toFixed(1)} KB</div></div></div>`;
+function removeScanFile(idx) {
+    scanFiles.splice(idx, 1);
+    renderScanFileList();
+    if (!scanFiles.length) {
+        document.getElementById('scan-actions').style.display = 'none';
+        document.getElementById('scan-preview-area').style.display = 'none';
     }
-    document.getElementById('scan-actions').style.display = 'block';
+}
+
+function renderScanFileList() {
+    const previewArea = document.getElementById('scan-preview-area');
+    if (!scanFiles.length) { previewArea.style.display = 'none'; return; }
+    previewArea.style.display = 'block';
+    let html = '<div class="scan-file-list">';
+    scanFiles.forEach((file, i) => {
+        const thumb = file.type.startsWith('image/')
+            ? `<img src="${URL.createObjectURL(file)}">`
+            : `<div style="font-size:1.8rem;">📄</div>`;
+        html += `<div class="scan-file-item">
+            ${thumb}
+            <div class="scan-file-info">
+                <div class="scan-file-name">${esc(file.name)}</div>
+                <div class="scan-file-meta">${file.type} · ${(file.size/1024).toFixed(1)} KB</div>
+            </div>
+            <button class="scan-file-remove" onclick="removeScanFile(${i})" title="Remove">✕</button>
+        </div>`;
+    });
+    html += '</div>';
+    if (scanFiles.length > 1) html += `<div class="scan-file-count">${scanFiles.length} documents ready to combine</div>`;
+    previewArea.innerHTML = html;
 }
 
 function clearScan() {
-    scanFile = null;
+    scanFiles = [];
     scanExtracted = null;
     document.getElementById('scan-preview-area').style.display = 'none';
     document.getElementById('scan-actions').style.display = 'none';
@@ -853,36 +937,296 @@ function clearScan() {
     document.getElementById('scan-file-input').value = '';
 }
 
+// ═══════════════════════════════════════════════
+//  FORM-LEVEL DOCUMENT UPLOAD (Add/Edit)
+// ═══════════════════════════════════════════════
+function formDragOver(e) { e.preventDefault(); document.getElementById('form-drop').classList.add('dragover'); }
+function formDragLeave() { document.getElementById('form-drop').classList.remove('dragover'); }
+function formDropFiles(e) {
+    e.preventDefault();
+    document.getElementById('form-drop').classList.remove('dragover');
+    if (e.dataTransfer.files.length) handleFormFiles(e.dataTransfer.files);
+}
+
+function handleFormFiles(fileList) {
+    if (!fileList || !fileList.length) return;
+    const validTypes = ['image/jpeg','image/png','image/jpg','application/pdf'];
+    for (const f of fileList) {
+        if (validTypes.includes(f.type)) formFiles.push(f);
+    }
+    document.getElementById('form-scan-status').style.display = 'none';
+    renderFormFileList();
+    document.getElementById('form-file-actions').style.display = formFiles.length ? 'block' : 'none';
+}
+
+function removeFormFile(idx) {
+    formFiles.splice(idx, 1);
+    renderFormFileList();
+    if (!formFiles.length) {
+        document.getElementById('form-file-actions').style.display = 'none';
+        document.getElementById('form-file-list').style.display = 'none';
+    }
+}
+
+function renderFormFileList() {
+    const listEl = document.getElementById('form-file-list');
+    if (!formFiles.length) { listEl.style.display = 'none'; return; }
+    listEl.style.display = 'block';
+    let html = '<div class="scan-file-list">';
+    formFiles.forEach((file, i) => {
+        const thumb = file.type.startsWith('image/')
+            ? `<img src="${URL.createObjectURL(file)}">`
+            : `<div style="font-size:1.8rem;">📄</div>`;
+        html += `<div class="scan-file-item">
+            ${thumb}
+            <div class="scan-file-info">
+                <div class="scan-file-name">${esc(file.name)}</div>
+                <div class="scan-file-meta">${file.type} · ${(file.size/1024).toFixed(1)} KB</div>
+            </div>
+            <button class="scan-file-remove" onclick="removeFormFile(${i})" title="Remove">✕</button>
+        </div>`;
+    });
+    html += '</div>';
+    if (formFiles.length > 1) html += `<div class="scan-file-count">${formFiles.length} documents ready to merge</div>`;
+    listEl.innerHTML = html;
+}
+
+function clearFormFiles() {
+    formFiles = [];
+    document.getElementById('form-file-list').style.display = 'none';
+    document.getElementById('form-file-actions').style.display = 'none';
+    document.getElementById('form-scan-status').style.display = 'none';
+    document.getElementById('form-file-input').value = '';
+}
+
+// ── Persistent Trip Document Management ──
+// Documents stored as array field on trip doc: { name, type, size, base64, uploadedAt }
+async function loadTripDocuments(tripId) {
+    tripDocuments = [];
+    if (!tripId) { renderTripDocsList(); return; }
+    try {
+        const doc = await db.collection('globetrotting_trips').doc(tripId).get();
+        if (doc.exists && doc.data().documents) {
+            tripDocuments = doc.data().documents.map((d, i) => ({ ...d, _idx: i }));
+        }
+    } catch(e) { console.error('Failed to load trip documents:', e); }
+    renderTripDocsList();
+}
+
+function renderTripDocsList() {
+    const listEl = document.getElementById('trip-docs-list');
+    const countEl = document.getElementById('trip-docs-count');
+    const resumBtn = document.getElementById('form-resummarize');
+    if (!listEl) return;
+
+    if (!tripDocuments.length) {
+        listEl.innerHTML = '<div class="trip-doc-empty">No documents uploaded yet.</div>';
+        if (countEl) countEl.textContent = '';
+        if (resumBtn) resumBtn.style.display = 'none';
+        return;
+    }
+
+    if (countEl) countEl.textContent = `${tripDocuments.length} document${tripDocuments.length!==1?'s':''}`;
+    if (resumBtn) resumBtn.style.display = 'block';
+
+    listEl.innerHTML = tripDocuments.map((doc, i) => {
+        const icon = doc.type && doc.type.startsWith('image/') ? '🖼️' : '📄';
+        const date = doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleDateString() : '';
+        const size = doc.size ? `${(doc.size/1024).toFixed(1)} KB` : '';
+        return `<div class="trip-doc-item">
+            <div class="trip-doc-icon">${icon}</div>
+            <div class="trip-doc-info">
+                <div class="trip-doc-name">${esc(doc.name)}</div>
+                <div class="trip-doc-meta">${size}${size && date ? ' · ' : ''}${date}</div>
+            </div>
+            <button class="scan-file-remove" onclick="deleteTripDoc(${i})" title="Delete">✕</button>
+        </div>`;
+    }).join('');
+}
+
+async function deleteTripDoc(idx) {
+    if (!editingId || idx < 0 || idx >= tripDocuments.length) return;
+    try {
+        tripDocuments.splice(idx, 1);
+        const docsToSave = tripDocuments.map(d => { const { _idx, ...rest } = d; return rest; });
+        await db.collection('globetrotting_trips').doc(editingId).update({ documents: docsToSave });
+        showToast('Document deleted');
+        renderTripDocsList();
+    } catch(e) {
+        showToast('Failed to delete document', true);
+        console.error(e);
+        await loadTripDocuments(editingId);
+    }
+}
+
+async function uploadFormDocs() {
+    if (!formFiles.length) return;
+    if (!editingId) {
+        showToast('Save the trip first, then upload documents', true);
+        return;
+    }
+
+    const statusEl = document.getElementById('form-scan-status');
+    statusEl.style.display = 'block';
+    statusEl.innerHTML = `<div class="scan-result"><div class="scan-result-title">Uploading ${formFiles.length} document${formFiles.length!==1?'s':''}…</div><div style="display:flex;justify-content:center;padding:16px;"><div class="spinner"></div></div></div>`;
+
+    try {
+        const newDocs = [];
+        for (const file of formFiles) {
+            const base64 = await fileToBase64(file);
+            newDocs.push({
+                name: file.name,
+                type: file.type,
+                size: file.size,
+                base64,
+                uploadedAt: new Date().toISOString()
+            });
+        }
+
+        // Merge with existing docs and save to trip document
+        const existingDocs = tripDocuments.map(d => { const { _idx, ...rest } = d; return rest; });
+        const allDocs = [...existingDocs, ...newDocs];
+        await db.collection('globetrotting_trips').doc(editingId).update({ documents: allDocs });
+
+        const count = formFiles.length;
+        clearFormFiles();
+        await loadTripDocuments(editingId);
+        statusEl.innerHTML = `<div class="scan-result"><div class="scan-result-title" style="color:var(--success);">Uploaded</div><p style="font-size:0.85rem;color:var(--text-secondary);">${count} document${count!==1?'s':''} saved to this trip. You can now re-summarize with AI.</p></div>`;
+    } catch(e) {
+        statusEl.innerHTML = `<div class="scan-result"><div class="scan-result-title" style="color:var(--danger);">Upload Error</div><pre style="color:var(--danger);">${esc(e.message)}</pre></div>`;
+    }
+}
+
+async function resummarizeTrip() {
+    if (!tripDocuments.length) { showToast('No documents to summarize', true); return; }
+    if (!apiKey || !proxyUrl) { showToast('Set API key & proxy in Agents → Settings first', true); return; }
+
+    const statusEl = document.getElementById('form-scan-status');
+    statusEl.style.display = 'block';
+    statusEl.innerHTML = `<div class="scan-result"><div class="scan-result-title">Summarizing ${tripDocuments.length} document${tripDocuments.length!==1?'s':''}…</div><div style="display:flex;justify-content:center;padding:16px;"><div class="spinner"></div></div></div>`;
+
+    try {
+        const contentBlocks = [];
+        for (const doc of tripDocuments) {
+            if (!doc.base64) continue;
+            if (doc.type && doc.type.startsWith('image/')) {
+                contentBlocks.push({ type: 'image', source: { type: 'base64', media_type: doc.type, data: doc.base64 } });
+            } else if (doc.type === 'application/pdf') {
+                contentBlocks.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: doc.base64 } });
+            }
+        }
+
+        if (!contentBlocks.length) { showToast('No document data to summarize', true); statusEl.style.display = 'none'; return; }
+
+        // Build context from current form values
+        const currentName = document.getElementById('f-name').value.trim();
+        const currentDep = document.getElementById('f-dep').value;
+        const currentRet = document.getElementById('f-ret').value;
+        const currentNotes = document.getElementById('f-notes').value.trim();
+        const currentDests = formDests.filter(d => d.city || d.country);
+
+        let existingContext = '';
+        if (currentName || currentDep || currentDests.length) {
+            const existing = { name: currentName || null, departureDate: currentDep || null, returnDate: currentRet || null, destinations: currentDests.map(d => ({city:d.city,state:d.state,country:d.country})), notes: currentNotes || null };
+            existingContext = `\n\nThe trip already has this data:\n${JSON.stringify(existing)}`;
+        }
+
+        const systemPrompt = 'You are a travel itinerary parser. You will receive all documents (tickets, itineraries, confirmations, etc.) associated with a trip. Combine all information into a single comprehensive trip summary. Return ONLY a JSON object: {name, departureDate (YYYY-MM-DD or null), returnDate (YYYY-MM-DD or null), destinations:[{city,state,country}], notes}. Merge destinations from all documents (no duplicates). Use the earliest departure date and latest return date. Combine all relevant details into notes. No explanation, just JSON.';
+        const userText = `I have ${contentBlocks.length} travel document${contentBlocks.length!==1?'s':''} for this trip. Parse and combine them into one complete trip summary as JSON.${existingContext}`;
+
+        contentBlocks.push({ type: 'text', text: userText });
+
+        const reqBody = {
+            apiKey, model: 'claude-opus-4-5', max_tokens: 2048, stream: false,
+            system: systemPrompt,
+            messages: [{ role: 'user', content: contentBlocks }]
+        };
+
+        const apiRes = await fetch(proxyUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(reqBody) });
+        const apiText = await apiRes.text();
+        const j = JSON.parse(apiText);
+        if (!apiRes.ok) throw new Error(j?.error?.message || 'API error ' + apiRes.status);
+        const rawText = (j?.content || []).filter(b=>b.type==='text').map(b=>b.text).join('') || '';
+
+        const match = rawText.match(/\{[\s\S]*\}/);
+        if (!match) throw new Error('No JSON found in response');
+        const extracted = JSON.parse(match[0]);
+
+        // Auto-geocode destinations
+        if (extracted.destinations && extracted.destinations.length) {
+            for (let i = 0; i < extracted.destinations.length; i++) {
+                const d = extracted.destinations[i];
+                const existingDest = formDests.find(fd => fd.city === d.city && fd.country === d.country && fd.lat);
+                if (existingDest) { d.lat = existingDest.lat; d.lon = existingDest.lon; continue; }
+                const q = [d.city, d.country].filter(Boolean).join(' ');
+                if (q) {
+                    try {
+                        const gr = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`);
+                        const gd = await gr.json();
+                        if (gd && gd.length) { d.lat = parseFloat(gd[0].lat); d.lon = parseFloat(gd[0].lon); }
+                    } catch {}
+                }
+            }
+        }
+
+        // Apply to form
+        if (extracted.name) document.getElementById('f-name').value = extracted.name;
+        if (extracted.departureDate) document.getElementById('f-dep').value = extracted.departureDate;
+        if (extracted.returnDate) document.getElementById('f-ret').value = extracted.returnDate;
+        if (extracted.notes) document.getElementById('f-notes').value = extracted.notes;
+        if (extracted.destinations && extracted.destinations.length) {
+            formDests = extracted.destinations.map(d => ({
+                city: d.city||'', state: d.state||'', country: d.country||'',
+                lat: d.lat||null, lon: d.lon||null
+            }));
+            renderDestRows();
+        }
+        updateDuration();
+
+        statusEl.innerHTML = `<div class="scan-result"><div class="scan-result-title" style="color:var(--success);">Re-summarized</div><p style="font-size:0.85rem;color:var(--text-secondary);">Trip details updated from all ${tripDocuments.length} document${tripDocuments.length!==1?'s':''}. Review the form above and save when ready.</p></div>`;
+    } catch(e) {
+        statusEl.innerHTML = `<div class="scan-result"><div class="scan-result-title" style="color:var(--danger);">Error</div><pre style="color:var(--danger);">${esc(e.message)}</pre></div>`;
+    }
+}
+
 async function runScan() {
-    if (!scanFile) return;
+    if (!scanFiles.length) return;
     if (!apiKey || !proxyUrl) { showToast('Set API key & proxy in Agents → Settings first', true); return; }
 
     const resultArea = document.getElementById('scan-result-area');
     resultArea.style.display = 'block';
-    resultArea.innerHTML = `<div class="scan-result"><div class="scan-result-title">Extracting…</div><div style="display:flex;justify-content:center;padding:20px;"><div class="spinner"></div></div></div>`;
+    const fileWord = scanFiles.length === 1 ? 'document' : `${scanFiles.length} documents`;
+    resultArea.innerHTML = `<div class="scan-result"><div class="scan-result-title">Extracting from ${fileWord}…</div><div style="display:flex;justify-content:center;padding:20px;"><div class="spinner"></div></div></div>`;
 
     try {
-        const base64 = await fileToBase64(scanFile);
-        const isImage = scanFile.type.startsWith('image/');
-        const isPDF = scanFile.type === 'application/pdf';
-
-        let contentBlock;
-        if (isImage) {
-            contentBlock = { type: 'image', source: { type: 'base64', media_type: scanFile.type, data: base64 } };
-        } else if (isPDF) {
-            contentBlock = { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } };
-        } else {
-            showToast('Unsupported file type', true);
-            return;
+        const contentBlocks = [];
+        for (const file of scanFiles) {
+            const base64 = await fileToBase64(file);
+            if (file.type.startsWith('image/')) {
+                contentBlocks.push({ type: 'image', source: { type: 'base64', media_type: file.type, data: base64 } });
+            } else if (file.type === 'application/pdf') {
+                contentBlocks.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } });
+            }
         }
+        if (!contentBlocks.length) { showToast('No supported files to process', true); return; }
+
+        const multiDoc = scanFiles.length > 1;
+        const systemPrompt = multiDoc
+            ? 'You are a travel itinerary parser. You will receive multiple documents (tickets, itineraries, confirmations, etc.) for the same trip. Combine all information into a single trip summary. Return ONLY a JSON object: {name, departureDate (YYYY-MM-DD or null), returnDate (YYYY-MM-DD or null), destinations:[{city,state,country}], notes}. Merge destinations from all documents (no duplicates). Use the earliest departure date and latest return date. Combine relevant notes. No explanation, just JSON.'
+            : 'You are a travel itinerary parser. Extract trip information and return ONLY a JSON object: {name, departureDate (YYYY-MM-DD or null), returnDate (YYYY-MM-DD or null), destinations:[{city,state,country}], notes}. No explanation, just JSON.';
+        const userText = multiDoc
+            ? `I have ${scanFiles.length} travel documents. Parse and combine them into one trip summary as JSON.`
+            : 'Parse this travel itinerary and return the JSON.';
+
+        contentBlocks.push({ type: 'text', text: userText });
 
         const reqBody = {
             apiKey,
             model: 'claude-opus-4-5',
-            max_tokens: 1024,
+            max_tokens: 2048,
             stream: false,
-            system: 'You are a travel itinerary parser. Extract trip information and return ONLY a JSON object: {name, departureDate (YYYY-MM-DD or null), returnDate (YYYY-MM-DD or null), destinations:[{city,state,country}], notes}. No explanation, just JSON.',
-            messages: [{ role: 'user', content: [contentBlock, { type: 'text', text: 'Parse this travel itinerary and return the JSON.' }] }]
+            system: systemPrompt,
+            messages: [{ role: 'user', content: contentBlocks }]
         };
 
         const res = await fetch(proxyUrl, {
@@ -1114,7 +1458,7 @@ async function renderBin() {
         <div class="bin-card">
             <div class="bin-card-info">
                 <div class="bin-card-name">${esc(t.name)}</div>
-                <div class="bin-card-meta">${fmtDate(t.departureDate)} – ${fmtDate(t.returnDate)} · ${statusBadge(t.status)}</div>
+                <div class="bin-card-meta">${fmtDate(t.departureDate)} – ${fmtDate(t.returnDate)} · ${statusBadge(t.status, t.returnDate)}</div>
             </div>
             <div style="display:flex;gap:8px;flex-shrink:0;">
                 <button class="btn btn-success btn-sm" onclick="restoreTrip('${t._id}')">↩️ Restore</button>
@@ -1148,7 +1492,7 @@ function openTripDetail(id) {
     const t = trips.find(x => x._id === id);
     if (!t) return;
     modalTripId = id;
-    document.getElementById('modal-trip-name').innerHTML = `${esc(t.name)} ${statusBadge(t.status)}`;
+    document.getElementById('modal-trip-name').innerHTML = `${esc(t.name)} ${statusBadge(t.status, t.returnDate)}`;
     const dur = tripDuration(t.departureDate, t.returnDate);
     const dests = (t.destinations||[]).map(d =>
         `<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:0.88rem;">
@@ -1171,8 +1515,22 @@ function openTripDetail(id) {
             ${dests}
         </div>
         ${t.notes?`<div class="modal-section"><div class="modal-section-title">Notes</div><div style="font-size:0.88rem;line-height:1.6;white-space:pre-wrap;">${esc(t.notes)}</div></div>`:''}
+        <div class="modal-section">
+            <div class="modal-section-title">Documents</div>
+            <div id="modal-docs-summary" style="font-size:0.85rem;color:var(--text-secondary);">Loading…</div>
+        </div>
     `;
     document.getElementById('trip-modal-overlay').classList.add('show');
+    // Show doc count from trip data
+    const docCount = (t.documents || []).length;
+    const docEl = document.getElementById('modal-docs-summary');
+    if (docEl) {
+        if (docCount > 0) {
+            docEl.innerHTML = `📄 ${docCount} document${docCount!==1?'s':''} uploaded. <a href="#" onclick="event.preventDefault();addDocsToTrip('${id}')" style="color:var(--accent);font-weight:600;">Edit trip to manage documents & re-summarize</a>`;
+        } else {
+            docEl.innerHTML = `No documents yet. <a href="#" onclick="event.preventDefault();addDocsToTrip('${id}')" style="color:var(--accent);font-weight:600;">Edit trip to upload documents</a>`;
+        }
+    }
 }
 
 function closeModal(e) {
@@ -1183,6 +1541,21 @@ function closeModal(e) {
 
 function modalEdit() {
     if (modalTripId) loadFormForEdit(modalTripId);
+}
+
+function modalAddDocs() {
+    if (!modalTripId) return;
+    loadFormForEdit(modalTripId);
+    setTimeout(() => {
+        document.getElementById('form-drop').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+}
+
+function addDocsToTrip(id) {
+    loadFormForEdit(id);
+    setTimeout(() => {
+        document.getElementById('form-drop').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
 }
 
 // ═══════════════════════════════════════════════
@@ -1217,13 +1590,19 @@ function getVisitedCountries(tripArr) {
     return countries;
 }
 
-function statusBadge(s) {
+function statusBadge(s, returnDate) {
+    // Auto-promote planned → completed if return date is in the past
+    let effective = s;
+    if ((s === 'planned' || !s) && returnDate) {
+        const ret = new Date(returnDate + 'T23:59:59');
+        if (!isNaN(ret) && ret < new Date()) effective = 'completed';
+    }
     const map = {
         'planned': ['badge-planned','Planned'],
         'in-progress': ['badge-in-progress','In Progress'],
         'completed': ['badge-completed','Completed']
     };
-    const [cls, label] = map[s] || ['badge-planned','Planned'];
+    const [cls, label] = map[effective] || ['badge-planned','Planned'];
     return `<span class="badge ${cls}">${label}</span>`;
 }
 

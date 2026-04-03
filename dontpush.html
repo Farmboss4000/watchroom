@@ -151,8 +151,12 @@ auth.onAuthStateChanged(user => {
     if (user) {
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('app').style.display = 'block';
-        document.getElementById('user-badge').innerHTML =
-            `${user.email} &nbsp;<button class="btn-so" onclick="auth.signOut()">Sign Out</button>`;
+        const badge = document.getElementById('user-badge');
+        badge.textContent = user.email + ' ';
+        const soBtn = document.createElement('button');
+        soBtn.className = 'btn-so'; soBtn.textContent = 'Sign Out';
+        soBtn.onclick = () => auth.signOut();
+        badge.appendChild(soBtn);
     } else {
         document.getElementById('login-screen').style.display = 'flex';
         document.getElementById('app').style.display = 'none';

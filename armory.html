@@ -3257,6 +3257,20 @@ function filterInventoryByCaliber(cal) {
 // ═══════════════════════════════════════
 //  SUPPRESSOR COMPATIBILITY REPORT
 // ═══════════════════════════════════════
+function runCompatReportCheck(docId) {
+    const supp = items.find(i => i._docId === docId);
+    if (!supp) { toast('Suppressor not found.', 'error'); return; }
+    if (!apiKey) { toast('Set your API key in Settings first.', 'error'); return; }
+    const label = [supp.manufacturer, supp.model].filter(Boolean).join(' ') || `Item #${supp.id}`;
+    // Show spinner on the button
+    const btn = document.querySelector(`[onclick="runCompatReportCheck('${docId}')"]`);
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Checking…'; }
+    runSuppressorCompatAndSave(docId, supp.threadType || '', supp.caliber || '', label)
+        .then(() => renderCompatibilityReport())
+        .catch(e => { toast('Check failed: ' + e.message, 'error'); })
+        .finally(() => { if (btn) { btn.disabled = false; btn.textContent = '🔍 Run Check'; } });
+}
+
 function renderCompatibilityReport() {
     const body = document.getElementById('suppressor-compat-body');
     if (!body) return;
@@ -3295,13 +3309,10 @@ function renderCompatibilityReport() {
 
         let bodyHTML;
         if (!compat.length) {
-            const safeLabel   = esc(label).replace(/'/g, "\\'");
-            const safeThread  = esc(supp.threadType||'').replace(/'/g, "\\'");
-            const safeCaliber = esc(supp.caliber||'').replace(/'/g, "\\'");
             bodyHTML = `<div class="sc-no-data">
                 No compatibility data yet.<br>
                 <button class="btn btn-ghost btn-sm" style="margin-top:10px;"
-                    onclick="runSuppressorCompatAndSave('${supp._docId}','${safeThread}','${safeCaliber}','${safeLabel}').then(()=>renderCompatibilityReport())">
+                    onclick="runCompatReportCheck('${supp._docId}')">
                     🔍 Run Check
                 </button>
             </div>`;

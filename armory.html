@@ -237,7 +237,9 @@
         /* ── CATEGORY BREAKDOWN ── */
         .cat-breakdown { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
         .cat-breakdown-item { display:flex; align-items:center; gap:10px; padding:8px 10px;
-            background:var(--bg-card); border-radius:7px; }
+            background:var(--bg-card); border-radius:7px; cursor:pointer; transition:all 0.15s; }
+        .cat-breakdown-item:hover { background:var(--accent-dim); border-color:var(--accent); outline:1.5px solid var(--accent); }
+        .cat-breakdown-item:hover .cbi-name { color:var(--accent); }
         .cbi-name { font-size:0.82rem; color:var(--text-primary); min-width:140px; font-weight:500; }
         .cbi-count { font-size:0.82rem; font-weight:700; color:var(--accent); min-width:28px; text-align:right; }
         .cbi-bar { flex:1; height:6px; background:var(--border); border-radius:3px; overflow:hidden; }
@@ -1599,7 +1601,7 @@ function renderDashboard() {
     const maxC = Math.max(...Object.values(counts), 1);
     document.getElementById('cat-breakdown').innerHTML = Object.keys(counts).length
         ? Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([cat,c])=>`
-            <div class="cat-breakdown-item">
+            <div class="cat-breakdown-item" onclick="filterInventoryByCategory('${esc(cat)}')" title="View ${esc(cat)} inventory">
                 <div class="cbi-name">${cat}</div>
                 <div class="cbi-count">${c}</div>
                 <div class="cbi-bar"><div class="cbi-bar-fill" style="width:${(c/maxC*100).toFixed(1)}%"></div></div>
@@ -2583,6 +2585,12 @@ async function deleteItem(docId) {
             toast('Restored!', 'success');
         } catch(e) { toast('Undo failed: ' + e.message, 'error'); }
     });
+}
+
+function filterInventoryByCategory(cat) {
+    showView('inventory');
+    const sel = document.getElementById('inv-filter-cat');
+    if (sel) { sel.value = cat; renderInventory(); }
 }
 
 // ═══════════════════════════════════════

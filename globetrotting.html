@@ -493,9 +493,9 @@
                      ondragover="scanDragOver(event)" ondragleave="scanDragLeave(event)" ondrop="scanDrop(event)">
                     <div class="scan-drop-icon">📄</div>
                     <div class="scan-drop-text">Drop documents here or <strong>click to browse</strong></div>
-                    <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:6px;">Supports JPG, PNG, PDF — select multiple files</div>
+                    <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:6px;">Supports JPG, PNG, PDF, EML email files — select multiple files</div>
                 </div>
-                <input type="file" id="scan-file-input" accept=".jpg,.jpeg,.png,.pdf" multiple style="display:none;" onchange="handleScanFiles(this.files)">
+                <input type="file" id="scan-file-input" accept=".jpg,.jpeg,.png,.pdf,.eml" multiple style="display:none;" onchange="handleScanFiles(this.files)">
                 <div id="scan-preview-area" style="display:none;"></div>
                 <div id="scan-actions" style="display:none;margin-top:14px;">
                     <button class="btn btn-primary" onclick="runScan()">🔍 Extract & Combine with AI</button>
@@ -992,9 +992,9 @@ function scanDrop(e) {
 
 function handleScanFiles(fileList) {
     if (!fileList || !fileList.length) return;
-    const validTypes = ['image/jpeg','image/png','image/jpg','application/pdf'];
+    const validTypes = ['image/jpeg','image/png','image/jpg','application/pdf','message/rfc822'];
     for (const f of fileList) {
-        if (validTypes.includes(f.type)) scanFiles.push(f);
+        if (validTypes.includes(f.type) || f.name.toLowerCase().endsWith('.eml')) scanFiles.push(f);
     }
     scanExtracted = null;
     document.getElementById('scan-result-area').style.display = 'none';
@@ -1017,14 +1017,17 @@ function renderScanFileList() {
     previewArea.style.display = 'block';
     let html = '<div class="scan-file-list">';
     scanFiles.forEach((file, i) => {
+        const isEml = file.name.toLowerCase().endsWith('.eml');
         const thumb = file.type.startsWith('image/')
             ? `<img src="${URL.createObjectURL(file)}">`
+            : isEml ? `<div style="font-size:1.8rem;">📧</div>`
             : `<div style="font-size:1.8rem;">📄</div>`;
+        const fileMeta = isEml ? `Email · ${(file.size/1024).toFixed(1)} KB` : `${file.type} · ${(file.size/1024).toFixed(1)} KB`;
         html += `<div class="scan-file-item">
             ${thumb}
             <div class="scan-file-info">
                 <div class="scan-file-name">${esc(file.name)}</div>
-                <div class="scan-file-meta">${file.type} · ${(file.size/1024).toFixed(1)} KB</div>
+                <div class="scan-file-meta">${fileMeta}</div>
             </div>
             <button class="scan-file-remove" onclick="removeScanFile(${i})" title="Remove">✕</button>
         </div>`;
@@ -1407,6 +1410,76 @@ async function runPhotoScan() {
     }
 }
 
+// ── EML EMAIL PARSING ──────────────────────────────────────────────────────
+
+function decodeEmailBody(text, encoding, contentType) {
+    encoding = (encoding || '').toLowerCase().trim();
+    if (encoding === 'quoted-printable') {
+        text = text.replace(/=\r?\n/g, '').replace(/=([0-9A-Fa-f]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+    } else if (encoding === 'base64') {
+        try { text = atob(text.replace(/\s/g, '')); } catch {}
+    }
+    if ((contentType || '').includes('text/html')) {
+        text = text.replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+    return text;
+}
+
+function extractMultipartText(raw, boundary) {
+    const parts = raw.split('--' + boundary);
+    for (const part of parts) {
+        const ctMatch = part.match(/Content-Type:\s*([^\r\n;]+)/i);
+        const ct = ctMatch ? ctMatch[1].toLowerCase().trim() : '';
+        if (!ct.includes('text/plain') && !ct.includes('text/html')) continue;
+        const start = part.search(/\r?\n\r?\n/);
+        if (start === -1) continue;
+        const bodyStart = part.indexOf('\n', start) + 1;
+        let text = part.substring(bodyStart).replace(/--\s*$/, '').trim();
+        const encMatch = part.match(/Content-Transfer-Encoding:\s*([^\r\n]+)/i);
+        text = decodeEmailBody(text, encMatch ? encMatch[1] : '', ct);
+        if (text.length > 50) return text;
+    }
+    return raw.substring(0, 5000);
+}
+
+async function parseEmlText(file) {
+    const raw = await file.text();
+    const lines = raw.split(/\r?\n/);
+    const headers = {};
+    let i = 0;
+    // Parse headers (stop at blank line)
+    while (i < lines.length && lines[i].trim() !== '') {
+        const m = lines[i].match(/^([A-Za-z\-]+):\s*(.*)/);
+        if (m) {
+            const key = m[1].toLowerCase();
+            let val = m[2];
+            while (i + 1 < lines.length && /^[ \t]/.test(lines[i + 1])) {
+                i++;
+                val += ' ' + lines[i].trim();
+            }
+            headers[key] = val;
+        }
+        i++;
+    }
+    // Body is everything after the blank line
+    const bodyRaw = lines.slice(i + 1).join('\n');
+    const contentType = headers['content-type'] || 'text/plain';
+    const encoding = headers['content-transfer-encoding'] || '';
+    let bodyText = '';
+    if (contentType.includes('multipart')) {
+        const bm = contentType.match(/boundary="?([^";]+)"?/i);
+        bodyText = bm ? extractMultipartText(raw, bm[1]) : bodyRaw.substring(0, 5000);
+    } else {
+        bodyText = decodeEmailBody(bodyRaw, encoding, contentType);
+    }
+    const subject = headers['subject'] || '(no subject)';
+    const date = headers['date'] || '';
+    const from = headers['from'] || '';
+    return `Subject: ${subject}\nDate: ${date}\nFrom: ${from}\n\n${bodyText.substring(0, 8000)}`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 async function runScan() {
     if (!scanFiles.length) return;
     if (!apiKey || !proxyUrl) { showToast('Set API key & proxy in Agents → Settings first', true); return; }
@@ -1419,11 +1492,16 @@ async function runScan() {
     try {
         const contentBlocks = [];
         for (const file of scanFiles) {
-            const base64 = await fileToBase64(file);
-            if (file.type.startsWith('image/')) {
-                contentBlocks.push({ type: 'image', source: { type: 'base64', media_type: file.type, data: base64 } });
-            } else if (file.type === 'application/pdf') {
-                contentBlocks.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } });
+            if (file.name.toLowerCase().endsWith('.eml') || file.type === 'message/rfc822') {
+                const emailText = await parseEmlText(file);
+                contentBlocks.push({ type: 'text', text: `[EMAIL: ${file.name}]\n${emailText}` });
+            } else {
+                const base64 = await fileToBase64(file);
+                if (file.type.startsWith('image/')) {
+                    contentBlocks.push({ type: 'image', source: { type: 'base64', media_type: file.type, data: base64 } });
+                } else if (file.type === 'application/pdf') {
+                    contentBlocks.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } });
+                }
             }
         }
         if (!contentBlocks.length) { showToast('No supported files to process', true); return; }

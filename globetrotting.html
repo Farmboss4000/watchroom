@@ -150,6 +150,32 @@
         .form-drop{border:2px dashed var(--border);border-radius:10px;padding:24px 16px;text-align:center;cursor:pointer;transition:all 0.2s;margin-bottom:10px;}
         .form-drop:hover,.form-drop.dragover{border-color:var(--accent);background:var(--accent-dim);}
         .form-drop-text{font-size:0.85rem;color:var(--text-secondary);}
+        /* ── REPORTS ── */
+        .rpt-stat-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-top:4px;}
+        .rpt-stat{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:14px 12px;text-align:center;}
+        .rpt-stat-val{font-size:1.7rem;font-weight:800;color:var(--accent);line-height:1;margin-bottom:3px;}
+        .rpt-stat-lbl{font-size:0.72rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;font-weight:600;}
+        .timeline{position:relative;padding-left:32px;}
+        .timeline::before{content:'';position:absolute;left:10px;top:0;bottom:0;width:2px;background:var(--border);}
+        .tl-year{font-size:0.78rem;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin:24px 0 10px -32px;padding-left:8px;border-left:3px solid var(--accent);}
+        .tl-year:first-child{margin-top:0;}
+        .tl-item{position:relative;margin-bottom:20px;}
+        .tl-dot{position:absolute;left:-26px;top:6px;width:12px;height:12px;border-radius:50%;background:var(--accent);border:2px solid var(--bg-secondary);z-index:1;}
+        .tl-dot.future{background:var(--info,#2dd4bf);border-color:var(--bg-secondary);}
+        .tl-dot.planned{background:#94a3b8;border-color:var(--bg-secondary);}
+        .tl-card{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;cursor:pointer;transition:box-shadow .15s;}
+        .tl-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.08);border-color:var(--accent);}
+        .tl-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px;}
+        .tl-card-name{font-weight:700;font-size:0.97rem;color:var(--text-primary);}
+        .tl-card-dates{font-size:0.8rem;color:var(--text-secondary);margin-bottom:6px;}
+        .tl-card-dests{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px;}
+        .tl-card-dur{font-size:0.75rem;color:var(--text-secondary);font-style:italic;}
+        .tl-empty{color:var(--text-secondary);font-size:0.9rem;padding:24px 0;text-align:center;}
+        .dest-table{width:100%;border-collapse:collapse;font-size:0.87rem;}
+        .dest-table th{text-align:left;padding:8px 10px;font-size:0.72rem;text-transform:uppercase;letter-spacing:.5px;color:var(--text-secondary);border-bottom:2px solid var(--border);font-weight:700;}
+        .dest-table td{padding:8px 10px;border-bottom:1px solid var(--border);color:var(--text-primary);}
+        .dest-table tr:last-child td{border-bottom:none;}
+        .dest-table tr:hover td{background:var(--bg-card);}
         .photo-scan-drop{border:2px dashed var(--border);border-radius:12px;padding:32px 20px;text-align:center;cursor:pointer;transition:all 0.2s;background:var(--bg-card);}
         .photo-scan-drop:hover,.photo-scan-drop.dragover{border-color:var(--accent);background:var(--accent-dim);}
         .photo-scan-thumb{width:72px;height:72px;object-fit:cover;border-radius:8px;border:2px solid var(--border);cursor:pointer;position:relative;}
@@ -320,6 +346,7 @@
             <button onclick="showView('scan')">🔍 Scan Itinerary</button>
             <button onclick="showView('world-map')">🌍 World Map</button>
             <button onclick="showView('us-map')">🇺🇸 US Map</button>
+            <button onclick="showView('reports')">📊 Reports</button>
             <button onclick="showView('recycle-bin')">🗑 Recycle Bin</button>
         </nav>
         <div class="header-right">
@@ -498,6 +525,36 @@
             </div>
         </div>
 
+        <!-- ── REPORTS ── -->
+        <div class="view" id="view-reports">
+            <div class="card" style="margin-bottom:20px;">
+                <div class="card-title" style="flex-wrap:wrap;gap:12px;">
+                    <span class="card-title-left">📊 Travel Reports</span>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                        <select id="rpt-year-filter" onchange="renderReports()" style="font-size:0.82rem;padding:5px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-secondary);color:var(--text-primary);">
+                            <option value="">All Years</option>
+                        </select>
+                        <button class="btn btn-ghost btn-sm" onclick="printTimeline()">🖨 Print</button>
+                    </div>
+                </div>
+
+                <!-- STAT STRIP -->
+                <div id="rpt-stats" class="rpt-stat-strip"></div>
+            </div>
+
+            <!-- TIMELINE -->
+            <div class="card">
+                <div class="card-title"><span class="card-title-left">🗓 Travel Timeline</span></div>
+                <div id="rpt-timeline"></div>
+            </div>
+
+            <!-- DESTINATIONS TABLE -->
+            <div class="card" style="margin-top:20px;">
+                <div class="card-title"><span class="card-title-left">📍 Destinations Visited</span></div>
+                <div id="rpt-destinations"></div>
+            </div>
+        </div>
+
         <!-- ── RECYCLE BIN ── -->
         <div class="view" id="view-recycle-bin">
             <div class="card">
@@ -565,7 +622,7 @@ let usGeoLayer = null;
 let activeView = 'dashboard';
 let modalTripId = null;
 
-const VIEWS = ['dashboard','trips','add-trip','scan','world-map','us-map','recycle-bin'];
+const VIEWS = ['dashboard','trips','add-trip','scan','world-map','us-map','reports','recycle-bin'];
 
 // ═══════════════════════════════════════════════
 //  AUTH
@@ -634,11 +691,12 @@ function showView(v) {
         if (el) el.classList.toggle('active', name === v);
     });
     const navBtns = document.querySelectorAll('#main-nav button');
-    const navIdx = {'dashboard':0,'trips':1,'add-trip':2,'scan':3,'world-map':4,'us-map':5,'recycle-bin':6};
+    const navIdx = {'dashboard':0,'trips':1,'add-trip':2,'scan':3,'world-map':4,'us-map':5,'reports':6,'recycle-bin':7};
     navBtns.forEach((b,i) => b.classList.toggle('active', i === navIdx[v]));
 
     if (v === 'dashboard') renderDashboard();
     if (v === 'trips') renderTrips();
+    if (v === 'reports') renderReports();
     if (v === 'world-map') renderWorldMap();
     if (v === 'us-map') renderUSMap();
     if (v === 'recycle-bin') renderBin();
@@ -1748,6 +1806,123 @@ function getVisitedCountries(tripArr) {
     const countries = new Set();
     arr.forEach(t => (t.destinations||[]).forEach(d => { if(d.country) countries.add(d.country.trim().toLowerCase()); }));
     return countries;
+}
+
+// ── REPORTS ──
+function renderReports() {
+    const active = trips.filter(t => !t.deleted);
+    const yearFilter = document.getElementById('rpt-year-filter')?.value || '';
+
+    // Populate year filter
+    const years = [...new Set(active.map(t => t.departureDate?.slice(0,4)).filter(Boolean))].sort().reverse();
+    const sel = document.getElementById('rpt-year-filter');
+    const curVal = sel.value;
+    sel.innerHTML = '<option value="">All Years</option>' + years.map(y => `<option value="${y}"${y===curVal?' selected':''}>${y}</option>`).join('');
+
+    const filtered = yearFilter ? active.filter(t => t.departureDate?.startsWith(yearFilter)) : active;
+    const now = new Date();
+
+    // ── STATS ──
+    const totalTrips = filtered.length;
+    const totalDays = filtered.reduce((s,t) => s + Math.max(0, tripDuration(t.departureDate, t.returnDate)), 0);
+    const countries = new Set();
+    const cities = new Set();
+    const destFreq = {};
+    filtered.forEach(t => (t.destinations||[]).forEach(d => {
+        if (d.country) countries.add(d.country.trim());
+        if (d.city)    cities.add(d.city.trim().toLowerCase());
+        const key = [d.city, d.country].filter(Boolean).join(', ');
+        if (key) destFreq[key] = (destFreq[key]||0) + 1;
+    }));
+    const upcoming = filtered.filter(t => t.departureDate && new Date(t.departureDate) > now).length;
+    const avgDays = totalTrips ? Math.round(totalDays / totalTrips) : 0;
+
+    document.getElementById('rpt-stats').innerHTML = `
+        <div class="rpt-stat"><div class="rpt-stat-val">${totalTrips}</div><div class="rpt-stat-lbl">${yearFilter ? 'Trips' : 'Total Trips'}</div></div>
+        <div class="rpt-stat"><div class="rpt-stat-val">${totalDays}</div><div class="rpt-stat-lbl">Days Traveled</div></div>
+        <div class="rpt-stat"><div class="rpt-stat-val">${countries.size}</div><div class="rpt-stat-lbl">Countries</div></div>
+        <div class="rpt-stat"><div class="rpt-stat-val">${cities.size}</div><div class="rpt-stat-lbl">Cities</div></div>
+        <div class="rpt-stat"><div class="rpt-stat-val">${avgDays}</div><div class="rpt-stat-lbl">Avg Days / Trip</div></div>
+        <div class="rpt-stat"><div class="rpt-stat-val">${upcoming}</div><div class="rpt-stat-lbl">Upcoming</div></div>`;
+
+    // ── TIMELINE ──
+    if (!filtered.length) {
+        document.getElementById('rpt-timeline').innerHTML = `<div class="tl-empty">No trips to display. Add your first adventure!</div>`;
+        document.getElementById('rpt-destinations').innerHTML = '';
+        return;
+    }
+
+    // Sort all chronologically: future upcoming (nearest first) then past (newest first)
+    const futureTrips = filtered.filter(t => !t.returnDate || new Date(t.returnDate+'T23:59:59') >= now)
+        .sort((a,b) => (a.departureDate||'').localeCompare(b.departureDate||''));
+    const pastTrips = filtered.filter(t => t.returnDate && new Date(t.returnDate+'T23:59:59') < now)
+        .sort((a,b) => (b.departureDate||'').localeCompare(a.departureDate||''));
+    const allSorted = [...futureTrips, ...pastTrips];
+
+    // Group by year
+    const byYear = {};
+    allSorted.forEach(t => {
+        const yr = t.departureDate?.slice(0,4) || 'Unknown';
+        if (!byYear[yr]) byYear[yr] = [];
+        byYear[yr].push(t);
+    });
+
+    // Render years — upcoming first, then past years descending
+    const upcomingYears = [...new Set(futureTrips.map(t => t.departureDate?.slice(0,4)||'Unknown'))];
+    const pastYears     = [...new Set(pastTrips.map(t => t.departureDate?.slice(0,4)||'Unknown'))];
+    const yearOrder     = [...new Set([...upcomingYears, ...pastYears])];
+
+    let html = '<div class="timeline">';
+    yearOrder.forEach(yr => {
+        html += `<div class="tl-year">✈️ ${yr}</div>`;
+        byYear[yr].forEach(t => {
+            const dur   = tripDuration(t.departureDate, t.returnDate);
+            const isFut = !t.returnDate || new Date(t.returnDate+'T23:59:59') >= now;
+            const isPla = t.status === 'planned' && isFut;
+            const dotCls = isFut ? (isPla ? 'planned' : 'future') : '';
+            const dests = (t.destinations||[]).slice(0,5)
+                .map(d => `<span class="dest-pill">${countryFlag(d.country)} ${esc(d.city||d.country||'')}</span>`).join('');
+            const more  = (t.destinations||[]).length > 5 ? `<span class="dest-pill">+${(t.destinations||[]).length-5} more</span>` : '';
+            const durStr = dur > 0 ? `${dur} day${dur!==1?'s':''}` : '';
+            const dateStr = [fmtDate(t.departureDate), fmtDate(t.returnDate)].filter(s=>s&&s!=='—').join(' → ');
+            html += `<div class="tl-item">
+                <div class="tl-dot ${dotCls}"></div>
+                <div class="tl-card" onclick="openTripDetail('${t._id}')">
+                    <div class="tl-card-top">
+                        <div class="tl-card-name">${esc(t.name)}</div>
+                        ${statusBadge(t.status, t.returnDate)}
+                    </div>
+                    <div class="tl-card-dates">${dateStr}${durStr ? ' &nbsp;·&nbsp; '+durStr : ''}</div>
+                    ${dests||more ? `<div class="tl-card-dests">${dests}${more}</div>` : ''}
+                    ${t.notes ? `<div class="tl-card-dur">${esc(t.notes.slice(0,120))}${t.notes.length>120?'…':''}</div>` : ''}
+                </div>
+            </div>`;
+        });
+    });
+    html += '</div>';
+    document.getElementById('rpt-timeline').innerHTML = html;
+
+    // ── DESTINATIONS TABLE ──
+    const destRows = Object.entries(destFreq).sort((a,b) => b[1]-a[1]);
+    if (!destRows.length) {
+        document.getElementById('rpt-destinations').innerHTML = '<p style="color:var(--text-secondary);font-size:0.87rem;">No destinations recorded yet.</p>';
+        return;
+    }
+    document.getElementById('rpt-destinations').innerHTML = `
+        <div style="overflow-x:auto;">
+        <table class="dest-table">
+            <thead><tr><th>#</th><th>Destination</th><th>Visits</th></tr></thead>
+            <tbody>${destRows.map(([dest, count], i) => `
+                <tr><td style="color:var(--text-secondary);">${i+1}</td>
+                    <td>${esc(dest)}</td>
+                    <td><span style="font-weight:700;color:var(--accent);">${count}</span></td>
+                </tr>`).join('')}
+            </tbody>
+        </table></div>`;
+}
+
+function printTimeline() {
+    window.print();
 }
 
 function statusBadge(s, returnDate) {

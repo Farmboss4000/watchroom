@@ -974,7 +974,7 @@ function prefillForm(data) {
     document.getElementById('f-dep').value = data.departureDate || '';
     document.getElementById('f-ret').value = data.returnDate || '';
     document.getElementById('f-notes').value = data.notes || '';
-    formDests = (data.destinations || []).map(d => ({city:d.city||'',state:d.state||'',country:d.country||'',lat:null,lon:null}));
+    formDests = (data.destinations || []).map(d => ({city:d.city||'',state:d.state||'',country:d.country||'',lat:d.lat||null,lon:d.lon||null}));
     updateDuration();
     renderDestRows();
 }
@@ -1601,8 +1601,37 @@ function fileToBase64(file) {
 // ═══════════════════════════════════════════════
 //  WORLD MAP
 // ═══════════════════════════════════════════════
-function renderWorldMap() {
+async function renderWorldMap() {
     const active = trips.filter(t => !t.deleted);
+
+    // Auto-geocode any destination missing lat/lon, then persist back to Firestore
+    let geocodedAny = false;
+    for (const t of active) {
+        const dests = t.destinations || [];
+        let tripChanged = false;
+        for (const d of dests) {
+            if (!d.lat || !d.lon) {
+                const q = [d.city, d.country].filter(Boolean).join(' ');
+                if (!q) continue;
+                try {
+                    const gr = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`);
+                    const gd = await gr.json();
+                    if (gd && gd.length) {
+                        d.lat = parseFloat(gd[0].lat);
+                        d.lon = parseFloat(gd[0].lon);
+                        tripChanged = true;
+                        geocodedAny = true;
+                    }
+                } catch {}
+            }
+        }
+        if (tripChanged) {
+            try {
+                await db.collection('globetrotting_trips').doc(t._id).update({ destinations: dests });
+            } catch {}
+        }
+    }
+
     const allDests = [];
     active.forEach(t => (t.destinations||[]).forEach(d => {
         if (d.lat && d.lon) allDests.push({...d, tripName: t.name, tripDates: `${fmtDate(t.departureDate)} – ${fmtDate(t.returnDate)}`});
@@ -1613,13 +1642,12 @@ function renderWorldMap() {
 
     if (!worldMapInit) {
         worldMapInst = L.map('world-map-container').setView([20, 0], 2);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors',
-            maxZoom: 18
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            attribution: '© <a href="https://carto.com/">CARTO</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            subdomains: 'abcd', maxZoom: 19
         }).addTo(worldMapInst);
         worldMapInit = true;
     } else {
-        // Invalidate size in case container was hidden
         setTimeout(() => worldMapInst.invalidateSize(), 50);
     }
 
@@ -1699,9 +1727,9 @@ async function renderUSMap() {
 
     if (!usMapInit) {
         usMapInst = L.map('us-map-container').setView([39, -96], 4);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors',
-            maxZoom: 18
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            attribution: '© <a href="https://carto.com/">CARTO</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            subdomains: 'abcd', maxZoom: 19
         }).addTo(usMapInst);
         usMapInit = true;
     } else {

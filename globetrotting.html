@@ -9,6 +9,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
     <style>
         *{box-sizing:border-box;margin:0;padding:0;}
         :root{
@@ -194,6 +195,18 @@
         .scan-result{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:16px;margin-top:14px;}
         .scan-result-title{font-size:0.85rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:10px;}
         .scan-result pre{font-family:monospace;font-size:0.83rem;white-space:pre-wrap;word-break:break-word;color:var(--text-primary);}
+
+        /* ── MS365 IMPORT ── */
+        .ms365-setup-box{background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:14px;}
+        .ms365-setup-title{font-size:0.8rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;}
+        .ms365-setup-box ol{font-size:0.84rem;color:var(--text-secondary);line-height:1.9;padding-left:20px;margin-bottom:14px;}
+        .ms365-setup-box code{font-size:0.78rem;background:var(--bg-card);padding:2px 6px;border-radius:4px;border:1px solid var(--border);word-break:break-all;}
+        .ms365-connected-row{display:flex;align-items:center;gap:10px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:12px;}
+        .ms365-trip-preview{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:11px 14px;margin-bottom:7px;display:flex;gap:10px;align-items:flex-start;}
+        .ms365-trip-preview.dup{opacity:0.65;}
+        .ms365-trip-name{font-size:0.9rem;font-weight:600;color:var(--text-primary);}
+        .ms365-trip-meta{font-size:0.78rem;color:var(--text-secondary);margin-top:2px;}
+        .ms365-trip-dup{font-size:0.75rem;color:var(--warning);font-weight:600;margin-top:3px;}
 
         /* ── MAP CONTAINERS ── */
         #world-map-container,#us-map-container{border-radius:10px;border:1px solid var(--border);}
@@ -484,6 +497,20 @@
 
         <!-- ── SCAN ITINERARY ── -->
         <div class="view" id="view-scan">
+
+            <!-- MS365 IMPORT CARD -->
+            <div class="card" style="margin-bottom:16px;">
+                <div class="card-title" style="cursor:pointer;margin-bottom:0;" onclick="toggleMS365Panel()">
+                    <span class="card-title-left">📧 Import from Microsoft 365 Email</span>
+                    <span id="ms365-toggle-icon" style="font-size:0.85rem;color:var(--text-secondary);">▼ expand</span>
+                </div>
+                <div id="ms365-panel" style="display:none;margin-top:16px;">
+                    <div id="ms365-setup-area"></div>
+                    <div id="ms365-folder-area" style="display:none;margin-top:4px;"></div>
+                    <div id="ms365-results-area" style="display:none;margin-top:14px;"></div>
+                </div>
+            </div>
+
             <div class="card">
                 <div class="card-title">
                     <span class="card-title-left">🔍 Scan Itinerary</span>
@@ -612,6 +639,9 @@ let formFiles = [];
 let tripDocuments = [];
 let apiKey = '';
 let proxyUrl = '';
+let ms365ClientId = '';
+let msalClient = null;
+let msAccount = null;
 let worldMapInst = null;
 let usMapInst = null;
 let worldMapInit = false;
@@ -670,6 +700,364 @@ async function loadSettings() {
     if (kd?.exists) apiKey = kd.data().key || '';
     const pd = await db.collection('settings').doc('proxy').get().catch(() => null);
     if (pd?.exists) proxyUrl = pd.data().url || '';
+    const md = await db.collection('settings').doc('ms365').get().catch(() => null);
+    if (md?.exists) ms365ClientId = md.data().clientId || '';
+    if (ms365ClientId) initMSAL();
+}
+
+// ═══════════════════════════════════════════════
+//  MICROSOFT 365 IMPORT
+// ═══════════════════════════════════════════════
+function toggleMS365Panel() {
+    const panel = document.getElementById('ms365-panel');
+    const icon  = document.getElementById('ms365-toggle-icon');
+    const open  = panel.style.display === 'none';
+    panel.style.display = open ? 'block' : 'none';
+    icon.textContent    = open ? '▲ collapse' : '▼ expand';
+    if (open) renderMS365Setup();
+}
+
+function renderMS365Setup() {
+    const setupArea  = document.getElementById('ms365-setup-area');
+    const folderArea = document.getElementById('ms365-folder-area');
+
+    if (msAccount) {
+        setupArea.innerHTML = `
+            <div class="ms365-connected-row">
+                <span style="font-size:1.3rem;">✅</span>
+                <div style="flex:1;">
+                    <div style="font-size:0.88rem;font-weight:600;color:var(--text-primary);">${esc(msAccount.username)}</div>
+                    <div style="font-size:0.78rem;color:var(--text-secondary);">${esc(msAccount.name || 'Microsoft 365')}</div>
+                </div>
+                <button class="btn btn-ghost btn-sm" onclick="disconnectMS365()">Disconnect</button>
+            </div>`;
+        folderArea.style.display = 'block';
+        loadMS365Folders();
+        return;
+    }
+
+    if (ms365ClientId) {
+        setupArea.innerHTML = `
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+                <span style="font-size:0.82rem;color:var(--text-secondary);">Azure Client ID:</span>
+                <code style="font-size:0.78rem;">${esc(ms365ClientId)}</code>
+                <button class="btn btn-ghost btn-sm" onclick="clearMS365ClientId()">Change</button>
+            </div>
+            <button class="btn btn-primary" onclick="connectMS365()">🔐 Sign in to Microsoft 365</button>`;
+        folderArea.style.display = 'none';
+        return;
+    }
+
+    // No client ID — show one-time setup instructions
+    const redirectUri = window.location.origin + window.location.pathname;
+    setupArea.innerHTML = `
+        <div class="ms365-setup-box">
+            <div class="ms365-setup-title">One-time Azure setup (5 min)</div>
+            <ol>
+                <li>Go to <strong>portal.azure.com</strong> → Azure Active Directory → App registrations → <strong>New registration</strong></li>
+                <li>Name it anything (e.g. "Globetrotting"). Under <em>Redirect URI</em> choose <strong>Single-page application (SPA)</strong> and enter:<br>
+                    <code>${esc(redirectUri)}</code></li>
+                <li>Click Register. Then go to <strong>API permissions → Add a permission → Microsoft Graph → Delegated</strong> → search <strong>Mail.Read</strong> → Add permissions</li>
+                <li>Copy the <strong>Application (client) ID</strong> from the Overview page and paste it below</li>
+            </ol>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <input type="text" id="ms365-client-id-input" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.85rem;background:var(--bg-secondary);color:var(--text-primary);">
+                <button class="btn btn-primary" onclick="saveMS365ClientId()">Save</button>
+            </div>
+        </div>`;
+    folderArea.style.display = 'none';
+}
+
+async function saveMS365ClientId() {
+    const val = (document.getElementById('ms365-client-id-input').value || '').trim();
+    if (!val) return;
+    await db.collection('settings').doc('ms365').set({ clientId: val }).catch(() => {});
+    ms365ClientId = val;
+    initMSAL();
+    renderMS365Setup();
+}
+
+function clearMS365ClientId() {
+    ms365ClientId = '';
+    msalClient = null;
+    msAccount = null;
+    db.collection('settings').doc('ms365').delete().catch(() => {});
+    renderMS365Setup();
+}
+
+function initMSAL() {
+    if (!ms365ClientId || msalClient) return;
+    msalClient = new msal.PublicClientApplication({
+        auth: {
+            clientId: ms365ClientId,
+            authority: 'https://login.microsoftonline.com/common',
+            redirectUri: window.location.origin + window.location.pathname
+        },
+        cache: { cacheLocation: 'sessionStorage', storeAuthStateInCookie: false }
+    });
+    const accounts = msalClient.getAllAccounts();
+    if (accounts.length) msAccount = accounts[0];
+}
+
+async function connectMS365() {
+    try {
+        if (!msalClient) initMSAL();
+        if (!msalClient) { showToast('Paste your Azure Client ID first', true); return; }
+        const result = await msalClient.loginPopup({ scopes: ['Mail.Read'], prompt: 'select_account' });
+        msAccount = result.account;
+        renderMS365Setup();
+    } catch(e) {
+        if (!e.message?.includes('user_cancelled') && !e.message?.includes('interaction_in_progress')) {
+            showToast('Sign-in failed: ' + e.message, true);
+        }
+    }
+}
+
+function disconnectMS365() {
+    if (msalClient && msAccount) msalClient.logoutPopup({ account: msAccount }).catch(() => {});
+    msAccount = null;
+    document.getElementById('ms365-folder-area').style.display = 'none';
+    document.getElementById('ms365-results-area').style.display = 'none';
+    renderMS365Setup();
+}
+
+async function getMS365Token() {
+    if (!msalClient || !msAccount) throw new Error('Not connected to Microsoft 365');
+    try {
+        const r = await msalClient.acquireTokenSilent({ scopes: ['Mail.Read'], account: msAccount });
+        return r.accessToken;
+    } catch {
+        const r = await msalClient.acquireTokenPopup({ scopes: ['Mail.Read'], account: msAccount });
+        return r.accessToken;
+    }
+}
+
+async function loadMS365Folders() {
+    const folderArea = document.getElementById('ms365-folder-area');
+    folderArea.innerHTML = '<div style="font-size:0.84rem;color:var(--text-secondary);">Loading folders…</div>';
+    try {
+        const token = await getMS365Token();
+        const res  = await fetch('https://graph.microsoft.com/v1.0/me/mailFolders?$top=50&$select=id,displayName,totalItemCount', {
+            headers: { Authorization: 'Bearer ' + token }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error?.message || 'Failed to load folders');
+        const folders = data.value || [];
+        folderArea.innerHTML = `
+            <div style="font-size:0.82rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:8px;">Select your travel folder</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <select id="ms365-folder-select" style="flex:1;min-width:200px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.88rem;background:var(--bg-secondary);color:var(--text-primary);">
+                    <option value="">— choose a folder —</option>
+                    ${folders.map(f => `<option value="${esc(f.id)}">${esc(f.displayName)} (${f.totalItemCount} emails)</option>`).join('')}
+                </select>
+                <button class="btn btn-primary" onclick="startMS365Scan()">📨 Scan for Trips</button>
+            </div>
+            <p style="font-size:0.78rem;color:var(--text-secondary);margin-top:8px;">Tip: In Outlook, create a folder called "Travel" and move your booking confirmations, flight tickets, and hotel reservations there.</p>`;
+    } catch(e) {
+        folderArea.innerHTML = `<div style="color:var(--danger);font-size:0.85rem;">${esc(e.message)}</div>`;
+    }
+}
+
+async function startMS365Scan() {
+    const sel = document.getElementById('ms365-folder-select');
+    const folderId = sel ? sel.value : '';
+    if (!folderId) { showToast('Select a folder first', true); return; }
+    if (!apiKey || !proxyUrl) { showToast('Set your API key in Settings first', true); return; }
+
+    const resultsArea = document.getElementById('ms365-results-area');
+    resultsArea.style.display = 'block';
+    resultsArea.innerHTML = `<div style="text-align:center;padding:20px 0;"><div class="spinner" style="margin:0 auto 10px;"></div><div style="font-size:0.85rem;color:var(--text-secondary);">Fetching emails…</div></div>`;
+
+    try {
+        const token = await getMS365Token();
+
+        // Fetch up to 100 emails, newest first
+        let messages = [];
+        let url = `https://graph.microsoft.com/v1.0/me/mailFolders/${encodeURIComponent(folderId)}/messages?$select=id,subject,body,from,receivedDateTime&$top=50&$orderby=receivedDateTime%20desc`;
+        while (url && messages.length < 100) {
+            const res  = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error?.message || 'Failed to fetch emails');
+            messages = messages.concat(data.value || []);
+            url = data['@odata.nextLink'] || null;
+        }
+
+        if (!messages.length) {
+            resultsArea.innerHTML = `<div style="font-size:0.85rem;color:var(--text-secondary);padding:12px 0;">No emails found in this folder.</div>`;
+            return;
+        }
+
+        resultsArea.innerHTML = `<div style="text-align:center;padding:20px 0;"><div class="spinner" style="margin:0 auto 10px;"></div><div style="font-size:0.85rem;color:var(--text-secondary);">Analyzing ${messages.length} emails with AI…</div></div>`;
+
+        // Process in batches of 5
+        const allExtracted = [];
+        for (let i = 0; i < messages.length; i += 5) {
+            const batch = messages.slice(i, i + 5);
+            const batchTrips = await extractTripsFromEmails(batch);
+            allExtracted.push(...batchTrips);
+        }
+
+        if (!allExtracted.length) {
+            resultsArea.innerHTML = `<div style="font-size:0.85rem;color:var(--text-secondary);padding:12px 0;">No travel itineraries detected in these emails. Try selecting a different folder.</div>`;
+            return;
+        }
+
+        // Geocode destinations
+        resultsArea.innerHTML = `<div style="text-align:center;padding:20px 0;"><div class="spinner" style="margin:0 auto 10px;"></div><div style="font-size:0.85rem;color:var(--text-secondary);">Geocoding destinations…</div></div>`;
+        for (const trip of allExtracted) {
+            for (const d of (trip.destinations || [])) {
+                if (!d.lat && (d.city || d.country)) {
+                    const q = [d.city, d.country].filter(Boolean).join(' ');
+                    try {
+                        const gr = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`);
+                        const gd = await gr.json();
+                        if (gd?.length) { d.lat = parseFloat(gd[0].lat); d.lon = parseFloat(gd[0].lon); }
+                    } catch {}
+                }
+            }
+        }
+
+        // Deduplicate and show preview
+        const preview = ms365DeduplicateTrips(allExtracted);
+        renderMS365Results(preview);
+
+    } catch(e) {
+        resultsArea.innerHTML = `<div style="color:var(--danger);font-size:0.85rem;padding:12px 0;">Error: ${esc(e.message)}</div>`;
+    }
+}
+
+async function extractTripsFromEmails(batch) {
+    const emailBlocks = batch.map((msg, idx) => {
+        const raw = msg.body?.content || '';
+        const body = msg.body?.contentType === 'html'
+            ? raw.replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 2500)
+            : raw.substring(0, 2500);
+        return `--- EMAIL ${idx + 1} ---\nSubject: ${msg.subject || ''}\nDate: ${msg.receivedDateTime || ''}\nFrom: ${msg.from?.emailAddress?.address || ''}\n\n${body}`;
+    }).join('\n\n');
+
+    const prompt = `${emailBlocks}
+
+These are ${batch.length} emails from a travel folder. For each email that contains a travel booking, flight confirmation, hotel reservation, or trip itinerary, extract the trip details.
+Return ONLY a JSON array (empty array [] if none found):
+[{"name":"descriptive trip name","departureDate":"YYYY-MM-DD or null","returnDate":"YYYY-MM-DD or null","destinations":[{"city":"","state":"","country":""}],"notes":"one-line summary"},...]
+Rules: ignore newsletters, promotions, and non-travel emails. One JSON object per distinct trip. No explanation, just the array.`;
+
+    try {
+        const res = await fetch(proxyUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ apiKey, model: 'claude-opus-4-6', max_tokens: 2048, stream: false,
+                messages: [{ role: 'user', content: prompt }] })
+        });
+        const text = await res.text();
+        const j = JSON.parse(text);
+        if (!res.ok) throw new Error(j?.error?.message || 'API error');
+        const raw = (j?.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+        const match = raw.match(/\[[\s\S]*\]/);
+        if (!match) return [];
+        const arr = JSON.parse(match[0]);
+        return Array.isArray(arr) ? arr.filter(t => (t.destinations?.length || t.departureDate) && t.name) : [];
+    } catch { return []; }
+}
+
+function ms365DeduplicateTrips(extracted) {
+    const existingActive = trips.filter(t => !t.deleted);
+    const results = [];
+    const seenKeys = new Set();
+
+    for (const t of extracted) {
+        const cities  = (t.destinations || []).map(d => (d.city || '').toLowerCase().trim()).filter(Boolean);
+        const depDate = t.departureDate ? new Date(t.departureDate) : null;
+
+        // Dedup within this batch
+        const batchKey = cities.join(',') + '|' + (t.departureDate || '');
+        if (seenKeys.has(batchKey)) continue;
+        seenKeys.add(batchKey);
+
+        // Check against saved trips
+        let existingMatch = null;
+        for (const ex of existingActive) {
+            const exCities = (ex.destinations || []).map(d => (d.city || '').toLowerCase().trim()).filter(Boolean);
+            if (!cities.some(c => exCities.includes(c))) continue;
+            if (depDate && ex.departureDate) {
+                if (Math.abs(depDate - new Date(ex.departureDate)) <= 7 * 86400000) { existingMatch = ex; break; }
+            } else if (!depDate && !ex.departureDate) {
+                existingMatch = ex; break;
+            }
+        }
+
+        results.push({ ...t, _isDuplicate: !!existingMatch, _existingTrip: existingMatch });
+    }
+    return results;
+}
+
+function renderMS365Results(trips365) {
+    const resultsArea = document.getElementById('ms365-results-area');
+    const newCount = trips365.filter(t => !t._isDuplicate).length;
+    const dupCount = trips365.filter(t => t._isDuplicate).length;
+
+    let html = `<div style="font-size:0.88rem;font-weight:600;color:var(--text-primary);margin-bottom:12px;">
+        Found <strong>${trips365.length}</strong> trip${trips365.length !== 1 ? 's' : ''} —
+        <span style="color:var(--success);">${newCount} new</span>${dupCount ? `, <span style="color:var(--text-secondary);">${dupCount} already saved</span>` : ''}
+    </div><div id="ms365-trip-list">`;
+
+    trips365.forEach((t, i) => {
+        const destStr  = (t.destinations || []).map(d => [d.city, d.country].filter(Boolean).join(', ')).filter(Boolean).join(' → ') || 'Unknown destination';
+        const dateStr  = [t.departureDate, t.returnDate].filter(Boolean).join(' – ') || 'Dates unknown';
+        const dupNote  = t._isDuplicate
+            ? `<div class="ms365-trip-dup">⚠ Already saved${t._existingTrip ? ` — matches "${esc(t._existingTrip.name)}"` : ''}</div>`
+            : '';
+        html += `<div class="ms365-trip-preview${t._isDuplicate ? ' dup' : ''}">
+            <input type="checkbox" id="ms365-chk-${i}" style="margin-top:3px;flex-shrink:0;" ${t._isDuplicate ? '' : 'checked'}>
+            <div style="flex:1;">
+                <div class="ms365-trip-name">${esc(t.name)}</div>
+                <div class="ms365-trip-meta">${esc(destStr)} · ${esc(dateStr)}</div>
+                ${t.notes ? `<div style="font-size:0.78rem;color:var(--text-secondary);margin-top:3px;">${esc(t.notes)}</div>` : ''}
+                ${dupNote}
+            </div>
+        </div>`;
+    });
+
+    html += `</div>
+    <div style="display:flex;gap:8px;margin-top:14px;align-items:center;flex-wrap:wrap;">
+        <button class="btn btn-primary" id="btn-ms365-import" onclick="importMS365Selected()">✅ Import Selected Trips</button>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('ms365-results-area').style.display='none'">✕ Cancel</button>
+        <span style="font-size:0.78rem;color:var(--text-secondary);">Uncheck duplicates or unwanted trips before importing</span>
+    </div>`;
+
+    resultsArea.innerHTML = html;
+    window._ms365Trips = trips365;
+}
+
+async function importMS365Selected() {
+    const trips365 = window._ms365Trips || [];
+    const btn = document.getElementById('btn-ms365-import');
+    btn.disabled = true; btn.textContent = '⏳ Importing…';
+
+    let imported = 0;
+    for (let i = 0; i < trips365.length; i++) {
+        const chk = document.getElementById(`ms365-chk-${i}`);
+        if (!chk?.checked) continue;
+        const t = trips365[i];
+        try {
+            await db.collection('globetrotting_trips').add({
+                name: t.name || (t.destinations?.[0] ? [t.destinations[0].city, t.destinations[0].country].filter(Boolean).join(', ') : 'Imported Trip'),
+                departureDate: t.departureDate || '',
+                returnDate: t.returnDate || '',
+                destinations: (t.destinations || []).map(d => ({ city: d.city||'', state: d.state||'', country: d.country||'', lat: d.lat||null, lon: d.lon||null })),
+                notes: t.notes || '',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            imported++;
+        } catch {}
+    }
+
+    await loadTrips();
+    renderAll();
+    document.getElementById('ms365-results-area').style.display = 'none';
+    showToast(`${imported} trip${imported !== 1 ? 's' : ''} imported!`);
+    btn.disabled = false; btn.textContent = '✅ Import Selected Trips';
 }
 
 // ═══════════════════════════════════════════════

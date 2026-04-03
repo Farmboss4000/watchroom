@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Don't Push — Farmboss</title>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg:     #08080e;
+            --card:   #10101c;
+            --border: rgba(255,255,255,0.07);
+            --text:   #eeeef5;
+            --text2:  #6666aa;
+            --danger: #ff453a;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+        /* ── SITE SWITCHER ── */
+        .site-switcher { background: #020408; display: flex; align-items: center; padding: 5px 18px; gap: 4px; font-size: 0.77rem; border-bottom: 1px solid rgba(255,255,255,0.05); overflow-x: auto; scrollbar-width: none; }
+        .site-switcher::-webkit-scrollbar { display: none; }
+        .site-switcher-label { color: #333355; font-size: 0.69rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; margin-right: 8px; flex-shrink: 0; }
+        .site-link { text-decoration: none; color: #55558a; padding: 4px 10px; border-radius: 12px; white-space: nowrap; transition: all 0.15s; font-size: 0.77rem; }
+        .site-link:hover { background: rgba(255,255,255,0.07); color: #cccce0; }
+        .site-link.active { background: rgba(255,69,58,0.15); color: var(--danger); font-weight: 700; }
+
+        /* ── LOGIN ── */
+        #login-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .login-box { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 40px 36px; width: 100%; max-width: 360px; }
+        .login-logo { text-align: center; font-size: 1.6rem; font-weight: 900; color: var(--danger); margin-bottom: 4px; letter-spacing: -0.5px; }
+        .login-sub { text-align: center; font-size: 0.8rem; color: var(--text2); margin-bottom: 26px; }
+        .login-box input { width: 100%; padding: 10px 14px; background: #191928; border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.9rem; margin-bottom: 10px; font-family: inherit; }
+        .login-box input:focus { outline: none; border-color: var(--danger); }
+        .login-btn { width: 100%; padding: 11px; background: var(--danger); color: #fff; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 800; cursor: pointer; transition: background 0.15s; }
+        .login-btn:hover { background: #ff2d22; }
+        .login-error { color: var(--danger); font-size: 0.82rem; margin-bottom: 10px; min-height: 18px; text-align: center; }
+
+        /* ── APP ── */
+        #app { display: none; }
+        .page-header { padding: 40px 20px 0; max-width: 860px; margin: 0 auto; }
+        .page-title { font-size: 2.4rem; font-weight: 900; letter-spacing: -1px; color: var(--danger); }
+        .page-sub { font-size: 0.88rem; color: var(--text2); margin-top: 6px; }
+        .caution-tape { display: flex; align-items: center; gap: 10px; margin-top: 14px; margin-bottom: 36px; padding: 10px 16px; background: repeating-linear-gradient(45deg, #1a0800, #1a0800 10px, #100800 10px, #100800 20px); border: 1px solid rgba(255,150,0,0.2); border-radius: 8px; font-size: 0.78rem; color: #ff9500; font-weight: 600; letter-spacing: 0.3px; }
+
+        /* ── CARDS ── */
+        .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; max-width: 860px; margin: 0 auto; padding: 0 20px 40px; }
+        .dp-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 26px 22px; text-decoration: none; color: inherit; display: block; transition: all 0.18s; position: relative; overflow: hidden; }
+        .dp-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--cc, #666); }
+        .dp-card:hover { border-color: rgba(255,255,255,0.12); transform: translateY(-3px); box-shadow: 0 12px 36px rgba(0,0,0,0.55); }
+        .dp-card-icon { font-size: 2.2rem; margin-bottom: 12px; }
+        .dp-card-name { font-size: 1.1rem; font-weight: 800; margin-bottom: 6px; letter-spacing: -0.3px; }
+        .dp-card-desc { font-size: 0.82rem; color: var(--text2); line-height: 1.55; }
+        .dp-card-tag { display: inline-block; margin-top: 14px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text2); background: rgba(255,255,255,0.05); padding: 3px 9px; border-radius: 20px; }
+
+        .user-badge { position: fixed; bottom: 16px; right: 16px; font-size: 0.72rem; color: var(--text2); }
+        .btn-so { background: none; border: none; color: var(--text2); cursor: pointer; font-size: 0.72rem; text-decoration: underline; }
+        .btn-so:hover { color: var(--danger); }
+    </style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+    <div class="login-box">
+        <div class="login-logo">🚫 DON'T PUSH</div>
+        <div class="login-sub">Internal / experimental tools</div>
+        <div class="login-error" id="login-error"></div>
+        <input type="email" id="login-email" placeholder="Email" autocomplete="email">
+        <input type="password" id="login-pass" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
+        <button class="login-btn" onclick="doLogin()">Sign In</button>
+    </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+    <div class="site-switcher">
+        <span class="site-switcher-label">Farmboss</span>
+        <a href="index.html" class="site-link">🏠 HQ</a>
+        <a href="armory.html" class="site-link">🔫 Armory</a>
+        <a href="machinery.html" class="site-link">🚜 Machinery</a>
+        <a href="automotive.html" class="site-link">🚗 Automotive</a>
+        <a href="livestock.html" class="site-link">🐄 Livestock</a>
+        <a href="timepieces.html" class="site-link">⌚ Timepieces</a>
+        <a href="knives.html" class="site-link">🔪 Knives</a>
+        <a href="pharmacy.html" class="site-link">💊 Pharmacy</a>
+        <a href="insurance.html" class="site-link">🛡 Insurance</a>
+        <a href="realestate.html" class="site-link">🏡 Real Estate</a>
+        <a href="globetrotting.html" class="site-link">✈️ Globetrotting</a>
+        <a href="dontpush.html" class="site-link active">🚫 Don't Push</a>
+    </div>
+
+    <div class="page-header">
+        <div class="page-title">🚫 DON'T PUSH</div>
+        <div class="page-sub">Experimental, internal, and work-in-progress tools. Handle with care.</div>
+        <div class="caution-tape">⚠️ &nbsp; These tools are not production-ready — they may change, break, or disappear at any time.</div>
+    </div>
+
+    <div class="cards">
+        <a href="shitshow.html" class="dp-card" style="--cc:#ff2d55;">
+            <div class="dp-card-icon">💡</div>
+            <div class="dp-card-name">SHITSHOW</div>
+            <div class="dp-card-desc">AI-powered brainstorming boards. Capture ideas fast, organize with colors and stars, and let Claude generate more.</div>
+            <div class="dp-card-tag">Brainstorming</div>
+        </a>
+        <a href="agents.html" class="dp-card" style="--cc:#0a7fff;">
+            <div class="dp-card-icon">🤖</div>
+            <div class="dp-card-name">Agents</div>
+            <div class="dp-card-desc">Configure API keys, proxy settings, and AI agent behavior across all Farmboss tools.</div>
+            <div class="dp-card-tag">Settings</div>
+        </a>
+        <a href="forte.html" class="dp-card" style="--cc:#bf5af2;">
+            <div class="dp-card-icon">✦</div>
+            <div class="dp-card-name">FORTÉ</div>
+            <div class="dp-card-desc">Personal strengths, skills inventory, and professional development tracking.</div>
+            <div class="dp-card-tag">Personal</div>
+        </a>
+    </div>
+
+    <div class="user-badge" id="user-badge"></div>
+</div>
+
+<script>
+firebase.initializeApp({
+    apiKey: "AIzaSyB7c4urD9tJO80S7nADItxjwhSYVqlrkEU",
+    authDomain: "watchroom-714a0.firebaseapp.com",
+    projectId: "watchroom-714a0",
+    storageBucket: "watchroom-714a0.appspot.com",
+    messagingSenderId: "911514107783",
+    appId: "1:911514107783:web:20e8a729fd66577c28dd22"
+});
+const auth = firebase.auth();
+
+auth.onAuthStateChanged(user => {
+    if (user) {
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+        document.getElementById('user-badge').innerHTML =
+            `${user.email} &nbsp;<button class="btn-so" onclick="auth.signOut()">Sign Out</button>`;
+    } else {
+        document.getElementById('login-screen').style.display = 'flex';
+        document.getElementById('app').style.display = 'none';
+    }
+});
+
+async function doLogin() {
+    const email = document.getElementById('login-email').value.trim();
+    const pass  = document.getElementById('login-pass').value;
+    document.getElementById('login-error').textContent = '';
+    try { await auth.signInWithEmailAndPassword(email, pass); }
+    catch(e) { document.getElementById('login-error').textContent = e.message; }
+}
+</script>
+</body>
+</html>

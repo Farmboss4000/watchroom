@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SHITSHOW — Brainstorming</title>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg:          #08080e;
+            --bg-card:     #11111c;
+            --bg-raised:   #191927;
+            --border:      rgba(255,255,255,0.07);
+            --accent:      #ff2d55;
+            --accent-dim:  rgba(255,45,85,0.12);
+            --purple:      #bf5af2;
+            --text:        #eeeef5;
+            --text2:       #7777aa;
+            --success:     #30d158;
+            --danger:      #ff453a;
+            --warning:     #ff9f0a;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+        /* ── SITE SWITCHER ── */
+        .site-switcher { background: #020408; display: flex; align-items: center; padding: 5px 18px; gap: 4px; font-size: 0.77rem; border-bottom: 1px solid rgba(255,255,255,0.05); overflow-x: auto; scrollbar-width: none; flex-wrap: nowrap; }
+        .site-switcher::-webkit-scrollbar { display: none; }
+        .site-switcher-label { color: #333355; font-size: 0.69rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; margin-right: 8px; flex-shrink: 0; }
+        .site-link { text-decoration: none; color: #55558a; padding: 4px 10px; border-radius: 12px; white-space: nowrap; transition: all 0.15s; font-size: 0.77rem; }
+        .site-link:hover { background: rgba(255,255,255,0.07); color: #cccce0; }
+        .site-link.active { background: var(--accent-dim); color: var(--accent); font-weight: 700; }
+
+        /* ── LOGIN ── */
+        #login-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: radial-gradient(ellipse at 50% 0%, #1e0020 0%, var(--bg) 60%); }
+        .login-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: 18px; padding: 44px 38px; width: 100%; max-width: 380px; }
+        .login-logo { text-align: center; font-size: 2.2rem; font-weight: 900; letter-spacing: -1px; color: var(--accent); margin-bottom: 4px; }
+        .login-tagline { text-align: center; font-size: 0.8rem; color: var(--text2); margin-bottom: 28px; letter-spacing: 0.3px; }
+        .login-box input { width: 100%; padding: 11px 14px; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 9px; color: var(--text); font-size: 0.9rem; margin-bottom: 10px; font-family: inherit; }
+        .login-box input:focus { outline: none; border-color: var(--accent); }
+        .login-btn { width: 100%; padding: 12px; background: var(--accent); color: #fff; border: none; border-radius: 9px; font-size: 0.95rem; font-weight: 800; cursor: pointer; margin-top: 4px; letter-spacing: 0.2px; transition: background 0.15s; }
+        .login-btn:hover { background: #ff1040; }
+        .login-error { color: var(--danger); font-size: 0.82rem; margin-bottom: 10px; min-height: 18px; text-align: center; }
+
+        /* ── APP ── */
+        #app { display: none; min-height: 100vh; }
+        .app-header { background: #0c0c1a; border-bottom: 1px solid var(--border); padding: 11px 20px; display: flex; align-items: center; gap: 14px; position: sticky; top: 0; z-index: 100; }
+        .app-logo { font-size: 1.35rem; font-weight: 900; letter-spacing: -0.5px; color: var(--accent); text-transform: uppercase; cursor: pointer; line-height: 1; user-select: none; }
+        .app-logo-sub { font-size: 0.65rem; color: var(--text2); font-weight: 400; letter-spacing: 0.8px; text-transform: uppercase; display: block; margin-top: 1px; }
+        .board-breadcrumb { font-size: 0.78rem; color: var(--text2); }
+        .board-breadcrumb strong { color: var(--text); }
+        .header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+        .user-email { font-size: 0.74rem; color: var(--text2); }
+        .btn-signout { background: none; border: 1px solid rgba(255,255,255,0.1); color: var(--text2); padding: 4px 11px; border-radius: 6px; cursor: pointer; font-size: 0.74rem; transition: all 0.15s; }
+        .btn-signout:hover { border-color: var(--danger); color: var(--danger); }
+
+        /* ── BUTTONS ── */
+        .btn { padding: 8px 16px; border: none; border-radius: 8px; cursor: pointer; font-size: 0.86rem; font-weight: 600; transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px; font-family: inherit; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-primary { background: var(--accent); color: #fff; }
+        .btn-primary:hover:not(:disabled) { background: #ff1040; }
+        .btn-ghost { background: none; color: var(--text2); border: 1px solid var(--border); }
+        .btn-ghost:hover { background: var(--bg-raised); color: var(--text); border-color: rgba(255,255,255,0.15); }
+        .btn-ai { background: linear-gradient(135deg, #7c3aed, #bf5af2); color: #fff; }
+        .btn-ai:hover:not(:disabled) { background: linear-gradient(135deg, #8b4cf7, #cc6ef5); }
+        .btn-sm { padding: 5px 11px; font-size: 0.78rem; }
+        .btn-danger { background: none; border: 1px solid var(--border); color: var(--text2); }
+        .btn-danger:hover { border-color: var(--danger); color: var(--danger); background: rgba(255,69,58,0.08); }
+
+        /* ── VIEWS ── */
+        main { padding: 22px 20px; max-width: 1400px; margin: 0 auto; }
+        .view { display: none; }
+        .view.active { display: block; }
+
+        /* ── BOARDS DASHBOARD ── */
+        .dash-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; flex-wrap: wrap; gap: 10px; }
+        .dash-title { font-size: 1.45rem; font-weight: 900; }
+        .dash-title span { font-size: 0.9rem; color: var(--text2); font-weight: 400; margin-left: 8px; }
+        .boards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 13px; }
+        .board-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 13px; padding: 20px 18px; cursor: pointer; transition: all 0.18s; position: relative; overflow: hidden; }
+        .board-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--bc, var(--accent)); }
+        .board-card:hover { border-color: rgba(255,255,255,0.13); transform: translateY(-2px); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .board-card-name { font-size: 1rem; font-weight: 800; margin-bottom: 5px; padding-right: 22px; }
+        .board-card-desc { font-size: 0.8rem; color: var(--text2); margin-bottom: 14px; min-height: 16px; }
+        .board-card-meta { font-size: 0.74rem; color: var(--text2); display: flex; align-items: center; gap: 10px; }
+        .board-card-meta strong { color: var(--text); font-size: 0.88rem; }
+        .board-del { position: absolute; top: 10px; right: 10px; background: none; border: none; color: var(--text2); cursor: pointer; font-size: 0.82rem; opacity: 0; transition: opacity 0.15s; padding: 4px 6px; border-radius: 5px; }
+        .board-card:hover .board-del { opacity: 1; }
+        .board-del:hover { color: var(--danger); background: rgba(255,69,58,0.1); }
+        .board-card-new { border: 2px dashed rgba(255,255,255,0.08); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 120px; color: var(--text2); transition: all 0.18s; }
+        .board-card-new:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+        .board-card-new-icon { font-size: 1.8rem; }
+        .board-card-new-label { font-size: 0.84rem; font-weight: 700; }
+
+        /* ── MODAL ── */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: none; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(4px); padding: 16px; }
+        .modal-overlay.open { display: flex; }
+        .modal-box { background: var(--bg-card); border: 1px solid rgba(255,255,255,0.1); border-radius: 15px; padding: 28px 26px; width: 100%; max-width: 430px; }
+        .modal-title { font-size: 1.1rem; font-weight: 800; margin-bottom: 18px; }
+        .mf { margin-bottom: 13px; }
+        .mf label { display: block; font-size: 0.75rem; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+        .mf input, .mf textarea { width: 100%; padding: 10px 13px; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.9rem; font-family: inherit; }
+        .mf input:focus, .mf textarea:focus { outline: none; border-color: var(--accent); }
+        .color-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+        .cdot { width: 26px; height: 26px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: transform 0.15s, border-color 0.15s; flex-shrink: 0; }
+        .cdot:hover, .cdot.sel { border-color: #fff; transform: scale(1.18); }
+        .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+
+        /* ── BOARD VIEW ── */
+        .board-hdr { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+        .back-btn { background: none; border: 1px solid var(--border); color: var(--text2); padding: 6px 13px; border-radius: 8px; cursor: pointer; font-size: 0.8rem; transition: all 0.15s; font-family: inherit; }
+        .back-btn:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
+        .board-title { font-size: 1.35rem; font-weight: 900; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .board-idea-count { font-size: 0.78rem; color: var(--text2); white-space: nowrap; }
+
+        /* ── ADD BAR ── */
+        .add-bar { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 13px 15px; margin-bottom: 14px; display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+        .add-input { flex: 1; min-width: 180px; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 8px; padding: 9px 13px; color: var(--text); font-size: 0.92rem; font-family: inherit; }
+        .add-input:focus { outline: none; border-color: var(--accent); }
+        .add-input::placeholder { color: var(--text2); }
+        .ncp { display: flex; gap: 5px; align-items: center; }
+        .ncp-dot { width: 21px; height: 21px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: transform 0.12s, border-color 0.12s; flex-shrink: 0; }
+        .ncp-dot:hover, .ncp-dot.sel { border-color: rgba(255,255,255,0.8); transform: scale(1.2); }
+
+        /* ── TOOLBAR ── */
+        .toolbar { display: flex; align-items: center; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+        .chip { padding: 4px 13px; border-radius: 20px; border: 1px solid var(--border); background: none; color: var(--text2); font-size: 0.76rem; cursor: pointer; transition: all 0.15s; font-family: inherit; white-space: nowrap; }
+        .chip:hover { background: var(--bg-raised); color: var(--text); }
+        .chip.on { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+        .tsep { width: 1px; height: 18px; background: var(--border); flex-shrink: 0; }
+        .sort-sel { padding: 5px 10px; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 8px; color: var(--text2); font-size: 0.76rem; cursor: pointer; font-family: inherit; }
+        .sort-sel:focus { outline: none; }
+        .count-lbl { font-size: 0.74rem; color: var(--text2); }
+
+        /* ── IDEAS MASONRY ── */
+        .ideas-grid { columns: 4 260px; column-gap: 11px; }
+
+        /* ── IDEA CARD ── */
+        .idea-card { break-inside: avoid; border-radius: 10px; padding: 14px; margin-bottom: 11px; position: relative; transition: transform 0.15s, box-shadow 0.15s; }
+        .idea-card:hover { transform: translateY(-2px) rotate(-0.4deg); box-shadow: 0 10px 28px rgba(0,0,0,0.55); }
+
+        /* Note colors */
+        .ic-yellow { background: #ffd60a; color: #1a1200; }
+        .ic-green  { background: #34d17a; color: #00180a; }
+        .ic-pink   { background: #ff375f; color: #fff; }
+        .ic-blue   { background: #0a7fff; color: #fff; }
+        .ic-orange { background: #ff9500; color: #1a0900; }
+        .ic-purple { background: #bf5af2; color: #fff; }
+        .ic-teal   { background: #1eccb8; color: #001a17; }
+        .ic-red    { background: #ff3b30; color: #fff; }
+        .ic-lime   { background: #a3e635; color: #0f1a00; }
+        .ic-dark   { background: #1e1e32; color: var(--text); border: 1px solid rgba(255,255,255,0.1); }
+
+        .idea-text { font-size: 0.92rem; line-height: 1.55; word-break: break-word; padding-right: 22px; white-space: pre-wrap; }
+        .idea-edit-ta { display: none; width: 100%; background: rgba(0,0,0,0.12); border: none; border-radius: 5px; padding: 3px 6px; font-size: 0.92rem; font-family: inherit; color: inherit; resize: none; line-height: 1.55; }
+        .idea-edit-ta:focus { outline: 1px solid rgba(255,255,255,0.35); }
+
+        .idea-footer { display: flex; align-items: center; gap: 5px; margin-top: 9px; opacity: 0; transition: opacity 0.15s; }
+        .idea-card:hover .idea-footer { opacity: 1; }
+        .iab { background: rgba(0,0,0,0.14); border: none; border-radius: 5px; padding: 3px 8px; cursor: pointer; font-size: 0.74rem; color: inherit; transition: background 0.1s; display: inline-flex; align-items: center; gap: 3px; font-family: inherit; }
+        .iab:hover { background: rgba(0,0,0,0.28); }
+        .iab.starred { background: rgba(0,0,0,0.22); }
+        .vote-n { font-weight: 800; }
+
+        .idea-del { position: absolute; top: 7px; right: 7px; background: rgba(0,0,0,0.14); border: none; border-radius: 4px; width: 20px; height: 20px; cursor: pointer; color: inherit; font-size: 0.68rem; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.15s; }
+        .idea-card:hover .idea-del { opacity: 1; }
+        .idea-del:hover { background: rgba(180,0,0,0.32); }
+
+        .idea-colors { display: flex; gap: 4px; margin-top: 9px; opacity: 0; transition: opacity 0.15s; flex-wrap: wrap; }
+        .idea-card:hover .idea-colors { opacity: 1; }
+        .icd { width: 13px; height: 13px; border-radius: 50%; cursor: pointer; border: 1px solid rgba(0,0,0,0.18); transition: transform 0.1s; flex-shrink: 0; }
+        .icd:hover { transform: scale(1.4); }
+
+        /* Empty */
+        .ideas-empty { text-align: center; padding: 60px 20px; color: var(--text2); grid-column: 1 / -1; }
+        .ideas-empty-icon { font-size: 3rem; margin-bottom: 12px; }
+        .ideas-empty-msg { font-size: 0.9rem; margin-bottom: 5px; }
+        .ideas-empty-hint { font-size: 0.78rem; color: #444466; }
+
+        /* ── AI MODAL ── */
+        .ai-modal { max-width: 530px; }
+        .ai-results-area { max-height: 340px; overflow-y: auto; margin-top: 14px; border: 1px solid var(--border); border-radius: 8px; }
+        .ai-row { display: flex; align-items: flex-start; gap: 9px; padding: 9px 12px; border-bottom: 1px solid var(--border); }
+        .ai-row:last-child { border-bottom: none; }
+        .ai-row label { font-size: 0.87rem; color: var(--text); cursor: pointer; flex: 1; line-height: 1.45; }
+        .ai-status { font-size: 0.8rem; color: var(--text2); margin-top: 7px; display: flex; align-items: center; gap: 6px; }
+
+        /* ── SPINNER ── */
+        .spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.1); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── TOAST ── */
+        .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(16px); background: var(--bg-raised); border: 1px solid rgba(255,255,255,0.1); color: var(--text); padding: 10px 20px; border-radius: 9px; font-size: 0.84rem; opacity: 0; transition: all 0.22s; z-index: 9999; pointer-events: none; white-space: nowrap; }
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .toast.err { border-color: var(--danger); color: var(--danger); }
+
+        /* ── RESPONSIVE ── */
+        @media (max-width: 640px) {
+            main { padding: 14px 12px; }
+            .ideas-grid { columns: 1; }
+            .boards-grid { grid-template-columns: 1fr; }
+            .add-bar { flex-direction: column; align-items: stretch; }
+            .board-hdr .btn-sm { font-size: 0.72rem; padding: 4px 8px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ── LOGIN ── -->
+<div id="login-screen">
+    <div class="login-box">
+        <div class="login-logo">SHITSHOW</div>
+        <div class="login-tagline">Where good ideas come to get weird</div>
+        <div class="login-error" id="login-error"></div>
+        <input type="email" id="login-email" placeholder="Email" autocomplete="email">
+        <input type="password" id="login-pass" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
+        <button class="login-btn" onclick="doLogin()">Sign In</button>
+    </div>
+</div>
+
+<!-- ── APP ── -->
+<div id="app">
+
+    <!-- Site Switcher -->
+    <div class="site-switcher">
+        <span class="site-switcher-label">Farmboss</span>
+        <a href="index.html" class="site-link">🏠 HQ</a>
+        <a href="armory.html" class="site-link">🔫 Armory</a>
+        <a href="machinery.html" class="site-link">🚜 Machinery</a>
+        <a href="automotive.html" class="site-link">🚗 Automotive</a>
+        <a href="livestock.html" class="site-link">🐄 Livestock</a>
+        <a href="timepieces.html" class="site-link">⌚ Timepieces</a>
+        <a href="knives.html" class="site-link">🔪 Knives</a>
+        <a href="pharmacy.html" class="site-link">💊 Pharmacy</a>
+        <a href="insurance.html" class="site-link">🛡 Insurance</a>
+        <a href="realestate.html" class="site-link">🏡 Real Estate</a>
+        <a href="dontpush.html" class="site-link active">🚫 Don't Push</a>
+        <a href="globetrotting.html" class="site-link">✈️ Globetrotting</a>
+    </div>
+
+    <!-- Header -->
+    <header class="app-header">
+        <div onclick="goBoards()" style="cursor:pointer;">
+            <div class="app-logo">SHITSHOW</div>
+            <span class="app-logo-sub">Brainstorming</span>
+        </div>
+        <div class="board-breadcrumb" id="board-breadcrumb" style="display:none;">/ <strong id="breadcrumb-name"></strong></div>
+        <div class="header-right">
+            <span class="user-email" id="user-email"></span>
+            <button class="btn-signout" onclick="doSignOut()">Sign Out</button>
+        </div>
+    </header>
+
+    <main>
+        <!-- ── BOARDS ── -->
+        <div class="view active" id="view-boards">
+            <div class="dash-top">
+                <div class="dash-title">My Boards <span id="boards-count"></span></div>
+                <button class="btn btn-primary" onclick="openNewBoardModal()">＋ New Board</button>
+            </div>
+            <div class="boards-grid" id="boards-grid"></div>
+        </div>
+
+        <!-- ── BOARD ── -->
+        <div class="view" id="view-board">
+            <div class="board-hdr">
+                <button class="back-btn" onclick="goBoards()">← Boards</button>
+                <div class="board-title" id="board-title"></div>
+                <div class="board-idea-count" id="board-idea-count"></div>
+                <div style="margin-left:auto;display:flex;gap:7px;flex-wrap:wrap;">
+                    <button class="btn btn-ai btn-sm" onclick="openAIModal()">✨ AI Brainstorm</button>
+                    <button class="btn btn-ghost btn-sm" onclick="exportBoard()">📋 Copy All</button>
+                </div>
+            </div>
+
+            <!-- Add Bar -->
+            <div class="add-bar">
+                <input class="add-input" id="add-input" placeholder="Type an idea… press Enter to add" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();addIdea();}">
+                <div class="ncp" id="ncp"></div>
+                <button class="btn btn-primary" onclick="addIdea()">＋ Add</button>
+            </div>
+
+            <!-- Toolbar -->
+            <div class="toolbar" id="toolbar">
+                <button class="chip on" id="chip-all" onclick="setFilter('all')">All</button>
+                <button class="chip" id="chip-starred" onclick="setFilter('starred')">⭐ Starred</button>
+                <div class="tsep"></div>
+                <div id="color-chips"></div>
+                <div class="tsep"></div>
+                <select class="sort-sel" id="sort-sel" onchange="renderIdeas()">
+                    <option value="newest">Newest</option>
+                    <option value="oldest">Oldest</option>
+                    <option value="votes">Top Voted</option>
+                    <option value="starred">Starred First</option>
+                    <option value="random">Shuffle 🎲</option>
+                </select>
+                <span class="count-lbl" id="count-lbl"></span>
+            </div>
+
+            <!-- Ideas -->
+            <div class="ideas-grid" id="ideas-grid"></div>
+        </div>
+    </main>
+</div>
+
+<!-- ── NEW BOARD MODAL ── -->
+<div class="modal-overlay" id="modal-new-board" onclick="if(event.target===this)closeNewBoardModal()">
+    <div class="modal-box">
+        <div class="modal-title">New Board</div>
+        <div class="mf">
+            <label>Name</label>
+            <input type="text" id="nb-name" placeholder="e.g. Product Launch Ideas" onkeydown="if(event.key==='Enter')createBoard()">
+        </div>
+        <div class="mf">
+            <label>Description (optional)</label>
+            <input type="text" id="nb-desc" placeholder="What are you brainstorming?">
+        </div>
+        <div class="mf">
+            <label>Accent Color</label>
+            <div class="color-row" id="board-color-row"></div>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="closeNewBoardModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="createBoard()">Create Board</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── AI MODAL ── -->
+<div class="modal-overlay" id="modal-ai" onclick="if(event.target===this)closeAIModal()">
+    <div class="modal-box ai-modal">
+        <div class="modal-title">✨ AI Brainstorm</div>
+        <div class="mf">
+            <label>Topic / Prompt (optional)</label>
+            <textarea id="ai-topic" rows="3" placeholder="Describe what you want ideas about — or leave blank to generate ideas based on what's already on this board…" style="resize:none;"></textarea>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <button class="btn btn-ai" id="btn-ai-gen" onclick="runAI()">✨ Generate Ideas</button>
+            <button class="btn btn-ghost btn-sm" onclick="closeAIModal()">Close</button>
+        </div>
+        <div class="ai-status" id="ai-status" style="display:none;"></div>
+        <div class="ai-results-area" id="ai-results" style="display:none;"></div>
+        <div id="ai-import-bar" style="display:none;margin-top:11px;display:none;flex-wrap:wrap;gap:7px;align-items:center;">
+            <button class="btn btn-primary btn-sm" onclick="importAIIdeas()">＋ Add Selected</button>
+            <button class="btn btn-ghost btn-sm" onclick="aiToggleAll(true)">Select All</button>
+            <button class="btn btn-ghost btn-sm" onclick="aiToggleAll(false)">None</button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  FIREBASE
+// ═══════════════════════════════════════════════
+firebase.initializeApp({
+    apiKey: "AIzaSyB7c4urD9tJO80S7nADItxjwhSYVqlrkEU",
+    authDomain: "watchroom-714a0.firebaseapp.com",
+    projectId: "watchroom-714a0",
+    storageBucket: "watchroom-714a0.appspot.com",
+    messagingSenderId: "911514107783",
+    appId: "1:911514107783:web:20e8a729fd66577c28dd22"
+});
+const auth = firebase.auth();
+const db   = firebase.firestore();
+
+// ═══════════════════════════════════════════════
+//  CONSTANTS
+// ═══════════════════════════════════════════════
+const BOARD_COLORS = ['#ff2d55','#bf5af2','#0a7fff','#34d17a','#ff9500','#1eccb8','#ff6b2b','#ffd60a'];
+const NOTE_COLORS  = ['yellow','green','pink','blue','orange','purple','teal','red','lime','dark'];
+const NOTE_HEX     = {
+    yellow:'#ffd60a', green:'#34d17a', pink:'#ff375f', blue:'#0a7fff',
+    orange:'#ff9500', purple:'#bf5af2', teal:'#1eccb8', red:'#ff3b30',
+    lime:'#a3e635',   dark:'#1e1e32'
+};
+
+// ═══════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════
+let boards        = [];
+let ideas         = [];
+let activeBoardId = null;
+let ideasUnsub    = null;
+let apiKey        = '';
+let proxyUrl      = '';
+let noteColor     = 'yellow';
+let activeFilter  = 'all';
+let colorFilter   = null;
+let boardColor    = BOARD_COLORS[0];
+let aiIdeas       = [];
+
+// ═══════════════════════════════════════════════
+//  AUTH
+// ═══════════════════════════════════════════════
+auth.onAuthStateChanged(async user => {
+    if (user) {
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+        document.getElementById('user-email').textContent = user.email;
+        await loadSettings();
+        await loadBoards();
+        renderBoardsGrid();
+        renderNoteColorPicker();
+        renderBoardColorPicker();
+    } else {
+        document.getElementById('login-screen').style.display = 'flex';
+        document.getElementById('app').style.display = 'none';
+    }
+});
+
+async function doLogin() {
+    const email = document.getElementById('login-email').value.trim();
+    const pass  = document.getElementById('login-pass').value;
+    document.getElementById('login-error').textContent = '';
+    try { await auth.signInWithEmailAndPassword(email, pass); }
+    catch(e) { document.getElementById('login-error').textContent = e.message; }
+}
+function doSignOut() { auth.signOut(); }
+
+// ═══════════════════════════════════════════════
+//  SETTINGS
+// ═══════════════════════════════════════════════
+async function loadSettings() {
+    const kd = await db.collection('settings').doc('apikey').get().catch(() => null);
+    if (kd?.exists) apiKey = kd.data().key || '';
+    const pd = await db.collection('settings').doc('proxy').get().catch(() => null);
+    if (pd?.exists) proxyUrl = pd.data().url || '';
+}
+
+// ═══════════════════════════════════════════════
+//  VIEWS
+// ═══════════════════════════════════════════════
+function showView(name) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-' + name).classList.add('active');
+}
+
+function goBoards() {
+    if (ideasUnsub) { ideasUnsub(); ideasUnsub = null; }
+    activeBoardId = null;
+    document.getElementById('board-breadcrumb').style.display = 'none';
+    showView('boards');
+}
+
+// ═══════════════════════════════════════════════
+//  BOARDS CRUD
+// ═══════════════════════════════════════════════
+async function loadBoards() {
+    const snap = await db.collection('shitshow_boards').orderBy('createdAt','desc').get().catch(() => null);
+    boards = snap ? snap.docs.map(d => ({ _id: d.id, ...d.data() })) : [];
+}
+
+function renderBoardsGrid() {
+    const el = document.getElementById('boards-grid');
+    document.getElementById('boards-count').textContent = boards.length ? `(${boards.length})` : '';
+    let html = boards.map(b => {
+        const col = b.color || '#ff2d55';
+        return `<div class="board-card" style="--bc:${esc(col)}" onclick="openBoard('${b._id}')">
+            <button class="board-del" onclick="event.stopPropagation();deleteBoard('${b._id}')" title="Delete">✕</button>
+            <div class="board-card-name">${esc(b.name)}</div>
+            <div class="board-card-desc">${esc(b.description||'')}</div>
+            <div class="board-card-meta">
+                <strong>${b.ideaCount||0}</strong> idea${b.ideaCount!==1?'s':''}
+                ${b.createdAt?.toDate ? ' · ' + fmtDate(b.createdAt.toDate()) : ''}
+            </div>
+        </div>`;
+    }).join('');
+    html += `<div class="board-card board-card-new" onclick="openNewBoardModal()">
+        <div class="board-card-new-icon">＋</div>
+        <div class="board-card-new-label">New Board</div>
+    </div>`;
+    el.innerHTML = html;
+}
+
+function renderBoardColorPicker() {
+    document.getElementById('board-color-row').innerHTML = BOARD_COLORS.map(c =>
+        `<div class="cdot${c===boardColor?' sel':''}" style="background:${c}" onclick="pickBoardColor('${c}',this)"></div>`
+    ).join('');
+}
+
+function pickBoardColor(c, el) {
+    boardColor = c;
+    document.querySelectorAll('#board-color-row .cdot').forEach(d => d.classList.remove('sel'));
+    el.classList.add('sel');
+}
+
+function openNewBoardModal() {
+    document.getElementById('nb-name').value = '';
+    document.getElementById('nb-desc').value = '';
+    renderBoardColorPicker();
+    document.getElementById('modal-new-board').classList.add('open');
+    setTimeout(() => document.getElementById('nb-name').focus(), 60);
+}
+function closeNewBoardModal() { document.getElementById('modal-new-board').classList.remove('open'); }
+
+async function createBoard() {
+    const name = document.getElementById('nb-name').value.trim();
+    if (!name) { document.getElementById('nb-name').focus(); return; }
+    const desc = document.getElementById('nb-desc').value.trim();
+    await db.collection('shitshow_boards').add({
+        name, description: desc, color: boardColor, ideaCount: 0,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    closeNewBoardModal();
+    await loadBoards();
+    renderBoardsGrid();
+    toast('Board created!');
+}
+
+async function deleteBoard(id) {
+    const b = boards.find(b => b._id === id);
+    if (!confirm(`Delete "${b?.name}"? All ${b?.ideaCount||0} ideas will be lost.`)) return;
+    const snap = await db.collection('shitshow_ideas').where('boardId','==',id).get().catch(() => null);
+    if (snap?.docs.length) {
+        const batch = db.batch();
+        snap.docs.forEach(d => batch.delete(d.ref));
+        await batch.commit().catch(() => {});
+    }
+    await db.collection('shitshow_boards').doc(id).delete();
+    await loadBoards();
+    renderBoardsGrid();
+    toast('Board deleted');
+}
+
+// ═══════════════════════════════════════════════
+//  BOARD / IDEAS
+// ═══════════════════════════════════════════════
+function openBoard(id) {
+    activeBoardId = id;
+    const b = boards.find(b => b._id === id);
+    if (!b) return;
+
+    document.getElementById('board-title').textContent = b.name;
+    document.getElementById('breadcrumb-name').textContent = b.name;
+    document.getElementById('board-breadcrumb').style.display = 'inline';
+
+    activeFilter = 'all';
+    colorFilter  = null;
+    document.getElementById('sort-sel').value = 'newest';
+    document.getElementById('chip-all').classList.add('on');
+    document.getElementById('chip-starred').classList.remove('on');
+
+    showView('board');
+    setTimeout(() => document.getElementById('add-input').focus(), 100);
+
+    if (ideasUnsub) ideasUnsub();
+    ideasUnsub = db.collection('shitshow_ideas')
+        .where('boardId','==',id)
+        .orderBy('createdAt','desc')
+        .onSnapshot(snap => {
+            ideas = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+            renderIdeas();
+            syncIdeaCount();
+        });
+}
+
+function renderIdeas() {
+    const sort = document.getElementById('sort-sel').value;
+    let list = ideas.slice();
+
+    if (activeFilter === 'starred') list = list.filter(i => i.starred);
+    if (colorFilter) list = list.filter(i => (i.color||'yellow') === colorFilter);
+
+    if (sort === 'oldest')   list.sort((a,b) => (a.createdAt?.seconds||0) - (b.createdAt?.seconds||0));
+    else if (sort === 'votes')   list.sort((a,b) => (b.votes||0) - (a.votes||0));
+    else if (sort === 'starred') list.sort((a,b) => (b.starred?1:0) - (a.starred?1:0));
+    else if (sort === 'random')  list.sort(() => Math.random() - 0.5);
+    else list.sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+
+    document.getElementById('count-lbl').textContent = `${list.length} idea${list.length!==1?'s':''}`;
+
+    const grid = document.getElementById('ideas-grid');
+    if (!list.length) {
+        grid.innerHTML = `<div class="ideas-empty">
+            <div class="ideas-empty-icon">${activeFilter==='starred'?'⭐':'💡'}</div>
+            <div class="ideas-empty-msg">${activeFilter==='starred'?'No starred ideas yet':'No ideas yet'}</div>
+            <div class="ideas-empty-hint">${activeFilter==='starred'?'Star ideas by hovering and clicking ☆':'Type your first idea above and press Enter'}</div>
+        </div>`;
+    } else {
+        grid.innerHTML = list.map(i => renderIdeaCard(i)).join('');
+    }
+
+    renderColorFilterChips();
+}
+
+function renderIdeaCard(idea) {
+    const col = idea.color || 'yellow';
+    const colorDots = NOTE_COLORS.map(n =>
+        `<div class="icd" style="background:${NOTE_HEX[n]};" title="${n}" onclick="event.stopPropagation();changeColor('${idea._id}','${n}')"></div>`
+    ).join('');
+    const votes = idea.votes || 0;
+    return `<div class="idea-card ic-${col}" id="card-${idea._id}">
+        <button class="idea-del" onclick="deleteIdea('${idea._id}')" title="Delete idea">✕</button>
+        <div class="idea-text" id="it-${idea._id}" ondblclick="startEdit('${idea._id}')">${esc(idea.text)}</div>
+        <textarea class="idea-edit-ta" id="ie-${idea._id}" rows="3"
+            onblur="finishEdit('${idea._id}')"
+            onkeydown="handleEditKey(event,'${idea._id}')"></textarea>
+        <div class="idea-colors">${colorDots}</div>
+        <div class="idea-footer">
+            <button class="iab${idea.starred?' starred':''}" onclick="toggleStar('${idea._id}')" title="${idea.starred?'Unstar':'Star'}">${idea.starred?'⭐':'☆'}</button>
+            <button class="iab" onclick="voteIdea('${idea._id}')" title="Upvote">👍${votes?' <span class="vote-n">'+votes+'</span>':''}</button>
+        </div>
+    </div>`;
+}
+
+function renderColorFilterChips() {
+    const used = [...new Set(ideas.map(i => i.color||'yellow'))];
+    document.getElementById('color-chips').innerHTML = used.map(c =>
+        `<button class="chip${colorFilter===c?' on':''}"
+            style="${colorFilter===c?`border-color:${NOTE_HEX[c]};color:${NOTE_HEX[c]};background:${NOTE_HEX[c]}22;`:''}"
+            onclick="setColorFilter('${c}')">
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${NOTE_HEX[c]};margin-right:4px;vertical-align:middle;"></span>${c}
+        </button>`
+    ).join('');
+}
+
+function setFilter(f) {
+    activeFilter = f;
+    colorFilter  = null;
+    document.getElementById('chip-all').classList.toggle('on', f==='all');
+    document.getElementById('chip-starred').classList.toggle('on', f==='starred');
+    renderIdeas();
+}
+
+function setColorFilter(c) {
+    if (colorFilter === c) { colorFilter = null; setFilter('all'); return; }
+    colorFilter  = c;
+    activeFilter = 'all';
+    document.getElementById('chip-all').classList.remove('on');
+    document.getElementById('chip-starred').classList.remove('on');
+    renderIdeas();
+}
+
+function syncIdeaCount() {
+    const n = ideas.length;
+    document.getElementById('board-idea-count').textContent = `${n} idea${n!==1?'s':''}`;
+    if (activeBoardId) {
+        db.collection('shitshow_boards').doc(activeBoardId).update({ ideaCount: n }).catch(()=>{});
+        const b = boards.find(b => b._id===activeBoardId);
+        if (b) b.ideaCount = n;
+    }
+}
+
+async function addIdea() {
+    const inp  = document.getElementById('add-input');
+    const text = inp.value.trim();
+    if (!text || !activeBoardId) return;
+    inp.value = '';
+    await db.collection('shitshow_ideas').add({
+        boardId: activeBoardId, text, color: noteColor,
+        starred: false, votes: 0,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    inp.focus();
+}
+
+async function deleteIdea(id) {
+    await db.collection('shitshow_ideas').doc(id).delete().catch(()=>{});
+}
+
+async function toggleStar(id) {
+    const idea = ideas.find(i => i._id===id);
+    if (idea) await db.collection('shitshow_ideas').doc(id).update({ starred: !idea.starred });
+}
+
+async function voteIdea(id) {
+    await db.collection('shitshow_ideas').doc(id).update({ votes: firebase.firestore.FieldValue.increment(1) });
+}
+
+async function changeColor(id, color) {
+    await db.collection('shitshow_ideas').doc(id).update({ color });
+}
+
+// ── Inline edit ──
+function startEdit(id) {
+    const txtEl = document.getElementById('it-' + id);
+    const taEl  = document.getElementById('ie-' + id);
+    if (!txtEl || !taEl) return;
+    taEl.value = ideas.find(i => i._id===id)?.text || txtEl.textContent;
+    txtEl.style.display = 'none';
+    taEl.style.display  = 'block';
+    taEl.focus();
+    taEl.select();
+}
+
+async function finishEdit(id) {
+    const txtEl = document.getElementById('it-' + id);
+    const taEl  = document.getElementById('ie-' + id);
+    if (!txtEl || !taEl) return;
+    const newText = taEl.value.trim();
+    if (newText && newText !== (ideas.find(i=>i._id===id)?.text||'')) {
+        await db.collection('shitshow_ideas').doc(id).update({ text: newText });
+    }
+    taEl.style.display  = 'none';
+    txtEl.style.display = 'block';
+}
+
+function handleEditKey(e, id) {
+    if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); finishEdit(id); }
+    if (e.key==='Escape') {
+        const txtEl = document.getElementById('it-'+id);
+        const taEl  = document.getElementById('ie-'+id);
+        if (taEl) taEl.style.display = 'none';
+        if (txtEl) txtEl.style.display = 'block';
+    }
+}
+
+// ── Note color picker ──
+function renderNoteColorPicker() {
+    document.getElementById('ncp').innerHTML = NOTE_COLORS.map(n =>
+        `<div class="ncp-dot${n===noteColor?' sel':''}" style="background:${NOTE_HEX[n]};" title="${n}" onclick="pickNoteColor('${n}',this)"></div>`
+    ).join('');
+}
+
+function pickNoteColor(n, el) {
+    noteColor = n;
+    document.querySelectorAll('.ncp-dot').forEach(d => d.classList.remove('sel'));
+    el.classList.add('sel');
+}
+
+// ═══════════════════════════════════════════════
+//  AI BRAINSTORM
+// ═══════════════════════════════════════════════
+function openAIModal() {
+    document.getElementById('ai-topic').value = '';
+    document.getElementById('ai-status').style.display = 'none';
+    document.getElementById('ai-results').style.display = 'none';
+    document.getElementById('ai-import-bar').style.display = 'none';
+    document.getElementById('modal-ai').classList.add('open');
+    aiIdeas = [];
+    setTimeout(() => document.getElementById('ai-topic').focus(), 60);
+}
+function closeAIModal() { document.getElementById('modal-ai').classList.remove('open'); }
+
+async function runAI() {
+    if (!apiKey || !proxyUrl) { toast('API key not configured — set it in Agents → Settings', true); return; }
+    const topic  = document.getElementById('ai-topic').value.trim();
+    const board  = boards.find(b => b._id===activeBoardId);
+    const btn    = document.getElementById('btn-ai-gen');
+    const statEl = document.getElementById('ai-status');
+
+    btn.disabled = true;
+    statEl.style.display = 'flex';
+    statEl.innerHTML = '<div class="spinner"></div> Generating ideas…';
+    document.getElementById('ai-results').style.display = 'none';
+    document.getElementById('ai-import-bar').style.display = 'none';
+
+    const existingText = ideas.map(i => `- ${i.text}`).join('\n');
+    const boardName    = board?.name || 'Brainstorm';
+
+    const prompt = topic
+        ? `You are a creative brainstorming partner. Generate 15 diverse, specific, and actionable ideas for:\n\n"${topic}"\n\nBoard context: "${boardName}"\n${existingText ? `\nExisting ideas (don't duplicate):\n${existingText}\n` : ''}\nReturn ONLY a JSON array of strings — one idea per element, no numbers, no explanation:\n["idea one", "idea two", ...]`
+        : `You are a creative brainstorming partner helping with a board called "${boardName}".${existingText ? `\n\nExisting ideas:\n${existingText}\n\nGenerate 15 more creative ideas that build on, challenge, or expand these ideas in unexpected directions.` : '\n\nGenerate 15 diverse starting ideas for this topic.'}\n\nReturn ONLY a JSON array of strings:\n["idea one", "idea two", ...]`;
+
+    try {
+        const res = await fetch(proxyUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ apiKey, model: 'claude-opus-4-6', max_tokens: 1024, stream: false,
+                messages: [{ role: 'user', content: prompt }] })
+        });
+        const j = JSON.parse(await res.text());
+        if (!res.ok) throw new Error(j?.error?.message || 'API error ' + res.status);
+        const raw = (j?.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
+        const m   = raw.match(/\[[\s\S]*\]/);
+        if (!m) throw new Error('Could not parse AI response');
+        aiIdeas = JSON.parse(m[0]).filter(s => typeof s === 'string' && s.trim());
+
+        const resEl = document.getElementById('ai-results');
+        resEl.innerHTML = aiIdeas.map((idea,i) =>
+            `<div class="ai-row">
+                <input type="checkbox" id="ai-c-${i}" checked>
+                <label for="ai-c-${i}">${esc(idea)}</label>
+            </div>`
+        ).join('');
+        resEl.style.display = 'block';
+        document.getElementById('ai-import-bar').style.display = 'flex';
+        statEl.innerHTML = `✓ ${aiIdeas.length} ideas generated`;
+    } catch(e) {
+        statEl.innerHTML = '❌ ' + esc(e.message);
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+async function importAIIdeas() {
+    const toAdd = aiIdeas.filter((_,i) => document.getElementById(`ai-c-${i}`)?.checked);
+    if (!toAdd.length) { toast('No ideas selected', true); return; }
+    const cols = NOTE_COLORS.filter(c => c !== 'dark');
+    for (let i = 0; i < toAdd.length; i++) {
+        await db.collection('shitshow_ideas').add({
+            boardId: activeBoardId, text: toAdd[i],
+            color: cols[i % cols.length],
+            starred: false, votes: 0,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    }
+    closeAIModal();
+    toast(`${toAdd.length} idea${toAdd.length!==1?'s':''} added!`);
+}
+
+function aiToggleAll(val) {
+    aiIdeas.forEach((_,i) => { const c = document.getElementById(`ai-c-${i}`); if(c) c.checked = val; });
+}
+
+// ═══════════════════════════════════════════════
+//  EXPORT
+// ═══════════════════════════════════════════════
+function exportBoard() {
+    const board   = boards.find(b => b._id===activeBoardId);
+    const starred = ideas.filter(i => i.starred).sort((a,b)=>(b.votes||0)-(a.votes||0));
+    const rest    = ideas.filter(i => !i.starred).sort((a,b)=>(b.votes||0)-(a.votes||0));
+    const lines   = [`# ${board?.name || 'Board'}\n`];
+    if (starred.length) {
+        lines.push('## ⭐ Starred\n');
+        starred.forEach(i => lines.push(`- ${i.text}${i.votes>0?' (👍'+i.votes+')':''}`));
+        lines.push('');
+    }
+    if (rest.length) {
+        lines.push('## Ideas\n');
+        rest.forEach(i => lines.push(`- ${i.text}${i.votes>0?' (👍'+i.votes+')':''}`));
+    }
+    const text = lines.join('\n');
+    navigator.clipboard.writeText(text)
+        .then(() => toast('Copied to clipboard!'))
+        .catch(() => {
+            const w = window.open('', '_blank');
+            w.document.write(`<pre style="font:14px monospace;padding:24px;white-space:pre-wrap;">${esc(text)}</pre>`);
+        });
+}
+
+// ═══════════════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════════════
+function esc(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function fmtDate(d) {
+    if (!d) return '';
+    return new Date(d).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+}
+
+let toastTimer;
+function toast(msg, isErr = false) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'toast show' + (isErr ? ' err' : '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>

@@ -240,6 +240,11 @@
             .report-full-text{font-size:11pt;line-height:1.6;}
             body{background:#fff;}
         }
+    
+        /* ── DON'T PUSH BLINK ── */
+        @keyframes dp-pulse { 0%,100%{opacity:1} 50%{opacity:0.45} }
+        .site-link[href="dontpush.html"] { animation: dp-pulse 3.5s ease-in-out infinite; }
+        .site-link[href="dontpush.html"].active { animation: dp-pulse 3.5s ease-in-out infinite; }
     </style>
 </head>
 <body>

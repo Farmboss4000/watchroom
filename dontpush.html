@@ -57,6 +57,11 @@
         .user-badge { position: fixed; bottom: 16px; right: 16px; font-size: 0.72rem; color: var(--text2); }
         .btn-so { background: none; border: none; color: var(--text2); cursor: pointer; font-size: 0.72rem; text-decoration: underline; }
         .btn-so:hover { color: var(--danger); }
+    
+        /* ── DON'T PUSH BLINK ── */
+        @keyframes dp-pulse { 0%,100%{opacity:1} 50%{opacity:0.45} }
+        .site-link[href="dontpush.html"] { animation: dp-pulse 3.5s ease-in-out infinite; }
+        .site-link[href="dontpush.html"].active { animation: dp-pulse 3.5s ease-in-out infinite; }
     </style>
 </head>
 <body>

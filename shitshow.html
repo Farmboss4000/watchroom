@@ -255,6 +255,11 @@
             .add-bar { flex-direction: column; align-items: stretch; }
             .board-hdr .btn-sm { font-size: 0.72rem; padding: 4px 8px; }
         }
+    
+        /* ── DON'T PUSH BLINK ── */
+        @keyframes dp-pulse { 0%,100%{opacity:1} 50%{opacity:0.45} }
+        .site-link[href="dontpush.html"] { animation: dp-pulse 3.5s ease-in-out infinite; }
+        .site-link[href="dontpush.html"].active { animation: dp-pulse 3.5s ease-in-out infinite; }
     </style>
 </head>
 <body>

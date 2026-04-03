@@ -1019,6 +1019,11 @@
         @media (max-width: 380px) {
             .stats-grid { grid-template-columns: 1fr; }
         }
+    
+        /* ── DON'T PUSH BLINK ── */
+        @keyframes dp-pulse { 0%,100%{opacity:1} 50%{opacity:0.45} }
+        .site-link[href="dontpush.html"] { animation: dp-pulse 3.5s ease-in-out infinite; }
+        .site-link[href="dontpush.html"].active { animation: dp-pulse 3.5s ease-in-out infinite; }
     </style>
 </head>
 <body>

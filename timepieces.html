@@ -728,6 +728,7 @@
         </div>
         <div class="modal-actions">
             <button class="btn btn-primary" onclick="printBarcode()">🖨 Print Label</button>
+            <button class="btn btn-ghost btn-sm" onclick="downloadBradyLabel()" title="Download for Brady M11 3/8&quot; tape">📥 Brady M11</button>
             <button class="btn btn-ghost" onclick="closeModal()">Close</button>
         </div>
     </div>
@@ -1751,14 +1752,35 @@ function closeOverviewModal(){
     document.getElementById('overview-modal').classList.remove('show');
 }
 document.getElementById('overview-modal').addEventListener('click',e=>{if(e.target===document.getElementById('overview-modal'))closeOverviewModal();});
+function _renderCompactBarcode(code){
+    const tmp=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    tmp.id='_bc_tmp_';tmp.style.cssText='position:absolute;visibility:hidden;left:-9999px;';
+    document.body.appendChild(tmp);
+    JsBarcode('#_bc_tmp_',code,{format:'CODE128',width:1.3,height:26,displayValue:true,fontSize:7,margin:2,background:'#fff',lineColor:'#000'});
+    const html=tmp.outerHTML;tmp.remove();return html;
+}
 function printBarcode(){
     if(!activeBcId)return;
-    const it=items.find(i=>i._docId===activeBcId); if(!it)return;
-    const label=[it.brand,it.model].filter(Boolean).join(' ')||`Timepiece #${it.id}`;
+    const it=items.find(i=>i._docId===activeBcId);if(!it)return;
     const code=`TPC${String(it.id).padStart(6,'0')}`;
-    document.getElementById('print-content').innerHTML=`<style>body{font-family:Arial,sans-serif;text-align:center;padding:10px;}.brady-label{display:inline-flex;flex-direction:column;align-items:center;border:2px solid #333;padding:8px 16px;border-radius:4px;}@media print{@page{size:3in 0.75in landscape;margin:0;}}</style>
-    <div class="brady-label"><h3 style="margin:0 0 2px;font-size:11px;">${label}</h3><p style="margin:0 0 6px;font-size:9px;color:#555;">${it.category||''} | Ref: ${it.reference||'N/A'}</p>${document.getElementById('bc-svg').outerHTML}<div style="font-size:9px;margin-top:4px;">${code}</div></div>`;
+    document.getElementById('print-content').innerHTML=`
+        <style>@page{size:2in 0.375in;margin:0;}
+        body{margin:0;padding:0;font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;width:2in;height:0.375in;overflow:hidden;background:#fff;}
+        svg{width:1.96in !important;height:auto !important;max-height:0.36in;display:block;}</style>
+        ${_renderCompactBarcode(code)}`;
     window.print();
+}
+function downloadBradyLabel(){
+    if(!activeBcId)return;
+    const it=items.find(i=>i._docId===activeBcId);if(!it)return;
+    const code=`TPC${String(it.id).padStart(6,'0')}`;
+    const svg=_renderCompactBarcode(code);
+    const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Brady Label - ${code}</title>
+<style>@page{size:2in 0.375in;margin:0;}*{margin:0;padding:0;box-sizing:border-box;}
+body{width:2in;height:0.375in;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#fff;}
+svg{width:1.96in !important;height:auto !important;max-height:0.36in;}</style></head><body>${svg}</body></html>`;
+    const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(new Blob([html],{type:'text/html'})),download:`brady-${code}.html`});
+    a.click();URL.revokeObjectURL(a.href);toast('Brady label downloaded','success');
 }
 
 async function openScanner(){

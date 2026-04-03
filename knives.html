@@ -641,6 +641,7 @@
         </div>
         <div class="modal-actions">
             <button class="btn btn-primary" onclick="printBarcode()">🖨 Print Label</button>
+            <button class="btn btn-ghost btn-sm" onclick="downloadBradyLabel()" title="Download for Brady M11 3/8&quot; tape">📥 Brady M11</button>
             <button class="btn btn-ghost" onclick="closeModal()">Close</button>
         </div>
     </div>
@@ -1269,18 +1270,33 @@ function openBarcode(docId){
     document.getElementById('barcode-modal').classList.add('show');
 }
 function closeModal(){document.getElementById('barcode-modal').classList.remove('show');}
+function _renderCompactBarcode(code) {
+    const tmp = document.createElementNS('http://www.w3.org/2000/svg','svg');
+    tmp.id = '_bc_tmp_'; tmp.style.cssText = 'position:absolute;visibility:hidden;left:-9999px;';
+    document.body.appendChild(tmp);
+    JsBarcode('#_bc_tmp_', code, {format:'CODE128',width:1.3,height:26,displayValue:true,fontSize:7,margin:2,background:'#fff',lineColor:'#000'});
+    const html = tmp.outerHTML; tmp.remove(); return html;
+}
 function printBarcode(){
-    const svg=document.getElementById('bc-svg');
-    const it=activeBcId?items.find(i=>i._docId===activeBcId):null;
-    const label=it?`${it.brand||''} ${it.model||''}`.trim():'Farmboss Knives';
-    const code=document.getElementById('bc-code').textContent;
+    const it=activeBcId?items.find(i=>i._docId===activeBcId):null; if(!it)return;
+    const code=`KNF${String(it.id).padStart(5,'0')}`;
     document.getElementById('print-content').innerHTML=`
-        <div style="font-family:sans-serif;padding:8px;display:inline-block;border:1px solid #ccc;border-radius:6px;text-align:center;">
-            <div style="font-size:9px;font-weight:600;margin-bottom:4px;">${label}</div>
-            ${svg.outerHTML}
-            <div style="font-size:8px;margin-top:2px;color:#555;">${code}</div>
-        </div>`;
+        <style>@page{size:2in 0.375in;margin:0;}
+        body{margin:0;padding:0;font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;width:2in;height:0.375in;overflow:hidden;background:#fff;}
+        svg{width:1.96in !important;height:auto !important;max-height:0.36in;display:block;}</style>
+        ${_renderCompactBarcode(code)}`;
     window.print();
+}
+function downloadBradyLabel(){
+    const it=activeBcId?items.find(i=>i._docId===activeBcId):null; if(!it)return;
+    const code=`KNF${String(it.id).padStart(5,'0')}`;
+    const svg=_renderCompactBarcode(code);
+    const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Brady Label - ${code}</title>
+<style>@page{size:2in 0.375in;margin:0;}*{margin:0;padding:0;box-sizing:border-box;}
+body{width:2in;height:0.375in;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#fff;}
+svg{width:1.96in !important;height:auto !important;max-height:0.36in;}</style></head><body>${svg}</body></html>`;
+    const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(new Blob([html],{type:'text/html'})),download:`brady-${code}.html`});
+    a.click(); URL.revokeObjectURL(a.href); toast('Brady label downloaded','success');
 }
 
 function openScanner(){

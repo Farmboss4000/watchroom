@@ -674,6 +674,43 @@
                 </div>
             </div>
 
+            <!-- ══ NFA / ATF FORM 4 ══ -->
+            <div style="margin-top:22px;padding-top:18px;border-top:1px solid var(--border);">
+                <div style="font-size:0.85rem;font-weight:600;color:var(--text-primary);margin-bottom:14px;">
+                    📋 NFA Registration <span style="font-size:0.75rem;font-weight:400;color:var(--text-secondary);margin-left:8px;">ATF Form 4 (5320.4) — leave blank if not an NFA item</span>
+                </div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>NFA Item Type</label>
+                        <select id="f-nfa-type">
+                            <option value="">Not an NFA item</option>
+                            <option value="Silencer">Silencer / Suppressor</option>
+                            <option value="Short Barreled Rifle">Short Barreled Rifle (SBR)</option>
+                            <option value="Short Barreled Shotgun">Short Barreled Shotgun (SBS)</option>
+                            <option value="Machine Gun">Machine Gun (MG)</option>
+                            <option value="Destructive Device">Destructive Device (DD)</option>
+                            <option value="Any Other Weapon">Any Other Weapon (AOW)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>ATF Approval Date</label>
+                        <input type="date" id="f-nfa-approval-date" placeholder="Date stamp approved">
+                    </div>
+                    <div class="form-group">
+                        <label>Barrel Length (inches)</label>
+                        <input type="text" id="f-barrel-length" placeholder='e.g. 10.5"'>
+                    </div>
+                    <div class="form-group">
+                        <label>Overall Length (inches)</label>
+                        <input type="text" id="f-overall-length" placeholder='e.g. 28.5"'>
+                    </div>
+                    <div class="form-group full-width">
+                        <label>Transferor / Dealer (Form 4 Seller)</label>
+                        <input type="text" id="f-transferor" placeholder="e.g. Silencer Shop, Bob's Gun Store — name from Section 1 of Form 4">
+                    </div>
+                </div>
+            </div>
+
             <!-- ══ MAGAZINES ══ -->
             <div id="mag-section" style="display:none;margin-top:22px;padding-top:18px;border-top:1px solid var(--border);">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
@@ -766,6 +803,18 @@
                             <input type="file" id="file-paperwork" accept="image/*,application/pdf" onchange="onPhotoSelected('paperwork',this)">
                         </div>
                         <button type="button" class="btn-ai" id="btn-paperwork" onclick="summarizePaperwork()" disabled>📄 Summarize Paperwork with AI</button>
+                    </div>
+                    <!-- ATF FORM 4 -->
+                    <div class="photo-slot">
+                        <div class="photo-slot-label">📋 ATF Form 4 (5320.4)</div>
+                        <div class="photo-preview" id="prev-form4">
+                            <span class="no-photo">📋</span>
+                            <button type="button" class="remove-photo" onclick="removePhoto('form4')">✕</button>
+                        </div>
+                        <div class="photo-file-input">
+                            <input type="file" id="file-form4" accept="image/*,application/pdf" onchange="onPhotoSelected('form4',this)">
+                        </div>
+                        <button type="button" class="btn-ai" id="btn-form4" onclick="extractForm4Data()" disabled>🔖 Extract Form 4 Data</button>
                     </div>
                 </div>
                 <p id="ai-status" style="font-size:0.82rem;color:var(--text-secondary);margin-top:10px;min-height:18px;"></p>
@@ -1329,7 +1378,8 @@ let formPhotos = {
     main:      { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false },
     serial:    { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false },
     extra:     { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false },
-    paperwork: { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false }
+    paperwork: { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false },
+    form4:     { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false }
 };
 
 const VIEWS = ['dashboard','add-item','inventory','reports','categories','packing-list','settings','recycle-bin','diary'];
@@ -1611,6 +1661,7 @@ async function onPhotoSelected(slot, input) {
     if (slot==='main')      document.getElementById('btn-identify').disabled  = false;
     if (slot==='serial')    document.getElementById('btn-ocr').disabled       = false;
     if (slot==='paperwork') document.getElementById('btn-paperwork').disabled = false;
+    if (slot==='form4')     document.getElementById('btn-form4').disabled     = false;
 }
 
 function renderPhotoPreview(slot, dataUrl) {
@@ -1620,13 +1671,14 @@ function renderPhotoPreview(slot, dataUrl) {
 
 function removePhoto(slot) {
     formPhotos[slot] = { file:null, base64:null, mimeType:null, existingUrl:null, deleted:true };
-    const icons = { main:'📷', serial:'📋', extra:'🖼', paperwork:'📄' };
+    const icons = { main:'📷', serial:'📋', extra:'🖼', paperwork:'📄', form4:'📋' };
     document.getElementById('prev-'+slot).innerHTML =
         `<span class="no-photo">${icons[slot]||'📷'}</span><button type="button" class="remove-photo" onclick="removePhoto('${slot}')">✕</button>`;
     document.getElementById('file-'+slot).value = '';
     if (slot==='main')      document.getElementById('btn-identify').disabled  = true;
     if (slot==='serial')    document.getElementById('btn-ocr').disabled       = true;
     if (slot==='paperwork') document.getElementById('btn-paperwork').disabled = true;
+    if (slot==='form4')     document.getElementById('btn-form4').disabled     = true;
 }
 
 async function callClaude(base64, mimeType, prompt) {
@@ -1755,6 +1807,62 @@ Return plain text only, no headers or bullet points.`;
     } finally {
         btn.disabled = false; btn.classList.remove('scanning');
         btn.innerHTML = '📄 Summarize Paperwork with AI';
+    }
+}
+
+async function extractForm4Data() {
+    const p = formPhotos.form4; if (!p.base64) return;
+    const btn    = document.getElementById('btn-form4');
+    const status = document.getElementById('ai-status');
+    btn.disabled = true; btn.classList.add('scanning'); btn.textContent = '⏳ Reading Form 4...';
+    status.textContent = 'Extracting ATF Form 4 data...';
+    try {
+        const catList = categories.join(',');
+        const prompt = `This is an ATF Form 4 (5320.4) — Application for Tax Paid Transfer and Registration of Firearm.
+Extract all available data and return ONLY valid JSON with these fields:
+{
+  "manufacturer": "firearm manufacturer from Section 2",
+  "model": "model name from Section 2",
+  "serialNumber": "serial number from Section 2",
+  "caliber": "caliber or gauge from Section 2",
+  "nfaType": "one of: Silencer, Short Barreled Rifle, Short Barreled Shotgun, Machine Gun, Destructive Device, Any Other Weapon — based on the Type of Firearm checked in Section 2",
+  "barrelLength": "barrel length in inches from Section 2, digits only e.g. 10.5",
+  "overallLength": "overall length in inches from Section 2, digits only e.g. 28.5",
+  "transferor": "transferor name from Section 1 (the dealer/seller)",
+  "nfaApprovalDate": "ATF approval date in YYYY-MM-DD format if stamp or approval date is visible",
+  "purchaseDate": "date of transfer or sale if visible, in YYYY-MM-DD format",
+  "vendor": "same as transferor dealer name",
+  "category": "one of: ${catList} or empty — infer from NFA item type"
+}
+Only include values you can read from the document. Return only the JSON object, no other text.`;
+        const raw = await callClaude(p.base64, p.mimeType, prompt);
+        if (!raw) return;
+        const jsonMatch = raw.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error('Could not parse AI response');
+        const r = JSON.parse(jsonMatch[0]);
+        const filled = [];
+        if (r.manufacturer)     { document.getElementById('f-manufacturer').value     = r.manufacturer;     filled.push('Manufacturer'); }
+        if (r.model)            { document.getElementById('f-model').value            = r.model;            filled.push('Model'); }
+        if (r.serialNumber)     { document.getElementById('f-serial').value           = r.serialNumber;     filled.push('Serial #'); }
+        if (r.caliber)          { document.getElementById('f-caliber').value          = r.caliber;          filled.push('Caliber'); }
+        if (r.category)         { populateCatSelect(); document.getElementById('f-category').value = r.category; updateMagSection(); filled.push('Category'); }
+        if (r.purchaseDate)     { document.getElementById('f-purchase-date').value    = r.purchaseDate;     filled.push('Purchase Date'); }
+        if (r.vendor)           { document.getElementById('f-vendor').value           = r.vendor;           filled.push('Vendor'); }
+        if (r.nfaType)          { document.getElementById('f-nfa-type').value         = r.nfaType;          filled.push('NFA Type'); }
+        if (r.nfaApprovalDate)  { document.getElementById('f-nfa-approval-date').value= r.nfaApprovalDate;  filled.push('ATF Approval Date'); }
+        if (r.barrelLength)     { document.getElementById('f-barrel-length').value    = r.barrelLength;     filled.push('Barrel Length'); }
+        if (r.overallLength)    { document.getElementById('f-overall-length').value   = r.overallLength;    filled.push('Overall Length'); }
+        if (r.transferor)       { document.getElementById('f-transferor').value       = r.transferor;       filled.push('Transferor'); }
+        status.textContent = filled.length
+            ? `✅ Form 4 extracted: ${filled.join(', ')}. Review and adjust as needed.`
+            : '⚠️ AI could not read Form 4 details clearly. Fill in fields manually.';
+        status.style.color = filled.length ? 'var(--success)' : 'var(--text-secondary)';
+    } catch(err) {
+        status.textContent = '❌ Error: ' + err.message;
+        status.style.color  = 'var(--danger)';
+    } finally {
+        btn.disabled = false; btn.classList.remove('scanning');
+        btn.innerHTML = '🔖 Extract Form 4 Data';
     }
 }
 
@@ -2032,13 +2140,18 @@ document.getElementById('item-form').addEventListener('submit', async e => {
         notes:        document.getElementById('f-notes').value.trim(),
         magazines:    formMagazines.filter(m => m.capacity || m.name).map((m,i) => ({ id:i+1, name:m.name||'', capacity:m.capacity||null, notes:m.notes||'' })),
         assignedTo:   document.getElementById('f-category').value === 'Suppressor' ? [...formAssignedTo] : [],
+        nfaType:      document.getElementById('f-nfa-type').value,
+        nfaApprovalDate: document.getElementById('f-nfa-approval-date').value,
+        barrelLength: document.getElementById('f-barrel-length').value.trim(),
+        overallLength:document.getElementById('f-overall-length').value.trim(),
+        transferor:   document.getElementById('f-transferor').value.trim(),
     };
     btn.disabled = true; btn.textContent = 'Saving...';
     try {
         addMfrIfNew(data.manufacturer);
         const existingPhotos = docId ? (items.find(i=>i._docId===docId)?.photos||[]) : [];
         const photos = [];
-        for (const slot of ['main','serial','extra','paperwork']) {
+        for (const slot of ['main','serial','extra','paperwork','form4']) {
             const p = formPhotos[slot];
             if (p.file) {
                 try {
@@ -2097,13 +2210,19 @@ function resetForm() {
     document.getElementById('form-submit-btn').disabled    = false;
     document.getElementById('ai-status').textContent   = '';
     populateCatSelect(); populateMfrList(); populateCalList();
-    for (const slot of ['main','serial','extra','paperwork']) {
+    for (const slot of ['main','serial','extra','paperwork','form4']) {
         formPhotos[slot] = { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false };
     }
-    removePhoto('main'); removePhoto('serial'); removePhoto('extra'); removePhoto('paperwork');
+    removePhoto('main'); removePhoto('serial'); removePhoto('extra'); removePhoto('paperwork'); removePhoto('form4');
     document.getElementById('btn-identify').disabled  = true;
     document.getElementById('btn-ocr').disabled       = true;
     document.getElementById('btn-paperwork').disabled = true;
+    document.getElementById('btn-form4').disabled     = true;
+    document.getElementById('f-nfa-type').value          = '';
+    document.getElementById('f-nfa-approval-date').value = '';
+    document.getElementById('f-barrel-length').value     = '';
+    document.getElementById('f-overall-length').value    = '';
+    document.getElementById('f-transferor').value        = '';
     // Clear magazines
     formMagazines = [];
     renderMagazineForm();
@@ -2138,6 +2257,11 @@ function editItem(docId) {
     document.getElementById('f-vendor').value             = it.vendor||'';
     document.getElementById('f-quantity').value           = it.quantity||'1';
     document.getElementById('f-notes').value              = it.notes||'';
+    document.getElementById('f-nfa-type').value           = it.nfaType||'';
+    document.getElementById('f-nfa-approval-date').value  = it.nfaApprovalDate||'';
+    document.getElementById('f-barrel-length').value      = it.barrelLength||'';
+    document.getElementById('f-overall-length').value     = it.overallLength||'';
+    document.getElementById('f-transferor').value         = it.transferor||'';
     document.getElementById('form-title').textContent         = `✏️ Edit Item #${it.id}`;
     document.getElementById('form-submit-btn').textContent    = 'Update Item';
     // Load magazines
@@ -2154,7 +2278,7 @@ function editItem(docId) {
         document.getElementById('suppressor-section').style.display = '';
         renderSuppressorSection();
     }
-    for (const slot of ['main','serial','extra','paperwork']) {
+    for (const slot of ['main','serial','extra','paperwork','form4']) {
         const ph = it.photos?.find(p=>p.slot===slot);
         if (ph) {
             formPhotos[slot] = { file:null, base64:null, mimeType:null, existingUrl:ph.url, deleted:false };
@@ -2163,6 +2287,7 @@ function editItem(docId) {
             if (slot==='main')      document.getElementById('btn-identify').disabled  = false;
             if (slot==='serial')    document.getElementById('btn-ocr').disabled       = false;
             if (slot==='paperwork') document.getElementById('btn-paperwork').disabled = false;
+            if (slot==='form4')     document.getElementById('btn-form4').disabled     = false;
         }
     }
     // Load existing documents

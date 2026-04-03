@@ -165,6 +165,26 @@
         .compat-yes { background:#f0fdf4; border:1px solid #86efac; }
         .compat-no  { background:#fef2f2; border:1px solid #fca5a5; }
         .compat-icon { font-size:1rem; flex-shrink:0; margin-top:1px; }
+        /* ── SUPPRESSOR COMPAT REPORT ── */
+        .sc-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:16px; }
+        .sc-card { border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+        .sc-header { background:linear-gradient(135deg,#1a1a2e,#2d1f4e); padding:14px 16px; }
+        .sc-title { font-size:0.95rem; font-weight:700; color:#fff; margin-bottom:3px; }
+        .sc-specs { font-size:0.75rem; color:rgba(255,255,255,0.55); display:flex; gap:10px; flex-wrap:wrap; }
+        .sc-spec { background:rgba(255,255,255,0.1); padding:2px 8px; border-radius:10px; }
+        .sc-body { padding:14px 16px; }
+        .sc-section-label { font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-secondary); margin:10px 0 6px; }
+        .sc-section-label:first-child { margin-top:0; }
+        .sc-firearm-row { display:flex; align-items:flex-start; gap:8px; padding:7px 10px; border-radius:6px; margin-bottom:4px; font-size:0.82rem; }
+        .sc-firearm-row.yes  { background:#f0fdf4; }
+        .sc-firearm-row.adapt{ background:#fffbeb; }
+        .sc-firearm-row.no   { background:#fef2f2; }
+        .sc-firearm-name { font-weight:600; color:var(--text-primary); }
+        .sc-firearm-cat  { font-size:0.72rem; color:var(--text-secondary); margin-left:4px; }
+        .sc-firearm-reason { font-size:0.76rem; color:var(--text-secondary); margin-top:2px; }
+        .sc-no-data { text-align:center; padding:18px 10px; color:var(--text-secondary); font-size:0.82rem; }
+        .sc-summary-bar { display:flex; gap:10px; margin-top:10px; padding-top:10px; border-top:1px solid var(--border); font-size:0.78rem; flex-wrap:wrap; }
+        .sc-sum-item { display:flex; align-items:center; gap:4px; font-weight:600; }
         .compat-label { font-weight:600; color:var(--text-primary); }
         .compat-reason { color:var(--text-secondary); font-size:0.79rem; margin-top:2px; }
 
@@ -932,6 +952,17 @@
         <div id="purchase-chart-summary" style="display:flex;gap:24px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);"></div>
     </div>
 
+    <!-- ── SUPPRESSOR COMPATIBILITY REPORT ── -->
+    <div class="card" style="margin-bottom:18px;" id="suppressor-compat-card">
+        <div class="card-title" style="flex-wrap:wrap;gap:10px;">
+            <div class="card-title-left">🔇 Suppressor Compatibility Report</div>
+            <button class="btn btn-ghost btn-sm" onclick="renderCompatibilityReport()">🔄 Refresh</button>
+        </div>
+        <div id="suppressor-compat-body">
+            <p style="color:var(--text-secondary);font-size:0.85rem;">Loading…</p>
+        </div>
+    </div>
+
     <!-- ── CALIBER REPORT ── -->
     <div class="card" style="margin-bottom:18px;">
         <div class="card-title" style="flex-wrap:wrap;gap:10px;">
@@ -1487,7 +1518,7 @@ async function initApp() {
         let firstLoad = true;
         unsubItems = db.collection('items').onSnapshot(snap => {
             items = snap.docs.map(doc => ({ _docId:doc.id, ...doc.data() }));
-            renderDashboard(); renderInventory(); renderReport(); renderCaliberReport();
+            renderDashboard(); renderInventory(); renderReport(); renderCaliberReport(); renderCompatibilityReport();
             if (firstLoad) { firstLoad = false; autoRefreshMarketValues(); }
         });
         document.getElementById('loading-screen').style.display = 'none';
@@ -1542,7 +1573,7 @@ function showView(v) {
     document.querySelectorAll('nav button').forEach((btn,i) => btn.classList.toggle('active', VIEWS[i]===v));
     if (v==='dashboard')    renderDashboard();
     if (v==='inventory')    { syncCatFilters(); renderInventory(); }
-    if (v==='reports')      { syncCatFilters(); renderReport(); renderPurchaseChart(); renderCaliberReport(); }
+    if (v==='reports')      { syncCatFilters(); renderReport(); renderPurchaseChart(); renderCaliberReport(); renderCompatibilityReport(); }
     if (v==='categories')   renderCatTags();
     if (v==='add-item')     { populateCatSelect(); updateMagSection(); }
     if (v==='recycle-bin')  loadRecycleBin();
@@ -3065,11 +3096,13 @@ function renderCaliberReport() {
         buckets[cal].mv    += (Number(it.marketValue) || 0);
     });
 
-    const entries = Object.entries(buckets).sort((a, b) => {
-        const va = caliberMode === 'count' ? b[1].count : caliberMode === 'qty' ? b[1].qty : b[1].value;
-        const vb = caliberMode === 'count' ? a[1].count : caliberMode === 'qty' ? a[1].qty : a[1].value;
-        return va - vb; // ascending so horizontal bar renders top-down biggest first
-    });
+    const entries = Object.entries(buckets)
+        .filter(([cal]) => cal !== '(No Caliber)')
+        .sort((a, b) => {
+            const va = caliberMode === 'count' ? b[1].count : caliberMode === 'qty' ? b[1].qty : b[1].value;
+            const vb = caliberMode === 'count' ? a[1].count : caliberMode === 'qty' ? a[1].qty : a[1].value;
+            return va - vb; // ascending so horizontal bar renders top-down biggest first
+        });
 
     if (!entries.length) {
         if (emptyEl) emptyEl.style.display = 'flex';
@@ -3118,7 +3151,7 @@ function renderCaliberReport() {
                         </div>
                         <span style="font-size:0.75rem;color:var(--text-secondary);min-width:32px;text-align:right;">${pct}%</span>
                     </div>`;
-                    return `<tr style="border-bottom:1px solid var(--border);" onmouseover="this.style.background='var(--accent-dim)'" onmouseout="this.style.background=''">
+                    return `<tr style="border-bottom:1px solid var(--border);cursor:pointer;" onmouseover="this.style.background='var(--accent-dim)'" onmouseout="this.style.background=''" onclick="filterInventoryByCaliber('${esc(cal)}')" title="View ${esc(cal)} in Inventory">
                         <td style="padding:7px 10px;font-weight:600;color:var(--text-primary);">${esc(cal)}</td>
                         <td style="padding:7px 10px;text-align:right;font-weight:700;color:var(--accent);">${b.count}</td>
                         <td style="padding:7px 10px;text-align:right;color:var(--text-secondary);">${b.qty}</td>
@@ -3174,6 +3207,9 @@ function renderCaliberReport() {
             indexAxis: 'y',
             responsive: true,
             maintainAspectRatio: false,
+            onClick: (evt, elements) => {
+                if (elements.length) filterInventoryByCaliber(chartLabels[elements[0].index]);
+            },
             plugins: {
                 legend: { display: false },
                 tooltip: {
@@ -3206,6 +3242,90 @@ function renderCaliberReport() {
             }
         }
     });
+    canvas.style.cursor = 'pointer';
+}
+
+function filterInventoryByCaliber(cal) {
+    showView('inventory');
+    const searchEl = document.getElementById('inv-search');
+    const catSel   = document.getElementById('inv-filter-cat');
+    if (catSel)   catSel.value = '';
+    if (searchEl) { searchEl.value = cal; }
+    renderInventory();
+}
+
+// ═══════════════════════════════════════
+//  SUPPRESSOR COMPATIBILITY REPORT
+// ═══════════════════════════════════════
+function renderCompatibilityReport() {
+    const body = document.getElementById('suppressor-compat-body');
+    if (!body) return;
+    const suppressors = items.filter(i => i.category === 'Suppressor');
+    if (!suppressors.length) {
+        body.innerHTML = '<p style="color:var(--text-secondary);font-size:0.85rem;padding:8px 0;">No suppressors in inventory.</p>';
+        return;
+    }
+
+    function firearmSection(rows, cls, icon, title) {
+        if (!rows.length) return '';
+        return `<div>
+            <div class="sc-section-label">${icon} ${title} (${rows.length})</div>
+            ${rows.map(r => `<div class="sc-firearm-row ${cls}">
+                <div style="flex:1;">
+                    <span class="sc-firearm-name">${esc(r.hostLabel || r.id)}</span>
+                    <span class="sc-firearm-cat">(${esc(r.hostCategory || '')})</span>
+                    <div class="sc-firearm-reason">${esc(r.reason)}</div>
+                </div>
+            </div>`).join('')}
+        </div>`;
+    }
+
+    body.innerHTML = `<div class="sc-grid">${suppressors.map(supp => {
+        const label = [supp.manufacturer, supp.model].filter(Boolean).join(' ') || `Item #${supp.id}`;
+        const compat = supp.compatibilityResults || [];
+        const yes     = compat.filter(r => r.compatible);
+        const adapter = compat.filter(r => !r.compatible && r.adapterNeeded);
+        const no      = compat.filter(r => !r.compatible && !r.adapterNeeded);
+        const checkedAt = supp.compatibilityCheckedAt ? new Date(supp.compatibilityCheckedAt).toLocaleString() : null;
+        const specs = [
+            supp.threadType ? `🔩 ${supp.threadType}` : null,
+            supp.caliber    ? `🎯 ${supp.caliber}`    : null,
+            supp.nfaType    ? supp.nfaType             : null,
+        ].filter(Boolean);
+
+        let bodyHTML;
+        if (!compat.length) {
+            const safeLabel   = esc(label).replace(/'/g, "\\'");
+            const safeThread  = esc(supp.threadType||'').replace(/'/g, "\\'");
+            const safeCaliber = esc(supp.caliber||'').replace(/'/g, "\\'");
+            bodyHTML = `<div class="sc-no-data">
+                No compatibility data yet.<br>
+                <button class="btn btn-ghost btn-sm" style="margin-top:10px;"
+                    onclick="runSuppressorCompatAndSave('${supp._docId}','${safeThread}','${safeCaliber}','${safeLabel}').then(()=>renderCompatibilityReport())">
+                    🔍 Run Check
+                </button>
+            </div>`;
+        } else {
+            bodyHTML =
+                firearmSection(yes,     'yes',   '✅', 'Compatible') +
+                firearmSection(adapter, 'adapt', '🔧', 'Compatible with Adapter') +
+                firearmSection(no,      'no',    '❌', 'Not Compatible') +
+                `<div class="sc-summary-bar">
+                    <span class="sc-sum-item" style="color:#16a34a;">✅ ${yes.length} compatible</span>
+                    ${adapter.length ? `<span class="sc-sum-item" style="color:#d97706;">🔧 ${adapter.length} with adapter</span>` : ''}
+                    <span class="sc-sum-item" style="color:#dc2626;">❌ ${no.length} incompatible</span>
+                    ${checkedAt ? `<span style="color:var(--text-secondary);margin-left:auto;font-size:0.72rem;">Checked: ${checkedAt}</span>` : ''}
+                </div>`;
+        }
+
+        return `<div class="sc-card">
+            <div class="sc-header">
+                <div class="sc-title">🔇 ${esc(label)}</div>
+                ${specs.length ? `<div class="sc-specs" style="margin-top:6px;">${specs.map(s=>`<span class="sc-spec">${esc(s)}</span>`).join('')}</div>` : ''}
+            </div>
+            <div class="sc-body">${bodyHTML}</div>
+        </div>`;
+    }).join('')}</div>`;
 }
 
 function printReport() {

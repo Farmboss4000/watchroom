@@ -1681,7 +1681,7 @@ function removePhoto(slot) {
     if (slot==='form4')     document.getElementById('btn-form4').disabled     = true;
 }
 
-async function callClaude(base64, mimeType, prompt) {
+async function callClaude(base64, mimeType, prompt, { retries = 2 } = {}) {
     if (!apiKey) { toast('Set your Anthropic API key in Settings first.','error'); return null; }
     const mediaBlock = mimeType === 'application/pdf'
         ? { type:'document', source:{ type:'base64', media_type:'application/pdf', data:base64 } }
@@ -1690,34 +1690,45 @@ async function callClaude(base64, mimeType, prompt) {
         model: aiModel, max_tokens:512,
         messages:[{ role:'user', content:[ mediaBlock, { type:'text', text:prompt } ]}]
     };
-    let res;
-    try {
-        if (proxyUrl) {
-            res = await fetch(proxyUrl, {
-                method:'POST',
-                headers:{ 'Content-Type':'application/json' },
-                body: JSON.stringify({ ...msgPayload, apiKey })
-            });
-        } else {
-            res = await fetch('https://api.anthropic.com/v1/messages', {
-                method:'POST', mode:'cors',
-                headers:{ 'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true' },
-                body: JSON.stringify(msgPayload)
-            });
-        }
-    } catch(networkErr) { throw new Error('Network error — set up a Proxy URL in Settings to fix CORS issues.'); }
-    if (!res.ok) {
-        let errMsg = `API error ${res.status}`;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        let res;
         try {
-            const d = await res.json();
-            errMsg = d.error?.message || errMsg;
-            if (res.status===401) errMsg = 'Invalid API key — re-enter your key in Settings.';
-            if (res.status===429) errMsg = 'Rate limit reached — please wait a moment.';
-        } catch(e) {}
-        throw new Error(errMsg);
+            if (proxyUrl) {
+                res = await fetch(proxyUrl, {
+                    method:'POST',
+                    headers:{ 'Content-Type':'application/json' },
+                    body: JSON.stringify({ ...msgPayload, apiKey })
+                });
+            } else {
+                res = await fetch('https://api.anthropic.com/v1/messages', {
+                    method:'POST', mode:'cors',
+                    headers:{ 'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true' },
+                    body: JSON.stringify(msgPayload)
+                });
+            }
+        } catch(networkErr) { throw new Error('Network error — set up a Proxy URL in Settings to fix CORS issues.'); }
+        if (res.status === 529 || res.status === 503) {
+            if (attempt < retries) {
+                const delay = (attempt + 1) * 4000;
+                document.getElementById('ai-status').textContent = `⏳ API busy — retrying in ${delay/1000}s… (${attempt+1}/${retries})`;
+                await new Promise(r => setTimeout(r, delay));
+                continue;
+            }
+            throw new Error('API is temporarily overloaded — please try again in a minute.');
+        }
+        if (!res.ok) {
+            let errMsg = `API error ${res.status}`;
+            try {
+                const d = await res.json();
+                errMsg = d.error?.message || errMsg;
+                if (res.status===401) errMsg = 'Invalid API key — re-enter your key in Settings.';
+                if (res.status===429) errMsg = 'Rate limit reached — please wait a moment.';
+            } catch(e) {}
+            throw new Error(errMsg);
+        }
+        const data = await res.json();
+        return data.content[0].text;
     }
-    const data = await res.json();
-    return data.content[0].text;
 }
 
 async function identifyItem() {

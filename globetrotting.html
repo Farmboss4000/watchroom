@@ -1989,44 +1989,70 @@ function fileToBase64(file) {
 // ═══════════════════════════════════════════════
 //  WORLD MAP
 // ═══════════════════════════════════════════════
-async function renderWorldMap() {
-    const active = trips.filter(t => !t.deleted);
+async function geocodeQuery(q) {
+    // Rate-limit: Nominatim requires ≤1 req/sec
+    await new Promise(r => setTimeout(r, 1100));
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`, {
+        headers: { 'Accept-Language': 'en' }
+    });
+    if (!res.ok) throw new Error('Nominatim ' + res.status);
+    const data = await res.json();
+    return data && data.length ? { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) } : null;
+}
 
-    // Auto-geocode any destination missing lat/lon, then persist back to Firestore
-    let geocodedAny = false;
-    for (const t of active) {
-        const dests = t.destinations || [];
-        let tripChanged = false;
-        for (const d of dests) {
-            if (!d.lat || !d.lon) {
-                const q = [d.city, d.country].filter(Boolean).join(' ');
-                if (!q) continue;
+async function renderWorldMap() {
+    const statsEl = document.getElementById('world-map-stats');
+    const active  = trips.filter(t => !t.deleted);
+
+    // Find destinations missing coordinates
+    const missing = [];
+    active.forEach(t => (t.destinations || []).forEach(d => {
+        if (!d.lat || !d.lon) missing.push({ trip: t, dest: d });
+    }));
+
+    if (missing.length) {
+        statsEl.innerHTML = `<span>⏳ Locating ${missing.length} destination${missing.length > 1 ? 's' : ''}…</span>`;
+        for (const { trip, dest } of missing) {
+            // Try city+country, then city alone, then country alone
+            const queries = [
+                [dest.city, dest.country].filter(Boolean).join(', '),
+                dest.city,
+                dest.country
+            ].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i); // deduplicate
+
+            let found = null;
+            for (const q of queries) {
+                try { found = await geocodeQuery(q); } catch {}
+                if (found) break;
+            }
+
+            if (found) {
+                dest.lat = found.lat;
+                dest.lon = found.lon;
                 try {
-                    const gr = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`);
-                    const gd = await gr.json();
-                    if (gd && gd.length) {
-                        d.lat = parseFloat(gd[0].lat);
-                        d.lon = parseFloat(gd[0].lon);
-                        tripChanged = true;
-                        geocodedAny = true;
-                    }
+                    await db.collection('globetrotting_trips').doc(trip._id).update({ destinations: trip.destinations });
                 } catch {}
             }
         }
-        if (tripChanged) {
-            try {
-                await db.collection('globetrotting_trips').doc(t._id).update({ destinations: dests });
-            } catch {}
-        }
     }
 
+    // Build allDests from (now-updated) active trips
     const allDests = [];
-    active.forEach(t => (t.destinations||[]).forEach(d => {
-        if (d.lat && d.lon) allDests.push({...d, tripName: t.name, tripDates: `${fmtDate(t.departureDate)} – ${fmtDate(t.returnDate)}`});
+    const unpinned = [];
+    active.forEach(t => (t.destinations || []).forEach(d => {
+        if (d.lat && d.lon) {
+            allDests.push({ ...d, tripName: t.name, tripDates: `${fmtDate(t.departureDate)} – ${fmtDate(t.returnDate)}` });
+        } else {
+            unpinned.push({ city: d.city, country: d.country, tripName: t.name });
+        }
     }));
 
     const countries = new Set(allDests.map(d => d.country).filter(Boolean));
-    document.getElementById('world-map-stats').innerHTML = `<strong>${allDests.length}</strong> destination${allDests.length!==1?'s':''} across <strong>${countries.size}</strong> countr${countries.size!==1?'ies':'y'}`;
+    const unpinnedNote = unpinned.length
+        ? ` · <span style="color:var(--warning);">${unpinned.length} destination${unpinned.length > 1 ? 's' : ''} missing location</span> <button class="btn btn-ghost btn-sm" style="padding:1px 8px;font-size:0.75rem;" onclick="showUnpinnedDests()">details</button>`
+        : '';
+    statsEl.innerHTML = `<strong>${allDests.length}</strong> destination${allDests.length !== 1 ? 's' : ''} across <strong>${countries.size}</strong> countr${countries.size !== 1 ? 'ies' : 'y'}${unpinnedNote}`;
+    window._unpinnedDests = unpinned;
 
     if (!worldMapInit) {
         worldMapInst = L.map('world-map-container').setView([20, 0], 2);
@@ -2039,7 +2065,6 @@ async function renderWorldMap() {
         setTimeout(() => worldMapInst.invalidateSize(), 50);
     }
 
-    // Clear old markers
     worldMarkers.forEach(m => worldMapInst.removeLayer(m));
     worldMarkers = [];
 
@@ -2048,11 +2073,18 @@ async function renderWorldMap() {
             radius: 8, color: '#0d9488', fillColor: '#0d9488',
             fillOpacity: 0.7, weight: 2
         }).addTo(worldMapInst);
-        m.bindPopup(`<strong>${esc(d.city||'')}</strong>${d.country?', '+esc(d.country):''}<br>${esc(d.tripName)}<br><small>${d.tripDates}</small>`);
+        m.bindPopup(`<strong>${esc(d.city || '')}</strong>${d.country ? ', ' + esc(d.country) : ''}<br>${esc(d.tripName)}<br><small>${d.tripDates}</small>`);
         worldMarkers.push(m);
     });
 
     setTimeout(() => worldMapInst.invalidateSize(), 100);
+}
+
+function showUnpinnedDests() {
+    const list = (window._unpinnedDests || []);
+    if (!list.length) return;
+    const lines = list.map(d => `• ${[d.city, d.country].filter(Boolean).join(', ') || '(no location)'} — ${d.tripName}`).join('\n');
+    alert(`Destinations without map coordinates:\n\n${lines}\n\nTo fix: edit the trip, make sure City and Country fields are filled in, then click the 📍 geocode button next to the destination.`);
 }
 
 // ═══════════════════════════════════════════════

@@ -144,6 +144,20 @@
         .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
         .toast.success{background:var(--success);}
         .toast.error{background:var(--danger);}
+        /* ── REPORTS ── */
+        .rpt-row{background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:16px 20px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;}
+        .rpt-row:hover{border-color:var(--accent);background:var(--accent-dim);}
+        .rpt-meta{flex:1;min-width:0;}
+        .rpt-title{font-size:0.95rem;font-weight:700;color:var(--text-primary);margin-bottom:3px;}
+        .rpt-sub{font-size:0.8rem;color:var(--text-secondary);}
+        .rpt-actions{display:flex;gap:8px;flex-shrink:0;}
+        .rpt-empty{text-align:center;padding:48px 20px;color:var(--text-secondary);font-size:0.9rem;}
+        /* ── PRINT / PDF ── */
+        @media print {
+            body * { visibility: hidden; }
+            #pdf-print-area, #pdf-print-area * { visibility: visible; }
+            #pdf-print-area { position: fixed; inset: 0; overflow: visible; }
+        }
         /* ── AUTO QUOTES ── */
         .aq-vehicle-row{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1.5px solid var(--border);border-radius:8px;margin-bottom:8px;cursor:pointer;transition:all 0.13s;background:var(--bg-secondary);}
         .aq-vehicle-row:hover{border-color:var(--accent);background:var(--accent-dim);}
@@ -286,6 +300,7 @@
         <button onclick="showView('policies')">All Policies</button>
         <button onclick="showView('contacts')">Contacts &amp; Agents</button>
         <button onclick="showView('auto-quotes')">🚗 Auto Quotes</button>
+        <button onclick="showView('reports')">📊 Reports</button>
         <button onclick="showView('recycle-bin')">🗑 Recycle Bin</button>
     </nav>
     <div class="header-right">
@@ -736,6 +751,25 @@
     </div>
 </div>
 
+<!-- REPORTS -->
+<div id="view-reports" class="view">
+    <div class="card" style="margin-bottom:18px;">
+        <div class="card-title">
+            <div class="card-title-left">📊 Auto Quote Reports</div>
+            <button class="btn btn-ghost btn-sm" onclick="loadReports()">🔄 Refresh</button>
+        </div>
+        <p style="font-size:0.85rem;color:var(--text-secondary);line-height:1.5;">
+            Every time <strong>Get Auto Quotes</strong> runs, a report is automatically saved here. Click any report to view or export it as a PDF.
+        </p>
+    </div>
+    <div id="reports-list">
+        <div class="rpt-empty" id="reports-empty" style="display:none;">
+            <div style="font-size:2.5rem;margin-bottom:10px;">📋</div>
+            <p>No quote reports yet. Run <strong>Get Auto Quotes</strong> to generate your first report.</p>
+        </div>
+    </div>
+</div>
+
 <!-- RECYCLE BIN -->
 <div id="view-recycle-bin" class="view">
     <div class="toolbar">
@@ -791,7 +825,7 @@ const TYPE_ICON={
     Home:'🏠',Renters:'🏢',Auto:'🚗',Health:'❤',Dental:'🦷',Vision:'👓',
     Life:'🌿',Farm:'🌾',Umbrella:'☂',Disability:'♿',Pet:'🐾',Travel:'✈',Other:'📋'
 };
-const VIEWS=['dashboard','add-item','policies','contacts','auto-quotes','recycle-bin'];
+const VIEWS=['dashboard','add-item','policies','contacts','auto-quotes','reports','recycle-bin'];
 
 auth.onAuthStateChanged(user=>{
     if(user){
@@ -840,6 +874,7 @@ function showView(v){
     document.querySelectorAll('nav button').forEach((b,i)=>{ b.classList.toggle('active',VIEWS[i]===v); });
     if(v==='add-item'&&!document.getElementById('edit-doc-id').value) resetForm();
     if(v==='auto-quotes') refreshAutoVehicles();
+    if(v==='reports') loadReports();
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────
@@ -1431,6 +1466,7 @@ async function getAutoQuotes() {
 
         try {
             const quotes = await fetchVehicleQuotes(v, state, driverAge, record);
+            v._quoteResult = quotes;
             renderQuoteCard(cardId, v, quotes, state, driverAgeLabel, recordLabel);
         } catch (err) {
             document.getElementById(cardId).querySelector('.quote-card-body').innerHTML =
@@ -1440,6 +1476,34 @@ async function getAutoQuotes() {
 
     btn.disabled = false; btn.textContent = '🚗 Get Auto Quotes';
     toast(`Quotes generated for ${selected.length} vehicle${selected.length > 1 ? 's' : ''}!`, 'success');
+
+    // Collect results and save report
+    const reportVehicles = [];
+    for (const v of selected) {
+        const card = document.getElementById('qcard-' + v._docId);
+        if (!card || card.querySelector('.aq-loading')) continue; // skip errored
+        const vLabel = [v.year, v.make, v.model].filter(Boolean).join(' ') || 'Unknown Vehicle';
+        if (v._quoteResult) reportVehicles.push({ vLabel, vinStr: v.serialNumber || v.vin || '', category: v.category || '', quotes: v._quoteResult });
+    }
+    if (reportVehicles.length) {
+        const reportId = await saveQuoteReport({
+            state, driverAgeLabel, recordLabel,
+            vehicleCount: reportVehicles.length,
+            vehicles: reportVehicles
+        });
+        // Show PDF export button in results header
+        const hdr = document.querySelector('#aq-results > div');
+        if (hdr && reportId) {
+            const existing = document.getElementById('aq-pdf-btn');
+            if (existing) existing.remove();
+            const pdfBtn = document.createElement('button');
+            pdfBtn.id = 'aq-pdf-btn';
+            pdfBtn.className = 'btn btn-primary btn-sm';
+            pdfBtn.textContent = '📄 Export PDF Report';
+            pdfBtn.onclick = () => exportQuotePDF(reportId);
+            hdr.appendChild(pdfBtn);
+        }
+    }
 }
 
 async function fetchVehicleQuotes(v, state, driverAge, record) {
@@ -1620,6 +1684,193 @@ function switchCoverage(cardId, coverageKey, btn) {
 }
 
 // auto-quotes vehicle load is handled in showView above
+
+// ══════════════════════════════════════════════════════════════════
+//  QUOTE REPORTS
+// ══════════════════════════════════════════════════════════════════
+let quoteReports = [];
+
+async function saveQuoteReport(data) {
+    try {
+        const doc = await db.collection('insurance_quote_reports').add({
+            ...data,
+            timestamp: new Date().toISOString(),
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        return doc.id;
+    } catch (e) {
+        console.error('Failed to save quote report:', e);
+        return null;
+    }
+}
+
+async function loadReports() {
+    const listEl = document.getElementById('reports-list');
+    const emptyEl = document.getElementById('reports-empty');
+    listEl.innerHTML = '<div style="color:var(--text-secondary);font-size:0.85rem;padding:16px;">Loading reports…</div>';
+    try {
+        const snap = await db.collection('insurance_quote_reports')
+            .orderBy('createdAt', 'desc').limit(50).get();
+        quoteReports = snap.docs.map(d => ({ _docId: d.id, ...d.data() }));
+        renderReports();
+    } catch (e) {
+        listEl.innerHTML = `<div style="color:var(--danger);padding:16px;">Error loading reports: ${esc(e.message)}</div>`;
+    }
+}
+
+function renderReports() {
+    const listEl = document.getElementById('reports-list');
+    const emptyEl = document.getElementById('reports-empty');
+    if (!quoteReports.length) {
+        listEl.innerHTML = '';
+        emptyEl.style.display = '';
+        listEl.appendChild(emptyEl);
+        return;
+    }
+    emptyEl.style.display = 'none';
+    listEl.innerHTML = quoteReports.map(r => {
+        const dt = r.timestamp ? new Date(r.timestamp).toLocaleString() : 'Unknown date';
+        const vehs = (r.vehicles || []).map(v => esc(v.vLabel)).join(', ');
+        const count = r.vehicleCount || (r.vehicles || []).length;
+        return `<div class="rpt-row">
+            <div class="rpt-meta">
+                <div class="rpt-title">📋 Auto Quote — ${esc(dt)}</div>
+                <div class="rpt-sub">${count} vehicle${count !== 1 ? 's' : ''} · ${esc(r.state || '?')} · ${esc(r.driverAgeLabel || '')} · ${esc(r.recordLabel || '')}</div>
+                <div class="rpt-sub" style="margin-top:3px;font-style:italic;">${vehs}</div>
+            </div>
+            <div class="rpt-actions">
+                <button class="btn btn-primary btn-sm" onclick="exportQuotePDF('${r._docId}')">📄 Export PDF</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteQuoteReport('${r._docId}')">🗑</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+async function exportQuotePDF(reportId) {
+    let report = quoteReports.find(r => r._docId === reportId);
+    if (!report) {
+        // Try loading from Firestore if not cached
+        try {
+            const doc = await db.collection('insurance_quote_reports').doc(reportId).get();
+            if (!doc.exists) { toast('Report not found.', 'error'); return; }
+            report = { _docId: doc.id, ...doc.data() };
+        } catch (e) { toast('Could not load report.', 'error'); return; }
+    }
+
+    const dt = report.timestamp ? new Date(report.timestamp).toLocaleString() : '';
+    const coverages = [
+        { key: 'liability', label: 'Liability Only' },
+        { key: 'full500',   label: 'Full Coverage · $500 Deductible' },
+        { key: 'full1000',  label: 'Full Coverage · $1,000 Deductible' },
+    ];
+
+    const vehicleHTML = (report.vehicles || []).map(v => {
+        const q = v.quotes || {};
+        const covTables = coverages.map(c => {
+            const cov = q[c.key];
+            if (!cov || !cov.carriers) return '';
+            const sorted = [...cov.carriers].sort((a, b) => a.monthly - b.monthly);
+            const cheapest = sorted[0]?.monthly;
+            const rows = sorted.map((car, i) => `
+                <tr style="${i % 2 === 0 ? 'background:#f8faf8;' : ''}">
+                    <td style="padding:7px 10px;font-weight:${car.monthly === cheapest ? '700' : '400'};color:${car.monthly === cheapest ? '#16a34a' : '#1a2e1a'};">
+                        ${esc(car.name)}${car.monthly === cheapest ? ' ✓ Lowest' : ''}
+                    </td>
+                    <td style="padding:7px 10px;text-align:right;font-weight:600;">$${car.monthly}/mo</td>
+                    <td style="padding:7px 10px;text-align:right;color:#4a6050;">$${Number(car.annual).toLocaleString()}/yr</td>
+                    <td style="padding:7px 10px;color:#6b7280;font-size:0.82em;">${esc(car.notes || '')}</td>
+                </tr>`).join('');
+            return `<div style="margin-bottom:20px;">
+                <div style="font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#16a34a;margin-bottom:6px;">${c.label}</div>
+                <div style="font-size:0.78rem;color:#4a6050;margin-bottom:8px;">${esc(cov.description || '')}</div>
+                <table style="width:100%;border-collapse:collapse;font-size:0.87rem;border:1px solid #c8d8c8;border-radius:6px;overflow:hidden;">
+                    <thead><tr style="background:#e6eee6;">
+                        <th style="padding:7px 10px;text-align:left;font-size:0.74rem;text-transform:uppercase;letter-spacing:0.4px;color:#4a6050;">Carrier</th>
+                        <th style="padding:7px 10px;text-align:right;font-size:0.74rem;text-transform:uppercase;letter-spacing:0.4px;color:#4a6050;">Monthly</th>
+                        <th style="padding:7px 10px;text-align:right;font-size:0.74rem;text-transform:uppercase;letter-spacing:0.4px;color:#4a6050;">Annual</th>
+                        <th style="padding:7px 10px;text-align:left;font-size:0.74rem;text-transform:uppercase;letter-spacing:0.4px;color:#4a6050;">Notes</th>
+                    </tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+                <div style="font-size:0.8rem;color:#4a6050;margin-top:6px;">
+                    Range: <strong>$${cheapest}–${sorted[sorted.length-1]?.monthly}/mo</strong>
+                    &nbsp;·&nbsp; Annual: <strong>$${(cheapest*12).toLocaleString()}–$${(sorted[sorted.length-1]?.monthly*12).toLocaleString()}</strong>
+                </div>
+            </div>`;
+        }).join('');
+
+        return `<div style="page-break-inside:avoid;margin-bottom:36px;padding:20px;border:1px solid #c8d8c8;border-radius:10px;">
+            <div style="background:#0f2510;color:#fff;padding:14px 18px;border-radius:8px;margin-bottom:18px;">
+                <div style="font-size:1.05rem;font-weight:700;">${vehicleIconText(v.category)} ${esc(v.vLabel)}</div>
+                ${v.vinStr ? `<div style="font-size:0.78rem;color:rgba(255,255,255,0.6);margin-top:3px;">VIN: ${esc(v.vinStr)}</div>` : ''}
+                ${q.vehicleSummary ? `<div style="font-size:0.8rem;color:rgba(255,255,255,0.55);margin-top:5px;font-style:italic;">${esc(q.vehicleSummary)}</div>` : ''}
+            </div>
+            ${covTables}
+            ${q.riskFactors?.length ? `<div style="font-size:0.82rem;color:#4a6050;margin-top:8px;padding:10px 14px;background:#f0f4f0;border-radius:6px;">
+                <strong style="color:#1a2e1a;">Rate Factors:</strong> ${q.riskFactors.map(f => esc(f)).join(' · ')}
+            </div>` : ''}
+            ${q.savingsTips?.length ? `<div style="font-size:0.82rem;color:#4a6050;margin-top:8px;padding:10px 14px;background:#f0f8f0;border-radius:6px;">
+                <strong style="color:#16a34a;">Ways to Save:</strong> ${q.savingsTips.map(t => esc(t)).join(' · ')}
+            </div>` : ''}
+        </div>`;
+    }).join('');
+
+    const html = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<title>Auto Insurance Quote Report — ${dt}</title>
+<style>
+  body{font-family:'Segoe UI',Tahoma,sans-serif;margin:0;padding:32px;color:#1a2e1a;background:#fff;font-size:14px;}
+  h1{font-size:1.5rem;color:#0f2510;margin:0 0 4px;}
+  .meta{font-size:0.85rem;color:#4a6050;margin-bottom:28px;padding-bottom:14px;border-bottom:2px solid #16a34a;}
+  .disclaimer{font-size:0.75rem;color:#6b7280;margin-top:32px;padding-top:14px;border-top:1px solid #c8d8c8;line-height:1.5;}
+  @media print{body{padding:20px;}}
+</style></head>
+<body>
+<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
+  <div style="width:44px;height:44px;background:#16a34a;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;flex-shrink:0;">🛡</div>
+  <div>
+    <h1>Auto Insurance Quote Report</h1>
+    <div style="font-size:0.82rem;color:#4a6050;">Farmboss Insurance</div>
+  </div>
+</div>
+<div class="meta">
+  <strong>Generated:</strong> ${dt} &nbsp;·&nbsp;
+  <strong>State:</strong> ${esc(report.state || '?')} &nbsp;·&nbsp;
+  <strong>Driver Age:</strong> ${esc(report.driverAgeLabel || '')} &nbsp;·&nbsp;
+  <strong>Driving Record:</strong> ${esc(report.recordLabel || '')} &nbsp;·&nbsp;
+  <strong>Vehicles:</strong> ${(report.vehicles || []).length}
+</div>
+${vehicleHTML}
+<div class="disclaimer">
+  ⚠ These are AI-estimated quotes based on typical market rates for the given vehicle and driver profile. They are for reference only and do not constitute a binding insurance offer.
+  Contact carriers directly for accurate, binding quotes. Actual rates vary by credit score, exact address, coverage limits, and other underwriting factors.
+</div>
+</body></html>`;
+
+    const win = window.open('', '_blank', 'width=900,height=700');
+    if (!win) { toast('Pop-up blocked — please allow pop-ups for this site.', 'error'); return; }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 600);
+}
+
+function vehicleIconText(cat) {
+    const m = { Truck:'🚚', Motorcycle:'🏍', SUV:'🚙', Van:'🚐', RV:'🏕', Boat:'⛵', ATV:'🛻' };
+    return m[cat] || '🚗';
+}
+
+async function deleteQuoteReport(docId) {
+    if (!confirm('Delete this report? This cannot be undone.')) return;
+    try {
+        await db.collection('insurance_quote_reports').doc(docId).delete();
+        quoteReports = quoteReports.filter(r => r._docId !== docId);
+        renderReports();
+        toast('Report deleted.', 'success');
+    } catch (e) {
+        toast('Delete failed: ' + e.message, 'error');
+    }
+}
 </script>
 </body>
 </html>

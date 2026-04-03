@@ -2265,32 +2265,43 @@ Use the exact id values from the host list. Base compatibility on: thread type m
 
 async function runSuppressorCompatAndSave(suppDocId, thread, caliber, label) {
     const hosts = items.filter(i => ['Pistol','Rifle','Shotgun','Revolver'].includes(i.category));
-    if (!hosts.length || !apiKey) return;
+    if (!apiKey) { toast('Set your API key in Settings first.', 'error'); return; }
+    if (!hosts.length) { toast('No pistols, rifles, shotguns, or revolvers in inventory to check against.', 'error'); return; }
 
+    // Build host list — INCLUDE the docId in the prompt so Claude echoes it back exactly
     const hostList = hosts.map(h => ({
         id: h._docId,
         label: [h.manufacturer, h.model].filter(Boolean).join(' ') || `Item #${h.id}`,
         category: h.category,
-        caliber: h.caliber || '',
-        threadType: h.threadType || ''
+        caliber: h.caliber || 'unknown',
+        threadType: h.threadType || 'unknown'
     }));
 
-    const prompt = `You are a firearms expert. Determine mechanical compatibility between a suppressor and a list of host firearms.
+    const prompt = `You are a suppressor compatibility expert. Evaluate whether the suppressor below is mechanically compatible with each host firearm.
 
 SUPPRESSOR: ${label || 'Unknown suppressor'}
-  Thread type: ${thread || 'Unknown'}
-  Caliber rated for: ${caliber || 'Unknown'}
+  Thread type: ${thread || 'unknown — assume standard adapters may be available'}
+  Caliber rated for: ${caliber || 'unknown'}
 
-HOST FIREARMS:
-${hostList.map((h,i) => `${i+1}. [${h.category}] ${h.label} — Caliber: ${h.caliber||'unknown'} — Thread: ${h.threadType||'unknown'}`).join('\n')}
+COMPATIBILITY RULES:
+- If suppressor caliber bore is LARGER than the host firearm's bullet diameter, it is mechanically safe to use.
+- Thread compatibility: if threads match → compatible directly. If threads differ but standard adapters exist → adapterNeeded=true, compatible=false. If no adapter is possible → compatible=false, adapterNeeded=false.
+- If suppressor thread is unknown, assume it can be adapted to most standard muzzle threads (1/2x28, 5/8x24, etc.) → mark adapterNeeded=true for otherwise caliber-compatible hosts.
+- Common bore diameter rules: 9mm suppressor (.355") works on 9mm, .380, .357, .38 Special. .30-cal suppressor (.308") works on .308, 7.62x39, 7.62x51, .300BLK, 5.56/223, .243, 6.5CM. .22 suppressor works on .22LR, .17HMR, .22WMR. 12-gauge suppressor only works on 12-gauge shotguns. .45-cal works on .45ACP, .45LC.
+- Caliber values may be shorthand: "9"=9mm, "22"=.22LR, "7.62"=7.62mm/.308, "12"=12-gauge, "46"=.46-cal/.45-cal range, "300"=.300BLK, "556"=5.56mm.
+- When in doubt about minor thread differences, lean toward adapterNeeded=true rather than outright incompatible.
+- ALWAYS return an entry for EVERY host firearm listed.
 
-For each host firearm determine compatibility. Return ONLY valid JSON array:
-[{"id":"<firearm_id>","compatible":true,"adapterNeeded":false,"reason":"<one sentence>"},...]
+HOST FIREARMS (use the exact "id" string in your response):
+${hostList.map(h => `ID:${h.id} | [${h.category}] ${h.label} | Caliber:${h.caliber} | Thread:${h.threadType}`).join('\n')}
 
-Use the exact id values. A .30-cal suppressor works on 5.56, 9mm, .300BLK; bore diameter must exceed bullet diameter; thread must match or adapter available.`;
+Return a JSON array with one entry per host firearm — ALL ${hostList.length} of them. Use exact id strings from above.
+[{"id":"<exact_id_from_above>","compatible":true,"adapterNeeded":false,"reason":"<one concise sentence explaining why>"},...]
+
+Return ONLY the JSON array, no other text.`;
 
     try {
-        const msgPayload = { model: aiModel, max_tokens: 1024, messages: [{ role:'user', content: prompt }] };
+        const msgPayload = { model: aiModel, max_tokens: 4096, messages: [{ role:'user', content: prompt }] };
         let res;
         if (proxyUrl) {
             res = await fetch(proxyUrl, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({...msgPayload, apiKey}) });
@@ -2301,18 +2312,34 @@ Use the exact id values. A .30-cal suppressor works on 5.56, 9mm, .300BLK; bore 
                 body: JSON.stringify(msgPayload)
             });
         }
-        if (!res.ok) return;
+        if (!res.ok) {
+            const errData = await res.json().catch(()=>({}));
+            throw new Error(errData.error?.message || `API error ${res.status}`);
+        }
         const data = await res.json();
-        const text = data.content[0].text;
-        const jsonMatch = text.match(/\[[\s\S]*\]/);
-        if (!jsonMatch) return;
-        const results = JSON.parse(jsonMatch[0]);
+        const text = data.content?.[0]?.text || '';
+        console.log('[CompatCheck] raw response:', text);
 
-        // Enrich results with firearm labels for display
+        const jsonMatch = text.match(/\[[\s\S]*\]/);
+        if (!jsonMatch) throw new Error(`AI returned no JSON array. Response: ${text.slice(0,200)}`);
+        const results = JSON.parse(jsonMatch[0]);
+        if (!results.length) throw new Error('AI returned an empty results array.');
+
+        // Enrich — match by exact docId
         const enriched = results.map(r => {
             const host = hosts.find(h => h._docId === r.id);
-            return { ...r, hostLabel: host ? ([host.manufacturer, host.model].filter(Boolean).join(' ') || `Item #${host.id}`) : r.id, hostCategory: host?.category || '' };
-        });
+            if (!host) { console.warn('[CompatCheck] unmatched id:', r.id); }
+            return {
+                id: r.id,
+                compatible: !!r.compatible,
+                adapterNeeded: !!r.adapterNeeded,
+                reason: r.reason || '',
+                hostLabel: host ? ([host.manufacturer, host.model].filter(Boolean).join(' ') || `Item #${host.id}`) : r.id,
+                hostCategory: host?.category || ''
+            };
+        }).filter(r => hosts.find(h => h._docId === r.id)); // drop any phantom ids
+
+        if (!enriched.length) throw new Error(`Results returned but no IDs matched inventory. Check console for details.`);
 
         // Save back to Firestore
         await db.collection('items').doc(suppDocId).update({
@@ -2320,14 +2347,17 @@ Use the exact id values. A .30-cal suppressor works on 5.56, 9mm, .300BLK; bore 
             compatibilityCheckedAt: new Date().toISOString()
         });
 
-        // Update local items array so inventory re-renders immediately
+        // Update local items array immediately
         const local = items.find(i => i._docId === suppDocId);
         if (local) { local.compatibilityResults = enriched; local.compatibilityCheckedAt = new Date().toISOString(); }
         renderInventory();
+
         const compatCount = enriched.filter(r => r.compatible || r.adapterNeeded).length;
-        toast(`✅ Compatibility check complete — ${compatCount} compatible firearm${compatCount !== 1 ? 's' : ''} found.`, 'success');
+        toast(`✅ ${compatCount} compatible firearm${compatCount !== 1 ? 's' : ''} found out of ${enriched.length} checked.`, 'success');
     } catch(e) {
-        console.error('Compat check failed:', e);
+        console.error('[CompatCheck] failed:', e);
+        toast('Compatibility check failed: ' + e.message, 'error');
+        throw e;
     }
 }
 

@@ -196,6 +196,57 @@
         .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
         .toast.err { border-color: var(--danger); color: var(--danger); }
 
+        /* ── TAGS ── */
+        .idea-tags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 6px; }
+        .tag { display: inline-flex; align-items: center; gap: 2px; font-size: 0.68rem; font-weight: 700; padding: 2px 7px; border-radius: 20px; background: rgba(0,0,0,0.18); letter-spacing: 0.2px; }
+        .tag-del { background: none; border: none; cursor: pointer; color: inherit; font-size: 0.65rem; padding: 0 1px; opacity: 0.6; line-height: 1; }
+        .tag-del:hover { opacity: 1; }
+        .tag-input-row { display: flex; gap: 4px; margin-top: 5px; opacity: 0; transition: opacity 0.15s; }
+        .idea-card:hover .tag-input-row { opacity: 1; }
+        .tag-mini-input { flex: 1; min-width: 0; background: rgba(0,0,0,0.15); border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; padding: 2px 7px; font-size: 0.72rem; color: inherit; font-family: inherit; }
+        .tag-mini-input:focus { outline: none; border-color: rgba(255,255,255,0.5); }
+        .tag-mini-input::placeholder { opacity: 0.5; }
+
+        /* ── VIEW TOGGLE ── */
+        .view-toggle { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+        .vt-btn { padding: 4px 13px; background: none; border: none; color: var(--text2); font-size: 0.76rem; cursor: pointer; transition: all 0.15s; font-family: inherit; white-space: nowrap; }
+        .vt-btn + .vt-btn { border-left: 1px solid var(--border); }
+        .vt-btn.on { background: var(--bg-raised); color: var(--text); font-weight: 700; }
+
+        /* ── KANBAN ── */
+        .kanban-wrap { overflow-x: auto; padding-bottom: 12px; scrollbar-width: thin; }
+        .kanban-wrap::-webkit-scrollbar { height: 5px; }
+        .kanban-wrap::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
+        .kanban { display: flex; gap: 12px; align-items: flex-start; min-width: max-content; }
+        .kanban-col { width: 260px; flex-shrink: 0; background: var(--bg-card); border: 1px solid var(--border); border-radius: 11px; overflow: hidden; }
+        .kanban-col-hdr { padding: 11px 14px 9px; display: flex; align-items: center; gap: 7px; border-bottom: 1px solid var(--border); position: relative; }
+        .kanban-col-hdr::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background: var(--kcc, #555); }
+        .kanban-col-name { font-size: 0.82rem; font-weight: 800; flex: 1; }
+        .kanban-col-cnt { font-size: 0.72rem; color: var(--text2); background: var(--bg-raised); padding: 1px 8px; border-radius: 20px; }
+        .kanban-col-del { background: none; border: none; color: var(--text2); cursor: pointer; font-size: 0.72rem; padding: 2px 5px; border-radius: 4px; opacity: 0.5; transition: all 0.15s; }
+        .kanban-col-del:hover { opacity: 1; color: var(--danger); }
+        .kanban-ideas { padding: 8px; display: flex; flex-direction: column; gap: 7px; min-height: 60px; }
+        .kanban-card { border-radius: 8px; padding: 10px 12px; position: relative; transition: transform 0.12s, box-shadow 0.12s; }
+        .kanban-card:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,0,0,0.5); }
+        .kanban-card .idea-del { opacity: 0; }
+        .kanban-card:hover .idea-del { opacity: 1; }
+        .kanban-card .idea-footer { opacity: 0; }
+        .kanban-card:hover .idea-footer { opacity: 1; }
+        .kanban-card .idea-colors { opacity: 0; }
+        .kanban-card:hover .idea-colors { opacity: 1; }
+        .move-col-sel { display: none; margin-top: 6px; width: 100%; padding: 3px 6px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.18); border-radius: 5px; color: inherit; font-size: 0.72rem; font-family: inherit; cursor: pointer; }
+        .kanban-card:hover .move-col-sel { display: block; }
+        .move-col-sel:focus { outline: none; }
+        .add-col-card { width: 220px; flex-shrink: 0; background: none; border: 2px dashed rgba(255,255,255,0.08); border-radius: 11px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 100px; cursor: pointer; color: var(--text2); transition: all 0.15s; font-size: 0.82rem; font-weight: 700; }
+        .add-col-card:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+
+        /* ── AI CLUSTER ── */
+        .cluster-modal { max-width: 560px; }
+        .cluster-group { margin-bottom: 11px; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
+        .cluster-group-hdr { padding: 9px 14px; background: var(--bg-raised); font-size: 0.84rem; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+        .cluster-tag-pill { font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; background: var(--accent-dim); color: var(--accent); }
+        .cluster-group-ideas { padding: 8px 14px 10px; font-size: 0.8rem; color: var(--text2); line-height: 2; }
+
         /* ── RESPONSIVE ── */
         @media (max-width: 640px) {
             main { padding: 14px 12px; }
@@ -269,6 +320,7 @@
                 <div class="board-idea-count" id="board-idea-count"></div>
                 <div style="margin-left:auto;display:flex;gap:7px;flex-wrap:wrap;">
                     <button class="btn btn-ai btn-sm" onclick="openAIModal()">✨ AI Brainstorm</button>
+                    <button class="btn btn-ghost btn-sm" onclick="openClusterModal()">🔗 Cluster</button>
                     <button class="btn btn-ghost btn-sm" onclick="exportBoard()">📋 Copy All</button>
                 </div>
             </div>
@@ -282,10 +334,17 @@
 
             <!-- Toolbar -->
             <div class="toolbar" id="toolbar">
+                <div class="view-toggle">
+                    <button class="vt-btn on" id="vt-cards" onclick="setViewMode('cards')">▦ Cards</button>
+                    <button class="vt-btn" id="vt-kanban" onclick="setViewMode('kanban')">☰ Columns</button>
+                </div>
+                <div class="tsep"></div>
                 <button class="chip on" id="chip-all" onclick="setFilter('all')">All</button>
                 <button class="chip" id="chip-starred" onclick="setFilter('starred')">⭐ Starred</button>
                 <div class="tsep"></div>
                 <div id="color-chips"></div>
+                <div class="tsep" id="tag-tsep" style="display:none;"></div>
+                <div id="tag-chips"></div>
                 <div class="tsep"></div>
                 <select class="sort-sel" id="sort-sel" onchange="renderIdeas()">
                     <option value="newest">Newest</option>
@@ -348,6 +407,24 @@
     </div>
 </div>
 
+<!-- ── AI CLUSTER MODAL ── -->
+<div class="modal-overlay" id="modal-cluster" onclick="if(event.target===this)closeClusterModal()">
+    <div class="modal-box cluster-modal">
+        <div class="modal-title">🔗 AI Cluster</div>
+        <p style="font-size:0.83rem;color:var(--text2);margin-bottom:14px;">Claude groups your ideas into themes and applies the theme names as tags. Existing tags are preserved.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+            <button class="btn btn-ai" id="btn-cluster-run" onclick="runCluster()">🔗 Analyze &amp; Cluster</button>
+            <button class="btn btn-ghost btn-sm" onclick="closeClusterModal()">Close</button>
+        </div>
+        <div class="ai-status" id="cluster-status" style="display:none;"></div>
+        <div id="cluster-results" style="display:none;margin-top:12px;max-height:360px;overflow-y:auto;"></div>
+        <div id="cluster-apply-bar" style="display:none;margin-top:11px;gap:7px;flex-wrap:wrap;">
+            <button class="btn btn-primary btn-sm" onclick="applyClusterTags()">Apply Tags to Ideas</button>
+            <button class="btn btn-ghost btn-sm" onclick="closeClusterModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
@@ -389,8 +466,12 @@ let proxyUrl      = '';
 let noteColor     = 'yellow';
 let activeFilter  = 'all';
 let colorFilter   = null;
+let tagFilter     = null;
+let viewMode      = 'cards';
 let boardColor    = BOARD_COLORS[0];
+let boardColumns  = [];
 let aiIdeas       = [];
+let clusterGroups = [];
 
 // ═══════════════════════════════════════════════
 //  AUTH
@@ -537,8 +618,14 @@ function openBoard(id) {
     document.getElementById('breadcrumb-name').textContent = b.name;
     document.getElementById('board-breadcrumb').style.display = 'inline';
 
-    activeFilter = 'all';
-    colorFilter  = null;
+    activeFilter  = 'all';
+    colorFilter   = null;
+    tagFilter     = null;
+    viewMode      = 'cards';
+    boardColumns  = b.columns || [];
+    document.getElementById('vt-cards').classList.add('on');
+    document.getElementById('vt-kanban').classList.remove('on');
+    document.getElementById('ideas-grid').className = 'ideas-grid';
     document.getElementById('sort-sel').value = 'newest';
     document.getElementById('chip-all').classList.add('on');
     document.getElementById('chip-starred').classList.remove('on');
@@ -563,6 +650,7 @@ function renderIdeas() {
 
     if (activeFilter === 'starred') list = list.filter(i => i.starred);
     if (colorFilter) list = list.filter(i => (i.color||'yellow') === colorFilter);
+    if (tagFilter)   list = list.filter(i => (i.tags||[]).includes(tagFilter));
 
     if (sort === 'oldest')   list.sort((a,b) => (a.createdAt?.seconds||0) - (b.createdAt?.seconds||0));
     else if (sort === 'votes')   list.sort((a,b) => (b.votes||0) - (a.votes||0));
@@ -572,18 +660,21 @@ function renderIdeas() {
 
     document.getElementById('count-lbl').textContent = `${list.length} idea${list.length!==1?'s':''}`;
 
+    renderColorFilterChips();
+    renderTagFilterChips();
+
+    if (viewMode === 'kanban') { renderKanban(list); return; }
+
     const grid = document.getElementById('ideas-grid');
     if (!list.length) {
         grid.innerHTML = `<div class="ideas-empty">
-            <div class="ideas-empty-icon">${activeFilter==='starred'?'⭐':'💡'}</div>
-            <div class="ideas-empty-msg">${activeFilter==='starred'?'No starred ideas yet':'No ideas yet'}</div>
-            <div class="ideas-empty-hint">${activeFilter==='starred'?'Star ideas by hovering and clicking ☆':'Type your first idea above and press Enter'}</div>
+            <div class="ideas-empty-icon">${activeFilter==='starred'?'⭐':tagFilter?'🏷️':'💡'}</div>
+            <div class="ideas-empty-msg">${activeFilter==='starred'?'No starred ideas yet':tagFilter?`No ideas tagged #${tagFilter}`:'No ideas yet'}</div>
+            <div class="ideas-empty-hint">${activeFilter==='starred'?'Star ideas by hovering and clicking ☆':tagFilter?'Try a different tag filter':'Type your first idea above and press Enter'}</div>
         </div>`;
     } else {
         grid.innerHTML = list.map(i => renderIdeaCard(i)).join('');
     }
-
-    renderColorFilterChips();
 }
 
 function renderIdeaCard(idea) {
@@ -592,16 +683,25 @@ function renderIdeaCard(idea) {
         `<div class="icd" style="background:${NOTE_HEX[n]};" title="${n}" onclick="event.stopPropagation();changeColor('${idea._id}','${n}')"></div>`
     ).join('');
     const votes = idea.votes || 0;
+    const tagsHtml = (idea.tags||[]).map(t =>
+        `<span class="tag">#${esc(t)}<button class="tag-del" onclick="event.stopPropagation();removeTag('${idea._id}','${esc(t)}')">×</button></span>`
+    ).join('');
     return `<div class="idea-card ic-${col}" id="card-${idea._id}">
         <button class="idea-del" onclick="deleteIdea('${idea._id}')" title="Delete idea">✕</button>
         <div class="idea-text" id="it-${idea._id}" ondblclick="startEdit('${idea._id}')">${esc(idea.text)}</div>
         <textarea class="idea-edit-ta" id="ie-${idea._id}" rows="3"
             onblur="finishEdit('${idea._id}')"
             onkeydown="handleEditKey(event,'${idea._id}')"></textarea>
+        ${tagsHtml ? `<div class="idea-tags">${tagsHtml}</div>` : ''}
         <div class="idea-colors">${colorDots}</div>
         <div class="idea-footer">
             <button class="iab${idea.starred?' starred':''}" onclick="toggleStar('${idea._id}')" title="${idea.starred?'Unstar':'Star'}">${idea.starred?'⭐':'☆'}</button>
             <button class="iab" onclick="voteIdea('${idea._id}')" title="Upvote">👍${votes?' <span class="vote-n">'+votes+'</span>':''}</button>
+        </div>
+        <div class="tag-input-row">
+            <input class="tag-mini-input" placeholder="+ #tag" id="ti-${idea._id}"
+                onkeydown="handleTagInput(event,'${idea._id}')"
+                onclick="event.stopPropagation()">
         </div>
     </div>`;
 }
@@ -646,12 +746,15 @@ function syncIdeaCount() {
 
 async function addIdea() {
     const inp  = document.getElementById('add-input');
-    const text = inp.value.trim();
-    if (!text || !activeBoardId) return;
+    const raw  = inp.value.trim();
+    if (!raw || !activeBoardId) return;
+    const tagMatches = raw.match(/#(\w+)/g) || [];
+    const tags = tagMatches.map(t => t.slice(1).toLowerCase());
+    const text = raw.replace(/#\w+/g, '').replace(/\s+/g, ' ').trim() || raw;
     inp.value = '';
     await db.collection('shitshow_ideas').add({
         boardId: activeBoardId, text, color: noteColor,
-        starred: false, votes: 0,
+        starred: false, votes: 0, tags,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     inp.focus();
@@ -804,6 +907,256 @@ async function importAIIdeas() {
 
 function aiToggleAll(val) {
     aiIdeas.forEach((_,i) => { const c = document.getElementById(`ai-c-${i}`); if(c) c.checked = val; });
+}
+
+// ═══════════════════════════════════════════════
+//  TAGS
+// ═══════════════════════════════════════════════
+async function removeTag(id, tag) {
+    const idea = ideas.find(i => i._id === id);
+    if (!idea) return;
+    await db.collection('shitshow_ideas').doc(id).update({ tags: (idea.tags||[]).filter(t => t !== tag) });
+}
+
+async function addTagToIdea(id, tag) {
+    const clean = tag.replace(/^#/, '').toLowerCase().trim().replace(/\s+/g,'-');
+    if (!clean) return;
+    const idea = ideas.find(i => i._id === id);
+    if (!idea) return;
+    const tags = [...new Set([...(idea.tags||[]), clean])];
+    await db.collection('shitshow_ideas').doc(id).update({ tags });
+}
+
+function handleTagInput(e, id) {
+    if (e.key === 'Enter' || e.key === ',') {
+        e.preventDefault();
+        const inp = document.getElementById('ti-' + id);
+        if (!inp) return;
+        const val = inp.value.trim();
+        if (val) addTagToIdea(id, val);
+        inp.value = '';
+    }
+}
+
+function renderTagFilterChips() {
+    const allTags = [...new Set(ideas.flatMap(i => i.tags||[]))].sort();
+    const el  = document.getElementById('tag-chips');
+    const sep = document.getElementById('tag-tsep');
+    if (!allTags.length) { el.innerHTML = ''; sep.style.display = 'none'; return; }
+    sep.style.display = '';
+    el.innerHTML = allTags.map(t =>
+        `<button class="chip${tagFilter===t?' on':''}"
+            style="${tagFilter===t?'border-color:var(--purple);color:var(--purple);background:rgba(191,90,242,0.12);':''}"
+            onclick="setTagFilter('${esc(t)}')">#${esc(t)}</button>`
+    ).join('');
+}
+
+function setTagFilter(t) {
+    tagFilter    = tagFilter === t ? null : t;
+    activeFilter = 'all';
+    colorFilter  = null;
+    document.getElementById('chip-all').classList.remove('on');
+    document.getElementById('chip-starred').classList.remove('on');
+    renderIdeas();
+}
+
+// ═══════════════════════════════════════════════
+//  VIEW MODE / KANBAN
+// ═══════════════════════════════════════════════
+function setViewMode(mode) {
+    viewMode = mode;
+    document.getElementById('vt-cards').classList.toggle('on', mode === 'cards');
+    document.getElementById('vt-kanban').classList.toggle('on', mode === 'kanban');
+    document.getElementById('ideas-grid').className = mode === 'kanban' ? 'kanban-wrap' : 'ideas-grid';
+    renderIdeas();
+}
+
+function renderKanban(list) {
+    const COL_COLORS = ['#0a7fff','#bf5af2','#30d158','#ff9500','#1eccb8','#ff2d55'];
+    const colOpts = boardColumns.map(c =>
+        `<option value="${esc(c.id)}">${esc(c.name)}</option>`
+    ).join('');
+
+    let html = '<div class="kanban">';
+
+    // Inbox — ideas with no column assignment
+    const inbox = list.filter(i => !i.column || !boardColumns.find(c => c.id === i.column));
+    html += `<div class="kanban-col">
+        <div class="kanban-col-hdr" style="--kcc:#555577;">
+            <div class="kanban-col-name">📥 Inbox</div>
+            <div class="kanban-col-cnt">${inbox.length}</div>
+        </div>
+        <div class="kanban-ideas">${inbox.map(i => renderKanbanCard(i, colOpts)).join('')}</div>
+    </div>`;
+
+    boardColumns.forEach((col, idx) => {
+        const colIdeas = list.filter(i => i.column === col.id);
+        const cc = col.color || COL_COLORS[idx % COL_COLORS.length];
+        html += `<div class="kanban-col">
+            <div class="kanban-col-hdr" style="--kcc:${esc(cc)};">
+                <div class="kanban-col-name">${esc(col.name)}</div>
+                <div class="kanban-col-cnt">${colIdeas.length}</div>
+                <button class="kanban-col-del" onclick="deleteColumn('${esc(col.id)}')" title="Delete column">✕</button>
+            </div>
+            <div class="kanban-ideas">${colIdeas.map(i => renderKanbanCard(i, colOpts)).join('')}</div>
+        </div>`;
+    });
+
+    html += `<div class="add-col-card" onclick="promptAddColumn()">
+        <div style="font-size:1.5rem;">＋</div>
+        <div>Add Column</div>
+    </div></div>`;
+
+    document.getElementById('ideas-grid').innerHTML = html;
+}
+
+function renderKanbanCard(idea, colOpts) {
+    const col = idea.color || 'yellow';
+    const colorDots = NOTE_COLORS.map(n =>
+        `<div class="icd" style="background:${NOTE_HEX[n]};" title="${n}" onclick="event.stopPropagation();changeColor('${idea._id}','${n}')"></div>`
+    ).join('');
+    const votes    = idea.votes || 0;
+    const tagsHtml = (idea.tags||[]).map(t => `<span class="tag">#${esc(t)}</span>`).join('');
+    const moveSel  = colOpts
+        ? `<select class="move-col-sel" onchange="moveToColumn('${idea._id}',this.value);this.value=''" onclick="event.stopPropagation()">
+            <option value="">Move to…</option>${colOpts}
+           </select>`
+        : '';
+    return `<div class="idea-card kanban-card ic-${col}" id="card-${idea._id}">
+        <button class="idea-del" onclick="deleteIdea('${idea._id}')" title="Delete">✕</button>
+        <div class="idea-text" id="it-${idea._id}" ondblclick="startEdit('${idea._id}')">${esc(idea.text)}</div>
+        <textarea class="idea-edit-ta" id="ie-${idea._id}" rows="3"
+            onblur="finishEdit('${idea._id}')"
+            onkeydown="handleEditKey(event,'${idea._id}')"></textarea>
+        ${tagsHtml ? `<div class="idea-tags">${tagsHtml}</div>` : ''}
+        <div class="idea-colors">${colorDots}</div>
+        <div class="idea-footer">
+            <button class="iab${idea.starred?' starred':''}" onclick="toggleStar('${idea._id}')">${idea.starred?'⭐':'☆'}</button>
+            <button class="iab" onclick="voteIdea('${idea._id}')">👍${votes?' <span class="vote-n">'+votes+'</span>':''}</button>
+        </div>
+        ${moveSel}
+    </div>`;
+}
+
+async function moveToColumn(ideaId, colId) {
+    if (!colId) return;
+    await db.collection('shitshow_ideas').doc(ideaId).update({ column: colId });
+}
+
+async function promptAddColumn() {
+    const name = prompt('Column name:');
+    if (!name?.trim()) return;
+    const COL_COLORS = ['#0a7fff','#bf5af2','#30d158','#ff9500','#1eccb8','#ff2d55'];
+    const id    = 'col_' + Date.now();
+    const color = COL_COLORS[boardColumns.length % COL_COLORS.length];
+    boardColumns.push({ id, name: name.trim(), color });
+    await db.collection('shitshow_boards').doc(activeBoardId).update({ columns: boardColumns });
+    renderIdeas();
+}
+
+async function deleteColumn(colId) {
+    const col = boardColumns.find(c => c.id === colId);
+    if (!confirm(`Delete column "${col?.name}"? Ideas move back to Inbox.`)) return;
+    boardColumns = boardColumns.filter(c => c.id !== colId);
+    await db.collection('shitshow_boards').doc(activeBoardId).update({ columns: boardColumns });
+    const toMove = ideas.filter(i => i.column === colId);
+    if (toMove.length) {
+        const batch = db.batch();
+        toMove.forEach(i => batch.update(db.collection('shitshow_ideas').doc(i._id), { column: null }));
+        await batch.commit().catch(() => {});
+    }
+    renderIdeas();
+}
+
+// ═══════════════════════════════════════════════
+//  AI CLUSTER
+// ═══════════════════════════════════════════════
+function openClusterModal() {
+    clusterGroups = [];
+    document.getElementById('cluster-status').style.display  = 'none';
+    document.getElementById('cluster-results').style.display = 'none';
+    document.getElementById('cluster-apply-bar').style.display = 'none';
+    document.getElementById('modal-cluster').classList.add('open');
+}
+function closeClusterModal() { document.getElementById('modal-cluster').classList.remove('open'); }
+
+async function runCluster() {
+    if (!apiKey || !proxyUrl) { toast('API key not configured — set it in Agents', true); return; }
+    if (ideas.length < 3) { toast('Need at least 3 ideas to cluster', true); return; }
+    const btn    = document.getElementById('btn-cluster-run');
+    const statEl = document.getElementById('cluster-status');
+    btn.disabled = true;
+    statEl.style.display = 'flex';
+    statEl.innerHTML = '<div class="spinner"></div> Analyzing ideas…';
+    document.getElementById('cluster-results').style.display = 'none';
+    document.getElementById('cluster-apply-bar').style.display = 'none';
+
+    const ideaList = ideas.map((i, n) => `${n+1}. ${i.text}`).join('\n');
+    const prompt = `Group these brainstorming ideas into 3-7 thematic clusters. Each cluster needs a short memorable name (1-3 words, no special characters).
+
+Ideas:
+${ideaList}
+
+Return ONLY valid JSON:
+{"clusters":[{"name":"Cluster Name","ideas":[1,3,5]},…]}
+
+Each idea number appears in exactly one cluster.`;
+
+    try {
+        const res = await fetch(proxyUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ apiKey, model: 'claude-opus-4-6', max_tokens: 1024, stream: false,
+                messages: [{ role: 'user', content: prompt }] })
+        });
+        const j = JSON.parse(await res.text());
+        if (!res.ok) throw new Error(j?.error?.message || 'API error ' + res.status);
+        const raw = (j?.content||[]).filter(b => b.type==='text').map(b => b.text).join('');
+        const m   = raw.match(/\{[\s\S]*\}/);
+        if (!m) throw new Error('Could not parse cluster response');
+        clusterGroups = JSON.parse(m[0]).clusters || [];
+
+        const resEl = document.getElementById('cluster-results');
+        resEl.innerHTML = clusterGroups.map(g => {
+            const gIdeas = (g.ideas||[]).map(n => ideas[n-1]).filter(Boolean);
+            return `<div class="cluster-group">
+                <div class="cluster-group-hdr">
+                    <span>${esc(g.name)}</span>
+                    <span class="cluster-tag-pill">${gIdeas.length} idea${gIdeas.length!==1?'s':''}</span>
+                </div>
+                <div class="cluster-group-ideas">
+                    ${gIdeas.map(i => `• ${esc(i.text.length>80?i.text.slice(0,80)+'…':i.text)}`).join('<br>')}
+                </div>
+            </div>`;
+        }).join('');
+        resEl.style.display = 'block';
+        document.getElementById('cluster-apply-bar').style.display = 'flex';
+        statEl.innerHTML = `✓ ${clusterGroups.length} clusters identified`;
+    } catch(e) {
+        statEl.innerHTML = '❌ ' + esc(e.message);
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+async function applyClusterTags() {
+    let count = 0;
+    const batch = db.batch();
+    clusterGroups.forEach(g => {
+        const tagName = g.name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+        (g.ideas||[]).forEach(n => {
+            const idea = ideas[n-1];
+            if (!idea) return;
+            const existing = idea.tags || [];
+            if (!existing.includes(tagName)) {
+                batch.update(db.collection('shitshow_ideas').doc(idea._id), { tags: [...existing, tagName] });
+                count++;
+            }
+        });
+    });
+    await batch.commit().catch(() => {});
+    closeClusterModal();
+    toast(`Tags applied to ${count} idea${count!==1?'s':''}!`);
 }
 
 // ═══════════════════════════════════════════════

@@ -1950,7 +1950,7 @@
     }
 
     async function fetchWeather() {
-        const url = `https://rt.ambientweather.net/v1/devices?applicationKey=${AW_APP_KEY}&apiKey=${AW_API_KEY}`;
+        const url = `https://api.ambientweather.net/v1/devices?applicationKey=${AW_APP_KEY}&apiKey=${AW_API_KEY}`;
         try {
             const r = await fetch(url);
             if (r.status === 429) throw new Error('Rate limited');

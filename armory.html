@@ -954,6 +954,10 @@
     <div class="card" style="margin-bottom:18px;" id="suppressor-compat-card">
         <div class="card-title" style="flex-wrap:wrap;gap:10px;">
             <div class="card-title-left">🔇 Suppressor Compatibility Report</div>
+            <button class="btn btn-ghost btn-sm" id="btn-hide-incompat"
+                onclick="compatHideIncompat=!compatHideIncompat;this.textContent=compatHideIncompat?'👁 Show Not Compatible':'🙈 Hide Not Compatible';renderCompatibilityReport()">
+                🙈 Hide Not Compatible
+            </button>
             <button class="btn btn-ghost btn-sm" onclick="renderCompatibilityReport()">🔄 Refresh</button>
         </div>
         <div id="suppressor-compat-body">
@@ -1427,9 +1431,10 @@ let formDocs = [];  // multi-document documentation array
 let formMagazines  = [];  // magazines being edited in the current form
 let formAssignedTo = [];  // suppressor host firearm docIds
 let unsubItems   = null;
-let apiKey       = '';
-let proxyUrl     = '';
-let aiModel      = 'claude-sonnet-4-6';
+let apiKey            = '';
+let proxyUrl          = '';
+let aiModel           = 'claude-sonnet-4-6';
+let compatHideIncompat = false;
 let scannerStream = null;
 let scannerActive = false;
 let activeMaintDocId = null;
@@ -3348,11 +3353,12 @@ function renderCompatibilityReport() {
             bodyHTML =
                 firearmSection(yes,     'yes',   '✅', 'Compatible') +
                 firearmSection(adapter, 'adapt', '🔧', 'Compatible with Adapter') +
-                firearmSection(no,      'no',    '❌', 'Not Compatible') +
+                (compatHideIncompat ? '' : firearmSection(no, 'no', '❌', 'Not Compatible')) +
                 `<div class="sc-summary-bar">
                     <span class="sc-sum-item" style="color:#16a34a;">✅ ${yes.length} compatible</span>
                     ${adapter.length ? `<span class="sc-sum-item" style="color:#d97706;">🔧 ${adapter.length} with adapter</span>` : ''}
-                    <span class="sc-sum-item" style="color:#dc2626;">❌ ${no.length} incompatible</span>
+                    ${!compatHideIncompat && no.length ? `<span class="sc-sum-item" style="color:#dc2626;">❌ ${no.length} incompatible</span>` : ''}
+                    ${compatHideIncompat && no.length ? `<span class="sc-sum-item" style="color:var(--text-secondary);">${no.length} hidden</span>` : ''}
                     ${checkedAt ? `<span style="color:var(--text-secondary);margin-left:auto;font-size:0.72rem;">Checked: ${checkedAt}</span>` : ''}
                 </div>`;
         }

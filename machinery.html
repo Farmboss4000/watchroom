@@ -1231,11 +1231,18 @@ function renderDashboard() {
 }
 
 function filterToCategory(cat) {
-    syncCatFilters();
-    document.getElementById('inv-filter-cat').value = cat;
     document.getElementById('inv-search').value = '';
     document.getElementById('inv-filter-cond').value = '';
-    showView('inventory');
+    showView('inventory'); // calls syncCatFilters() + renderInventory() internally
+    // After the select is rebuilt, ensure the category option exists and select it
+    const sel = document.getElementById('inv-filter-cat');
+    if (![...sel.options].some(o => o.value === cat)) {
+        const o = document.createElement('option');
+        o.value = o.textContent = cat;
+        sel.appendChild(o);
+    }
+    sel.value = cat;
+    renderInventory(); // re-render with the filter now applied
 }
 
 // ═══════════════════════════════════════

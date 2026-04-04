@@ -569,6 +569,12 @@
             font-weight: 500;
         }
 
+        .stat-value-blurred { filter: blur(8px); cursor: pointer; user-select: none; transition: filter 0.25s; }
+        .stat-value-blurred:hover { filter: blur(4px); }
+        .reveal-hint { font-size: 0.7rem; color: var(--text-secondary); margin-top: 4px; opacity: 0.7; cursor: pointer; }
+        .portfolio-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 32px; }
+        @media (max-width: 600px) { .portfolio-grid { grid-template-columns: 1fr; } }
+
         /* ── SITE CARDS ── */
         .sites-grid {
             display: grid;
@@ -1203,6 +1209,21 @@
             </div>
         </div>
 
+        <!-- PORTFOLIO TOTALS -->
+        <div class="section-title">Portfolio Totals — All Sites</div>
+        <div class="portfolio-grid">
+            <div class="stat-card" style="border-left-color:#60a5fa;cursor:pointer;" onclick="togglePortfolioBlur('hq-total-purchase')" title="Click to reveal">
+                <div class="stat-number stat-value-blurred" id="hq-total-purchase" style="color:#60a5fa;">—</div>
+                <div class="stat-label" id="hq-total-purchase-label">💰 Total Purchase Price — All Sites</div>
+                <div class="reveal-hint" id="hq-total-purchase-hint">👁 Click to reveal</div>
+            </div>
+            <div class="stat-card" style="border-left-color:#22c55e;cursor:pointer;" onclick="togglePortfolioBlur('hq-total-market')" title="Click to reveal">
+                <div class="stat-number stat-value-blurred" id="hq-total-market" style="color:#22c55e;">—</div>
+                <div class="stat-label" id="hq-total-market-label">📈 Total Market Value — All Sites</div>
+                <div class="reveal-hint" id="hq-total-market-hint">👁 Click to reveal</div>
+            </div>
+        </div>
+
         <!-- DAUGHTER SITE CARDS -->
         <div class="section-title">Daughter Sites</div>
         <div class="sites-grid">
@@ -1609,6 +1630,7 @@
         initWeather();
         initQuotes();
         initOneLiners();
+        loadPortfolioTotals();
     }
 
     // ── LIVE COUNTS ──
@@ -1900,6 +1922,61 @@
     function initClock() {
         updateClock();
         setInterval(updateClock, 1000);
+    }
+
+    // ── PORTFOLIO TOTALS (cross-site purchase + market value) ──
+    function togglePortfolioBlur(id) {
+        const el = document.getElementById(id);
+        const hint = document.getElementById(id + '-hint');
+        if (!el) return;
+        const revealed = el.classList.toggle('stat-value-blurred') === false;
+        if (hint) hint.textContent = revealed ? '👁 Click to hide' : '👁 Click to reveal';
+    }
+
+    async function loadPortfolioTotals() {
+        // Collections: [name, priceField, marketValueField or null]
+        const SOURCES = [
+            { col: 'items',             priceField: 'price',         mvField: null           },  // Armory
+            { col: 'machinery_items',   priceField: 'price',         mvField: 'marketValue'  },
+            { col: 'automotive_items',  priceField: 'price',         mvField: 'marketValue'  },
+            { col: 'livestock_items',   priceField: 'price',         mvField: null           },
+            { col: 'timepiece_items',   priceField: 'price',         mvField: 'marketValue'  },
+            { col: 'knife_items',       priceField: 'price',         mvField: null           },
+            { col: 'realestate_items',  priceField: 'purchasePrice', mvField: 'currentValue' },
+        ];
+        try {
+            const snaps = await Promise.all(SOURCES.map(s => db.collection(s.col).get().catch(() => null)));
+            let totalPurchase = 0, purchaseCount = 0;
+            let totalMarket   = 0, marketCount   = 0;
+            snaps.forEach((snap, i) => {
+                if (!snap) return;
+                const s = SOURCES[i];
+                snap.docs.forEach(doc => {
+                    const d = doc.data();
+                    if (d.deleted) return;
+                    const p = Number(d[s.priceField]) || 0;
+                    if (p > 0) { totalPurchase += p; purchaseCount++; }
+                    if (s.mvField) {
+                        const mv = Number(d[s.mvField]) || 0;
+                        if (mv > 0) { totalMarket += mv; marketCount++; }
+                    }
+                });
+            });
+            const purchaseEl = document.getElementById('hq-total-purchase');
+            const marketEl   = document.getElementById('hq-total-market');
+            const purchaseLbl = document.getElementById('hq-total-purchase-label');
+            const marketLbl   = document.getElementById('hq-total-market-label');
+            if (purchaseEl) purchaseEl.textContent = purchaseCount
+                ? '$' + Math.round(totalPurchase).toLocaleString()
+                : '—';
+            if (marketEl) marketEl.textContent = marketCount
+                ? '$' + Math.round(totalMarket).toLocaleString()
+                : '—';
+            if (purchaseLbl) purchaseLbl.innerHTML = `💰 Total Purchase Price — All Sites <span style="font-size:0.65rem;opacity:0.6;">(${purchaseCount} items)</span>`;
+            if (marketLbl)   marketLbl.innerHTML   = `📈 Total Market Value — All Sites <span style="font-size:0.65rem;opacity:0.6;">(${marketCount} valued)</span>`;
+        } catch(e) {
+            console.warn('Portfolio totals failed:', e);
+        }
     }
 
     // ── WEATHER (Ambient Weather API) ──

@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Farmboss Machinery</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -352,6 +353,9 @@
         }
     
         /* ── DON'T PUSH BLINK ── */
+        .stat-value-blurred { filter: blur(7px); cursor: pointer; user-select: none; transition: filter 0.25s; }
+        .stat-value-blurred:hover { filter: blur(4px); }
+        .reveal-hint { font-size: 0.68rem; color: var(--text-secondary); margin-top: 4px; opacity: 0.7; cursor: pointer; }
         @keyframes dp-pulse { 0%,100%{opacity:1} 50%{opacity:0.45} }
         .site-link[href="dontpush.html"] { animation: dp-pulse 3.5s ease-in-out infinite; }
         .site-link[href="dontpush.html"].active { animation: dp-pulse 3.5s ease-in-out infinite; }
@@ -496,6 +500,14 @@
             </tr></thead>
             <tbody id="recent-tbody"></tbody></table>
         </div>
+    </div>
+    <div class="card">
+        <div class="card-title">
+            <div class="card-title-left">📈 Fleet Value Over Time</div>
+            <span id="mch-last-snap" style="font-size:0.8rem;color:var(--text-secondary);"></span>
+        </div>
+        <div id="mch-chart-empty" style="color:var(--text-secondary);font-size:0.88rem;padding:20px 0;text-align:center;display:none;">No value history yet — refresh market values to start tracking.</div>
+        <canvas id="mch-chart" style="max-height:280px;"></canvas>
     </div>
 </div>
 
@@ -683,6 +695,7 @@
             </select>
             <button class="btn btn-primary btn-sm" onclick="showView('add-item');resetForm()">+ Add Equipment</button>
             <button class="btn btn-ghost btn-sm" onclick="openScanner()" title="Scan barcode">📷 Scan</button>
+            <button class="btn btn-ghost btn-sm" id="btn-refresh-all-mv" onclick="refreshAllMarketValues()">💲 Refresh All Values</button>
             <button class="btn btn-ghost btn-sm" onclick="exportCSV()">↓ Export CSV</button>
         </div>
         <div class="table-wrapper">
@@ -699,6 +712,7 @@
                     <th onclick="sortBy('condition')">Condition</th>
                     <th onclick="sortBy('location')">Location</th>
                     <th onclick="sortBy('purchaseDate')">Purchased</th>
+                    <th onclick="sortBy('marketValue')">Market Value</th>
                     <th class="no-sort">Actions</th>
                 </tr></thead>
                 <tbody id="inv-tbody"></tbody>
@@ -734,6 +748,7 @@
                 <option value="condition">Sort: Condition</option>
                 <option value="purchaseDate">Sort: Purchase Date</option>
                 <option value="price">Sort: Price</option>
+                <option value="marketValue">Sort: Market Value</option>
             </select>
             <select id="rpt-sort-dir" onchange="renderReport()" style="min-width:120px;">
                 <option value="asc">Ascending</option>
@@ -754,6 +769,7 @@
                 <th onclick="rptSortBy('condition')">Condition</th>
                 <th onclick="rptSortBy('purchaseDate')">Purchased</th>
                 <th onclick="rptSortBy('price')">Price</th>
+                <th onclick="rptSortBy('marketValue')">Market Value</th>
                 <th onclick="rptSortBy('location')">Location</th>
                 <th class="no-sort">Notes</th>
             </tr></thead>
@@ -1085,8 +1101,10 @@ async function initApp() {
             document.getElementById('api-proxy-input').value = proxyUrl;
         }
         unsubItems = db.collection('machinery_items').onSnapshot(snap => {
+            const firstLoad = items.length === 0;
             items = snap.docs.map(doc => ({ _docId:doc.id, ...doc.data() }));
             renderDashboard(); renderInventory(); renderReport();
+            if (firstLoad) autoRefreshMarketValues();
         });
         document.getElementById('loading-screen').style.display = 'none';
         document.getElementById('app').style.display            = 'block';
@@ -1137,7 +1155,7 @@ function showView(v) {
     VIEWS.forEach(id => document.getElementById('view-'+id).classList.remove('active'));
     document.getElementById('view-'+v).classList.add('active');
     document.querySelectorAll('nav button').forEach((btn,i) => btn.classList.toggle('active', VIEWS[i]===v));
-    if (v==='dashboard')  renderDashboard();
+    if (v==='dashboard')  { renderDashboard(); loadValueHistory('machinery_value_snapshots','mch-chart','mch-chart-empty','mch-last-snap'); }
     if (v==='inventory')  { syncCatFilters(); renderInventory(); }
     if (v==='reports')    { syncCatFilters(); renderReport(); }
     if (v==='categories') renderCatTags();
@@ -1158,12 +1176,27 @@ function renderDashboard() {
     const totalPurchase = priced.length
         ? '$' + priced.reduce((s,i) => s + (Number(i.price)||0), 0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})
         : '—';
+    const priceLabel = priced.length ? `Total Paid <span style="font-size:0.65rem;opacity:0.6;">(${priced.length}/${total})</span>` : 'Total Paid';
+    const valued = items.filter(i => i.marketValue && Number(i.marketValue) > 0);
+    const totalFleet = valued.length
+        ? '$' + valued.reduce((s,i) => s + (Number(i.marketValue)||0), 0).toLocaleString()
+        : '—';
+    const fleetLabel = valued.length ? `Fleet Value <span style="font-size:0.65rem;opacity:0.6;">(${valued.length}/${total} valued)</span>` : 'Fleet Value';
     document.getElementById('stats-grid').innerHTML = `
         <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Total Equipment</div></div>
         <div class="stat-card"><div class="stat-value">${categories.length}</div><div class="stat-label">Equipment Types</div></div>
         <div class="stat-card"><div class="stat-value">${recent}</div><div class="stat-label">Added This Month</div></div>
         <div class="stat-card"><div class="stat-value">${avgHrs}</div><div class="stat-label">Avg Engine Hours</div></div>
-        <div class="stat-card"><div class="stat-value" style="color:#3b82f6;font-size:1.4rem;">${totalPurchase}</div><div class="stat-label">Total Purchase Price</div></div>`;
+        <div class="stat-card" style="border-color:#60a5fa;" onclick="toggleBlur('mch-purchase')" title="Click to reveal">
+            <div class="stat-value stat-value-blurred" id="mch-purchase" style="color:#60a5fa;font-size:1.4rem;">${totalPurchase}</div>
+            <div class="stat-label">${priceLabel}</div>
+            <div class="reveal-hint" id="mch-purchase-hint">👁 Click to reveal</div>
+        </div>
+        <div class="stat-card" style="border-color:#22c55e;" onclick="toggleBlur('mch-fleetval')" title="Click to reveal">
+            <div class="stat-value stat-value-blurred" id="mch-fleetval" style="color:#22c55e;">${totalFleet}</div>
+            <div class="stat-label">${fleetLabel}</div>
+            <div class="reveal-hint" id="mch-fleetval-hint">👁 Click to reveal</div>
+        </div>`;
     const counts = {};
     items.forEach(it => { counts[it.category]=(counts[it.category]||0)+1; });
     const maxC = Math.max(...Object.values(counts),1);
@@ -1739,7 +1772,7 @@ function renderInventory() {
     const data  = sorted(filteredItems('inv-search','inv-filter-cat'), invSortField, invSortDir);
     document.getElementById('inv-count').textContent = `${data.length} item${data.length!==1?'s':''}`;
     document.querySelectorAll('#inv-table thead th').forEach(th=>th.classList.remove('sort-asc','sort-desc'));
-    const thIdx = {id:1,category:2,make:3,model:4,year:5,serialNumber:6,hours:7,condition:8,location:9,purchaseDate:10};
+    const thIdx = {id:1,category:2,make:3,model:4,year:5,serialNumber:6,hours:7,condition:8,location:9,purchaseDate:10,marketValue:11};
     const ti = thIdx[invSortField];
     if (ti!==undefined) document.querySelectorAll('#inv-table thead th')[ti]?.classList.add(invSortDir==='asc'?'sort-asc':'sort-desc');
     const tbody = document.getElementById('inv-tbody');
@@ -1765,6 +1798,7 @@ function renderInventory() {
             <td>${condBadge}</td>
             <td style="font-size:0.82rem">${esc(it.location)||'—'}</td>
             <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():'—'}</td>
+            <td id="mv-cell-${it._docId}">${marketValueCell(it)}</td>
             <td style="white-space:nowrap">
                 <button class="btn btn-info btn-sm" onclick="showBarcode('${it._docId}')" title="Barcode/Photos">▣</button>
                 <button class="btn btn-ghost btn-sm" style="color:#d4941a;border-color:#d4941a;" onclick="openMaintenance('${it._docId}')" title="Maintenance Log">🔧</button>
@@ -1802,10 +1836,11 @@ function renderReport() {
             <td>${it.condition||'—'}</td>
             <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():'—'}</td>
             <td>${it.price ? '$'+Number(it.price).toLocaleString() : '—'}</td>
+            <td>${it.marketValue && Number(it.marketValue)>0 ? `<span style="font-weight:700;color:#22c55e;">$${Number(it.marketValue).toLocaleString()}</span>` : '—'}</td>
             <td style="font-size:0.82rem">${esc(it.location)||'—'}</td>
             <td style="color:var(--text-secondary);font-size:0.82rem">${esc(it.notes)||'—'}</td>
           </tr>`).join('')
-        :'<tr><td colspan="12" style="text-align:center;color:var(--text-secondary);padding:30px">No items match filters.</td></tr>';
+        :'<tr><td colspan="13" style="text-align:center;color:var(--text-secondary);padding:30px">No items match filters.</td></tr>';
 }
 function printReport() {
     const field=document.getElementById('rpt-sort-field').value, dir=document.getElementById('rpt-sort-dir').value;
@@ -2251,6 +2286,173 @@ Extract ONLY the numeric hours reading. Return ONLY the number — no units, no 
         btn.disabled = false;
         btn.textContent = '⏱ Read Hours with AI';
     }
+}
+
+// ── MARKET VALUE ──
+const MV_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+let mchChartInstance = null;
+
+function toggleBlur(id) {
+    const el = document.getElementById(id);
+    const hint = document.getElementById(id + '-hint');
+    if (!el) return;
+    const revealed = el.classList.toggle('stat-value-blurred') === false;
+    if (hint) hint.textContent = revealed ? '👁 Click to hide' : '👁 Click to reveal';
+}
+
+function marketValueAge(it) {
+    if (!it.marketValueDate) return Infinity;
+    return Date.now() - new Date(it.marketValueDate).getTime();
+}
+
+function marketValueCell(it) {
+    if (it.marketValue && Number(it.marketValue) > 0) {
+        const age = marketValueAge(it);
+        const stale = age > MV_MAX_AGE_MS;
+        const ageStr = age < 3600000 ? 'Just now'
+            : age < 86400000 ? Math.floor(age/3600000) + 'h ago'
+            : Math.floor(age/86400000) + 'd ago';
+        return `<div style="font-weight:700;color:#22c55e;">$${Number(it.marketValue).toLocaleString()}</div>
+                <div style="font-size:0.68rem;color:${stale?'#f59e0b':'var(--text-secondary)'};">${stale?'⚠ Stale · ':''}${ageStr}
+                  <button onclick="refreshMarketValue('${it._docId}')" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:0.72rem;padding:0 0 0 4px;" title="Refresh">↻</button>
+                </div>`;
+    }
+    return `<button class="btn btn-ghost btn-sm" style="font-size:0.75rem;" onclick="refreshMarketValue('${it._docId}')">💲 Get Value</button>`;
+}
+
+async function refreshMarketValue(docId) {
+    if (!apiKey) { toast('Set your API key in Settings first.', true); return; }
+    const it = items.find(i => i._docId === docId);
+    if (!it) return;
+    if (!it.make || !it.model) { toast('Equipment needs Make and Model to estimate value.', true); return; }
+    const cell = document.getElementById('mv-cell-' + docId);
+    if (cell) cell.innerHTML = '<span style="font-size:0.78rem;color:var(--text-secondary);">⏳ Estimating…</span>';
+    try {
+        const prompt = `You are a farm equipment valuation expert. Estimate the current fair market value for this piece of farm equipment in US dollars. Consider year, make, model, hours, and condition. Return ONLY a whole number integer with no dollar sign, no commas, no text — just the number.
+
+Make: ${it.make}
+Model: ${it.model}
+${it.year ? 'Year: ' + it.year : ''}
+${it.hours ? 'Engine Hours: ' + Number(it.hours).toLocaleString() : ''}
+${it.condition ? 'Condition: ' + it.condition : ''}
+${it.category ? 'Category: ' + it.category : ''}`;
+        const msgPayload = { model: 'claude-sonnet-4-6', max_tokens: 64,
+            messages:[{ role:'user', content: prompt }] };
+        let res;
+        if (proxyUrl) {
+            res = await fetch(proxyUrl, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({...msgPayload, apiKey}) });
+        } else {
+            res = await fetch('https://api.anthropic.com/v1/messages', { method:'POST', mode:'cors',
+                headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true'},
+                body: JSON.stringify(msgPayload) });
+        }
+        if (!res.ok) throw new Error('API error ' + res.status);
+        const data = await res.json();
+        const val = parseInt(data.content[0].text.trim().replace(/[^0-9]/g,''), 10);
+        if (!val || val < 100) throw new Error('Could not parse a valid value');
+        await db.collection('machinery_items').doc(docId).update({
+            marketValue: val, marketValueDate: new Date().toISOString()
+        });
+        toast(`Market value updated: $${val.toLocaleString()}`);
+        saveValueSnapshot('machinery_value_snapshots');
+    } catch(err) {
+        toast('Value estimate failed: ' + err.message, true);
+        const it2 = items.find(i => i._docId === docId);
+        const cell2 = document.getElementById('mv-cell-' + docId);
+        if (cell2 && it2) cell2.innerHTML = marketValueCell(it2);
+    }
+}
+
+async function refreshAllMarketValues() {
+    if (!apiKey) { toast('Set your API key in Settings first.', true); return; }
+    const eligible = items.filter(it => it.make && it.model);
+    if (!eligible.length) { toast('No equipment with Make & Model to value.', true); return; }
+    const btn = document.getElementById('btn-refresh-all-mv');
+    if (btn) { btn.disabled = true; btn.textContent = `⏳ 0 / ${eligible.length}`; }
+    for (let i = 0; i < eligible.length; i++) {
+        if (btn) btn.textContent = `⏳ ${i+1} / ${eligible.length}`;
+        await refreshMarketValue(eligible[i]._docId);
+        if (i < eligible.length - 1) await new Promise(r => setTimeout(r, 1500));
+    }
+    if (btn) { btn.disabled = false; btn.textContent = '💲 Refresh All Values'; }
+    toast(`✅ Market values updated for ${eligible.length} item${eligible.length !== 1 ? 's' : ''}`);
+    await saveValueSnapshot('machinery_value_snapshots');
+}
+
+async function saveValueSnapshot(collection) {
+    try {
+        const valued = items.filter(i => i.marketValue && Number(i.marketValue) > 0);
+        const totalValue = valued.reduce((s,i) => s + (Number(i.marketValue)||0), 0);
+        if (!totalValue) return;
+        const today = new Date().toISOString().slice(0,10);
+        await db.collection(collection).doc(today).set({
+            date: today, totalValue, itemCount: valued.length, recordedAt: new Date().toISOString()
+        });
+    } catch(e) { console.warn('Snapshot save failed', e); }
+}
+
+async function loadValueHistory(collection, canvasId, emptyId, labelId) {
+    const canvas = document.getElementById(canvasId);
+    const emptyEl = document.getElementById(emptyId);
+    const labelEl = document.getElementById(labelId);
+    if (!canvas) return;
+    try {
+        const snap = await db.collection(collection).orderBy('date','asc').get();
+        const docs = snap.docs.map(d => d.data()).filter(d => d.date && d.totalValue);
+        if (!docs.length) {
+            canvas.style.display = 'none';
+            if (emptyEl) emptyEl.style.display = 'block';
+            return;
+        }
+        canvas.style.display = '';
+        if (emptyEl) emptyEl.style.display = 'none';
+        if (labelEl) {
+            const last = docs[docs.length-1];
+            labelEl.textContent = `Last snapshot: ${last.date} · $${Number(last.totalValue).toLocaleString()} across ${last.itemCount} item${last.itemCount!==1?'s':''}`;
+        }
+        if (mchChartInstance) { mchChartInstance.destroy(); mchChartInstance = null; }
+        mchChartInstance = new Chart(canvas, {
+            type: 'line',
+            data: {
+                labels: docs.map(d => d.date),
+                datasets: [{
+                    label: 'Total Fleet Value',
+                    data: docs.map(d => Number(d.totalValue)),
+                    borderColor: '#d4941a',
+                    backgroundColor: 'rgba(212,148,26,0.1)',
+                    borderWidth: 2.5,
+                    pointRadius: docs.length > 60 ? 2 : 4,
+                    pointBackgroundColor: '#d4941a',
+                    tension: 0.3, fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: ctx => ` $${Number(ctx.parsed.y).toLocaleString()}` } }
+                },
+                scales: {
+                    x: { ticks: { maxTicksLimit:10, color:'#6b7280' }, grid: { color:'rgba(0,0,0,0.06)' } },
+                    y: { ticks: { color:'#6b7280', callback: v => '$'+Number(v).toLocaleString() }, grid: { color:'rgba(0,0,0,0.06)' } }
+                }
+            }
+        });
+    } catch(e) {
+        if (emptyEl) { emptyEl.textContent = '⚠️ Could not load history.'; emptyEl.style.display = 'block'; }
+        if (canvas) canvas.style.display = 'none';
+    }
+}
+
+async function autoRefreshMarketValues() {
+    if (!apiKey) return;
+    const stale = items.filter(it => it.make && it.model &&
+        (!it.marketValue || marketValueAge(it) > MV_MAX_AGE_MS));
+    for (let i = 0; i < Math.min(stale.length, 3); i++) {
+        await refreshMarketValue(stale[i]._docId);
+        await new Promise(r => setTimeout(r, 1500));
+    }
+    if (stale.length > 3) toast(`${stale.length-3} more items need valuation — click 💲 Refresh All Values.`);
 }
 
 // ── RECYCLE BIN ──

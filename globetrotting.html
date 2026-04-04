@@ -83,6 +83,13 @@
         /* ── STATS ── */
         .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:20px;}
         .stat-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:18px 16px;text-align:center;}
+        .stat-card.clickable{cursor:pointer;transition:border-color 0.15s,box-shadow 0.15s;}
+        .stat-card.clickable:hover{border-color:var(--accent);box-shadow:0 0 0 2px rgba(15,168,143,0.12);}
+        .stat-card.clickable .stat-label::after{content:' ▾';font-size:0.7em;opacity:0.6;}
+        .stat-list-pills{display:flex;flex-wrap:wrap;gap:8px;padding:4px 0;}
+        .stat-list-pill{background:var(--bg-card);border:1px solid var(--border);border-radius:20px;padding:5px 13px;font-size:0.85rem;font-weight:500;color:var(--text-primary);}
+        .stat-list-pill.state-pill{font-family:monospace;font-size:0.78rem;letter-spacing:0.5px;}
+        .stat-list-count{font-size:0.78rem;color:var(--text-secondary);margin-bottom:12px;}
         .stat-value{font-size:2rem;font-weight:800;color:var(--accent);line-height:1;margin-bottom:4px;}
         .stat-label{font-size:0.77rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;}
 
@@ -612,6 +619,20 @@
     </div>
 </div>
 
+<!-- STAT LIST MODAL -->
+<div class="modal-overlay" id="stat-list-overlay" onclick="closeStatList(event)">
+    <div class="modal" style="max-width:480px;">
+        <div class="modal-hdr">
+            <div class="modal-title" id="stat-list-title"></div>
+            <button class="modal-close" onclick="closeStatList()">✕</button>
+        </div>
+        <div id="stat-list-body" style="max-height:62vh;overflow-y:auto;"></div>
+        <div class="modal-actions">
+            <button class="btn btn-ghost btn-sm" onclick="closeStatList()">Close</button>
+        </div>
+    </div>
+</div>
+
 <!-- ═══ TOAST ═══ -->
 <div class="toast" id="toast"></div>
 
@@ -690,6 +711,13 @@ async function doLogin() {
 async function doSignOut() {
     await auth.signOut();
 }
+
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+        closeModal();
+        closeStatList();
+    }
+});
 
 document.getElementById('login-password').addEventListener('keydown', e => {
     if (e.key === 'Enter') doLogin();
@@ -1102,20 +1130,40 @@ function renderAll() {
 // ═══════════════════════════════════════════════
 //  DASHBOARD
 // ═══════════════════════════════════════════════
+// Global stat data for modal drill-down
+let _statCountryMap = new Map(); // lowercase -> original
+let _statStateSet   = new Set(); // abbreviations
+let _statCityMap    = new Map(); // lowercase -> original
+
 function renderDashboard() {
     const active = trips.filter(t => !t.deleted);
-    const countries = getVisitedCountries(active);
-    const states = getVisitedStates(active);
-    const cities = new Set();
-    active.forEach(t => (t.destinations||[]).forEach(d => { if(d.city) cities.add(d.city.toLowerCase()); }));
+
+    // Countries — use Map for proper-case display
+    _statCountryMap = new Map();
+    active.forEach(t => (t.destinations||[]).forEach(d => {
+        if (d.country) _statCountryMap.set(d.country.trim().toLowerCase(), d.country.trim());
+    }));
+    const countries = { size: _statCountryMap.size };
+
+    // States
+    _statStateSet = getVisitedStates(active);
+    const states = { size: _statStateSet.size };
+
+    // Cities — use Map for proper-case display
+    _statCityMap = new Map();
+    active.forEach(t => (t.destinations||[]).forEach(d => {
+        if (d.city) _statCityMap.set(d.city.trim().toLowerCase(), d.city.trim());
+    }));
+    const cities = { size: _statCityMap.size };
+
     let days = 0;
     active.forEach(t => { const d = tripDuration(t.departureDate, t.returnDate); if(d>0) days+=d; });
 
     document.getElementById('dash-stats').innerHTML = `
         <div class="stat-card"><div class="stat-value">${active.length}</div><div class="stat-label">Total Trips</div></div>
-        <div class="stat-card"><div class="stat-value">${countries.size}</div><div class="stat-label">Discrete Countries Visited</div></div>
-        <div class="stat-card"><div class="stat-value">${states.size}</div><div class="stat-label">US States</div></div>
-        <div class="stat-card"><div class="stat-value">${cities.size}</div><div class="stat-label">Discrete Cities Visited</div></div>
+        <div class="stat-card clickable" onclick="openStatList('countries')" title="Click for list"><div class="stat-value">${countries.size}</div><div class="stat-label">Discrete Countries Visited</div></div>
+        <div class="stat-card clickable" onclick="openStatList('states')" title="Click for list"><div class="stat-value">${states.size}</div><div class="stat-label">US States</div></div>
+        <div class="stat-card clickable" onclick="openStatList('cities')" title="Click for list"><div class="stat-value">${cities.size}</div><div class="stat-label">Discrete Cities Visited</div></div>
         <div class="stat-card"><div class="stat-value">${days}</div><div class="stat-label">Days Traveled</div></div>
     `;
 
@@ -2288,6 +2336,50 @@ function closeModal(e) {
 
 function modalEdit() {
     if (modalTripId) loadFormForEdit(modalTripId);
+}
+
+function openStatList(type) {
+    const overlay = document.getElementById('stat-list-overlay');
+    const title   = document.getElementById('stat-list-title');
+    const body    = document.getElementById('stat-list-body');
+    let heading = '', items = [], isState = false;
+
+    if (type === 'countries') {
+        heading = '🌍 Countries Visited';
+        items = [..._statCountryMap.values()].sort((a,b) => a.localeCompare(b));
+    } else if (type === 'states') {
+        heading = '🇺🇸 US States Visited';
+        isState = true;
+        items = [..._statStateSet].sort((a,b) => (STATE_NAMES[a]||a).localeCompare(STATE_NAMES[b]||b));
+    } else if (type === 'cities') {
+        heading = '🏙️ Cities Visited';
+        items = [..._statCityMap.values()].sort((a,b) => a.localeCompare(b));
+    }
+
+    title.textContent = heading;
+    if (!items.length) {
+        body.innerHTML = '<p style="color:var(--text-secondary);padding:8px 0;">No data yet.</p>';
+    } else {
+        const countWord = type === 'states'
+            ? items.length + ' state' + (items.length !== 1 ? 's' : '')
+            : type === 'countries'
+            ? items.length + ' countr' + (items.length !== 1 ? 'ies' : 'y')
+            : items.length + ' cit' + (items.length !== 1 ? 'ies' : 'y');
+        const pills = items.map(item => {
+            if (isState) {
+                const full = STATE_NAMES[item] || item;
+                return `<span class="stat-list-pill state-pill" title="${esc(full)}">${esc(item)} — ${esc(full)}</span>`;
+            }
+            return `<span class="stat-list-pill">${esc(item)}</span>`;
+        }).join('');
+        body.innerHTML = `<div class="stat-list-count">${countWord} · alphabetical</div><div class="stat-list-pills">${pills}</div>`;
+    }
+    overlay.classList.add('show');
+}
+
+function closeStatList(e) {
+    if (e && e.target !== document.getElementById('stat-list-overlay')) return;
+    document.getElementById('stat-list-overlay').classList.remove('show');
 }
 
 function modalAddDocs() {

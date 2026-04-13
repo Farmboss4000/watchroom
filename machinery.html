@@ -232,6 +232,22 @@
         .cbi-count { font-size:0.82rem; font-weight:700; color:var(--accent); min-width:28px; text-align:right; }
         .cbi-bar { flex:1; height:6px; background:var(--border); border-radius:3px; overflow:hidden; }
         .cbi-bar-fill { height:100%; background:var(--accent); border-radius:3px; transition:width 0.3s; }
+        .cat-breakdown-item.active { background:var(--accent-dim); box-shadow:inset 0 0 0 1.5px var(--accent); }
+
+        /* ── CATEGORY DETAIL PANEL ── */
+        .cat-detail { margin-top:12px; border-top:1.5px solid var(--border); padding-top:12px; }
+        .cat-detail-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+        .cat-detail-title { font-size:0.92rem; font-weight:700; color:var(--text-primary); }
+        .cat-detail-close { background:none; border:1px solid var(--border); border-radius:5px; padding:2px 10px;
+            font-size:0.78rem; color:var(--text-secondary); cursor:pointer; }
+        .cat-detail-close:hover { background:var(--bg-card); color:var(--text-primary); }
+        .cat-detail table { width:100%; border-collapse:collapse; font-size:0.82rem; }
+        .cat-detail th { text-align:left; padding:6px 10px; font-weight:600; color:var(--text-secondary);
+            border-bottom:1.5px solid var(--border); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.03em; }
+        .cat-detail td { padding:8px 10px; border-bottom:1px solid var(--border); color:var(--text-primary); }
+        .cat-detail tr:last-child td { border-bottom:none; }
+        .cat-detail tr { cursor:pointer; transition:background 0.12s; }
+        .cat-detail tr:hover { background:var(--accent-dim); }
 
         /* ── TAGS ── */
         .tags { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
@@ -376,6 +392,7 @@
         <a href="timepieces.html">⌚ Timepieces</a>
         <a href="knives.html">🔪 Knives</a>
         <a href="pharmacy.html">💊 Pharmacy</a>
+        <a href="addison.html">🩺 Addison</a>
     </div>
     <div class="login-box">
         <div class="login-logo">🚜</div>
@@ -414,6 +431,7 @@
         <a href="knives.html" class="site-link">🔪 Knives</a>
         <a href="realestate.html" class="site-link">🏡 Real Estate</a>
         <a href="globetrotting.html" class="site-link">✈️ Globetrotting</a>
+        <a href="addison.html" class="site-link">🩺 Addison</a>
         <a href="dontpush.html" class="site-link">🚫 Don't Push</a>
     </div>
 
@@ -486,6 +504,7 @@
     <div class="card">
         <div class="card-title"><div class="card-title-left">📊 Inventory by Equipment Type</div></div>
         <div class="cat-breakdown" id="cat-breakdown"></div>
+        <div id="cat-detail" class="cat-detail" style="display:none;"></div>
     </div>
     <div class="card">
         <div class="card-title"><div class="card-title-left">🕐 Recently Added</div></div>
@@ -1202,14 +1221,23 @@ function renderDashboard() {
     const counts = {};
     items.forEach(it => { counts[it.category]=(counts[it.category]||0)+1; });
     const maxC = Math.max(...Object.values(counts),1);
-    document.getElementById('cat-breakdown').innerHTML = Object.keys(counts).length
-        ? Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([cat,c])=>`
-            <div class="cat-breakdown-item" onclick="filterToCategory(${JSON.stringify(cat)})" title="View ${c} item${c!==1?'s':''} in ${cat}">
+    const sortedCats = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+    document.getElementById('cat-breakdown').innerHTML = sortedCats.length
+        ? sortedCats.map(([cat,c])=>`
+            <div class="cat-breakdown-item" title="View ${c} item${c!==1?'s':''} in ${esc(cat)}">
                 <div class="cbi-name">${esc(cat)}</div>
                 <div class="cbi-count">${c}</div>
                 <div class="cbi-bar"><div class="cbi-bar-fill" style="width:${(c/maxC*100).toFixed(1)}%"></div></div>
             </div>`).join('')
         : '<p style="color:var(--text-secondary);padding:16px 0;">No equipment yet.</p>';
+    // Attach click handlers directly to each category bar
+    document.querySelectorAll('.cat-breakdown-item').forEach((el, i) => {
+        el.addEventListener('click', () => toggleCatDetail(sortedCats[i][0]));
+    });
+    // Reset detail panel when dashboard re-renders
+    activeCatDetail = null;
+    const detailPanel = document.getElementById('cat-detail');
+    if (detailPanel) detailPanel.style.display = 'none';
     const rec = [...items].sort((a,b)=>b.id-a.id).slice(0,10);
     document.getElementById('recent-tbody').innerHTML = rec.length
         ? rec.map(it => {
@@ -1230,19 +1258,49 @@ function renderDashboard() {
         : '<tr><td colspan="8" style="text-align:center;color:var(--text-secondary);padding:30px;">No equipment yet.</td></tr>';
 }
 
-function filterToCategory(cat) {
-    document.getElementById('inv-search').value = '';
-    document.getElementById('inv-filter-cond').value = '';
-    showView('inventory'); // calls syncCatFilters() + renderInventory() internally
-    // After the select is rebuilt, ensure the category option exists and select it
-    const sel = document.getElementById('inv-filter-cat');
-    if (![...sel.options].some(o => o.value === cat)) {
-        const o = document.createElement('option');
-        o.value = o.textContent = cat;
-        sel.appendChild(o);
+let activeCatDetail = null;
+
+function toggleCatDetail(cat) {
+    const panel = document.getElementById('cat-detail');
+    // If clicking the same category again, collapse it
+    if (activeCatDetail === cat) {
+        panel.style.display = 'none';
+        activeCatDetail = null;
+        document.querySelectorAll('.cat-breakdown-item.active').forEach(el => el.classList.remove('active'));
+        return;
     }
-    sel.value = cat;
-    renderInventory(); // re-render with the filter now applied
+    activeCatDetail = cat;
+    // Highlight active bar
+    document.querySelectorAll('.cat-breakdown-item.active').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.cat-breakdown-item').forEach(el => {
+        if (el.querySelector('.cbi-name')?.textContent === cat) el.classList.add('active');
+    });
+    // Build detail listing
+    const catItems = items.filter(it => it.category === cat);
+    const rows = catItems.map(it => {
+        const condColor = it.condition==='Excellent'?'#15803d':it.condition==='Good'?'#1d4ed8':it.condition==='Fair'?'#92400e':it.condition?'#dc2626':'';
+        return `<tr onclick="editItem('${it._docId}')" title="Click to edit">
+            <td class="mono">#${it.id}</td>
+            <td>${esc(it.make)||'—'}</td>
+            <td>${esc(it.model)||'—'}</td>
+            <td>${it.year||'—'}</td>
+            <td class="mono">${esc(it.serialNumber)||'—'}</td>
+            <td>${it.hours ? Number(it.hours).toLocaleString()+' hrs' : '—'}</td>
+            <td>${it.condition ? `<span style="font-weight:600;color:${condColor}">${it.condition}</span>` : '—'}</td>
+            <td>${esc(it.location)||'—'}</td>
+        </tr>`;
+    }).join('');
+    panel.innerHTML = `
+        <div class="cat-detail-header">
+            <div class="cat-detail-title">${esc(cat)} — ${catItems.length} item${catItems.length!==1?'s':''}</div>
+            <button class="cat-detail-close" id="cat-detail-close-btn">✕ Close</button>
+        </div>
+        <table><thead><tr>
+            <th>ID</th><th>Make</th><th>Model</th><th>Year</th><th>Serial</th><th>Hours</th><th>Condition</th><th>Location</th>
+        </tr></thead><tbody>${rows || '<tr><td colspan="8" style="text-align:center;color:var(--text-secondary);">No items</td></tr>'}</tbody></table>`;
+    document.getElementById('cat-detail-close-btn').addEventListener('click', () => toggleCatDetail(cat));
+    panel.style.display = 'block';
+    panel.scrollIntoView({ behavior:'smooth', block:'nearest' });
 }
 
 // ═══════════════════════════════════════

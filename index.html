@@ -425,6 +425,9 @@
         .dtw-weather-icon { font-size: 2.2rem; line-height: 1; }
         .dtw-temp { font-size: 1.6rem; font-weight: 700; color: var(--accent); }
         .dtw-details { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.7; }
+        .dtw-wx-stats { display: flex; flex-direction: column; gap: 2px; }
+        .dtw-wx-row { font-size: 0.82rem; color: var(--text-secondary); }
+        .dtw-wx-label { font-weight: 600; color: var(--text-secondary); opacity: 0.7; margin-right: 4px; }
         .dtw-station-label { font-size: 0.68rem; color: var(--text-secondary); margin-top: 4px; opacity: 0.7; }
 
         /* ── WEATHER REPORTS ── */
@@ -1046,6 +1049,7 @@
         <a href="knives.html" class="site-link">🔪 Knives</a>
         <a href="realestate.html" class="site-link">🏡 Real Estate</a>
         <a href="globetrotting.html" class="site-link">✈️ Globetrotting</a>
+        <a href="addison.html" class="site-link">🩺 Addison</a>
         <a href="dontpush.html" class="site-link">🚫 Don't Push</a>
     </div>
 
@@ -1072,6 +1076,7 @@
         <a href="machinery.html">🚜 Machinery</a>
         <a href="automotive.html">🚗 Automotive</a>
         <a href="livestock.html">🐄 Livestock</a>
+        <a href="addison.html">🩺 Addison</a>
     </div>
 </div>
 
@@ -1116,70 +1121,11 @@
             </div>
             <div class="dtw-weather" id="dtw-weather">
                 <div class="dtw-weather-icon" id="wx-icon">⏳</div>
-                <div class="dtw-temp" id="wx-temp">--°F</div>
-                <div class="dtw-details" id="wx-details">Loading weather...</div>
-            </div>
-        </div>
-
-        <!-- WEATHER REPORTS -->
-        <div class="section-title">Weather Station Reports</div>
-        <div class="wx-reports-grid" id="wx-reports-grid">
-            <div class="wx-report-card" onclick="openWxDetail('rain-today')">
-                <div class="wx-report-value" id="wxr-rain-today">--</div>
-                <div class="wx-report-label">Rain Today</div>
-                <div class="wx-report-sub" id="wxr-rain-rate-sub"></div>
-            </div>
-            <div class="wx-report-card" onclick="openWxDetail('rain-week')">
-                <div class="wx-report-value" id="wxr-rain-week">--</div>
-                <div class="wx-report-label">Rain — Week to Date</div>
-            </div>
-            <div class="wx-report-card" onclick="openWxDetail('rain-year')">
-                <div class="wx-report-value" id="wxr-rain-year">--</div>
-                <div class="wx-report-label">Rain — Year to Date</div>
-            </div>
-            <div class="wx-report-card" onclick="openWxDetail('rain-event')">
-                <div class="wx-report-value" id="wxr-rain-event">--</div>
-                <div class="wx-report-label">Event Rain</div>
-                <div class="wx-report-sub" id="wxr-rain-event-sub">Since last dry period</div>
-            </div>
-            <div class="wx-report-card" onclick="openWxDetail('last-rain')">
-                <div class="wx-report-value" id="wxr-last-rain">--</div>
-                <div class="wx-report-label">Last Detected Rain</div>
-                <div class="wx-report-sub" id="wxr-last-rain-sub"></div>
-            </div>
-            <div class="wx-report-card wind" onclick="openWxDetail('wind-gust-today')">
-                <div class="wx-report-value" id="wxr-wind-gust">--</div>
-                <div class="wx-report-label">Max Wind Gust Today</div>
-            </div>
-            <div class="wx-report-card wind" onclick="openWxDetail('wind-avg')">
-                <div class="wx-report-value" id="wxr-wind-avg10">--</div>
-                <div class="wx-report-label">10-Min Avg Wind</div>
-                <div class="wx-report-sub" id="wxr-wind-avg10-sub"></div>
-            </div>
-            <div class="wx-report-card conditions" onclick="openWxDetail('battery')">
-                <div class="wx-report-value" id="wxr-battery">--</div>
-                <div class="wx-report-label">Battery Status</div>
-                <div class="wx-report-sub" id="wxr-battery-sub"></div>
-            </div>
-        </div>
-
-        <!-- 3-DAY FORECAST -->
-        <div class="section-title">3-Day Forecast</div>
-        <div class="wx-reports-grid" id="wx-forecast-grid">
-            <div class="wx-report-card conditions" id="wx-forecast-0">
-                <div class="wx-report-value" id="wxf-day-0">--</div>
-                <div class="wx-report-label" id="wxf-label-0">Loading...</div>
-                <div class="wx-report-sub" id="wxf-sub-0"></div>
-            </div>
-            <div class="wx-report-card conditions" id="wx-forecast-1">
-                <div class="wx-report-value" id="wxf-day-1">--</div>
-                <div class="wx-report-label" id="wxf-label-1">Loading...</div>
-                <div class="wx-report-sub" id="wxf-sub-1"></div>
-            </div>
-            <div class="wx-report-card conditions" id="wx-forecast-2">
-                <div class="wx-report-value" id="wxf-day-2">--</div>
-                <div class="wx-report-label" id="wxf-label-2">Loading...</div>
-                <div class="wx-report-sub" id="wxf-sub-2"></div>
+                <div class="dtw-wx-stats">
+                    <div class="dtw-temp" id="wx-temp">--°F</div>
+                    <div class="dtw-wx-row"><span class="dtw-wx-label">Wind</span> <span id="wx-wind">--</span></div>
+                    <div class="dtw-wx-row"><span class="dtw-wx-label">MTD Rain</span> <span id="wx-mtd-rain">--</span></div>
+                </div>
             </div>
         </div>
 
@@ -1228,138 +1174,18 @@
         <div class="section-title">Daughter Sites</div>
         <div class="sites-grid">
 
-            <!-- Armory -->
+            <!-- Addison -->
             <div class="site-card">
-                <div class="site-card-top" style="background:#c8a96e;"></div>
+                <div class="site-card-top" style="background:linear-gradient(135deg,#2d1a4a,#7c3aed);"></div>
                 <div class="site-card-body">
                     <div class="site-card-header">
-                        <div class="site-card-icon">🔫</div>
-                        <div class="site-card-badge"><span id="badge-armory">—</span> items &nbsp;|&nbsp; ARM barcodes</div>
+                        <div class="site-card-icon">🩺</div>
+                        <div class="site-card-badge"><span id="badge-addison">—</span> visits</div>
                     </div>
-                    <div class="site-card-title">FARMBOSS ARMORY</div>
-                    <div class="site-card-desc">Firearms &amp; Equipment Collection</div>
-                    <div class="site-card-meta"><strong id="meta-armory">—</strong> items tracked</div>
-                    <a href="armory.html" class="site-card-btn" style="background:#c8a96e;color:#0f172a;">Go to Armory →</a>
-                </div>
-            </div>
-
-            <!-- Machinery -->
-            <div class="site-card">
-                <div class="site-card-top" style="background:#d4941a;"></div>
-                <div class="site-card-body">
-                    <div class="site-card-header">
-                        <div class="site-card-icon">🚜</div>
-                        <div class="site-card-badge"><span id="badge-machinery">—</span> items &nbsp;|&nbsp; MCH barcodes</div>
-                    </div>
-                    <div class="site-card-title">FARMBOSS MACHINERY</div>
-                    <div class="site-card-desc">Farm Equipment Inventory</div>
-                    <div class="site-card-meta"><strong id="meta-machinery">—</strong> items tracked</div>
-                    <a href="machinery.html" class="site-card-btn" style="background:#d4941a;color:#0f172a;">Go to Machinery →</a>
-                </div>
-            </div>
-
-            <!-- Automotive -->
-            <div class="site-card">
-                <div class="site-card-top" style="background:#3b82f6;"></div>
-                <div class="site-card-body">
-                    <div class="site-card-header">
-                        <div class="site-card-icon">🚗</div>
-                        <div class="site-card-badge"><span id="badge-automotive">—</span> items &nbsp;|&nbsp; AUT barcodes</div>
-                    </div>
-                    <div class="site-card-title">FARMBOSS AUTOMOTIVE</div>
-                    <div class="site-card-desc">Vehicle Fleet Management</div>
-                    <div class="site-card-meta"><strong id="meta-automotive">—</strong> vehicles tracked</div>
-                    <a href="automotive.html" class="site-card-btn" style="background:#3b82f6;color:#fff;">Go to Automotive →</a>
-                </div>
-            </div>
-
-            <!-- Livestock -->
-            <div class="site-card">
-                <div class="site-card-top" style="background:#22c55e;"></div>
-                <div class="site-card-body">
-                    <div class="site-card-header">
-                        <div class="site-card-icon">🐄</div>
-                        <div class="site-card-badge"><span id="badge-livestock">—</span> items &nbsp;|&nbsp; LST barcodes</div>
-                    </div>
-                    <div class="site-card-title">FARMBOSS LIVESTOCK</div>
-                    <div class="site-card-desc">Animal Records &amp; Health</div>
-                    <div class="site-card-meta"><strong id="meta-livestock">—</strong> animals tracked</div>
-                    <a href="livestock.html" class="site-card-btn" style="background:#22c55e;color:#0f172a;">Go to Livestock →</a>
-                </div>
-            </div>
-
-            <!-- Timepieces -->
-            <div class="site-card">
-                <div class="site-card-top" style="background:#d97706;"></div>
-                <div class="site-card-body">
-                    <div class="site-card-header">
-                        <div class="site-card-icon">⌚</div>
-                        <div class="site-card-badge"><span id="badge-timepieces">—</span> items &nbsp;|&nbsp; TPC barcodes</div>
-                    </div>
-                    <div class="site-card-title">FARMBOSS TIMEPIECES</div>
-                    <div class="site-card-desc">Watch &amp; Clock Collection</div>
-                    <div class="site-card-meta"><strong id="meta-timepieces">—</strong> timepieces tracked</div>
-                    <a href="timepieces.html" class="site-card-btn" style="background:#d97706;color:#fff;">Go to Timepieces →</a>
-                </div>
-            </div>
-
-            <!-- Knives -->
-            <div class="site-card">
-                <div class="site-card-top" style="background:#dc2626;"></div>
-                <div class="site-card-body">
-                    <div class="site-card-header">
-                        <div class="site-card-icon">🔪</div>
-                        <div class="site-card-badge"><span id="badge-knives">—</span> items &nbsp;|&nbsp; KNF barcodes</div>
-                    </div>
-                    <div class="site-card-title">FARMBOSS KNIVES</div>
-                    <div class="site-card-desc">Blade &amp; Edged Tools Collection</div>
-                    <div class="site-card-meta"><strong id="meta-knives">—</strong> knives tracked</div>
-                    <a href="knives.html" class="site-card-btn" style="background:#dc2626;color:#fff;">Go to Knives →</a>
-                </div>
-            </div>
-
-            <!-- Pharmacy -->
-            <div class="site-card">
-                <div class="site-card-top" style="background:#0ea5e9;"></div>
-                <div class="site-card-body">
-                    <div class="site-card-header">
-                        <div class="site-card-icon">💊</div>
-                        <div class="site-card-badge"><span id="badge-pharmacy">—</span> active Rx</div>
-                    </div>
-                    <div class="site-card-title">FARMBOSS PHARMACY</div>
-                    <div class="site-card-desc">Prescriptions &amp; Medication Tracker</div>
-                    <div class="site-card-meta"><strong id="meta-pharmacy">—</strong> prescriptions on file</div>
-                    <a href="pharmacy.html" class="site-card-btn" style="background:#0ea5e9;color:#fff;">Go to Pharmacy →</a>
-                </div>
-            </div>
-
-            <!-- Insurance -->
-            <div class="site-card">
-                <div class="site-card-top" style="background:#16a34a;"></div>
-                <div class="site-card-body">
-                    <div class="site-card-header">
-                        <div class="site-card-icon">🛡</div>
-                        <div class="site-card-badge"><span id="badge-insurance">—</span> policies</div>
-                    </div>
-                    <div class="site-card-title">FARMBOSS INSURANCE</div>
-                    <div class="site-card-desc">Home · Auto · Health · Life · Farm</div>
-                    <div class="site-card-meta"><strong id="meta-insurance">—</strong> active policies</div>
-                    <a href="insurance.html" class="site-card-btn" style="background:#16a34a;color:#fff;">Go to Insurance →</a>
-                </div>
-            </div>
-
-            <!-- Real Estate -->
-            <div class="site-card">
-                <div class="site-card-top" style="background:#0891b2;"></div>
-                <div class="site-card-body">
-                    <div class="site-card-header">
-                        <div class="site-card-icon">🏡</div>
-                        <div class="site-card-badge"><span id="badge-realestate">—</span> properties</div>
-                    </div>
-                    <div class="site-card-title">FARMBOSS REAL ESTATE</div>
-                    <div class="site-card-desc">Property Portfolio &amp; Mortgage Tracker</div>
-                    <div class="site-card-meta"><strong id="meta-realestate">—</strong> properties tracked</div>
-                    <a href="realestate.html" class="site-card-btn" style="background:#0891b2;color:#fff;">Go to Real Estate →</a>
+                    <div class="site-card-title">FARMBOSS ADDISON</div>
+                    <div class="site-card-desc">Medical visit records &amp; physician directory</div>
+                    <div class="site-card-meta"><strong id="meta-addison">—</strong> visits on file</div>
+                    <a href="addison.html" class="site-card-btn" style="background:#7c3aed;color:#fff;">Go to Addison →</a>
                 </div>
             </div>
 
@@ -1378,6 +1204,36 @@
                 </div>
             </div>
 
+            <!-- Armory -->
+            <div class="site-card">
+                <div class="site-card-top" style="background:#c8a96e;"></div>
+                <div class="site-card-body">
+                    <div class="site-card-header">
+                        <div class="site-card-icon">🔫</div>
+                        <div class="site-card-badge"><span id="badge-armory">—</span> items &nbsp;|&nbsp; ARM barcodes</div>
+                    </div>
+                    <div class="site-card-title">FARMBOSS ARMORY</div>
+                    <div class="site-card-desc">Firearms &amp; Equipment Collection</div>
+                    <div class="site-card-meta"><strong id="meta-armory">—</strong> items tracked</div>
+                    <a href="armory.html" class="site-card-btn" style="background:#c8a96e;color:#0f172a;">Go to Armory →</a>
+                </div>
+            </div>
+
+            <!-- Automotive -->
+            <div class="site-card">
+                <div class="site-card-top" style="background:#3b82f6;"></div>
+                <div class="site-card-body">
+                    <div class="site-card-header">
+                        <div class="site-card-icon">🚗</div>
+                        <div class="site-card-badge"><span id="badge-automotive">—</span> items &nbsp;|&nbsp; AUT barcodes</div>
+                    </div>
+                    <div class="site-card-title">FARMBOSS AUTOMOTIVE</div>
+                    <div class="site-card-desc">Vehicle Fleet Management</div>
+                    <div class="site-card-meta"><strong id="meta-automotive">—</strong> vehicles tracked</div>
+                    <a href="automotive.html" class="site-card-btn" style="background:#3b82f6;color:#fff;">Go to Automotive →</a>
+                </div>
+            </div>
+
             <!-- FORTÉ -->
             <div class="site-card">
                 <div class="site-card-top" style="background:linear-gradient(135deg,#0c1824 0%,#1d3045 100%);"></div>
@@ -1390,6 +1246,111 @@
                     <div class="site-card-desc">Company Intelligence &amp; Report Engine</div>
                     <div class="site-card-meta"><strong id="meta-forte">—</strong> reports generated</div>
                     <a href="forte.html" class="site-card-btn" style="background:#0c1824;color:#c9963a;">Go to FORTÉ →</a>
+                </div>
+            </div>
+
+            <!-- Insurance -->
+            <div class="site-card">
+                <div class="site-card-top" style="background:#16a34a;"></div>
+                <div class="site-card-body">
+                    <div class="site-card-header">
+                        <div class="site-card-icon">🛡</div>
+                        <div class="site-card-badge"><span id="badge-insurance">—</span> policies</div>
+                    </div>
+                    <div class="site-card-title">FARMBOSS INSURANCE</div>
+                    <div class="site-card-desc">Home · Auto · Health · Life · Farm</div>
+                    <div class="site-card-meta"><strong id="meta-insurance">—</strong> active policies</div>
+                    <a href="insurance.html" class="site-card-btn" style="background:#16a34a;color:#fff;">Go to Insurance →</a>
+                </div>
+            </div>
+
+            <!-- Knives -->
+            <div class="site-card">
+                <div class="site-card-top" style="background:#dc2626;"></div>
+                <div class="site-card-body">
+                    <div class="site-card-header">
+                        <div class="site-card-icon">🔪</div>
+                        <div class="site-card-badge"><span id="badge-knives">—</span> items &nbsp;|&nbsp; KNF barcodes</div>
+                    </div>
+                    <div class="site-card-title">FARMBOSS KNIVES</div>
+                    <div class="site-card-desc">Blade &amp; Edged Tools Collection</div>
+                    <div class="site-card-meta"><strong id="meta-knives">—</strong> knives tracked</div>
+                    <a href="knives.html" class="site-card-btn" style="background:#dc2626;color:#fff;">Go to Knives →</a>
+                </div>
+            </div>
+
+            <!-- Livestock -->
+            <div class="site-card">
+                <div class="site-card-top" style="background:#22c55e;"></div>
+                <div class="site-card-body">
+                    <div class="site-card-header">
+                        <div class="site-card-icon">🐄</div>
+                        <div class="site-card-badge"><span id="badge-livestock">—</span> items &nbsp;|&nbsp; LST barcodes</div>
+                    </div>
+                    <div class="site-card-title">FARMBOSS LIVESTOCK</div>
+                    <div class="site-card-desc">Animal Records &amp; Health</div>
+                    <div class="site-card-meta"><strong id="meta-livestock">—</strong> animals tracked</div>
+                    <a href="livestock.html" class="site-card-btn" style="background:#22c55e;color:#0f172a;">Go to Livestock →</a>
+                </div>
+            </div>
+
+            <!-- Machinery -->
+            <div class="site-card">
+                <div class="site-card-top" style="background:#d4941a;"></div>
+                <div class="site-card-body">
+                    <div class="site-card-header">
+                        <div class="site-card-icon">🚜</div>
+                        <div class="site-card-badge"><span id="badge-machinery">—</span> items &nbsp;|&nbsp; MCH barcodes</div>
+                    </div>
+                    <div class="site-card-title">FARMBOSS MACHINERY</div>
+                    <div class="site-card-desc">Farm Equipment Inventory</div>
+                    <div class="site-card-meta"><strong id="meta-machinery">—</strong> items tracked</div>
+                    <a href="machinery.html" class="site-card-btn" style="background:#d4941a;color:#0f172a;">Go to Machinery →</a>
+                </div>
+            </div>
+
+            <!-- Pharmacy -->
+            <div class="site-card">
+                <div class="site-card-top" style="background:#0ea5e9;"></div>
+                <div class="site-card-body">
+                    <div class="site-card-header">
+                        <div class="site-card-icon">💊</div>
+                        <div class="site-card-badge"><span id="badge-pharmacy">—</span> active Rx</div>
+                    </div>
+                    <div class="site-card-title">FARMBOSS PHARMACY</div>
+                    <div class="site-card-desc">Prescriptions &amp; Medication Tracker</div>
+                    <div class="site-card-meta"><strong id="meta-pharmacy">—</strong> prescriptions on file</div>
+                    <a href="pharmacy.html" class="site-card-btn" style="background:#0ea5e9;color:#fff;">Go to Pharmacy →</a>
+                </div>
+            </div>
+
+            <!-- Real Estate -->
+            <div class="site-card">
+                <div class="site-card-top" style="background:#0891b2;"></div>
+                <div class="site-card-body">
+                    <div class="site-card-header">
+                        <div class="site-card-icon">🏡</div>
+                        <div class="site-card-badge"><span id="badge-realestate">—</span> properties</div>
+                    </div>
+                    <div class="site-card-title">FARMBOSS REAL ESTATE</div>
+                    <div class="site-card-desc">Property Portfolio &amp; Mortgage Tracker</div>
+                    <div class="site-card-meta"><strong id="meta-realestate">—</strong> properties tracked</div>
+                    <a href="realestate.html" class="site-card-btn" style="background:#0891b2;color:#fff;">Go to Real Estate →</a>
+                </div>
+            </div>
+
+            <!-- Timepieces -->
+            <div class="site-card">
+                <div class="site-card-top" style="background:#d97706;"></div>
+                <div class="site-card-body">
+                    <div class="site-card-header">
+                        <div class="site-card-icon">⌚</div>
+                        <div class="site-card-badge"><span id="badge-timepieces">—</span> items &nbsp;|&nbsp; TPC barcodes</div>
+                    </div>
+                    <div class="site-card-title">FARMBOSS TIMEPIECES</div>
+                    <div class="site-card-desc">Watch &amp; Clock Collection</div>
+                    <div class="site-card-meta"><strong id="meta-timepieces">—</strong> timepieces tracked</div>
+                    <a href="timepieces.html" class="site-card-btn" style="background:#d97706;color:#fff;">Go to Timepieces →</a>
                 </div>
             </div>
 
@@ -1634,11 +1595,11 @@
     }
 
     // ── LIVE COUNTS ──
-    const counts = { armory:0, machinery:0, automotive:0, livestock:0, timepieces:0, knives:0, pharmacy:0, insurance:0, realestate:0, agents:0 };
+    const counts = { armory:0, machinery:0, automotive:0, livestock:0, timepieces:0, knives:0, pharmacy:0, insurance:0, realestate:0, agents:0, addison:0 };
     let analyticsDonut = null, analyticsBar = null, analyticsRadar = null, analyticsPolar = null, analyticsHBar = null;
 
     function updateCounts() {
-        ['armory','machinery','automotive','livestock','timepieces','knives','pharmacy','insurance','realestate','agents'].forEach(k => {
+        ['armory','machinery','automotive','livestock','timepieces','knives','pharmacy','insurance','realestate','agents','addison'].forEach(k => {
             const v = counts[k];
             const statEl = document.getElementById('stat-' + k);
             if (statEl) statEl.textContent = v;
@@ -1651,10 +1612,10 @@
     }
 
     function updateAnalyticsCharts() {
-        const labels = ['Armory','Machinery','Automotive','Livestock','Timepieces','Knives','Pharmacy','Insurance','Real Estate','Agents'];
-        const keys   = ['armory','machinery','automotive','livestock','timepieces','knives','pharmacy','insurance','realestate','agents'];
+        const labels = ['Armory','Machinery','Automotive','Livestock','Timepieces','Knives','Pharmacy','Insurance','Real Estate','Agents','Addison'];
+        const keys   = ['armory','machinery','automotive','livestock','timepieces','knives','pharmacy','insurance','realestate','agents','addison'];
         const data   = keys.map(k => counts[k] || 0);
-        const colors = ['#c8a96e','#d4941a','#3b82f6','#22c55e','#d97706','#dc2626','#0ea5e9','#16a34a','#0891b2','#8b5cf6'];
+        const colors = ['#c8a96e','#d4941a','#3b82f6','#22c55e','#d97706','#dc2626','#0ea5e9','#16a34a','#0891b2','#8b5cf6','#7c3aed'];
 
         const total = data.reduce((s,v) => s + v, 0);
         if (total === 0) return; // no data yet
@@ -1821,7 +1782,8 @@
             pharmacy:    'rx_items',
             insurance:   'insurance_items',
             realestate:  'realestate_items',
-            agents:      'agents'
+            agents:      'agents',
+            addison:     'addison_items'
         };
         Object.entries(collections).forEach(([key, col]) => {
             const unsub = db.collection(col).onSnapshot(snap => {
@@ -2043,75 +2005,15 @@
             // Station label
             document.getElementById('dtw-location-label').textContent = stationName;
             const lastUpdate = d.dateutc ? new Date(d.dateutc).toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' }) : '';
-            document.getElementById('dtw-station-label').textContent = lastUpdate ? `Last update: ${lastUpdate}  ·  Powered by Ambient Weather` : 'Powered by Ambient Weather';
+            document.getElementById('dtw-station-label').textContent = lastUpdate ? `Last update: ${lastUpdate}  ·  Ambient Weather` : 'Ambient Weather';
 
-            // Current conditions bar
-            const icon = deriveWeatherIcon(d);
-            const desc = deriveConditionDesc(d);
-            document.getElementById('wx-icon').textContent = icon;
+            // Current conditions — simplified
+            document.getElementById('wx-icon').textContent = deriveWeatherIcon(d);
             document.getElementById('wx-temp').textContent = `${Math.round(d.tempf)}°F`;
             const windDir = d.winddir != null ? ` ${degToCompass(d.winddir)}` : '';
-            document.getElementById('wx-details').innerHTML =
-                `${desc}<br>` +
-                `Feels like ${Math.round(d.feelsLike)}°F<br>` +
-                `Wind ${Math.round(d.windspeedmph)} mph${windDir} &nbsp;·&nbsp; Humidity ${d.humidity}%`;
-
-            // Weather report cards
-            document.getElementById('wxr-rain-today').textContent = fmtRain(d.dailyrainin);
-            document.getElementById('wxr-rain-rate-sub').textContent = d.hourlyrainin != null ? `Rate: ${d.hourlyrainin.toFixed(2)}"/hr` : '';
-
-            document.getElementById('wxr-rain-week').textContent = fmtRain(d.weeklyrainin);
-            document.getElementById('wxr-rain-year').textContent = fmtRain(d.yearlyrainin != null ? d.yearlyrainin : d.totalrainin);
-
-            document.getElementById('wxr-wind-gust').textContent = d.maxdailygust != null ? `${Math.round(d.maxdailygust)} mph` : '--';
-
-            // Event rain
-            document.getElementById('wxr-rain-event').textContent = fmtRain(d.eventrainin);
-            document.getElementById('wxr-rain-event-sub').textContent = d.eventrainin != null ? 'Since last dry period' : '';
-
-            // Last detected rain — calculated from current data, not stale lastRain field
-            if (d.hourlyrainin > 0) {
-                document.getElementById('wxr-last-rain').textContent = 'Raining Now';
-                document.getElementById('wxr-last-rain-sub').textContent = `${d.hourlyrainin.toFixed(2)}"/hr`;
-            } else if (d.dailyrainin > 0) {
-                document.getElementById('wxr-last-rain').textContent = 'Today';
-                document.getElementById('wxr-last-rain-sub').textContent = `${d.dailyrainin.toFixed(2)}" so far today`;
-            } else {
-                document.getElementById('wxr-last-rain').textContent = 'Not today';
-                document.getElementById('wxr-last-rain-sub').textContent = 'No rain detected today';
-            }
-
-            // 10-minute average wind (fallback chain: 10m avg → 2m avg → instant)
-            const avgWind = d.windspdmph_avg10m ?? d.windspdmph_avg2m ?? d.windspeedmph;
-            const avgDir = d.winddir_avg10m ?? d.winddir_avg2m ?? d.winddir;
-            const avgLabel = d.windspdmph_avg10m != null ? '10-min avg' : d.windspdmph_avg2m != null ? '2-min avg' : 'Current';
-            document.getElementById('wxr-wind-avg10').textContent = avgWind != null ? `${Math.round(avgWind)} mph` : '--';
-            if (avgDir != null) {
-                document.getElementById('wxr-wind-avg10-sub').textContent = `${avgLabel} · ${degToCompass(avgDir)} (${Math.round(avgDir)}°)`;
-            }
-
-            // Battery status
-            const batteryItems = [];
-            if (d.battout != null) batteryItems.push({ name:'Outdoor', ok: d.battout === 1 });
-            if (d.battin != null) batteryItems.push({ name:'Indoor', ok: d.battin === 1 });
-            for (let i = 1; i <= 10; i++) { if (d[`batt${i}`] != null) batteryItems.push({ name:`Sensor ${i}`, ok: d[`batt${i}`] === 1 }); }
-            if (d.batt_25 != null) batteryItems.push({ name:'PM2.5', ok: d.batt_25 === 1 });
-            if (d.batt_lightning != null) batteryItems.push({ name:'Lightning', ok: d.batt_lightning === 0 }); // inverted: 1=Low
-            const allOk = batteryItems.length > 0 && batteryItems.every(b => b.ok);
-            const lowCount = batteryItems.filter(b => !b.ok).length;
-            document.getElementById('wxr-battery').textContent = batteryItems.length === 0 ? '--' : allOk ? 'All OK' : `${lowCount} Low`;
-            document.getElementById('wxr-battery').style.color = allOk ? '#22c55e' : (lowCount > 0 ? '#ef4444' : 'var(--accent)');
-            document.getElementById('wxr-battery-sub').textContent = batteryItems.length > 0 ? `${batteryItems.length} sensor${batteryItems.length > 1 ? 's' : ''} monitored` : '';
-            wxBatteryItems = batteryItems;
-
-            // Fetch 7-day historical data after a delay (rate limit: 1 req/sec)
-            const macAddress = device.macAddress;
-            // Fetch 3-day forecast using Open-Meteo (free, uses station coords)
-            if (device.info?.coords?.coords?.lat != null) {
-                fetch3DayForecast(device.info.coords.coords.lat, device.info.coords.coords.lon);
-            } else {
-                fetch3DayForecast(44.8247, -93.6052);
-            }
+            document.getElementById('wx-wind').textContent = `${Math.round(d.windspeedmph)} mph${windDir}`;
+            const mtdRain = d.monthlyrainin ?? d.weeklyrainin ?? 0;
+            document.getElementById('wx-mtd-rain').textContent = `${Number(mtdRain).toFixed(2)}"`;
 
         } catch(e) {
             console.error('Weather fetch error:', e);

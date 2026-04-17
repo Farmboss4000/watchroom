@@ -1050,6 +1050,7 @@
         <a href="realestate.html" class="site-link">🏡 Real Estate</a>
         <a href="globetrotting.html" class="site-link">✈️ Globetrotting</a>
         <a href="addison.html" class="site-link">🩺 Addison</a>
+        <a href="vendors.html" class="site-link">💼 Vendors</a>
         <a href="dontpush.html" class="site-link">🚫 Don't Push</a>
     </div>
 
@@ -1076,6 +1077,7 @@
         <a href="machinery.html">🚜 Machinery</a>
         <a href="automotive.html">🚗 Automotive</a>
         <a href="livestock.html">🐄 Livestock</a>
+        <a href="vendors.html">💼 Vendors</a>
         <a href="addison.html">🩺 Addison</a>
     </div>
 </div>
@@ -1339,6 +1341,21 @@
                 </div>
             </div>
 
+            <!-- Vendors -->
+            <div class="site-card">
+                <div class="site-card-top" style="background:#4f46e5;"></div>
+                <div class="site-card-body">
+                    <div class="site-card-header">
+                        <div class="site-card-icon">💼</div>
+                        <div class="site-card-badge"><span id="badge-vendors">—</span> transactions</div>
+                    </div>
+                    <div class="site-card-title">FARMBOSS VENDORS</div>
+                    <div class="site-card-desc">Vendor Directory &amp; Invoice Tracker</div>
+                    <div class="site-card-meta"><strong id="meta-vendors">—</strong> vendors tracked</div>
+                    <a href="vendors.html" class="site-card-btn" style="background:#4f46e5;color:#fff;">Go to Vendors →</a>
+                </div>
+            </div>
+
         </div>
 
         <!-- RECENT ACTIVITY SECTION -->
@@ -1580,11 +1597,11 @@
     }
 
     // ── LIVE COUNTS ──
-    const counts = { armory:0, machinery:0, automotive:0, livestock:0, timepieces:0, knives:0, pharmacy:0, insurance:0, realestate:0, agents:0 };
+    const counts = { armory:0, machinery:0, automotive:0, livestock:0, timepieces:0, knives:0, pharmacy:0, insurance:0, realestate:0, agents:0, vendors:0 };
     let analyticsDonut = null, analyticsBar = null, analyticsRadar = null, analyticsPolar = null, analyticsHBar = null;
 
     function updateCounts() {
-        ['armory','machinery','automotive','livestock','timepieces','knives','pharmacy','insurance','realestate','agents'].forEach(k => {
+        ['armory','machinery','automotive','livestock','timepieces','knives','pharmacy','insurance','realestate','agents','vendors'].forEach(k => {
             const v = counts[k];
             const statEl = document.getElementById('stat-' + k);
             if (statEl) statEl.textContent = v;
@@ -1597,10 +1614,10 @@
     }
 
     function updateAnalyticsCharts() {
-        const labels = ['Armory','Machinery','Automotive','Livestock','Timepieces','Knives','Pharmacy','Insurance','Real Estate','Agents'];
-        const keys   = ['armory','machinery','automotive','livestock','timepieces','knives','pharmacy','insurance','realestate','agents'];
+        const labels = ['Armory','Machinery','Automotive','Livestock','Timepieces','Knives','Pharmacy','Insurance','Real Estate','Agents','Vendors'];
+        const keys   = ['armory','machinery','automotive','livestock','timepieces','knives','pharmacy','insurance','realestate','agents','vendors'];
         const data   = keys.map(k => counts[k] || 0);
-        const colors = ['#c8a96e','#d4941a','#3b82f6','#22c55e','#d97706','#dc2626','#0ea5e9','#16a34a','#0891b2','#8b5cf6'];
+        const colors = ['#c8a96e','#d4941a','#3b82f6','#22c55e','#d97706','#dc2626','#0ea5e9','#16a34a','#0891b2','#8b5cf6','#4f46e5'];
 
         const total = data.reduce((s,v) => s + v, 0);
         if (total === 0) return; // no data yet
@@ -1768,6 +1785,7 @@
             insurance:   'insurance_items',
             realestate:  'realestate_items',
             agents:      'agents',
+            vendors:     'vendors_transactions',
         };
         Object.entries(collections).forEach(([key, col]) => {
             const unsub = db.collection(col).onSnapshot(snap => {

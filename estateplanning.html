@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Farmboss Estate Planning</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.0/dist/mermaid.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0;}
+        :root{
+            --bg-primary:#f5f3ef;--bg-secondary:#ffffff;--bg-card:#ece8df;
+            --accent:#7f1d1d;--accent-hover:#991b1b;--accent-dim:rgba(127,29,29,0.12);
+            --text-primary:#1a1f2e;--text-secondary:#5a6070;--border:#cdc8bd;
+            --success:#16a34a;--danger:#dc2626;--info:#2563eb;--warn:#f59e0b;--hdr-bg:#1a1409;
+        }
+        body{font-family:'Georgia',serif;background:var(--bg-primary);color:var(--text-primary);min-height:100vh;overflow-x:hidden;}
+        .site-switcher{background:#111827;display:flex;align-items:center;padding:5px 18px;gap:4px;font-size:0.77rem;border-bottom:1px solid rgba(255,255,255,0.07);overflow-x:auto;scrollbar-width:none;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
+        .site-switcher::-webkit-scrollbar{display:none;}
+        .site-switcher-label{color:#9ca3af;font-size:0.75rem;font-weight:600;}
+        .site-link{text-decoration:none;color:#9ca3af;padding:4px 12px;border-radius:4px;display:flex;align-items:center;gap:6px;font-weight:500;transition:all 0.15s;white-space:nowrap;}
+        .site-link:hover{background:rgba(255,255,255,0.1);color:#e5e7eb;}
+        .site-link.active{background:rgba(255,255,255,0.13);color:#fff;font-weight:600;}
+        #login-screen{position:fixed;inset:0;background:linear-gradient(135deg,#1a0a0a 0%,#3d1818 100%);display:flex;align-items:center;justify-content:center;z-index:9000;flex-direction:column;gap:12px;}
+        .login-site-links{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
+        .login-site-links a{color:rgba(255,255,255,0.5);font-size:0.78rem;text-decoration:none;padding:4px 12px;border:1px solid rgba(255,255,255,0.2);border-radius:4px;transition:all 0.15s;}
+        .login-site-links a:hover{color:#fff;border-color:rgba(255,255,255,0.5);}
+        .login-site-links a.active{color:#d4a574;border-color:#d4a574;}
+        .login-box{background:#fff;border-radius:10px;padding:44px 40px;width:100%;max-width:400px;box-shadow:0 24px 64px rgba(0,0,0,0.4);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
+        .login-logo{width:56px;height:56px;background:var(--accent);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 16px;color:#fff;}
+        .login-box h2{text-align:center;font-size:1.5rem;color:#1a1f2e;margin-bottom:4px;font-family:'Georgia',serif;}
+        .login-sub{text-align:center;font-size:0.85rem;color:#6b7280;margin-bottom:28px;font-style:italic;}
+        .login-error{color:var(--danger);font-size:0.82rem;margin-bottom:12px;min-height:18px;text-align:center;}
+        .login-full{width:100%;justify-content:center;}
+        .form-group{margin-bottom:14px;}
+        .form-group label{display:block;font-size:0.8rem;font-weight:600;color:#374151;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.4px;}
+        .form-group input,.form-group select,.form-group textarea{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:5px;font-size:0.9rem;font-family:inherit;color:var(--text-primary);background:var(--bg-secondary);transition:border-color 0.15s;}
+        .form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--accent);}
+        #loading-screen{display:none;position:fixed;inset:0;background:var(--bg-primary);flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:8000;}
+        .spinner{width:44px;height:44px;border:4px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
+        @keyframes spin{to{transform:rotate(360deg);}}
+        #app{display:none;min-height:100vh;flex-direction:column;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
+        header{background:var(--hdr-bg);padding:0 20px;display:flex;align-items:center;gap:16px;min-height:56px;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,0.25);flex-wrap:wrap;}
+        .logo-area{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+        .logo-icon{width:32px;height:32px;background:var(--accent);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:17px;color:#fff;flex-shrink:0;}
+        header h1{font-size:1.15rem;font-weight:700;color:#fff;white-space:nowrap;font-family:'Georgia',serif;}
+        header h1 span{color:#d4a574;}
+        nav{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;flex-shrink:0;}
+        nav::-webkit-scrollbar{display:none;}
+        nav button{background:transparent;border:none;color:#9ca3af;padding:8px 13px;border-radius:5px;cursor:pointer;font-size:0.83rem;transition:all 0.15s;white-space:nowrap;font-family:inherit;}
+        nav button:hover{background:rgba(127,29,29,0.3);color:#fff;}
+        nav button.active{background:var(--accent);color:#fff;font-weight:600;}
+        .header-right{display:flex;align-items:center;gap:10px;margin-left:auto;}
+        .user-badge{font-size:0.78rem;color:#9ca3af;background:rgba(255,255,255,0.08);padding:4px 10px;border-radius:5px;}
+        .btn-signout{background:transparent;border:1px solid rgba(255,255,255,0.2);color:#9ca3af;padding:5px 12px;border-radius:5px;cursor:pointer;font-size:0.78rem;transition:all 0.15s;font-family:inherit;}
+        .btn-signout:hover{border-color:var(--danger);color:var(--danger);}
+        .hero{background:linear-gradient(135deg,#2a0f0f 0%,#3d1818 60%,#531f1f 100%);border-radius:10px;padding:28px 32px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:16px;overflow:hidden;position:relative;}
+        .hero-title{font-size:1.7rem;font-weight:800;color:#fff;margin-bottom:4px;font-family:'Georgia',serif;letter-spacing:0.5px;}
+        .hero-title span{color:#d4a574;}
+        .hero-sub{font-size:0.9rem;color:rgba(255,255,255,0.7);font-style:italic;}
+        main{padding:20px;max-width:1400px;margin:0 auto;flex:1;}
+        .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:20px;}
+        .stat-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:18px 16px;text-align:center;}
+        .stat-value{font-size:2rem;font-weight:800;color:var(--accent);line-height:1;margin-bottom:4px;font-family:'Georgia',serif;}
+        .stat-label{font-size:0.77rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;}
+        .card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:22px;margin-bottom:20px;}
+        .card-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;gap:10px;flex-wrap:wrap;}
+        .card-title-left{font-size:1.05rem;font-weight:700;color:var(--text-primary);font-family:'Georgia',serif;}
+        .view{display:none;}.view.active{display:block;}
+        .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:5px;font-size:0.85rem;font-weight:600;cursor:pointer;border:none;transition:all 0.15s;font-family:inherit;}
+        .btn-primary{background:var(--accent);color:#fff;}.btn-primary:hover{background:var(--accent-hover);}
+        .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text-primary);}.btn-ghost:hover{background:var(--bg-card);}
+        .btn-danger{background:var(--danger);color:#fff;}.btn-danger:hover{opacity:0.85;}
+        .btn-info{background:var(--info);color:#fff;}.btn-info:hover{opacity:0.85;}
+        .btn-sm{padding:5px 10px;font-size:0.78rem;}
+        .btn-secondary{background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary);}.btn-secondary:hover{background:var(--border);}
+        .form-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+        .form-group.full-width{grid-column:1/-1;}
+        .form-group.span2{grid-column:span 2;}
+        .form-actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+        .toolbar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;}
+        .toolbar input[type="text"]{flex:1;min-width:200px;padding:8px 12px;border:1px solid var(--border);border-radius:5px;font-size:0.87rem;font-family:inherit;background:var(--bg-secondary);color:var(--text-primary);}
+        .toolbar input:focus{outline:none;border-color:var(--accent);}
+        .toolbar select{padding:8px 12px;border:1px solid var(--border);border-radius:5px;font-size:0.87rem;font-family:inherit;background:var(--bg-secondary);color:var(--text-primary);cursor:pointer;}
+        .table-wrapper{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+        table{width:100%;border-collapse:collapse;font-size:0.88rem;}
+        thead th{background:var(--bg-card);padding:10px 12px;text-align:left;font-size:0.74rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary);border-bottom:2px solid var(--border);cursor:pointer;white-space:nowrap;user-select:none;}
+        thead th.no-sort{cursor:default;}
+        thead th:hover:not(.no-sort){color:var(--accent);}
+        thead th.sort-asc::after{content:' ↑';color:var(--accent);}
+        thead th.sort-desc::after{content:' ↓';color:var(--accent);}
+        tbody tr{border-bottom:1px solid var(--border);transition:background 0.1s;}
+        tbody tr:hover{background:var(--accent-dim);}
+        tbody td{padding:10px 12px;vertical-align:top;}
+        .empty{text-align:center;padding:40px 20px;color:var(--text-secondary);}
+        .empty-icon{font-size:3rem;margin-bottom:12px;}
+        .badge{display:inline-block;padding:3px 9px;border-radius:4px;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;white-space:nowrap;}
+        .badge-will{background:#fee2e2;color:#991b1b;}
+        .badge-trust{background:#fef3c7;color:#92400e;}
+        .badge-poa{background:#dbeafe;color:#1d4ed8;}
+        .badge-health{background:#dcfce7;color:#15803d;}
+        .badge-insurance{background:#ede9fe;color:#6d28d9;}
+        .badge-property{background:#fce7f3;color:#9d174d;}
+        .badge-beneficiary{background:#fed7aa;color:#9a3412;}
+        .badge-financial{background:#ccfbf1;color:#0d9488;}
+        .badge-tax{background:#e0e7ff;color:#4338ca;}
+        .badge-business{background:#f1f5f9;color:#475569;}
+        .badge-other{background:var(--bg-card);color:var(--text-secondary);}
+        .cat-breakdown{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+        .cat-breakdown-item{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg-card);border-radius:5px;}
+        .cbi-name{font-size:0.85rem;color:var(--text-primary);min-width:140px;font-weight:600;}
+        .cbi-count{font-size:0.85rem;font-weight:700;color:var(--accent);min-width:28px;text-align:right;}
+        .cbi-bar{flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden;}
+        .cbi-bar-fill{height:100%;background:var(--accent);border-radius:3px;transition:width 0.3s;}
+        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;opacity:0;pointer-events:none;transition:opacity 0.2s;}
+        .modal-overlay.show{opacity:1;pointer-events:all;}
+        .modal{background:#fff;border-radius:10px;padding:28px 24px;width:100%;max-width:640px;margin:16px;max-height:90vh;overflow-y:auto;transform:scale(0.95);transition:transform 0.2s;}
+        .modal-overlay.show .modal{transform:scale(1);}
+        .modal-title{font-size:1.15rem;font-weight:700;color:var(--text-primary);margin-bottom:4px;font-family:'Georgia',serif;}
+        .modal-sub{font-size:0.85rem;color:var(--text-secondary);margin-bottom:16px;font-style:italic;}
+        .modal-actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+        .api-key-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;}
+        .api-key-row .form-group{flex:1;min-width:260px;}
+        .api-status{font-size:0.82rem;margin-top:8px;padding:8px 12px;border-radius:5px;}
+        .api-status.ok{background:#dcfce7;color:#15803d;}
+        .api-status.err{background:#fee2e2;color:#b91c1c;}
+        /* Bulk upload */
+        .bulk-drop-zone{border:2px dashed var(--border);border-radius:10px;padding:48px 20px;text-align:center;cursor:pointer;transition:all 0.2s;background:var(--bg-card);margin-bottom:20px;}
+        .bulk-drop-zone:hover,.bulk-drop-zone.dragover{border-color:var(--accent);background:var(--accent-dim);}
+        .bulk-drop-icon{font-size:3rem;margin-bottom:8px;}
+        .bulk-drop-title{font-size:1.15rem;font-weight:700;color:var(--text-primary);margin-bottom:4px;font-family:'Georgia',serif;}
+        .bulk-drop-sub{font-size:0.85rem;color:var(--text-secondary);font-style:italic;}
+        .bulk-queue{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;margin-top:20px;}
+        .bulk-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;overflow:hidden;position:relative;transition:box-shadow 0.15s;}
+        .bulk-card.done{border-color:var(--success);}
+        .bulk-card.error{border-color:var(--danger);}
+        .bulk-card-img{width:100%;height:140px;object-fit:cover;display:block;background:var(--bg-card);cursor:pointer;}
+        .bulk-card-img-placeholder{width:100%;height:140px;display:flex;align-items:center;justify-content:center;font-size:3rem;background:var(--bg-card);}
+        .bulk-card-body{padding:12px 14px;}
+        .bulk-card-status{font-size:0.78rem;font-weight:700;padding:3px 10px;border-radius:20px;display:inline-block;margin-bottom:8px;}
+        .status-pending{background:rgba(100,100,100,0.15);color:var(--text-secondary);}
+        .status-scanning{background:rgba(37,99,235,0.15);color:var(--info);}
+        .status-ready{background:rgba(22,163,74,0.15);color:var(--success);}
+        .status-saved{background:rgba(22,163,74,0.3);color:var(--success);}
+        .status-error{background:rgba(220,38,38,0.15);color:var(--danger);}
+        .bulk-card-field{font-size:0.82rem;color:var(--text-secondary);margin-bottom:3px;}
+        .bulk-card-field strong{color:var(--text-primary);}
+        .bulk-card-field input,.bulk-card-field select,.bulk-card-field textarea{width:100%;font-size:0.8rem;padding:4px 8px;border:1px solid var(--border);border-radius:4px;margin-top:2px;background:var(--bg-secondary);color:var(--text-primary);font-family:inherit;}
+        .bulk-card-remove{position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.55);border:none;color:#fff;width:24px;height:24px;border-radius:50%;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;z-index:2;}
+        .bulk-progress-bar{height:4px;background:var(--bg-card);border-radius:2px;margin-bottom:16px;overflow:hidden;}
+        .bulk-progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width 0.3s;}
+        .bulk-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px;}
+        /* Analysis panel */
+        .analysis-panel{background:#fdf9f3;border:1.5px solid #e8dcc4;border-radius:10px;padding:24px;margin-top:20px;line-height:1.7;font-size:0.92rem;color:var(--text-primary);}
+        .analysis-panel h2{font-size:1.15rem;font-weight:700;color:var(--accent);margin:18px 0 8px;font-family:'Georgia',serif;border-bottom:1px solid var(--border);padding-bottom:4px;}
+        .analysis-panel h2:first-child{margin-top:0;}
+        .analysis-panel h3{font-size:1rem;font-weight:700;color:var(--text-primary);margin:14px 0 6px;font-family:'Georgia',serif;}
+        .analysis-panel ul,.analysis-panel ol{margin:8px 0;padding-left:24px;}
+        .analysis-panel li{margin-bottom:4px;}
+        .analysis-panel strong{color:var(--text-primary);}
+        .analysis-panel em{color:var(--accent);font-style:italic;}
+        .mermaid-wrap{background:#fff;border:1px solid var(--border);border-radius:10px;padding:30px;overflow-x:auto;text-align:center;margin-top:16px;}
+        .doc-summary-text{font-size:0.85rem;color:var(--text-secondary);line-height:1.6;margin-top:4px;}
+        .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#1a1f2e;color:#fff;padding:10px 20px;border-radius:8px;font-size:0.87rem;font-weight:500;opacity:0;transition:all 0.3s;z-index:9999;pointer-events:none;white-space:nowrap;max-width:90vw;}
+        .toast.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:all;}
+        .toast.success{background:var(--success);}
+        .toast.error{background:var(--danger);}
+        .toast.warn{background:var(--warn);}
+        @media(max-width:720px){
+            header{flex-wrap:wrap;padding:10px 14px;gap:6px;}
+            nav{order:3;width:100%;overflow-x:auto;scrollbar-width:none;padding-bottom:2px;border-top:1px solid rgba(255,255,255,0.1);padding-top:6px;}
+            main{padding:12px;}
+            .form-grid{grid-template-columns:1fr 1fr;}
+            .form-group.span2{grid-column:span 1;}
+            .stats-grid{grid-template-columns:1fr 1fr;}
+            input,select,textarea{font-size:16px;}
+        }
+        @media(max-width:480px){
+            .form-grid{grid-template-columns:1fr;}
+            .form-group.full-width,.form-group.span2{grid-column:1;}
+            .cat-breakdown{grid-template-columns:1fr;}
+        }
+    </style>
+</head>
+<body>
+
+<div id="login-screen">
+    <div class="login-site-links">
+        <a href="index.html">🏠 HQ</a>
+        <a href="addison.html">🩺 Addison</a>
+        <a href="dontpush.html">🚫 Don't Push</a>
+        <a href="estateplanning.html" class="active">📜 Estate Planning</a>
+    </div>
+    <div class="login-box">
+        <div class="login-logo">📜</div>
+        <h2>Farmboss Estate Planning</h2>
+        <p class="login-sub">Legal &amp; financial document vault</p>
+        <form id="login-form">
+            <div class="form-group"><label>Email</label><input type="email" id="login-email" placeholder="your@email.com" required autocomplete="username"></div>
+            <div class="form-group" style="margin-bottom:20px;"><label>Password</label><input type="password" id="login-password" placeholder="••••••••" required autocomplete="current-password"></div>
+            <div class="login-error" id="login-error"></div>
+            <button type="submit" class="btn btn-primary login-full" id="login-btn">Sign In</button>
+        </form>
+    </div>
+</div>
+
+<div id="loading-screen"><div class="spinner"></div><p>Loading your archive...</p></div>
+
+<div id="app">
+<div class="site-switcher">
+    <span class="site-switcher-label">Farmboss</span>
+    <a href="index.html" class="site-link">🏠 HQ</a>
+    <a href="armory.html" class="site-link">🔫 Armory</a>
+    <a href="machinery.html" class="site-link">🚜 Machinery</a>
+    <a href="automotive.html" class="site-link">🚗 Automotive</a>
+    <a href="livestock.html" class="site-link">🐄 Livestock</a>
+    <a href="timepieces.html" class="site-link">⌚ Timepieces</a>
+    <a href="knives.html" class="site-link">🔪 Knives</a>
+    <a href="realestate.html" class="site-link">🏡 Real Estate</a>
+    <a href="globetrotting.html" class="site-link">✈️ Globetrotting</a>
+    <a href="vendors.html" class="site-link">💼 Vendors</a>
+    <a href="estateplanning.html" class="site-link active">📜 Estate Planning</a>
+    <a href="dontpush.html" class="site-link">🚫 Don't Push</a>
+</div>
+<header>
+    <div class="logo-area">
+        <div class="logo-icon">📜</div>
+        <h1>Farmboss <span>Estate Planning</span></h1>
+    </div>
+    <nav>
+        <button class="active" onclick="showView('dashboard')">Dashboard</button>
+        <button onclick="showView('upload')">📥 Upload Documents</button>
+        <button onclick="showView('documents')">📚 Documents</button>
+        <button onclick="showView('relationships')">🔗 Relationships</button>
+        <button onclick="showView('flow')">📊 Flow Diagram</button>
+        <button onclick="showView('settings')">⚙ Settings</button>
+        <button onclick="showView('recycle-bin')">🗑 Recycle Bin</button>
+    </nav>
+    <div class="header-right">
+        <span class="user-badge" id="user-email"></span>
+        <button class="btn-signout" onclick="doSignOut()">Sign Out</button>
+    </div>
+</header>
+<main>
+
+<!-- DASHBOARD -->
+<div id="view-dashboard" class="view active">
+    <div class="hero">
+        <div>
+            <div class="hero-title">Farmboss <span>Estate Planning</span></div>
+            <div class="hero-sub">Your confidential archive of legal &amp; financial instruments</div>
+        </div>
+        <svg width="110" height="110" viewBox="0 0 120 120" style="opacity:0.85;flex-shrink:0;" xmlns="http://www.w3.org/2000/svg">
+            <rect x="30" y="22" width="60" height="76" rx="3" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="2.5"/>
+            <line x1="40" y1="40" x2="80" y2="40" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
+            <line x1="40" y1="50" x2="80" y2="50" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
+            <line x1="40" y1="60" x2="72" y2="60" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
+            <line x1="40" y1="70" x2="80" y2="70" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
+            <line x1="40" y1="80" x2="65" y2="80" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
+            <circle cx="58" cy="92" r="8" fill="rgba(212,165,116,0.8)" stroke="rgba(255,255,255,0.6)" stroke-width="1"/>
+            <line x1="58" y1="92" x2="58" y2="108" stroke="rgba(212,165,116,0.6)" stroke-width="3"/>
+        </svg>
+    </div>
+    <div class="stats-grid" id="stats-grid"></div>
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">📚 Documents by Category</div></div>
+        <div class="cat-breakdown" id="cat-breakdown"></div>
+    </div>
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">🕐 Recently Added</div></div>
+        <div class="table-wrapper">
+            <table><thead><tr>
+                <th class="no-sort">Title</th>
+                <th class="no-sort">Category</th>
+                <th class="no-sort">Date</th>
+                <th class="no-sort">Parties</th>
+            </tr></thead><tbody id="recent-tbody"></tbody></table>
+        </div>
+    </div>
+</div>
+
+<!-- UPLOAD -->
+<div id="view-upload" class="view">
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">📥 Upload Legal &amp; Financial Documents</div></div>
+        <p style="font-size:0.9rem;color:var(--text-secondary);margin-bottom:16px;font-style:italic;">Drop wills, trusts, deeds, insurance policies, POAs, or other estate documents. AI will categorize, summarize, and extract key parties &amp; dates.</p>
+        <div class="bulk-drop-zone" id="bulk-drop-zone" onclick="document.getElementById('bulk-file-input').click()"
+            ondragover="event.preventDefault();this.classList.add('dragover')"
+            ondragleave="this.classList.remove('dragover')"
+            ondrop="event.preventDefault();this.classList.remove('dragover');handleBulkFiles(event.dataTransfer.files)">
+            <div class="bulk-drop-icon">📜</div>
+            <div class="bulk-drop-title">Drop documents here</div>
+            <div class="bulk-drop-sub">or click to select (PDF, JPG, PNG)</div>
+            <input type="file" id="bulk-file-input" accept="image/*,application/pdf" multiple style="display:none" onchange="handleBulkFiles(this.files);this.value='';">
+        </div>
+        <div class="bulk-actions" id="bulk-actions" style="display:none;">
+            <button class="btn btn-primary" id="btn-bulk-scan" onclick="runBulkScan()">🤖 Analyze All with AI</button>
+            <button class="btn btn-ghost" onclick="clearBulkQueue()">Clear All</button>
+            <button class="btn btn-primary" id="btn-bulk-save-all" onclick="saveBulkAll()" style="display:none;">💾 Save All to Archive</button>
+            <span style="font-size:0.82rem;color:var(--text-secondary);" id="bulk-count-label"></span>
+        </div>
+        <div class="bulk-progress-bar" id="bulk-progress-bar" style="display:none;"><div class="bulk-progress-fill" id="bulk-progress-fill" style="width:0%"></div></div>
+        <div class="bulk-queue" id="bulk-queue"></div>
+    </div>
+</div>
+
+<!-- DOCUMENTS -->
+<div id="view-documents" class="view">
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">📚 Document Archive</div><span style="font-size:0.85rem;color:var(--text-secondary)" id="docs-count">0 documents</span></div>
+        <div class="toolbar">
+            <input type="text" id="docs-search" placeholder="Search title, summary, parties, dates..." oninput="renderDocuments()">
+            <select id="docs-filter-cat" onchange="renderDocuments()"><option value="">All Categories</option></select>
+        </div>
+        <div class="table-wrapper">
+            <table id="docs-table"><thead><tr>
+                <th onclick="docsSortBy('title')">Title</th>
+                <th onclick="docsSortBy('category')">Category</th>
+                <th class="no-sort">Summary</th>
+                <th class="no-sort">Parties</th>
+                <th onclick="docsSortBy('effectiveDate')">Effective</th>
+                <th class="no-sort">Actions</th>
+            </tr></thead><tbody id="docs-tbody"></tbody></table>
+        </div>
+        <div id="docs-empty" class="empty" style="display:none;"><div class="empty-icon">📜</div><p>No documents yet. Use Upload Documents to get started.</p></div>
+    </div>
+</div>
+
+<!-- RELATIONSHIPS -->
+<div id="view-relationships" class="view">
+    <div class="card">
+        <div class="card-title">
+            <div class="card-title-left">🔗 Document Relationships &amp; Overview</div>
+            <button class="btn btn-primary" id="btn-analyze-rel" onclick="analyzeRelationships()">🔬 Generate Analysis</button>
+        </div>
+        <p style="font-size:0.9rem;color:var(--text-secondary);margin-bottom:12px;font-style:italic;">AI reviews all documents in your archive and identifies how they interrelate — shared parties, cross-references, beneficiary chains, asset ownership, and gaps.</p>
+        <div id="rel-status" style="font-size:0.82rem;color:var(--text-secondary);min-height:18px;margin-bottom:8px;"></div>
+        <div id="rel-result" class="analysis-panel" style="display:none;"></div>
+    </div>
+</div>
+
+<!-- FLOW DIAGRAM -->
+<div id="view-flow" class="view">
+    <div class="card">
+        <div class="card-title">
+            <div class="card-title-left">📊 Estate Flow Diagram</div>
+            <button class="btn btn-primary" id="btn-generate-flow" onclick="generateFlowDiagram()">🎨 Generate Flow Diagram</button>
+        </div>
+        <p style="font-size:0.9rem;color:var(--text-secondary);margin-bottom:12px;font-style:italic;">Visualize how your estate instruments flow — how assets pass from owners through trusts and beneficiaries, and how documents reference each other.</p>
+        <div id="flow-status" style="font-size:0.82rem;color:var(--text-secondary);min-height:18px;margin-bottom:8px;"></div>
+        <div id="mermaid-wrap" class="mermaid-wrap" style="display:none;">
+            <div id="mermaid-container"></div>
+        </div>
+        <details style="margin-top:14px;">
+            <summary style="cursor:pointer;font-size:0.82rem;color:var(--text-secondary);">Diagram source (Mermaid)</summary>
+            <pre id="mermaid-source" style="background:#1a1a2e;color:#60a5fa;padding:14px;border-radius:6px;font-size:0.78rem;overflow-x:auto;white-space:pre-wrap;margin-top:8px;"></pre>
+        </details>
+    </div>
+</div>
+
+<!-- SETTINGS -->
+<div id="view-settings" class="view">
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">🔑 Anthropic API Key</div></div>
+        <p style="font-size:0.88rem;color:var(--text-secondary);margin-bottom:16px;font-style:italic;">Required for AI analysis of documents, summaries, relationship mapping, and flow diagrams.</p>
+        <div class="api-key-row">
+            <div class="form-group" style="margin-bottom:0;"><label>API Key</label><input type="password" id="api-key-input" placeholder="sk-ant-api03-…"></div>
+            <button class="btn btn-primary" onclick="saveApiKey()">Save Key</button>
+            <button class="btn btn-ghost" onclick="testApiKey()">Test</button>
+        </div>
+        <div class="api-status" id="api-status" style="display:none;"></div>
+    </div>
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">🌐 CORS Proxy URL (optional)</div></div>
+        <div class="api-key-row">
+            <div class="form-group" style="margin-bottom:0;"><label>Proxy URL</label><input type="text" id="api-proxy-input" placeholder="https://your-proxy.workers.dev/"></div>
+            <button class="btn btn-primary" onclick="saveProxyUrl()">Save Proxy</button>
+        </div>
+    </div>
+</div>
+
+<!-- RECYCLE BIN -->
+<div id="view-recycle-bin" class="view">
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">🗑 Recycle Bin</div></div>
+        <div id="recycle-bin-list"></div>
+    </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="doc-modal">
+    <div class="modal">
+        <div class="modal-title" id="doc-modal-title">Edit Document</div>
+        <div class="modal-sub">Review and update AI-extracted details.</div>
+        <input type="hidden" id="doc-edit-doc-id">
+        <div class="form-grid" style="grid-template-columns:1fr 1fr;">
+            <div class="form-group full-width"><label>Title *</label><input type="text" id="df-title" required></div>
+            <div class="form-group"><label>Category</label><select id="df-category"></select></div>
+            <div class="form-group"><label>Type</label><select id="df-type"><option>Legal</option><option>Financial</option><option>Insurance</option><option>Property</option><option>Tax</option><option>Business</option><option>Other</option></select></div>
+            <div class="form-group"><label>Effective Date</label><input type="date" id="df-effective-date"></div>
+            <div class="form-group"><label>Expiration / Review Date</label><input type="date" id="df-expiration-date"></div>
+            <div class="form-group full-width"><label>Summary</label><textarea id="df-summary" rows="4"></textarea></div>
+            <div class="form-group full-width"><label>Parties (comma-separated)</label><input type="text" id="df-parties" placeholder="e.g. John Smith, Jane Smith, ABC Bank"></div>
+            <div class="form-group full-width"><label>Related Entities / Cross-References</label><textarea id="df-related" rows="2" placeholder="e.g. References Smith Family Trust; names daughter as beneficiary"></textarea></div>
+            <div class="form-group full-width"><label>Key Dates / Tags</label><input type="text" id="df-tags" placeholder="e.g. signed 2023-05-12, needs review 2026"></div>
+            <div class="form-group full-width"><label>Notes</label><textarea id="df-notes" rows="2"></textarea></div>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-primary" onclick="saveDocEdit()">Save</button>
+            <button class="btn btn-ghost" onclick="closeDocModal()">Cancel</button>
+            <a id="df-doc-link" href="" target="_blank" class="btn btn-info" style="display:none;">📄 Open Document</a>
+        </div>
+    </div>
+</div>
+
+</main>
+</div><!-- end #app -->
+
+<div id="toast" class="toast"></div>
+
+<script>
+firebase.initializeApp({
+    apiKey:"AIzaSyB7c4urD9tJO80S7nADItxjwhSYVqlrkEU",
+    authDomain:"watchroom-714a0.firebaseapp.com",
+    projectId:"watchroom-714a0",
+    storageBucket:"watchroom-714a0.firebasestorage.app",
+    messagingSenderId:"911514107783",
+    appId:"1:911514107783:web:20e8a729fd66577c28dd22"
+});
+const auth=firebase.auth(),db=firebase.firestore(),storage=firebase.storage();
+
+// Mermaid init
+if(window.mermaid){mermaid.initialize({startOnLoad:false,theme:'default',securityLevel:'loose',flowchart:{useMaxWidth:true,htmlLabels:true,curve:'basis'}});}
+
+// STATE
+let documents=[];
+const DEFAULT_CATEGORIES=['Will','Trust','Power of Attorney','Healthcare Directive','Life Insurance','Property/Deed','Beneficiary Designation','Financial Account','Retirement Account','Investment','Tax Document','Business Entity','Other'];
+let categories=[...DEFAULT_CATEGORIES];
+let nextId=1;
+let docsSortField='addedAt',docsSortDir='desc';
+let apiKey='',proxyUrl='',aiModel='claude-sonnet-4-5';
+let unsubDocs=null;
+const VIEWS=['dashboard','upload','documents','relationships','flow','settings','recycle-bin'];
+
+// UTILS
+function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):'';}
+function toast(msg,type){const el=document.getElementById('toast');el.textContent=msg;el.className='toast '+(type||'')+' show';clearTimeout(el._tid);el._tid=setTimeout(()=>el.classList.remove('show'),3500);}
+function fmtDate(d){if(!d)return '—';try{return new Date(d+'T00:00:00').toLocaleDateString();}catch(e){return d;}}
+function catBadgeClass(c){const x=(c||'').toLowerCase();if(x.includes('will'))return'badge-will';if(x.includes('trust'))return'badge-trust';if(x.includes('power of attorney')||x.includes('poa'))return'badge-poa';if(x.includes('health'))return'badge-health';if(x.includes('insurance'))return'badge-insurance';if(x.includes('property')||x.includes('deed'))return'badge-property';if(x.includes('beneficiary'))return'badge-beneficiary';if(x.includes('financial')||x.includes('retirement')||x.includes('investment'))return'badge-financial';if(x.includes('tax'))return'badge-tax';if(x.includes('business'))return'badge-business';return'badge-other';}
+
+// AUTH
+auth.onAuthStateChanged(user=>{
+    if(user){
+        document.getElementById('login-screen').style.display='none';
+        document.getElementById('loading-screen').style.display='flex';
+        document.getElementById('app').style.display='none';
+        document.getElementById('user-email').textContent=user.email;
+        initApp();
+    } else {
+        document.getElementById('login-screen').style.display='flex';
+        document.getElementById('loading-screen').style.display='none';
+        document.getElementById('app').style.display='none';
+        if(unsubDocs){unsubDocs();unsubDocs=null;}
+        documents=[];
+    }
+});
+document.getElementById('login-form').addEventListener('submit',async e=>{
+    e.preventDefault();
+    const email=document.getElementById('login-email').value.trim();
+    const pass=document.getElementById('login-password').value;
+    const errEl=document.getElementById('login-error'),btn=document.getElementById('login-btn');
+    errEl.textContent='';btn.textContent='Signing in...';btn.disabled=true;
+    try{await auth.signInWithEmailAndPassword(email,pass);}
+    catch(err){errEl.textContent='Invalid email or password.';btn.textContent='Sign In';btn.disabled=false;}
+});
+async function doSignOut(){if(!confirm('Sign out?'))return;await auth.signOut();}
+
+// INIT
+async function initApp(){
+    try{
+        const cfgDoc=await db.collection('estate_config').doc('data').get();
+        if(cfgDoc.exists){
+            const d=cfgDoc.data();
+            if(d.categories&&d.categories.length) categories=d.categories;
+            if(d.nextId) nextId=d.nextId;
+        }
+        const keyDoc=await db.collection('settings').doc('apikey').get();
+        if(keyDoc.exists&&keyDoc.data().key){apiKey=keyDoc.data().key;document.getElementById('api-key-input').value=apiKey;}
+        const proxyDoc=await db.collection('settings').doc('proxy').get();
+        if(proxyDoc.exists&&proxyDoc.data().url){proxyUrl=proxyDoc.data().url;document.getElementById('api-proxy-input').value=proxyUrl;}
+        const modelDoc=await db.collection('settings').doc('model').get();
+        if(modelDoc.exists&&modelDoc.data().model) aiModel=modelDoc.data().model;
+
+        unsubDocs=db.collection('estate_documents').onSnapshot(snap=>{
+            documents=snap.docs.map(doc=>({_docId:doc.id,...doc.data()}));
+            renderDashboard();renderDocuments();populateCategoryFilters();
+        },err=>console.warn('docs snap err',err));
+
+        document.getElementById('loading-screen').style.display='none';
+        document.getElementById('app').style.display='block';
+        populateCategoryFilters();showView('dashboard');
+    }catch(err){
+        document.getElementById('loading-screen').innerHTML=`<p style="color:var(--danger);padding:20px;text-align:center;">Error: ${err.message}<br><br><button class="btn btn-ghost" onclick="doSignOut()">Sign Out</button></p>`;
+    }
+}
+async function saveConfig(){await db.collection('estate_config').doc('data').set({nextId,categories});}
+
+function showView(v){
+    VIEWS.forEach(id=>document.getElementById('view-'+id).classList.remove('active'));
+    document.getElementById('view-'+v).classList.add('active');
+    document.querySelectorAll('nav button').forEach((btn,i)=>btn.classList.toggle('active',VIEWS[i]===v));
+    if(v==='dashboard')renderDashboard();
+    if(v==='documents'){populateCategoryFilters();renderDocuments();}
+    if(v==='upload'){document.getElementById('bulk-actions').style.display=bulkQueue.length?'flex':'none';renderBulkQueue();}
+    if(v==='recycle-bin')loadRecycleBin();
+    window.scrollTo(0,0);
+}
+
+function populateCategoryFilters(){
+    const sel=document.getElementById('docs-filter-cat');
+    if(sel){
+        const cur=sel.value;
+        sel.innerHTML='<option value="">All Categories</option>'+categories.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+        if(cur&&[...sel.options].some(o=>o.value===cur))sel.value=cur;
+    }
+    const catSel=document.getElementById('df-category');
+    if(catSel){
+        catSel.innerHTML=categories.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+    }
+}
+
+// CRUD
+async function uploadDocFile(file,label){
+    const ext=file.name?file.name.split('.').pop():(file.type==='application/pdf'?'pdf':'jpg');
+    const safe=(label||'doc').toLowerCase().replace(/[^a-z0-9]/g,'_').slice(0,40);
+    const path=`estate_docs/${Date.now()}_${safe}.${ext}`;
+    const ref=storage.ref().child(path);
+    await ref.put(file);return await ref.getDownloadURL();
+}
+async function dbAddDocument(data){
+    const item={id:nextId++,addedAt:new Date().toISOString(),...data};
+    const docRef=await db.collection('estate_documents').add(item);
+    await saveConfig();return{...item,_docId:docRef.id};
+}
+async function dbUpdateDocument(docId,data){await db.collection('estate_documents').doc(docId).update(data);}
+
+// DASHBOARD
+function renderDashboard(){
+    const total=documents.length;
+    const parties=new Set();
+    documents.forEach(d=>(d.parties||[]).forEach(p=>parties.add(p)));
+    const now=new Date().toISOString().slice(0,10);
+    const expiring=documents.filter(d=>d.expirationDate&&d.expirationDate>=now&&d.expirationDate<=new Date(Date.now()+180*86400000).toISOString().slice(0,10)).length;
+    const missingSummary=documents.filter(d=>!d.summary).length;
+    document.getElementById('stats-grid').innerHTML=`
+        <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Documents</div></div>
+        <div class="stat-card"><div class="stat-value">${parties.size}</div><div class="stat-label">People / Entities</div></div>
+        <div class="stat-card"><div class="stat-value">${new Set(documents.map(d=>d.category).filter(Boolean)).size}</div><div class="stat-label">Categories Used</div></div>
+        <div class="stat-card" style="border-color:${expiring?'#f59e0b':'var(--border)'};"><div class="stat-value" style="color:${expiring?'#f59e0b':''};">${expiring}</div><div class="stat-label">Expiring in 180d</div></div>
+        <div class="stat-card"><div class="stat-value">${missingSummary}</div><div class="stat-label">Need Review</div></div>`;
+    const counts={};
+    documents.forEach(d=>{if(d.category)counts[d.category]=(counts[d.category]||0)+1;});
+    const maxC=Math.max(...Object.values(counts),1);
+    document.getElementById('cat-breakdown').innerHTML=Object.keys(counts).length
+        ?Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([c,n])=>`
+            <div class="cat-breakdown-item">
+                <div class="cbi-name">${esc(c)}</div>
+                <div class="cbi-count">${n}</div>
+                <div class="cbi-bar"><div class="cbi-bar-fill" style="width:${(n/maxC*100).toFixed(1)}%"></div></div>
+            </div>`).join('')
+        :'<p style="color:var(--text-secondary);padding:16px 0;">No documents yet.</p>';
+    const rec=[...documents].sort((a,b)=>(b.addedAt||'').localeCompare(a.addedAt||'')).slice(0,10);
+    document.getElementById('recent-tbody').innerHTML=rec.length
+        ?rec.map(d=>`<tr style="cursor:pointer" onclick="editDocument('${d._docId}')">
+            <td><strong>${esc(d.title)||'Untitled'}</strong></td>
+            <td><span class="badge ${catBadgeClass(d.category)}">${esc(d.category)||'—'}</span></td>
+            <td>${fmtDate(d.effectiveDate)}</td>
+            <td style="font-size:0.82rem;color:var(--text-secondary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc((d.parties||[]).join(', '))||'—'}</td>
+          </tr>`).join('')
+        :'<tr><td colspan="4" style="text-align:center;color:var(--text-secondary);padding:30px;">No documents yet.</td></tr>';
+}
+
+// DOCUMENTS LIST
+function docsSortBy(f){docsSortDir=docsSortField===f?(docsSortDir==='asc'?'desc':'asc'):'desc';docsSortField=f;renderDocuments();}
+function renderDocuments(){
+    const q=(document.getElementById('docs-search')?.value||'').toLowerCase();
+    const cat=document.getElementById('docs-filter-cat')?.value||'';
+    const filtered=documents.filter(d=>{
+        if(cat&&d.category!==cat)return false;
+        if(q){
+            const blob=[d.title,d.category,d.summary,d.notes,d.relatedEntities,d.tags,(d.parties||[]).join(' '),(d.dates||[]).join(' ')].join(' ').toLowerCase();
+            if(!blob.includes(q))return false;
+        }
+        return true;
+    });
+    filtered.sort((a,b)=>{
+        let va=a[docsSortField]??'',vb=b[docsSortField]??'';
+        va=String(va).toLowerCase();vb=String(vb).toLowerCase();
+        return va<vb?(docsSortDir==='asc'?-1:1):va>vb?(docsSortDir==='asc'?1:-1):0;
+    });
+    document.getElementById('docs-count').textContent=`${filtered.length} document${filtered.length!==1?'s':''}`;
+    document.querySelectorAll('#docs-table thead th').forEach(th=>th.classList.remove('sort-asc','sort-desc'));
+    const thIdx={title:0,category:1,effectiveDate:4};
+    const ti=thIdx[docsSortField];
+    if(ti!==undefined)document.querySelectorAll('#docs-table thead th')[ti]?.classList.add(docsSortDir==='asc'?'sort-asc':'sort-desc');
+    const tbody=document.getElementById('docs-tbody'),empty=document.getElementById('docs-empty');
+    if(!filtered.length){tbody.innerHTML='';empty.style.display='block';return;}
+    empty.style.display='none';
+    tbody.innerHTML=filtered.map(d=>`<tr>
+        <td style="cursor:pointer" onclick="editDocument('${d._docId}')"><strong>${esc(d.title)||'Untitled'}</strong>${d.documentUrl?` <a href="${esc(d.documentUrl)}" target="_blank" onclick="event.stopPropagation()" title="Open file">📄</a>`:''}</td>
+        <td><span class="badge ${catBadgeClass(d.category)}">${esc(d.category)||'—'}</span></td>
+        <td><div class="doc-summary-text" style="max-width:340px;">${esc((d.summary||'').slice(0,200))}${(d.summary||'').length>200?'…':''}</div></td>
+        <td style="font-size:0.82rem;max-width:160px;">${esc((d.parties||[]).join(', '))||'—'}</td>
+        <td>${fmtDate(d.effectiveDate)}</td>
+        <td style="white-space:nowrap;">
+            <button class="btn btn-primary btn-sm" onclick="editDocument('${d._docId}')">✏️</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteDocument('${d._docId}')">✗</button>
+        </td></tr>`).join('');
+}
+
+// EDIT MODAL
+function editDocument(docId){
+    const d=documents.find(x=>x._docId===docId);if(!d)return;
+    populateCategoryFilters();
+    document.getElementById('doc-edit-doc-id').value=d._docId;
+    document.getElementById('doc-modal-title').textContent=`Edit: ${d.title||'Untitled'}`;
+    document.getElementById('df-title').value=d.title||'';
+    document.getElementById('df-category').value=d.category||categories[0]||'';
+    document.getElementById('df-type').value=d.type||'Legal';
+    document.getElementById('df-effective-date').value=d.effectiveDate||'';
+    document.getElementById('df-expiration-date').value=d.expirationDate||'';
+    document.getElementById('df-summary').value=d.summary||'';
+    document.getElementById('df-parties').value=(d.parties||[]).join(', ');
+    document.getElementById('df-related').value=d.relatedEntities||'';
+    document.getElementById('df-tags').value=d.tags||'';
+    document.getElementById('df-notes').value=d.notes||'';
+    const link=document.getElementById('df-doc-link');
+    if(d.documentUrl){link.href=d.documentUrl;link.style.display='';}else{link.style.display='none';}
+    document.getElementById('doc-modal').classList.add('show');
+}
+function closeDocModal(){document.getElementById('doc-modal').classList.remove('show');}
+document.getElementById('doc-modal').addEventListener('click',e=>{if(e.target===document.getElementById('doc-modal'))closeDocModal();});
+async function saveDocEdit(){
+    const docId=document.getElementById('doc-edit-doc-id').value;
+    if(!docId)return;
+    const data={
+        title:document.getElementById('df-title').value.trim(),
+        category:document.getElementById('df-category').value,
+        type:document.getElementById('df-type').value,
+        effectiveDate:document.getElementById('df-effective-date').value,
+        expirationDate:document.getElementById('df-expiration-date').value,
+        summary:document.getElementById('df-summary').value.trim(),
+        parties:document.getElementById('df-parties').value.split(',').map(s=>s.trim()).filter(Boolean),
+        relatedEntities:document.getElementById('df-related').value.trim(),
+        tags:document.getElementById('df-tags').value.trim(),
+        notes:document.getElementById('df-notes').value.trim(),
+    };
+    try{await dbUpdateDocument(docId,data);toast('Document updated.','success');closeDocModal();}
+    catch(e){toast('Save failed: '+e.message,'error');}
+}
+
+// DELETE / RECYCLE BIN
+async function softDeleteDoc(docId){
+    const ref=db.collection('estate_documents').doc(docId);
+    const snap=await ref.get();if(!snap.exists)return null;
+    const binRef=await db.collection('recycle_bin').add({originalCollection:'estate_documents',originalDocId:docId,site:'estateplanning',deletedAt:firebase.firestore.FieldValue.serverTimestamp(),data:snap.data()});
+    await ref.delete();return binRef.id;
+}
+async function deleteDocument(docId){
+    const d=documents.find(x=>x._docId===docId);if(!d)return;
+    if(!confirm(`Delete "${d.title||'document'}"?`))return;
+    try{await softDeleteDoc(docId);toast('Document moved to Recycle Bin.','success');}
+    catch(e){toast('Delete failed: '+e.message,'error');}
+}
+
+let recycleBinItems=[];
+async function loadRecycleBin(){
+    const list=document.getElementById('recycle-bin-list');
+    list.innerHTML='<div class="empty"><div class="empty-icon">⏳</div><p>Loading...</p></div>';
+    try{
+        const snap=await db.collection('recycle_bin').where('site','==','estateplanning').get();
+        recycleBinItems=snap.docs.map(doc=>({_binId:doc.id,...doc.data()}));
+        recycleBinItems.sort((a,b)=>{const ta=a.deletedAt?.toMillis?.()??0,tb=b.deletedAt?.toMillis?.()??0;return tb-ta;});
+        renderRecycleBin();
+    }catch(e){list.innerHTML=`<div class="empty"><p style="color:var(--danger);">Error: ${e.message}</p></div>`;}
+}
+function renderRecycleBin(){
+    const list=document.getElementById('recycle-bin-list');
+    if(!recycleBinItems.length){list.innerHTML='<div class="empty"><div class="empty-icon">🗑</div><p>Recycle bin is empty</p></div>';return;}
+    list.innerHTML=`<div class="table-wrapper"><table><thead><tr><th>Title</th><th>Category</th><th>Deleted</th><th>Actions</th></tr></thead><tbody>
+    ${recycleBinItems.map(item=>{
+        const d=item.data||{};
+        const deletedDate=item.deletedAt?.toDate?.()?.toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'})||'Unknown';
+        return `<tr><td><strong>${esc(d.title||'Untitled')}</strong></td><td><span class="badge ${catBadgeClass(d.category)}">${esc(d.category||'—')}</span></td><td style="font-size:0.82rem;color:var(--text-secondary);">${deletedDate}</td><td style="white-space:nowrap;"><button class="btn btn-primary btn-sm" onclick="restoreBinItem('${item._binId}')">↩ Restore</button> <button class="btn btn-danger btn-sm" onclick="permanentDeleteBinItem('${item._binId}')">✗ Delete</button></td></tr>`;
+    }).join('')}</tbody></table></div>`;
+}
+async function restoreBinItem(binId){
+    try{const binDoc=await db.collection('recycle_bin').doc(binId).get();if(!binDoc.exists)return;const d=binDoc.data();await db.collection(d.originalCollection).add(d.data);await db.collection('recycle_bin').doc(binId).delete();toast('Restored!','success');loadRecycleBin();}catch(e){toast('Restore failed.','error');}
+}
+async function permanentDeleteBinItem(binId){
+    if(!confirm('Permanently delete? This cannot be undone.'))return;
+    try{await db.collection('recycle_bin').doc(binId).delete();toast('Permanently deleted.','success');loadRecycleBin();}catch(e){toast('Delete failed.','error');}
+}
+
+// AI + BULK UPLOAD
+async function compressImage(file,maxPx=1920,maxMB=4){
+    return new Promise(resolve=>{
+        const url=URL.createObjectURL(file),img=new Image();
+        img.onload=()=>{
+            URL.revokeObjectURL(url);
+            let w=img.naturalWidth,h=img.naturalHeight;
+            if(w>maxPx||h>maxPx){if(w>=h){h=Math.round(h*maxPx/w);w=maxPx;}else{w=Math.round(w*maxPx/h);h=maxPx;}}
+            const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
+            canvas.getContext('2d').drawImage(img,0,0,w,h);
+            let quality=0.90;
+            const encode=()=>{const dataUrl=canvas.toDataURL('image/jpeg',quality);const bytes=Math.ceil((dataUrl.length-'data:image/jpeg;base64,'.length)*0.75);if(bytes<=maxMB*1024*1024||quality<=0.25){resolve(dataUrl);}else{quality-=0.10;encode();}};
+            encode();
+        };
+        img.onerror=()=>{URL.revokeObjectURL(url);resolve(null);};
+        img.src=url;
+    });
+}
+async function callClaude(base64,mimeType,prompt,maxTokens=2048,timeoutMs=90000,extSignal=null){
+    if(!apiKey){toast('Set API key in Settings first.','error');return null;}
+    const mediaBlock=mimeType==='application/pdf'
+        ?{type:'document',source:{type:'base64',media_type:'application/pdf',data:base64}}
+        :{type:'image',source:{type:'base64',media_type:mimeType,data:base64}};
+    const msgPayload={model:aiModel,max_tokens:maxTokens,messages:[{role:'user',content:[mediaBlock,{type:'text',text:prompt}]}]};
+    const ctrl=new AbortController();
+    const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
+    if(extSignal)extSignal.addEventListener('abort',()=>ctrl.abort(),{once:true});
+    let res;
+    try{
+        if(proxyUrl){res=await fetch(proxyUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...msgPayload,apiKey}),signal:ctrl.signal});}
+        else{res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',mode:'cors',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true'},body:JSON.stringify(msgPayload),signal:ctrl.signal});}
+    }catch(networkErr){clearTimeout(timer);if(networkErr.name==='AbortError')throw new Error('Timeout or cancelled');throw new Error('Network error — set up a Proxy URL in Settings.');}
+    clearTimeout(timer);
+    if(!res.ok){let e=`API error ${res.status}`;try{const d=await res.json();e=d.error?.message||e;}catch(x){}throw new Error(e);}
+    const data=await res.json();return data.content[0].text;
+}
+async function callClaudeText(prompt,maxTokens=4096,timeoutMs=120000){
+    if(!apiKey){toast('Set API key in Settings first.','error');return null;}
+    const msgPayload={model:aiModel,max_tokens:maxTokens,messages:[{role:'user',content:prompt}]};
+    const ctrl=new AbortController();
+    const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
+    let res;
+    try{
+        if(proxyUrl){res=await fetch(proxyUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...msgPayload,apiKey}),signal:ctrl.signal});}
+        else{res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',mode:'cors',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true'},body:JSON.stringify(msgPayload),signal:ctrl.signal});}
+    }catch(networkErr){clearTimeout(timer);if(networkErr.name==='AbortError')throw new Error('Timeout');throw new Error('Network error — set up a Proxy URL.');}
+    clearTimeout(timer);
+    if(!res.ok){let e=`API error ${res.status}`;try{const d=await res.json();e=d.error?.message||e;}catch(x){}throw new Error(e);}
+    const data=await res.json();return data.content[0].text;
+}
+
+let bulkQueue=[];
+let bulkScanAbort=null;
+
+function handleBulkFiles(files){
+    const valid=Array.from(files).filter(f=>f.type.startsWith('image/')||f.type==='application/pdf');
+    if(!valid.length){toast('Please select images or PDFs.','error');return;}
+    valid.forEach(file=>{
+        bulkQueue.push({id:Date.now()+Math.random(),file,base64:null,mimeType:file.type==='application/pdf'?'application/pdf':'image/jpeg',status:'pending',result:null});
+    });
+    renderBulkQueue();
+    document.getElementById('bulk-actions').style.display='flex';
+    document.getElementById('btn-bulk-save-all').style.display='none';
+    updateBulkCountLabel();
+}
+function clearBulkQueue(){bulkQueue=[];document.getElementById('bulk-queue').innerHTML='';document.getElementById('bulk-actions').style.display='none';document.getElementById('bulk-count-label').textContent='';}
+function removeBulkItem(id){bulkQueue=bulkQueue.filter(q=>q.id!==id);renderBulkQueue();updateBulkCountLabel();if(!bulkQueue.length)document.getElementById('bulk-actions').style.display='none';}
+function updateBulkCountLabel(){
+    const total=bulkQueue.length,done=bulkQueue.filter(q=>q.status==='saved').length,ready=bulkQueue.filter(q=>q.status==='ready').length;
+    document.getElementById('bulk-count-label').textContent=total?`${total} file${total>1?'s':''} · ${done} saved · ${ready} ready`:'';
+}
+function cancelBulkScan(){if(bulkScanAbort){bulkScanAbort.abort();bulkScanAbort=null;toast('Cancelling scan…','warn');}}
+
+function renderBulkQueue(){
+    const grid=document.getElementById('bulk-queue');
+    if(!bulkQueue.length){grid.innerHTML='';return;}
+    grid.innerHTML=bulkQueue.map(q=>{
+        const isPdf=q.mimeType==='application/pdf';
+        const imgHtml=q.base64&&!isPdf?`<img class="bulk-card-img" src="data:image/jpeg;base64,${q.base64}" onclick="window.open(this.src,'_blank')">`:`<div class="bulk-card-img-placeholder">${isPdf?'📄':'📜'}</div>`;
+        const statusClass={pending:'status-pending',scanning:'status-scanning',ready:'status-ready',saved:'status-saved',error:'status-error'}[q.status]||'status-pending';
+        const statusLabel={pending:'Pending',scanning:'Analyzing…',ready:'Ready',saved:'Saved ✓',error:'Error'}[q.status]||'Pending';
+        const r=q.result||{};
+        let details='';
+        if(q.status==='ready'||q.status==='saved'){
+            const catOptions=categories.map(c=>`<option value="${esc(c)}" ${c===r.category?'selected':''}>${esc(c)}</option>`).join('');
+            details=`
+                <div class="bulk-card-field"><strong>Title:</strong> <input type="text" value="${esc(r.title||'')}" oninput="bulkQueue.find(x=>x.id===${q.id}).result.title=this.value"></div>
+                <div class="bulk-card-field"><strong>Category:</strong> <select onchange="bulkQueue.find(x=>x.id===${q.id}).result.category=this.value">${catOptions}</select></div>
+                <div class="bulk-card-field"><strong>Summary:</strong> <textarea rows="3" oninput="bulkQueue.find(x=>x.id===${q.id}).result.summary=this.value">${esc(r.summary||'')}</textarea></div>
+                <div class="bulk-card-field"><strong>Parties:</strong> <input type="text" value="${esc((r.parties||[]).join(', '))}" oninput="bulkQueue.find(x=>x.id===${q.id}).result.parties=this.value.split(',').map(s=>s.trim()).filter(Boolean)"></div>
+                <div class="bulk-card-field"><strong>Effective:</strong> <input type="date" value="${esc(r.effectiveDate||'')}" oninput="bulkQueue.find(x=>x.id===${q.id}).result.effectiveDate=this.value"></div>`;
+        } else if(q.status==='error'){
+            details=`<div class="bulk-card-field" style="color:var(--danger);">${esc(q.error||'AI extraction failed')}</div>`;
+        }
+        const saveBtn=q.status==='ready'?`<button class="btn btn-primary btn-sm" style="margin-top:8px;width:100%;" onclick="saveBulkItem(${q.id})">💾 Save to Archive</button>`:'';
+        return `<div class="bulk-card ${q.status}" id="bulk-card-${q.id}">
+            <button class="bulk-card-remove" onclick="removeBulkItem(${q.id})" title="Remove">✕</button>
+            ${imgHtml}
+            <div class="bulk-card-body">
+                <span class="bulk-card-status ${statusClass}">${statusLabel}</span>
+                ${details}
+                ${saveBtn}
+            </div></div>`;
+    }).join('');
+}
+
+async function scanOneItem(q,abortSignal){
+    q.status='scanning';renderBulkQueue();updateBulkCountLabel();
+    try{
+        if(!q.base64){
+            if(q.mimeType==='application/pdf'){q.base64=await new Promise(r=>{const fr=new FileReader();fr.onload=e=>r(e.target.result.split(',')[1]);fr.readAsDataURL(q.file);});}
+            else{const dataUrl=await compressImage(q.file)||await new Promise(r=>{const fr=new FileReader();fr.onload=e=>r(e.target.result);fr.readAsDataURL(q.file);});q.base64=dataUrl.split(',')[1];}
+        }
+        if(abortSignal?.aborted)throw new Error('Cancelled');
+        const prompt=`You are a paralegal analyzing an estate planning document. Extract metadata and summarize. Return ONLY a valid JSON object with these exact keys:
+- title: concise descriptive name (e.g., "Last Will and Testament of John Smith", "Irrevocable Life Insurance Trust")
+- category: one of [${DEFAULT_CATEGORIES.map(c=>'"'+c+'"').join(', ')}]
+- type: one of ["Legal","Financial","Insurance","Property","Tax","Business","Other"]
+- summary: 3-5 sentence plain-English summary of what this document does, who it names, and key provisions
+- parties: array of names/entities mentioned (people, trusts, banks, companies)
+- effectiveDate: YYYY-MM-DD when document takes effect/was signed (empty if unknown)
+- expirationDate: YYYY-MM-DD expiration or next review date (empty if perpetual/unknown)
+- relatedEntities: string describing cross-references to other documents, beneficiaries, assets, or trusts
+- tags: string of notable dates, account numbers, or keywords
+Use empty string/array if not found.`;
+        console.log(`[EP] Analyzing ${q.file?.name||q.id}…`);
+        const raw=await callClaude(q.base64,q.mimeType,prompt,2048,90000,abortSignal);
+        const jsonMatch=raw&&raw.match(/\{[\s\S]*\}/);
+        if(!jsonMatch)throw new Error('Could not parse AI response');
+        q.result=JSON.parse(jsonMatch[0]);
+        if(!Array.isArray(q.result.parties))q.result.parties=[];
+        q.status='ready';
+        console.log(`[EP] ✓ ${q.file?.name||q.id}: ${q.result.title} [${q.result.category}]`);
+    }catch(err){q.status='error';q.error=err.message;console.warn(`[EP] ✗ ${q.file?.name||q.id}: ${err.message}`);}
+}
+
+async function runBulkScan(){
+    if(!apiKey){toast('Set API key in Settings first.','error');return;}
+    const pending=bulkQueue.filter(q=>q.status==='pending'||q.status==='error');
+    if(!pending.length){toast('Nothing to scan.','error');return;}
+    const btn=document.getElementById('btn-bulk-scan');
+    btn.disabled=true;btn.textContent='⏳ Analyzing… (click Cancel to stop)';
+    let cancelBtn=document.getElementById('btn-bulk-cancel');
+    if(!cancelBtn){cancelBtn=document.createElement('button');cancelBtn.id='btn-bulk-cancel';cancelBtn.className='btn btn-danger';cancelBtn.textContent='✕ Cancel';cancelBtn.onclick=cancelBulkScan;btn.parentNode.insertBefore(cancelBtn,btn.nextSibling);}else cancelBtn.style.display='';
+    const fill=document.getElementById('bulk-progress-fill');
+    document.getElementById('bulk-progress-bar').style.display='';
+    const statusLbl=document.getElementById('bulk-count-label');
+    bulkScanAbort=new AbortController();
+    const sig=bulkScanAbort.signal;
+    const CONCURRENCY=3;
+    let index=0,done=0;
+    const total=pending.length;
+    console.log(`[EP] Scan start — ${total} files, concurrency ${CONCURRENCY}`);
+    async function worker(){
+        while(true){
+            if(sig.aborted)return;
+            const i=index++;if(i>=pending.length)return;
+            await scanOneItem(pending[i],sig);
+            done++;
+            fill.style.width=Math.round(done/total*100)+'%';
+            if(statusLbl)statusLbl.textContent=`${done} / ${total} analyzed`;
+        }
+    }
+    await Promise.all(Array.from({length:Math.min(CONCURRENCY,pending.length)},()=>worker()));
+    renderBulkQueue();updateBulkCountLabel();
+    btn.disabled=false;btn.textContent='🤖 Analyze All with AI';
+    if(cancelBtn)cancelBtn.style.display='none';
+    document.getElementById('bulk-progress-bar').style.display='none';
+    bulkScanAbort=null;
+    const readyCount=bulkQueue.filter(q=>q.status==='ready').length;
+    const errCount=bulkQueue.filter(q=>q.status==='error').length;
+    if(readyCount)document.getElementById('btn-bulk-save-all').style.display='';
+    toast(`Analysis complete — ${readyCount} ready${errCount?', '+errCount+' errors':''}.`,errCount?'warn':'success');
+}
+
+async function saveBulkItem(id){
+    const q=bulkQueue.find(x=>x.id===id);if(!q||q.status!=='ready')return;
+    const card=document.getElementById(`bulk-card-${id}`);
+    const saveBtn=card?card.querySelector('.btn-primary'):null;
+    if(saveBtn){saveBtn.disabled=true;saveBtn.textContent='Saving…';}
+    try{
+        const r=q.result||{};
+        let documentUrl='';
+        try{documentUrl=await uploadDocFile(q.file,r.title||'doc');}catch(ue){console.warn('File upload failed:',ue);}
+        const data={
+            title:r.title||q.file?.name||'Untitled',
+            category:r.category||'Other',
+            type:r.type||'Legal',
+            summary:r.summary||'',
+            parties:Array.isArray(r.parties)?r.parties:[],
+            effectiveDate:r.effectiveDate||'',
+            expirationDate:r.expirationDate||'',
+            relatedEntities:r.relatedEntities||'',
+            tags:r.tags||'',
+            notes:'',
+            documentUrl,
+            documentMimeType:q.mimeType||'',
+            fileName:q.file?.name||'',
+        };
+        await dbAddDocument(data);
+        q.status='saved';renderBulkQueue();updateBulkCountLabel();
+    }catch(err){q.status='error';q.error=err.message;renderBulkQueue();toast('Save failed: '+err.message,'error');}
+}
+async function saveBulkAll(){
+    const ready=bulkQueue.filter(q=>q.status==='ready');
+    if(!ready.length){toast('No items ready.','error');return;}
+    const btn=document.getElementById('btn-bulk-save-all');
+    btn.disabled=true;btn.textContent='Saving…';
+    for(const q of ready)await saveBulkItem(q.id);
+    btn.disabled=false;btn.textContent='💾 Save All to Archive';
+    document.getElementById('btn-bulk-save-all').style.display='none';
+    toast('All saved.','success');
+}
+
+// RELATIONSHIPS / OVERVIEW
+function buildDocsCorpus(){
+    return documents.map((d,i)=>`--- Document ${i+1} (id=${d.id}) ---
+Title: ${d.title||'Untitled'}
+Category: ${d.category||''}
+Type: ${d.type||''}
+Effective Date: ${d.effectiveDate||''}
+Expiration: ${d.expirationDate||''}
+Parties: ${(d.parties||[]).join('; ')}
+Related Entities: ${d.relatedEntities||''}
+Tags: ${d.tags||''}
+Summary: ${d.summary||''}
+`).join('\n');
+}
+
+async function analyzeRelationships(){
+    if(!apiKey){toast('Set API key in Settings first.','error');return;}
+    if(!documents.length){toast('No documents to analyze.','error');return;}
+    const btn=document.getElementById('btn-analyze-rel'),statusEl=document.getElementById('rel-status'),resultEl=document.getElementById('rel-result');
+    btn.disabled=true;btn.textContent='⏳ Analyzing…';
+    statusEl.textContent='Reviewing all documents and mapping relationships…';
+    resultEl.style.display='none';
+    try{
+        const prompt=`You are an estate planning attorney reviewing this client's entire document archive. Produce a comprehensive analysis in markdown. Include ALL of the following sections:
+
+## Overview
+A brief description of the estate plan's overall structure (2-3 sentences).
+
+## Document Inventory
+Bulleted list of each document by category, noting the most important provision of each.
+
+## People & Entities
+List every person and entity mentioned across the documents, noting their role (e.g., "Jane Smith — spouse, primary beneficiary of will and 401k").
+
+## Cross-References & Relationships
+Describe how documents reference each other: which trusts are funded by which wills, who is named in multiple places, pour-over relationships, beneficiary chains, etc.
+
+## Asset Flow
+Describe how assets pass. For each major asset class (real estate, retirement accounts, life insurance, business interests, personal property), note how the documents direct it.
+
+## Gaps & Concerns
+Identify anything missing or inconsistent: missing beneficiary designations, stale dates, conflicting provisions, documents that reference entities that don't exist in the archive, assets without a clear disposition path, outdated powers of attorney, etc.
+
+## Recommendations
+Actionable next steps.
+
+Here is the archive:
+
+${buildDocsCorpus()}`;
+        const raw=await callClaudeText(prompt,4096);
+        if(!raw)return;
+        let html=esc(raw);
+        html=html.replace(/^## (.+)$/gm,'<h2>$1</h2>');
+        html=html.replace(/^### (.+)$/gm,'<h3>$1</h3>');
+        html=html.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+        html=html.replace(/\*(.+?)\*/g,'<em>$1</em>');
+        html=html.replace(/^- (.+)$/gm,'<li>$1</li>');
+        html=html.replace(/(<li>.*?<\/li>(?:\s*<li>.*?<\/li>)*)/gs,(m)=>'<ul>'+m+'</ul>');
+        html=html.replace(/<\/ul>\s*<ul>/g,'');
+        resultEl.innerHTML=html;resultEl.style.display='block';
+        statusEl.textContent=`✅ Analysis complete — ${documents.length} document${documents.length!==1?'s':''} reviewed.`;
+        statusEl.style.color='var(--success)';
+    }catch(err){statusEl.textContent='❌ Error: '+err.message;statusEl.style.color='var(--danger)';}
+    finally{btn.disabled=false;btn.textContent='🔬 Generate Analysis';}
+}
+
+// FLOW DIAGRAM
+async function generateFlowDiagram(){
+    if(!apiKey){toast('Set API key in Settings first.','error');return;}
+    if(!documents.length){toast('No documents to diagram.','error');return;}
+    const btn=document.getElementById('btn-generate-flow'),statusEl=document.getElementById('flow-status'),wrap=document.getElementById('mermaid-wrap'),container=document.getElementById('mermaid-container'),srcEl=document.getElementById('mermaid-source');
+    btn.disabled=true;btn.textContent='⏳ Generating…';
+    statusEl.textContent='Building flow diagram from your documents…';
+    wrap.style.display='none';
+    try{
+        const prompt=`You are creating a Mermaid.js flowchart to visualize this estate plan. Use 'graph TD' or 'graph LR' syntax. Show:
+- Grantors/owners as source nodes
+- Each document as a labeled node
+- Trusts, beneficiaries, and entities as nodes
+- Asset flow arrows (e.g., "will --> residuary trust")
+- Cross-references between documents
+- Use distinctive node shapes for different categories: [[document]] for legal docs, (()) for people, {trust} for trusts, [/asset/] for assets where appropriate.
+
+Use concise node labels (under 30 chars). Give nodes short IDs (d1, p1, t1, etc).
+Apply color classes using classDef. Example:
+classDef doc fill:#fee2e2,stroke:#991b1b;
+classDef person fill:#dbeafe,stroke:#1d4ed8;
+classDef trust fill:#fef3c7,stroke:#92400e;
+classDef asset fill:#dcfce7,stroke:#15803d;
+
+Return ONLY the Mermaid code, no markdown code fences, no explanation. Start directly with "graph TD" or "graph LR".
+
+Documents to diagram:
+${buildDocsCorpus()}`;
+        const raw=await callClaudeText(prompt,3000);
+        if(!raw)return;
+        // Strip any markdown code fences if the AI added them
+        let mermaidCode=raw.trim().replace(/^```(?:mermaid)?\s*/,'').replace(/\s*```\s*$/,'').trim();
+        if(!mermaidCode.match(/^graph\s+(TD|LR|TB|BT|RL)/i)){
+            // Try to find a graph block inside
+            const m=raw.match(/graph\s+(TD|LR|TB|BT|RL)[\s\S]*/i);
+            if(m)mermaidCode=m[0];
+        }
+        srcEl.textContent=mermaidCode;
+        container.innerHTML=`<div class="mermaid">${mermaidCode}</div>`;
+        wrap.style.display='block';
+        if(window.mermaid){
+            await mermaid.run({nodes:container.querySelectorAll('.mermaid')});
+        }
+        statusEl.textContent=`✅ Diagram rendered.`;statusEl.style.color='var(--success)';
+    }catch(err){
+        statusEl.textContent='❌ Error: '+err.message;statusEl.style.color='var(--danger)';
+        console.error('Flow diagram error:',err);
+    }
+    finally{btn.disabled=false;btn.textContent='🎨 Generate Flow Diagram';}
+}
+
+// SETTINGS
+async function saveApiKey(){const key=document.getElementById('api-key-input').value.trim();if(!key){toast('Enter a key first.','error');return;}await db.collection('settings').doc('apikey').set({key});apiKey=key;toast('API key saved!','success');}
+async function testApiKey(){
+    const key=document.getElementById('api-key-input').value.trim(),proxy=document.getElementById('api-proxy-input').value.trim();
+    if(!key){toast('Enter a key first.','error');return;}
+    const el=document.getElementById('api-status');el.style.display='block';el.className='api-status';el.textContent='Testing…';
+    try{
+        const testPayload={model:aiModel,max_tokens:10,messages:[{role:'user',content:'Hi'}]};
+        let res;
+        if(proxy){res=await fetch(proxy,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...testPayload,apiKey:key})});}
+        else{res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',mode:'cors',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true'},body:JSON.stringify(testPayload)});}
+        if(res.ok){el.className='api-status ok';el.textContent=`✅ Connected! AI features are ready.`;}
+        else{const d=await res.json().catch(()=>({}));el.className='api-status err';el.textContent=`❌ ${d.error?.message||res.status}`;}
+    }catch(err){el.className='api-status err';el.textContent=`❌ ${err.message}`;}
+}
+async function saveProxyUrl(){const url=document.getElementById('api-proxy-input').value.trim();await db.collection('settings').doc('proxy').set({url});proxyUrl=url;toast(url?'Proxy saved!':'Proxy cleared.','success');}
+</script>
+</body>
+</html>

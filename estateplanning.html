@@ -738,7 +738,15 @@ async function callClaude(base64,mimeType,prompt,maxTokens=2048,timeoutMs=90000,
         else{res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',mode:'cors',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true'},body:JSON.stringify(msgPayload),signal:ctrl.signal});}
     }catch(networkErr){clearTimeout(timer);if(networkErr.name==='AbortError')throw new Error('Timeout or cancelled');throw new Error('Network error — set up a Proxy URL in Settings.');}
     clearTimeout(timer);
-    if(!res.ok){let e=`API error ${res.status}`;try{const d=await res.json();e=d.error?.message||e;}catch(x){}throw new Error(e);}
+    if(!res.ok){
+        let e=`API error ${res.status}`;
+        try{const d=await res.json();e=d.error?.message||e;}catch(x){}
+        if(res.status===429){
+            const retryAfter=parseInt(res.headers.get('retry-after'))||60;
+            const err=new Error(e);err.isRateLimit=true;err.retryAfter=retryAfter;throw err;
+        }
+        throw new Error(e);
+    }
     const data=await res.json();return data.content[0].text;
 }
 async function callClaudeText(prompt,maxTokens=4096,timeoutMs=120000){
@@ -813,13 +821,15 @@ function renderBulkQueue(){
 
 async function scanOneItem(q,abortSignal){
     q.status='scanning';renderBulkQueue();updateBulkCountLabel();
-    try{
-        if(!q.base64){
-            if(q.mimeType==='application/pdf'){q.base64=await new Promise(r=>{const fr=new FileReader();fr.onload=e=>r(e.target.result.split(',')[1]);fr.readAsDataURL(q.file);});}
-            else{const dataUrl=await compressImage(q.file)||await new Promise(r=>{const fr=new FileReader();fr.onload=e=>r(e.target.result);fr.readAsDataURL(q.file);});q.base64=dataUrl.split(',')[1];}
-        }
-        if(abortSignal?.aborted)throw new Error('Cancelled');
-        const prompt=`You are a paralegal analyzing an estate planning document. Extract metadata and summarize. Return ONLY a valid JSON object with these exact keys:
+    const MAX_RETRIES=3;
+    for(let attempt=0;attempt<=MAX_RETRIES;attempt++){
+        try{
+            if(!q.base64){
+                if(q.mimeType==='application/pdf'){q.base64=await new Promise(r=>{const fr=new FileReader();fr.onload=e=>r(e.target.result.split(',')[1]);fr.readAsDataURL(q.file);});}
+                else{const dataUrl=await compressImage(q.file)||await new Promise(r=>{const fr=new FileReader();fr.onload=e=>r(e.target.result);fr.readAsDataURL(q.file);});q.base64=dataUrl.split(',')[1];}
+            }
+            if(abortSignal?.aborted)throw new Error('Cancelled');
+            const prompt=`You are a paralegal analyzing an estate planning document. Extract metadata and summarize. Return ONLY a valid JSON object with these exact keys:
 - title: concise descriptive name (e.g., "Last Will and Testament of John Smith", "Irrevocable Life Insurance Trust")
 - category: one of [${DEFAULT_CATEGORIES.map(c=>'"'+c+'"').join(', ')}]
 - type: one of ["Legal","Financial","Insurance","Property","Tax","Business","Other"]
@@ -830,15 +840,34 @@ async function scanOneItem(q,abortSignal){
 - relatedEntities: string describing cross-references to other documents, beneficiaries, assets, or trusts
 - tags: string of notable dates, account numbers, or keywords
 Use empty string/array if not found.`;
-        console.log(`[EP] Analyzing ${q.file?.name||q.id}…`);
-        const raw=await callClaude(q.base64,q.mimeType,prompt,2048,90000,abortSignal);
-        const jsonMatch=raw&&raw.match(/\{[\s\S]*\}/);
-        if(!jsonMatch)throw new Error('Could not parse AI response');
-        q.result=JSON.parse(jsonMatch[0]);
-        if(!Array.isArray(q.result.parties))q.result.parties=[];
-        q.status='ready';
-        console.log(`[EP] ✓ ${q.file?.name||q.id}: ${q.result.title} [${q.result.category}]`);
-    }catch(err){q.status='error';q.error=err.message;console.warn(`[EP] ✗ ${q.file?.name||q.id}: ${err.message}`);}
+            console.log(`[EP] Analyzing ${q.file?.name||q.id}…${attempt>0?' (retry '+attempt+')':''}`);
+            const raw=await callClaude(q.base64,q.mimeType,prompt,2048,90000,abortSignal);
+            const jsonMatch=raw&&raw.match(/\{[\s\S]*\}/);
+            if(!jsonMatch)throw new Error('Could not parse AI response');
+            q.result=JSON.parse(jsonMatch[0]);
+            if(!Array.isArray(q.result.parties))q.result.parties=[];
+            q.status='ready';
+            console.log(`[EP] ✓ ${q.file?.name||q.id}: ${q.result.title} [${q.result.category}]`);
+            return;
+        }catch(err){
+            if(err.isRateLimit&&attempt<MAX_RETRIES&&!abortSignal?.aborted){
+                const waitSec=err.retryAfter||60;
+                console.warn(`[EP] ⏳ Rate limit on ${q.file?.name||q.id} — waiting ${waitSec}s before retry ${attempt+1}/${MAX_RETRIES}`);
+                q.error=`Rate-limited, waiting ${waitSec}s (retry ${attempt+1}/${MAX_RETRIES})…`;
+                renderBulkQueue();
+                // Wait but check for cancel every second
+                for(let i=0;i<waitSec;i++){
+                    if(abortSignal?.aborted)throw new Error('Cancelled');
+                    await new Promise(r=>setTimeout(r,1000));
+                }
+                q.error='';
+                continue;
+            }
+            q.status='error';q.error=err.message;
+            console.warn(`[EP] ✗ ${q.file?.name||q.id}: ${err.message}`);
+            return;
+        }
+    }
 }
 
 async function runBulkScan(){
@@ -854,10 +883,12 @@ async function runBulkScan(){
     const statusLbl=document.getElementById('bulk-count-label');
     bulkScanAbort=new AbortController();
     const sig=bulkScanAbort.signal;
-    const CONCURRENCY=3;
+    // Process one-at-a-time by default to stay under 30k input tokens/min rate limit
+    // (legal PDFs are often 3k-10k tokens each — 3 parallel easily exceeds the limit)
+    const CONCURRENCY=1;
     let index=0,done=0;
     const total=pending.length;
-    console.log(`[EP] Scan start — ${total} files, concurrency ${CONCURRENCY}`);
+    console.log(`[EP] Scan start — ${total} files, concurrency ${CONCURRENCY} (auto-retries on rate limit)`);
     async function worker(){
         while(true){
             if(sig.aborted)return;

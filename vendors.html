@@ -1113,7 +1113,15 @@ async function callClaude(base64,mimeType,prompt,timeoutMs=60000,extSignal=null)
         throw new Error('Network error — set up a Proxy URL in Settings.');
     }
     clearTimeout(timer);
-    if(!res.ok){let e=`API error ${res.status}`;try{const d=await res.json();e=d.error?.message||e;}catch(x){}throw new Error(e);}
+    if(!res.ok){
+        let e=`API error ${res.status}`;
+        try{const d=await res.json();e=d.error?.message||e;}catch(x){}
+        if(res.status===429){
+            const retryAfter=parseInt(res.headers.get('retry-after'))||60;
+            const err=new Error(e);err.isRateLimit=true;err.retryAfter=retryAfter;throw err;
+        }
+        throw new Error(e);
+    }
     const data=await res.json();return data.content[0].text;
 }
 
@@ -1224,27 +1232,44 @@ function cancelBulkScan(){
 
 async function scanOneItem(q,abortSignal){
     q.status='scanning';renderBulkQueue();updateBulkCountLabel();
-    try{
-        if(!q.base64){
-            if(q.mimeType==='application/pdf'){q.base64=await new Promise(r=>{const fr=new FileReader();fr.onload=e=>r(e.target.result.split(',')[1]);fr.readAsDataURL(q.file);});}
-            else{const dataUrl=await compressImage(q.file)||await new Promise(r=>{const fr=new FileReader();fr.onload=e=>r(e.target.result);fr.readAsDataURL(q.file);});q.base64=dataUrl.split(',')[1];}
+    const MAX_RETRIES=3;
+    for(let attempt=0;attempt<=MAX_RETRIES;attempt++){
+        try{
+            if(!q.base64){
+                if(q.mimeType==='application/pdf'){q.base64=await new Promise(r=>{const fr=new FileReader();fr.onload=e=>r(e.target.result.split(',')[1]);fr.readAsDataURL(q.file);});}
+                else{const dataUrl=await compressImage(q.file)||await new Promise(r=>{const fr=new FileReader();fr.onload=e=>r(e.target.result);fr.readAsDataURL(q.file);});q.base64=dataUrl.split(',')[1];}
+            }
+            if(abortSignal?.aborted)throw new Error('Cancelled');
+            const prompt=`You are an accounts payable assistant. Extract data from this invoice/bill/receipt. Return ONLY a valid JSON object with these exact keys: vendorName, date (YYYY-MM-DD), amount (number, total due or paid), invoiceNumber, accountNumber, description (brief summary of line items), category (one of: Supplies, Service, Utility, Equipment, Professional Fees, Shipping, Subscription, Tax, Rent, Other), type (one of: Invoice, Bill, Receipt). Use empty string or 0 if not found.`;
+            console.log(`[Bulk] Scanning ${q.file?.name||q.id}…${attempt>0?' (retry '+attempt+')':''}`);
+            const raw=await callClaude(q.base64,q.mimeType,prompt,60000,abortSignal);
+            const jsonMatch=raw&&raw.match(/\{[\s\S]*\}/);
+            if(!jsonMatch)throw new Error('Could not parse AI response');
+            q.result=JSON.parse(jsonMatch[0]);
+            q.result.amount=Number(q.result.amount)||0;
+            q.vendorId=guessVendorId(q.result.vendorName);
+            const dup=findDuplicate(q.vendorId,q.result.date,q.result.amount,q.result.invoiceNumber);
+            if(dup){q.status=dup.type==='exact'?'duplicate':'possible-duplicate';q.dupExistingId=dup.existing.id;}
+            else{q.status='ready';}
+            console.log(`[Bulk] ✓ ${q.file?.name||q.id}: ${q.result.vendorName} $${q.result.amount}`);
+            return;
+        }catch(err){
+            if(err.isRateLimit&&attempt<MAX_RETRIES&&!abortSignal?.aborted){
+                const waitSec=err.retryAfter||60;
+                console.warn(`[Bulk] ⏳ Rate limit on ${q.file?.name||q.id} — waiting ${waitSec}s before retry ${attempt+1}/${MAX_RETRIES}`);
+                q.error=`Rate-limited, waiting ${waitSec}s (retry ${attempt+1}/${MAX_RETRIES})…`;
+                renderBulkQueue();
+                for(let i=0;i<waitSec;i++){
+                    if(abortSignal?.aborted)throw new Error('Cancelled');
+                    await new Promise(r=>setTimeout(r,1000));
+                }
+                q.error='';
+                continue;
+            }
+            q.status='error';q.error=err.message;
+            console.warn(`[Bulk] ✗ ${q.file?.name||q.id}: ${err.message}`);
+            return;
         }
-        if(abortSignal?.aborted)throw new Error('Cancelled');
-        const prompt=`You are an accounts payable assistant. Extract data from this invoice/bill/receipt. Return ONLY a valid JSON object with these exact keys: vendorName, date (YYYY-MM-DD), amount (number, total due or paid), invoiceNumber, accountNumber, description (brief summary of line items), category (one of: Supplies, Service, Utility, Equipment, Professional Fees, Shipping, Subscription, Tax, Rent, Other), type (one of: Invoice, Bill, Receipt). Use empty string or 0 if not found.`;
-        console.log(`[Bulk] Scanning ${q.file?.name||q.id}…`);
-        const raw=await callClaude(q.base64,q.mimeType,prompt,60000,abortSignal);
-        const jsonMatch=raw&&raw.match(/\{[\s\S]*\}/);
-        if(!jsonMatch)throw new Error('Could not parse AI response');
-        q.result=JSON.parse(jsonMatch[0]);
-        q.result.amount=Number(q.result.amount)||0;
-        q.vendorId=guessVendorId(q.result.vendorName);
-        const dup=findDuplicate(q.vendorId,q.result.date,q.result.amount,q.result.invoiceNumber);
-        if(dup){q.status=dup.type==='exact'?'duplicate':'possible-duplicate';q.dupExistingId=dup.existing.id;}
-        else{q.status='ready';}
-        console.log(`[Bulk] ✓ ${q.file?.name||q.id}: ${q.result.vendorName} $${q.result.amount}`);
-    }catch(err){
-        q.status='error';q.error=err.message;
-        console.warn(`[Bulk] ✗ ${q.file?.name||q.id}: ${err.message}`);
     }
 }
 
@@ -1265,10 +1290,12 @@ async function runBulkScan(){
     const statusLbl=document.getElementById('bulk-count-label');
     bulkScanAbort=new AbortController();
     const sig=bulkScanAbort.signal;
-    const CONCURRENCY=3;
+    // 2 parallel keeps us under 30k input tokens/min on tier-1 API keys
+    // (auto-retry with wait kicks in on any 429 rate limit responses)
+    const CONCURRENCY=2;
     let index=0,done=0;
     const total=pending.length;
-    console.log(`[Bulk] Starting scan of ${total} files with concurrency ${CONCURRENCY}`);
+    console.log(`[Bulk] Starting scan of ${total} files with concurrency ${CONCURRENCY} (auto-retries on 429)`);
 
     async function worker(){
         while(true){

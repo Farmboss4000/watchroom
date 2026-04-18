@@ -2405,7 +2405,7 @@ async function renderWorldMap() {
     const unpinned = [];
     active.forEach(t => (t.destinations || []).forEach(d => {
         if (d.lat && d.lon) {
-            allDests.push({ ...d, tripName: t.name, tripDates: `${fmtDate(t.departureDate)} – ${fmtDate(t.returnDate)}` });
+            allDests.push({ ...d, tripId: t._id, tripName: t.name, tripDates: `${fmtDate(t.departureDate)} – ${fmtDate(t.returnDate)}` });
         } else {
             unpinned.push({ city: d.city, country: d.country, tripName: t.name });
         }
@@ -2437,7 +2437,8 @@ async function renderWorldMap() {
             radius: 8, color: '#0d9488', fillColor: '#0d9488',
             fillOpacity: 0.7, weight: 2
         }).addTo(worldMapInst);
-        m.bindPopup(`<strong>${esc(d.city || '')}</strong>${d.country ? ', ' + esc(d.country) : ''}<br>${esc(d.tripName)}<br><small>${d.tripDates}</small>`);
+        const popupHtml = `<strong>${esc(d.city || '')}</strong>${d.country ? ', ' + esc(d.country) : ''}<br><a href="#" onclick="event.preventDefault();openTripDetail('${esc(d.tripId)}');" style="color:#0d9488;font-weight:600;text-decoration:underline;">${esc(d.tripName)}</a><br><small>${d.tripDates}</small>`;
+        m.bindPopup(popupHtml);
         worldMarkers.push(m);
     });
 

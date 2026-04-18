@@ -1,0 +1,1543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Farmboss Enterprise Contacts</title>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0;}
+        :root{
+            --bg-primary:#eef4f8;--bg-secondary:#ffffff;--bg-card:#dde8ef;
+            --accent:#0d9488;--accent-hover:#0f766e;--accent-dim:rgba(13,148,136,0.12);
+            --text-primary:#0f1f2e;--text-secondary:#4b5b6b;--border:#c4d3dd;
+            --success:#16a34a;--danger:#dc2626;--info:#0284c7;--warn:#f59e0b;--hdr-bg:#0f1f2e;
+        }
+        body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:var(--bg-primary);color:var(--text-primary);min-height:100vh;overflow-x:hidden;}
+        .site-switcher{background:#0b1420;display:flex;align-items:center;padding:5px 18px;gap:4px;font-size:0.77rem;border-bottom:1px solid rgba(255,255,255,0.07);overflow-x:auto;scrollbar-width:none;}
+        .site-switcher::-webkit-scrollbar{display:none;}
+        .site-switcher-label{color:#9ca3af;font-size:0.75rem;font-weight:600;}
+        .site-link{text-decoration:none;color:#9ca3af;padding:4px 12px;border-radius:4px;display:flex;align-items:center;gap:6px;font-weight:500;transition:all 0.15s;white-space:nowrap;}
+        .site-link:hover{background:rgba(255,255,255,0.1);color:#e5e7eb;}
+        .site-link.active{background:rgba(255,255,255,0.13);color:#fff;font-weight:600;}
+        @keyframes dp-pulse{0%,100%{color:#9ca3af;}50%{color:#ef4444;}}
+        .site-link[href="dontpush.html"]{animation:dp-pulse 3.5s ease-in-out infinite;}
+        #login-screen{position:fixed;inset:0;background:linear-gradient(135deg,#0f1f2e 0%,#134e4a 100%);display:flex;align-items:center;justify-content:center;z-index:9000;flex-direction:column;gap:12px;}
+        .login-site-links{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;}
+        .login-site-links a{color:rgba(255,255,255,0.5);font-size:0.78rem;text-decoration:none;padding:4px 12px;border:1px solid rgba(255,255,255,0.2);border-radius:4px;transition:all 0.15s;}
+        .login-site-links a:hover{color:#fff;border-color:rgba(255,255,255,0.5);}
+        .login-site-links a.active{color:var(--accent);border-color:var(--accent);}
+        .login-box{background:#fff;border-radius:14px;padding:44px 40px;width:100%;max-width:400px;box-shadow:0 24px 64px rgba(0,0,0,0.4);}
+        .login-logo{width:56px;height:56px;background:var(--accent);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 16px;color:#fff;}
+        .login-box h2{text-align:center;font-size:1.5rem;color:#0f1f2e;margin-bottom:4px;}
+        .login-sub{text-align:center;font-size:0.85rem;color:#6b7280;margin-bottom:28px;}
+        .login-error{color:var(--danger);font-size:0.82rem;margin-bottom:12px;min-height:18px;text-align:center;}
+        .login-full{width:100%;justify-content:center;}
+        .form-group{margin-bottom:14px;}
+        .form-group label{display:block;font-size:0.8rem;font-weight:600;color:#374151;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.4px;}
+        .form-group input,.form-group select,.form-group textarea{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:7px;font-size:0.9rem;font-family:inherit;color:var(--text-primary);background:var(--bg-secondary);transition:border-color 0.15s;}
+        .form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--accent);}
+        #loading-screen{display:none;position:fixed;inset:0;background:var(--bg-primary);flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:8000;}
+        .spinner{width:44px;height:44px;border:4px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
+        @keyframes spin{to{transform:rotate(360deg);}}
+        #app{display:none;min-height:100vh;flex-direction:column;}
+        header{background:var(--hdr-bg);padding:0 20px;display:flex;align-items:center;gap:16px;min-height:56px;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,0.25);flex-wrap:wrap;}
+        .logo-area{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+        .logo-icon{width:32px;height:32px;background:var(--accent);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:17px;color:#fff;flex-shrink:0;}
+        header h1{font-size:1.15rem;font-weight:700;color:#fff;white-space:nowrap;}
+        header h1 span{color:var(--accent);}
+        nav{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;flex-shrink:0;}
+        nav::-webkit-scrollbar{display:none;}
+        nav button{background:transparent;border:none;color:#9ca3af;padding:8px 13px;border-radius:6px;cursor:pointer;font-size:0.83rem;transition:all 0.15s;white-space:nowrap;}
+        nav button:hover{background:rgba(13,148,136,0.2);color:#fff;}
+        nav button.active{background:var(--accent);color:#fff;font-weight:600;}
+        .header-right{display:flex;align-items:center;gap:10px;margin-left:auto;}
+        .user-badge{font-size:0.78rem;color:#9ca3af;background:rgba(255,255,255,0.08);padding:4px 10px;border-radius:5px;}
+        .btn-signout{background:transparent;border:1px solid rgba(255,255,255,0.2);color:#9ca3af;padding:5px 12px;border-radius:5px;cursor:pointer;font-size:0.78rem;transition:all 0.15s;}
+        .btn-signout:hover{border-color:var(--danger);color:var(--danger);}
+        .hero{background:linear-gradient(135deg,#0f1f2e 0%,#134e4a 60%,#0d9488 100%);border-radius:12px;padding:28px 32px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:16px;overflow:hidden;position:relative;}
+        .hero-title{font-size:1.6rem;font-weight:800;color:#fff;margin-bottom:4px;}
+        .hero-title span{color:var(--accent);}
+        .hero-sub{font-size:0.88rem;color:rgba(255,255,255,0.7);}
+        main{padding:20px;max-width:1400px;margin:0 auto;flex:1;width:100%;}
+        .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:20px;}
+        .stat-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:18px 16px;text-align:center;}
+        .stat-value{font-size:2rem;font-weight:800;color:var(--accent);line-height:1;margin-bottom:4px;}
+        .stat-label{font-size:0.77rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;}
+        .card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:22px;margin-bottom:20px;}
+        .card-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;gap:10px;flex-wrap:wrap;}
+        .card-title-left{font-size:1rem;font-weight:700;color:var(--text-primary);}
+        .view{display:none;}.view.active{display:block;}
+        .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:7px;font-size:0.85rem;font-weight:600;cursor:pointer;border:none;transition:all 0.15s;font-family:inherit;}
+        .btn-primary{background:var(--accent);color:#fff;}.btn-primary:hover{background:var(--accent-hover);}
+        .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text-primary);}.btn-ghost:hover{background:var(--bg-card);}
+        .btn-danger{background:var(--danger);color:#fff;}.btn-danger:hover{opacity:0.85;}
+        .btn-info{background:var(--info);color:#fff;}.btn-info:hover{opacity:0.85;}
+        .btn-warn{background:var(--warn);color:#fff;}.btn-warn:hover{opacity:0.85;}
+        .btn-success{background:var(--success);color:#fff;}.btn-success:hover{opacity:0.85;}
+        .btn-sm{padding:5px 10px;font-size:0.78rem;}
+        .btn-secondary{background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary);}.btn-secondary:hover{background:var(--border);}
+        .form-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+        .form-group.full-width{grid-column:1/-1;}
+        .form-group.span2{grid-column:span 2;}
+        .form-actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+        .sub-form-group{border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;background:var(--bg-card);}
+        .sub-form-row{display:grid;grid-template-columns:repeat(4,1fr) auto;gap:10px;align-items:end;margin-bottom:8px;}
+        .sub-form-row .form-group{margin-bottom:0;}
+        .sub-form-row .btn{align-self:end;}
+        .toolbar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;}
+        .toolbar input[type="text"],.toolbar input[type="date"],.toolbar input[type="number"]{flex:1;min-width:160px;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:0.87rem;font-family:inherit;background:var(--bg-secondary);color:var(--text-primary);}
+        .toolbar input:focus{outline:none;border-color:var(--accent);}
+        .toolbar select{padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:0.87rem;font-family:inherit;background:var(--bg-secondary);color:var(--text-primary);cursor:pointer;}
+        .table-wrapper{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+        table{width:100%;border-collapse:collapse;font-size:0.85rem;}
+        thead th{background:var(--bg-card);padding:10px 12px;text-align:left;font-size:0.74rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary);border-bottom:2px solid var(--border);cursor:pointer;white-space:nowrap;user-select:none;}
+        thead th.no-sort{cursor:default;}
+        thead th:hover:not(.no-sort){color:var(--accent);}
+        thead th.sort-asc::after{content:' ↑';color:var(--accent);}
+        thead th.sort-desc::after{content:' ↓';color:var(--accent);}
+        tbody tr{border-bottom:1px solid var(--border);transition:background 0.1s;}
+        tbody tr:hover{background:var(--accent-dim);}
+        tbody td{padding:10px 12px;vertical-align:middle;}
+        tfoot td{background:var(--bg-card);padding:10px 12px;font-weight:700;border-top:2px solid var(--border);}
+        .mono{font-family:monospace;font-size:0.83rem;}
+        .empty{text-align:center;padding:40px 20px;color:var(--text-secondary);}
+        .empty-icon{font-size:3rem;margin-bottom:12px;}
+        .badge{display:inline-block;padding:3px 9px;border-radius:5px;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;white-space:nowrap;}
+        .badge-default{background:var(--bg-card);color:var(--text-secondary);}
+        .badge-work{background:#dbeafe;color:#1d4ed8;}
+        .badge-personal{background:#dcfce7;color:#15803d;}
+        .badge-mobile{background:#fef3c7;color:#92400e;}
+        .badge-office{background:#e0e7ff;color:#3730a3;}
+        .badge-fax{background:#f3e8ff;color:#6b21a8;}
+        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;opacity:0;pointer-events:none;transition:opacity 0.2s;}
+        .modal-overlay.show{opacity:1;pointer-events:all;}
+        .modal{background:#fff;border-radius:14px;padding:28px 24px;width:100%;max-width:640px;margin:16px;max-height:90vh;overflow-y:auto;transform:scale(0.95);transition:transform 0.2s;}
+        .modal-overlay.show .modal{transform:scale(1);}
+        .modal-hdr{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px;}
+        .modal-title{font-size:1.1rem;font-weight:700;color:var(--text-primary);margin-bottom:4px;}
+        .modal-sub{font-size:0.85rem;color:var(--text-secondary);margin-bottom:16px;}
+        .modal-close{background:transparent;border:none;color:var(--text-secondary);font-size:1.1rem;cursor:pointer;padding:4px 8px;border-radius:6px;}
+        .modal-close:hover{background:var(--bg-card);color:var(--text-primary);}
+        .modal-actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+        .api-key-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;}
+        .api-key-row .form-group{flex:1;min-width:260px;}
+        .api-status{font-size:0.82rem;margin-top:8px;padding:8px 12px;border-radius:6px;}
+        .api-status.ok{background:#dcfce7;color:#15803d;}
+        .api-status.err{background:#fee2e2;color:#b91c1c;}
+        .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#0f1f2e;color:#fff;padding:10px 20px;border-radius:8px;font-size:0.87rem;font-weight:500;opacity:0;transition:all 0.3s;z-index:9999;pointer-events:none;white-space:nowrap;max-width:90vw;}
+        .toast.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:all;}
+        .toast.success{background:var(--success);}
+        .toast.error{background:var(--danger);}
+        .toast.warn{background:var(--warn);}
+        .ms365-setup-box{background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:14px;}
+        .ms365-setup-title{font-size:0.8rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;}
+        .ms365-setup-box ol{font-size:0.84rem;color:var(--text-secondary);line-height:1.9;padding-left:20px;margin-bottom:14px;}
+        .ms365-setup-box code{font-size:0.78rem;background:var(--bg-card);padding:2px 6px;border-radius:4px;border:1px solid var(--border);word-break:break-all;}
+        .ms365-connected-row{display:flex;align-items:center;gap:10px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:12px;}
+        .chip{display:inline-block;background:var(--bg-card);color:var(--text-primary);border:1px solid var(--border);border-radius:999px;padding:2px 9px;font-size:0.72rem;margin:1px 3px 1px 0;}
+        .chip-label{color:var(--text-secondary);font-size:0.68rem;margin-right:3px;text-transform:uppercase;}
+        .preview-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start;}
+        .preview-card.duplicate{border-left:4px solid var(--warn);}
+        .preview-card input[type="checkbox"]{margin-top:4px;width:16px;height:16px;flex-shrink:0;cursor:pointer;}
+        .preview-body{flex:1;min-width:0;}
+        .preview-name{font-size:0.92rem;font-weight:700;color:var(--text-primary);}
+        .preview-meta{font-size:0.78rem;color:var(--text-secondary);margin-top:2px;}
+        .preview-edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;}
+        .preview-edit-grid input{padding:5px 8px;border:1px solid var(--border);border-radius:5px;font-size:0.8rem;background:var(--bg-secondary);color:var(--text-primary);font-family:inherit;}
+        .progress-box{text-align:center;padding:18px 10px;background:var(--bg-card);border-radius:10px;margin-bottom:14px;}
+        .progress-label{font-size:0.86rem;color:var(--text-secondary);margin-bottom:10px;}
+        .progress-bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden;}
+        .progress-fill{height:100%;background:var(--accent);transition:width 0.3s;width:0%;}
+        @media(max-width:720px){
+            header{flex-wrap:wrap;padding:10px 14px;gap:6px;}
+            .logo-area{flex:1;min-width:0;overflow:hidden;}
+            header h1{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
+            .header-right{flex-shrink:0;margin-left:auto;}
+            .user-badge{display:none;}
+            nav{order:3;width:100%;overflow-x:auto;scrollbar-width:none;padding-bottom:2px;border-top:1px solid rgba(255,255,255,0.1);padding-top:6px;}
+            nav button{padding:6px 10px;font-size:0.78rem;white-space:nowrap;flex-shrink:0;}
+            main{padding:12px;}
+            .stats-grid{grid-template-columns:1fr 1fr;gap:10px;}
+            .form-grid{grid-template-columns:1fr 1fr;gap:12px;}
+            .form-group.span2{grid-column:span 1;}
+            .sub-form-row{grid-template-columns:1fr 1fr;}
+            table{font-size:0.8rem;}
+            thead th,tbody td{padding:8px 10px;}
+            .btn{min-height:40px;}
+            input[type="text"],input[type="email"],input[type="number"],input[type="date"],input[type="tel"],select,textarea{font-size:16px;}
+        }
+        @media(max-width:600px){
+            .site-switcher{padding:4px 8px;gap:2px;}
+            .site-switcher-label{display:none;}
+            .site-link{padding:5px 8px;font-size:0.72rem;}
+        }
+        @media(max-width:480px){
+            main{padding:10px;}
+            .card{padding:16px;}
+            .form-grid,.sub-form-row{grid-template-columns:1fr;}
+            .form-group.full-width,.form-group.span2{grid-column:1;}
+            .preview-edit-grid{grid-template-columns:1fr;}
+        }
+        @media(max-width:380px){.stats-grid{grid-template-columns:1fr;}}
+    </style>
+</head>
+<body>
+
+<div id="login-screen">
+    <div class="login-site-links">
+        <a href="index.html">🏠 HQ</a>
+        <a href="armory.html">🔫 Armory</a>
+        <a href="contacts.html" class="active">👥 Enterprise Contacts</a>
+        <a href="vendors.html">💼 Vendors</a>
+        <a href="globetrotting.html">✈️ Globetrotting</a>
+    </div>
+    <div class="login-box">
+        <div class="login-logo">👥</div>
+        <h2>Farmboss Enterprise Contacts</h2>
+        <p class="login-sub">Sign in to manage your contact directory</p>
+        <form id="login-form">
+            <div class="form-group"><label>Email</label><input type="email" id="login-email" placeholder="your@email.com" required autocomplete="username"></div>
+            <div class="form-group" style="margin-bottom:20px;"><label>Password</label><input type="password" id="login-password" placeholder="••••••••" required autocomplete="current-password"></div>
+            <div class="login-error" id="login-error"></div>
+            <button type="submit" class="btn btn-primary login-full" id="login-btn">Sign In</button>
+        </form>
+    </div>
+</div>
+
+<div id="loading-screen"><div class="spinner"></div><p>Loading your contacts...</p></div>
+
+<div id="app">
+<div class="site-switcher">
+    <a href="index.html" class="site-link">🏠 HQ</a>
+    <a href="armory.html" class="site-link">🔫 Armory</a>
+    <a href="machinery.html" class="site-link">🚜 Machinery</a>
+    <a href="automotive.html" class="site-link">🚗 Automotive</a>
+    <a href="livestock.html" class="site-link">🐄 Livestock</a>
+    <a href="timepieces.html" class="site-link">⌚ Timepieces</a>
+    <a href="knives.html" class="site-link">🔪 Knives</a>
+    <a href="realestate.html" class="site-link">🏡 Real Estate</a>
+    <a href="globetrotting.html" class="site-link">✈️ Globetrotting</a>
+    <a href="vendors.html" class="site-link">💼 Vendors</a>
+    <a href="contacts.html" class="site-link active">👥 Enterprise Contacts</a>
+    <a href="estateplanning.html" class="site-link">📜 Estate Planning</a>
+    <a href="dontpush.html" class="site-link">🚫 Don't Push</a>
+</div>
+<header>
+    <div class="logo-area">
+        <div class="logo-icon">👥</div>
+        <h1>Farmboss <span>Enterprise Contacts</span></h1>
+    </div>
+    <nav>
+        <button class="active" onclick="showView('dashboard')">Dashboard</button>
+        <button onclick="showView('contacts')">Contacts</button>
+        <button onclick="showView('add-contact')">+ Contact</button>
+        <button onclick="showView('import')">📨 Import from Email</button>
+        <button onclick="openMergeDuplicates()">🔀 Merge Duplicates</button>
+        <button onclick="showView('settings')">⚙ Settings</button>
+        <button onclick="showView('recycle-bin')">🗑 Recycle Bin</button>
+    </nav>
+    <div class="header-right">
+        <span class="user-badge" id="user-email"></span>
+        <button class="btn-signout" onclick="doSignOut()">Sign Out</button>
+    </div>
+</header>
+<main>
+
+<!-- DASHBOARD -->
+<div id="view-dashboard" class="view active">
+    <div class="hero">
+        <div>
+            <div class="hero-title">Farmboss <span>Contacts</span></div>
+            <div class="hero-sub">Your enterprise contact directory &mdash; auto-built from email signatures</div>
+        </div>
+        <svg width="110" height="110" viewBox="0 0 120 120" style="opacity:0.85;flex-shrink:0;" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="60" cy="45" r="18" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="3"/>
+            <path d="M28 100 C28 78, 92 78, 92 100" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="3"/>
+            <circle cx="30" cy="38" r="9" fill="rgba(13,148,136,0.6)"/>
+            <circle cx="90" cy="38" r="9" fill="rgba(13,148,136,0.6)"/>
+        </svg>
+    </div>
+    <div class="stats-grid" id="stats-grid"></div>
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">🕐 Recently Added</div></div>
+        <div class="table-wrapper">
+            <table><thead><tr>
+                <th class="no-sort">Name</th>
+                <th class="no-sort">Company / Title</th>
+                <th class="no-sort">Email</th>
+                <th class="no-sort">Phone</th>
+                <th class="no-sort">Added</th>
+            </tr></thead><tbody id="recent-tbody"></tbody></table>
+        </div>
+    </div>
+</div>
+
+<!-- CONTACTS LIST -->
+<div id="view-contacts" class="view">
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">👥 Contacts</div><span style="font-size:0.85rem;color:var(--text-secondary)" id="contact-count">0 contacts</span></div>
+        <div class="toolbar">
+            <input type="text" id="contact-search" placeholder="Search name, company, email, phone..." oninput="renderContacts()">
+            <button class="btn btn-primary btn-sm" onclick="showView('add-contact')">+ Add Contact</button>
+            <button class="btn btn-ghost btn-sm" onclick="openMergeDuplicates()">🔀 Merge Duplicates</button>
+            <button class="btn btn-ghost btn-sm" onclick="exportContactsCSV()">📥 Export CSV</button>
+        </div>
+        <div class="table-wrapper">
+            <table id="contact-table"><thead><tr>
+                <th onclick="contactSortBy('fullName')">Name</th>
+                <th onclick="contactSortBy('company')">Company / Title</th>
+                <th class="no-sort">Emails</th>
+                <th class="no-sort">Phones</th>
+                <th onclick="contactSortBy('lastSeenAt')">Last Seen</th>
+                <th class="no-sort">Actions</th>
+            </tr></thead><tbody id="contact-tbody"></tbody></table>
+        </div>
+        <div id="contact-empty" class="empty" style="display:none;"><div class="empty-icon">👥</div><p>No contacts yet. Click "Add Contact" or use Import from Email to get started.</p></div>
+    </div>
+</div>
+
+<!-- ADD / EDIT CONTACT -->
+<div id="view-add-contact" class="view">
+    <div class="card">
+        <div class="card-title"><div class="card-title-left" id="contact-form-title">➕ Add New Contact</div></div>
+        <form id="contact-form">
+            <input type="hidden" id="contact-edit-doc-id">
+            <div class="form-grid">
+                <div class="form-group"><label>First Name</label><input type="text" id="cf-first" placeholder="Jane"></div>
+                <div class="form-group"><label>Last Name</label><input type="text" id="cf-last" placeholder="Smith"></div>
+                <div class="form-group"><label>Full Name *</label><input type="text" id="cf-full" required placeholder="Jane Smith"></div>
+                <div class="form-group"><label>Company</label><input type="text" id="cf-company" placeholder="Acme Corp"></div>
+                <div class="form-group"><label>Title</label><input type="text" id="cf-title" placeholder="Director of Sales"></div>
+                <div class="form-group"><label>Department</label><input type="text" id="cf-department" placeholder="Sales"></div>
+                <div class="form-group"><label>Website</label><input type="text" id="cf-website" placeholder="https://..."></div>
+                <div class="form-group"><label>LinkedIn</label><input type="text" id="cf-linkedin" placeholder="linkedin.com/in/..."></div>
+                <div class="form-group"><label>Twitter / X</label><input type="text" id="cf-twitter" placeholder="@handle"></div>
+                <div class="form-group"><label>Source</label><input type="text" id="cf-source" placeholder="Email signature, business card..."></div>
+                <div class="form-group"><label>Last Seen</label><input type="date" id="cf-last-seen"></div>
+                <div class="form-group full-width"><label>Notes</label><textarea id="cf-notes" rows="3" placeholder="Notes about this contact"></textarea></div>
+            </div>
+
+            <div class="card" style="margin-top:16px;padding:16px;">
+                <div class="card-title"><div class="card-title-left">📧 Emails</div><button type="button" class="btn btn-ghost btn-sm" onclick="addEmailRow()">+ Add Email</button></div>
+                <div id="emails-container"></div>
+            </div>
+
+            <div class="card" style="margin-top:0;padding:16px;">
+                <div class="card-title"><div class="card-title-left">📞 Phones</div><button type="button" class="btn btn-ghost btn-sm" onclick="addPhoneRow()">+ Add Phone</button></div>
+                <div id="phones-container"></div>
+            </div>
+
+            <div class="card" style="margin-top:0;padding:16px;">
+                <div class="card-title"><div class="card-title-left">🏢 Addresses</div><button type="button" class="btn btn-ghost btn-sm" onclick="addAddressRow()">+ Add Address</button></div>
+                <div id="addresses-container"></div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" id="contact-form-submit">Save Contact</button>
+                <button type="button" class="btn btn-ghost" onclick="resetContactForm();showView('contacts')">Cancel</button>
+                <button type="button" class="btn btn-danger" id="contact-form-delete" style="display:none;margin-left:auto;" onclick="deleteCurrentContact()">🗑 Delete</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- IMPORT FROM EMAIL -->
+<div id="view-import" class="view">
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">📨 Import Contacts from Email</div></div>
+        <p style="font-size:0.88rem;color:var(--text-secondary);margin-bottom:16px;">Scan a Microsoft 365 mail folder. AI extracts email signatures into structured contacts. Existing matches (by email) are union-merged rather than duplicated.</p>
+        <div id="ms365-setup-area"></div>
+        <div id="ms365-folder-area" style="display:none;"></div>
+        <div id="ms365-results-area" style="display:none;margin-top:14px;"></div>
+    </div>
+</div>
+
+<!-- SETTINGS -->
+<div id="view-settings" class="view">
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">📨 Microsoft 365 Connection</div></div>
+        <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:16px;">Shared across all Farmboss sites. Used to scan mail folders for signatures.</p>
+        <div id="ms365-settings-area"></div>
+    </div>
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">🔑 Anthropic API Key</div></div>
+        <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:16px;">Required for AI signature extraction.</p>
+        <div class="api-key-row">
+            <div class="form-group" style="margin-bottom:0;"><label>API Key</label><input type="password" id="api-key-input" placeholder="sk-ant-api03-…"></div>
+            <button class="btn btn-primary" onclick="saveApiKey()">Save Key</button>
+            <button class="btn btn-ghost" onclick="testApiKey()">Test</button>
+        </div>
+        <div class="api-status" id="api-status" style="display:none;"></div>
+    </div>
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">🌐 Proxy URL</div></div>
+        <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:16px;">CORS-safe proxy endpoint for Claude API calls.</p>
+        <div class="api-key-row">
+            <div class="form-group" style="margin-bottom:0;"><label>Proxy URL</label><input type="text" id="api-proxy-input" placeholder="https://your-proxy.workers.dev/"></div>
+            <button class="btn btn-primary" onclick="saveProxyUrl()">Save Proxy</button>
+        </div>
+    </div>
+</div>
+
+<!-- RECYCLE BIN -->
+<div id="view-recycle-bin" class="view">
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">🗑 Recycle Bin</div></div>
+        <div id="recycle-bin-list"></div>
+    </div>
+</div>
+
+</main>
+</div><!-- end #app -->
+
+<!-- MERGE DUPLICATES MODAL -->
+<div class="modal-overlay" id="merge-modal-overlay" onclick="closeMergeModal(event)">
+    <div class="modal" style="max-width:640px;max-height:82vh;display:flex;flex-direction:column;">
+        <div class="modal-hdr" style="flex-shrink:0;">
+            <div><div class="modal-title">🔀 Merge Duplicate Contacts</div><div style="font-size:0.78rem;color:var(--text-secondary);margin-top:2px;">Groups share a normalized email or full name. The most complete record is kept; others are merged in (emails/phones/addresses unioned, blanks filled).</div></div>
+            <button class="modal-close" onclick="closeMergeModal()">✕</button>
+        </div>
+        <div id="merge-modal-body" style="overflow-y:auto;flex:1;padding:4px 0;"></div>
+        <div class="modal-actions" style="flex-shrink:0;">
+            <button class="btn btn-primary btn-sm" id="btn-merge-all" onclick="mergeAllGroups()">🔀 Merge All Groups</button>
+            <button class="btn btn-ghost btn-sm" onclick="closeMergeModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+firebase.initializeApp({
+    apiKey:"AIzaSyB7c4urD9tJO80S7nADItxjwhSYVqlrkEU",
+    authDomain:"watchroom-714a0.firebaseapp.com",
+    projectId:"watchroom-714a0",
+    storageBucket:"watchroom-714a0.appspot.com",
+    messagingSenderId:"911514107783",
+    appId:"1:911514107783:web:20e8a729fd66577c28dd22"
+});
+const auth=firebase.auth(), db=firebase.firestore();
+
+// STATE
+let contacts=[];
+let contactSortField='fullName', contactSortDir='asc';
+let apiKey='', proxyUrl='', aiModel='claude-opus-4-6';
+let ms365ClientId='', ms365TenantId='', msalClient=null, msAccount=null;
+let unsubContacts=null;
+let formEmails=[], formPhones=[], formAddresses=[];
+const VIEWS=['dashboard','contacts','add-contact','import','settings','recycle-bin'];
+
+// UTILS
+function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):'';}
+function showToast(msg,isError){const el=document.getElementById('toast');el.textContent=msg;el.className='toast '+(isError===true?'error':(isError||''))+' show';clearTimeout(el._tid);el._tid=setTimeout(()=>el.classList.remove('show'),3500);}
+function toast(msg,type){showToast(msg,type);}
+function fmtDate(d){if(!d)return '—';try{const dt=new Date(d);if(isNaN(dt.getTime()))return d;return dt.toLocaleDateString();}catch(e){return d;}}
+function normalizeEmail(e){return (e||'').toString().trim().toLowerCase();}
+function normalizeName(n){if(!n)return '';return String(n).toLowerCase().replace(/[.,&()'']/g,' ').replace(/\s+/g,' ').trim();}
+function labelBadgeClass(label){const x=(label||'').toLowerCase();if(x==='work')return 'badge-work';if(x==='personal')return 'badge-personal';if(x==='mobile')return 'badge-mobile';if(x==='office')return 'badge-office';if(x==='fax')return 'badge-fax';return 'badge-default';}
+function stripHtml(s){if(!s)return '';return String(s).replace(/<style[\s\S]*?<\/style>/gi,'').replace(/<script[\s\S]*?<\/script>/gi,'').replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/\s+/g,' ').trim();}
+
+// AUTH
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMergeModal(); });
+
+auth.onAuthStateChanged(user=>{
+    if(user){
+        document.getElementById('login-screen').style.display='none';
+        document.getElementById('loading-screen').style.display='flex';
+        document.getElementById('app').style.display='none';
+        document.getElementById('user-email').textContent=user.email;
+        initApp();
+    } else {
+        document.getElementById('login-screen').style.display='flex';
+        document.getElementById('loading-screen').style.display='none';
+        document.getElementById('app').style.display='none';
+        if(unsubContacts){unsubContacts();unsubContacts=null;}
+        contacts=[];
+    }
+});
+document.getElementById('login-form').addEventListener('submit',async e=>{
+    e.preventDefault();
+    const email=document.getElementById('login-email').value.trim();
+    const pass=document.getElementById('login-password').value;
+    const errEl=document.getElementById('login-error'),btn=document.getElementById('login-btn');
+    errEl.textContent='';btn.textContent='Signing in...';btn.disabled=true;
+    try{await auth.signInWithEmailAndPassword(email,pass);}
+    catch(err){errEl.textContent='Invalid email or password.';btn.textContent='Sign In';btn.disabled=false;}
+});
+async function doSignOut(){if(!confirm('Sign out?'))return;await auth.signOut();}
+
+// INIT
+async function initApp(){
+    try{
+        const keyDoc=await db.collection('settings').doc('apikey').get();
+        if(keyDoc.exists&&keyDoc.data().key){apiKey=keyDoc.data().key;document.getElementById('api-key-input').value=apiKey;}
+        const proxyDoc=await db.collection('settings').doc('proxy').get();
+        if(proxyDoc.exists&&proxyDoc.data().url){proxyUrl=proxyDoc.data().url;document.getElementById('api-proxy-input').value=proxyUrl;}
+        const msDoc=await db.collection('settings').doc('ms365').get();
+        if(msDoc.exists){
+            ms365ClientId=msDoc.data().clientId||'';
+            ms365TenantId=msDoc.data().tenantId||'';
+        }
+        if(ms365ClientId)initMSAL();
+
+        unsubContacts=db.collection('contacts').where('deleted','==',false).onSnapshot(snap=>{
+            contacts=snap.docs.map(doc=>({_docId:doc.id,...doc.data()}));
+            renderDashboard();renderContacts();
+        },err=>{
+            console.warn('contacts snap err',err);
+            db.collection('contacts').onSnapshot(snap=>{
+                contacts=snap.docs.map(doc=>({_docId:doc.id,...doc.data()})).filter(c=>!c.deleted);
+                renderDashboard();renderContacts();
+            });
+        });
+
+        document.getElementById('loading-screen').style.display='none';
+        document.getElementById('app').style.display='block';
+        showView('dashboard');
+    }catch(err){
+        document.getElementById('loading-screen').innerHTML=`<p style="color:var(--danger);padding:20px;text-align:center;">Error: ${esc(err.message)}<br><br><button class="btn btn-ghost" onclick="doSignOut()">Sign Out</button></p>`;
+    }
+}
+
+// NAVIGATION
+function showView(v){
+    VIEWS.forEach(id=>document.getElementById('view-'+id).classList.remove('active'));
+    document.getElementById('view-'+v).classList.add('active');
+    document.querySelectorAll('nav button').forEach(btn=>btn.classList.remove('active'));
+    const idx={dashboard:0,contacts:1,'add-contact':2,import:3,settings:5,'recycle-bin':6}[v];
+    if(idx!==undefined){const btns=document.querySelectorAll('nav button');if(btns[idx])btns[idx].classList.add('active');}
+    if(v==='dashboard')renderDashboard();
+    if(v==='contacts')renderContacts();
+    if(v==='add-contact'){if(!document.getElementById('contact-edit-doc-id').value)resetContactForm();}
+    if(v==='import')renderMS365Setup();
+    if(v==='settings')renderMS365SettingsArea();
+    if(v==='recycle-bin')loadRecycleBin();
+    window.scrollTo(0,0);
+}
+
+// ═══════════════════════════════════════
+//  DASHBOARD
+// ═══════════════════════════════════════
+function renderDashboard(){
+    const total=contacts.length;
+    const withEmail=contacts.filter(c=>(c.emails||[]).some(e=>e.address)).length;
+    const withPhone=contacts.filter(c=>(c.phones||[]).some(p=>p.number)).length;
+    const now=Date.now();
+    const WEEK=7*24*60*60*1000;
+    const recent=contacts.filter(c=>{
+        const t=c.createdAt?.toMillis?.()??(c.addedAt?new Date(c.addedAt).getTime():0);
+        return t&&(now-t)<WEEK;
+    }).length;
+    document.getElementById('stats-grid').innerHTML=`
+        <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Total Contacts</div></div>
+        <div class="stat-card"><div class="stat-value">${withEmail}</div><div class="stat-label">With Email</div></div>
+        <div class="stat-card"><div class="stat-value">${withPhone}</div><div class="stat-label">With Phone</div></div>
+        <div class="stat-card" style="border-color:var(--accent);"><div class="stat-value">${recent}</div><div class="stat-label">Added This Week</div></div>`;
+
+    const sorted=[...contacts].sort((a,b)=>{
+        const ta=a.createdAt?.toMillis?.()??(a.addedAt?new Date(a.addedAt).getTime():0);
+        const tb=b.createdAt?.toMillis?.()??(b.addedAt?new Date(b.addedAt).getTime():0);
+        return tb-ta;
+    }).slice(0,10);
+    const tbody=document.getElementById('recent-tbody');
+    if(!sorted.length){
+        tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--text-secondary);padding:30px;">No contacts yet.</td></tr>';
+        return;
+    }
+    tbody.innerHTML=sorted.map(c=>{
+        const email=(c.emails||[])[0]?.address||'';
+        const phone=(c.phones||[])[0]?.number||'';
+        const added=c.createdAt?.toDate?.()?.toLocaleDateString()||(c.addedAt?new Date(c.addedAt).toLocaleDateString():'—');
+        const companyTitle=[c.company,c.title].filter(Boolean).join(' — ');
+        return `<tr style="cursor:pointer" onclick="editContact('${c._docId}')">
+            <td><strong>${esc(c.fullName)||'—'}</strong></td>
+            <td>${esc(companyTitle)||'—'}</td>
+            <td>${esc(email)||'—'}</td>
+            <td>${esc(phone)||'—'}</td>
+            <td>${added}</td>
+        </tr>`;
+    }).join('');
+}
+
+// ═══════════════════════════════════════
+//  CONTACTS LIST
+// ═══════════════════════════════════════
+function contactSortBy(field){contactSortDir=contactSortField===field?(contactSortDir==='asc'?'desc':'asc'):'asc';contactSortField=field;renderContacts();}
+function renderContacts(){
+    const q=(document.getElementById('contact-search')?.value||'').toLowerCase();
+    const filtered=contacts.filter(c=>{
+        if(!q)return true;
+        const fields=[c.fullName,c.firstName,c.lastName,c.company,c.title,c.department,c.notes,c.source,c.website,c.linkedin,c.twitter,
+            (c.emails||[]).map(e=>e.address).join(' '),
+            (c.phones||[]).map(p=>p.number).join(' '),
+            (c.addresses||[]).map(a=>[a.street,a.city,a.state,a.zip,a.country].filter(Boolean).join(' ')).join(' ')];
+        return fields.some(f=>f&&f.toString().toLowerCase().includes(q));
+    });
+    filtered.sort((a,b)=>{
+        let va=a[contactSortField]??'',vb=b[contactSortField]??'';
+        va=String(va).toLowerCase();vb=String(vb).toLowerCase();
+        return va<vb?(contactSortDir==='asc'?-1:1):va>vb?(contactSortDir==='asc'?1:-1):0;
+    });
+    document.getElementById('contact-count').textContent=`${filtered.length} contact${filtered.length!==1?'s':''}`;
+    document.querySelectorAll('#contact-table thead th').forEach(th=>th.classList.remove('sort-asc','sort-desc'));
+    const thIdx={fullName:0,company:1,lastSeenAt:4};
+    const ti=thIdx[contactSortField];
+    if(ti!==undefined)document.querySelectorAll('#contact-table thead th')[ti]?.classList.add(contactSortDir==='asc'?'sort-asc':'sort-desc');
+    const tbody=document.getElementById('contact-tbody'),empty=document.getElementById('contact-empty');
+    if(!filtered.length){tbody.innerHTML='';empty.style.display='block';return;}
+    empty.style.display='none';
+    tbody.innerHTML=filtered.map(c=>{
+        const emails=(c.emails||[]).slice(0,2).map(e=>`<div style="font-size:0.82rem;">${esc(e.address)}${e.label?` <span class="badge ${labelBadgeClass(e.label)}">${esc(e.label)}</span>`:''}</div>`).join('');
+        const extraEmails=(c.emails||[]).length>2?`<div style="font-size:0.74rem;color:var(--text-secondary);">+${(c.emails||[]).length-2} more</div>`:'';
+        const phones=(c.phones||[]).slice(0,2).map(p=>`<div style="font-size:0.82rem;">${esc(p.number)}${p.label?` <span class="badge ${labelBadgeClass(p.label)}">${esc(p.label)}</span>`:''}</div>`).join('');
+        const extraPhones=(c.phones||[]).length>2?`<div style="font-size:0.74rem;color:var(--text-secondary);">+${(c.phones||[]).length-2} more</div>`:'';
+        const companyTitle=[c.company,c.title].filter(Boolean).join(' — ');
+        return `<tr>
+            <td style="cursor:pointer" onclick="editContact('${c._docId}')"><strong>${esc(c.fullName)||'—'}</strong>${c.department?`<br><span style="font-size:0.75rem;color:var(--text-secondary);">${esc(c.department)}</span>`:''}</td>
+            <td>${esc(companyTitle)||'—'}</td>
+            <td>${emails||'—'}${extraEmails}</td>
+            <td>${phones||'—'}${extraPhones}</td>
+            <td>${fmtDate(c.lastSeenAt)}</td>
+            <td style="white-space:nowrap;">
+                <button class="btn btn-primary btn-sm" onclick="editContact('${c._docId}')">✏️</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteContact('${c._docId}')">✗</button>
+            </td></tr>`;
+    }).join('');
+}
+
+// ═══════════════════════════════════════
+//  CONTACT FORM (emails / phones / addresses)
+// ═══════════════════════════════════════
+function renderEmailRows(){
+    const c=document.getElementById('emails-container');
+    if(!formEmails.length){c.innerHTML='<p style="font-size:0.82rem;color:var(--text-secondary);">No emails added.</p>';return;}
+    c.innerHTML=formEmails.map((e,i)=>`
+        <div class="sub-form-row">
+            <div class="form-group span2"><label>Email</label><input type="email" value="${esc(e.address)}" oninput="formEmails[${i}].address=this.value" placeholder="name@company.com"></div>
+            <div class="form-group span2"><label>Label</label><input type="text" value="${esc(e.label)}" oninput="formEmails[${i}].label=this.value" placeholder="work, personal"></div>
+            <button type="button" class="btn btn-danger btn-sm" onclick="formEmails.splice(${i},1);renderEmailRows()" title="Remove">✗</button>
+        </div>`).join('');
+}
+function addEmailRow(){formEmails.push({address:'',label:'work'});renderEmailRows();}
+
+function renderPhoneRows(){
+    const c=document.getElementById('phones-container');
+    if(!formPhones.length){c.innerHTML='<p style="font-size:0.82rem;color:var(--text-secondary);">No phones added.</p>';return;}
+    c.innerHTML=formPhones.map((p,i)=>`
+        <div class="sub-form-row">
+            <div class="form-group span2"><label>Number</label><input type="tel" value="${esc(p.number)}" oninput="formPhones[${i}].number=this.value" placeholder="(555) 123-4567"></div>
+            <div class="form-group span2"><label>Label</label><input type="text" value="${esc(p.label)}" oninput="formPhones[${i}].label=this.value" placeholder="office, mobile, fax"></div>
+            <button type="button" class="btn btn-danger btn-sm" onclick="formPhones.splice(${i},1);renderPhoneRows()" title="Remove">✗</button>
+        </div>`).join('');
+}
+function addPhoneRow(){formPhones.push({number:'',label:'mobile'});renderPhoneRows();}
+
+function renderAddressRows(){
+    const c=document.getElementById('addresses-container');
+    if(!formAddresses.length){c.innerHTML='<p style="font-size:0.82rem;color:var(--text-secondary);">No addresses added.</p>';return;}
+    c.innerHTML=formAddresses.map((a,i)=>`
+        <div class="sub-form-group">
+            <div class="sub-form-row">
+                <div class="form-group span2"><label>Street</label><input type="text" value="${esc(a.street)}" oninput="formAddresses[${i}].street=this.value" placeholder="123 Main St"></div>
+                <div class="form-group"><label>City</label><input type="text" value="${esc(a.city)}" oninput="formAddresses[${i}].city=this.value" placeholder="Springfield"></div>
+                <div class="form-group"><label>State</label><input type="text" value="${esc(a.state)}" oninput="formAddresses[${i}].state=this.value" placeholder="IL"></div>
+                <button type="button" class="btn btn-danger btn-sm" onclick="formAddresses.splice(${i},1);renderAddressRows()" title="Remove">✗</button>
+            </div>
+            <div class="sub-form-row" style="margin-bottom:0;">
+                <div class="form-group"><label>Zip</label><input type="text" value="${esc(a.zip)}" oninput="formAddresses[${i}].zip=this.value" placeholder="62701"></div>
+                <div class="form-group"><label>Country</label><input type="text" value="${esc(a.country)}" oninput="formAddresses[${i}].country=this.value" placeholder="USA"></div>
+                <div class="form-group span2"><label>Label</label><input type="text" value="${esc(a.label)}" oninput="formAddresses[${i}].label=this.value" placeholder="office, home"></div>
+                <span></span>
+            </div>
+        </div>`).join('');
+}
+function addAddressRow(){formAddresses.push({street:'',city:'',state:'',zip:'',country:'',label:'office'});renderAddressRows();}
+
+function resetContactForm(){
+    document.getElementById('contact-edit-doc-id').value='';
+    document.getElementById('contact-form').reset();
+    document.getElementById('contact-form-title').textContent='➕ Add New Contact';
+    document.getElementById('contact-form-submit').textContent='Save Contact';
+    document.getElementById('contact-form-delete').style.display='none';
+    formEmails=[];formPhones=[];formAddresses=[];
+    renderEmailRows();renderPhoneRows();renderAddressRows();
+}
+function editContact(docId){
+    const c=contacts.find(x=>x._docId===docId);if(!c)return;
+    resetContactForm();showView('add-contact');
+    document.getElementById('contact-edit-doc-id').value=c._docId;
+    document.getElementById('cf-first').value=c.firstName||'';
+    document.getElementById('cf-last').value=c.lastName||'';
+    document.getElementById('cf-full').value=c.fullName||'';
+    document.getElementById('cf-company').value=c.company||'';
+    document.getElementById('cf-title').value=c.title||'';
+    document.getElementById('cf-department').value=c.department||'';
+    document.getElementById('cf-website').value=c.website||'';
+    document.getElementById('cf-linkedin').value=c.linkedin||'';
+    document.getElementById('cf-twitter').value=c.twitter||'';
+    document.getElementById('cf-source').value=c.source||'';
+    document.getElementById('cf-last-seen').value=c.lastSeenAt?String(c.lastSeenAt).slice(0,10):'';
+    document.getElementById('cf-notes').value=c.notes||'';
+    formEmails=Array.isArray(c.emails)?c.emails.map(e=>({...e})):[];
+    formPhones=Array.isArray(c.phones)?c.phones.map(p=>({...p})):[];
+    formAddresses=Array.isArray(c.addresses)?c.addresses.map(a=>({...a})):[];
+    renderEmailRows();renderPhoneRows();renderAddressRows();
+    document.getElementById('contact-form-title').textContent=`✏️ Edit Contact — ${esc(c.fullName||'')}`;
+    document.getElementById('contact-form-submit').textContent='Update Contact';
+    document.getElementById('contact-form-delete').style.display='inline-flex';
+}
+
+document.getElementById('contact-form').addEventListener('submit',async e=>{
+    e.preventDefault();
+    const docId=document.getElementById('contact-edit-doc-id').value;
+    const btn=document.getElementById('contact-form-submit');
+    const fullName=document.getElementById('cf-full').value.trim();
+    if(!fullName){toast('Full name is required.','error');return;}
+    const firstName=document.getElementById('cf-first').value.trim();
+    const lastName=document.getElementById('cf-last').value.trim();
+    const data={
+        fullName,
+        firstName: firstName || fullName.split(/\s+/).slice(0,-1).join(' ') || fullName,
+        lastName: lastName || fullName.split(/\s+/).slice(-1)[0] || '',
+        company:document.getElementById('cf-company').value.trim(),
+        title:document.getElementById('cf-title').value.trim(),
+        department:document.getElementById('cf-department').value.trim(),
+        website:document.getElementById('cf-website').value.trim(),
+        linkedin:document.getElementById('cf-linkedin').value.trim(),
+        twitter:document.getElementById('cf-twitter').value.trim(),
+        source:document.getElementById('cf-source').value.trim(),
+        lastSeenAt:document.getElementById('cf-last-seen').value||'',
+        notes:document.getElementById('cf-notes').value.trim(),
+        emails:formEmails.filter(e=>e.address&&e.address.trim()).map(e=>({address:e.address.trim(),label:e.label||''})),
+        phones:formPhones.filter(p=>p.number&&p.number.trim()).map(p=>({number:p.number.trim(),label:p.label||''})),
+        addresses:formAddresses.filter(a=>a.street||a.city||a.state||a.zip||a.country).map(a=>({...a})),
+        updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
+        deleted:false,
+    };
+    btn.disabled=true;btn.textContent='Saving...';
+    try{
+        if(docId){
+            await db.collection('contacts').doc(docId).update(data);
+            toast('Contact updated.','success');
+        } else {
+            data.createdAt=firebase.firestore.FieldValue.serverTimestamp();
+            await db.collection('contacts').add(data);
+            toast('Contact added!','success');
+        }
+        resetContactForm();showView('contacts');
+    }catch(err){toast('Error: '+err.message,'error');}
+    finally{btn.disabled=false;btn.textContent=docId?'Update Contact':'Save Contact';}
+});
+
+async function deleteCurrentContact(){
+    const docId=document.getElementById('contact-edit-doc-id').value;
+    if(!docId)return;
+    await deleteContact(docId);
+}
+
+async function deleteContact(docId){
+    const c=contacts.find(x=>x._docId===docId);if(!c)return;
+    if(!confirm(`Move "${c.fullName||'this contact'}" to Recycle Bin?`))return;
+    try{
+        await db.collection('contacts').doc(docId).update({deleted:true,deletedAt:firebase.firestore.FieldValue.serverTimestamp()});
+        toast('Contact moved to Recycle Bin.','success');
+        if(document.getElementById('contact-edit-doc-id').value===docId){resetContactForm();showView('contacts');}
+    }catch(e){toast('Delete failed: '+e.message,'error');}
+}
+
+// ═══════════════════════════════════════
+//  RECYCLE BIN
+// ═══════════════════════════════════════
+let recycleBinItems=[];
+async function loadRecycleBin(){
+    const list=document.getElementById('recycle-bin-list');
+    list.innerHTML='<div class="empty"><div class="empty-icon">⏳</div><p>Loading...</p></div>';
+    try{
+        const snap=await db.collection('contacts').where('deleted','==',true).get();
+        recycleBinItems=snap.docs.map(doc=>({_docId:doc.id,...doc.data()}));
+        recycleBinItems.sort((a,b)=>{const ta=a.deletedAt?.toMillis?.()??0,tb=b.deletedAt?.toMillis?.()??0;return tb-ta;});
+        renderRecycleBin();
+    }catch(e){list.innerHTML=`<div class="empty"><p style="color:var(--danger);">Error: ${esc(e.message)}</p></div>`;}
+}
+function renderRecycleBin(){
+    const list=document.getElementById('recycle-bin-list');
+    if(!recycleBinItems.length){list.innerHTML='<div class="empty"><div class="empty-icon">🗑</div><p>Recycle bin is empty</p></div>';return;}
+    list.innerHTML=`<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Company</th><th>Email</th><th>Deleted</th><th>Actions</th></tr></thead><tbody>
+    ${recycleBinItems.map(c=>{
+        const email=(c.emails||[])[0]?.address||'';
+        const deletedDate=c.deletedAt?.toDate?.()?.toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'})||'Unknown';
+        return `<tr>
+            <td><strong>${esc(c.fullName||'—')}</strong></td>
+            <td>${esc(c.company)||'—'}</td>
+            <td>${esc(email)||'—'}</td>
+            <td style="font-size:0.82rem;color:var(--text-secondary);">${deletedDate}</td>
+            <td style="white-space:nowrap;">
+                <button class="btn btn-primary btn-sm" onclick="restoreContact('${c._docId}')">↩ Restore</button>
+                <button class="btn btn-danger btn-sm" onclick="permanentDeleteContact('${c._docId}')">✗ Delete</button>
+            </td></tr>`;
+    }).join('')}</tbody></table></div>`;
+}
+async function restoreContact(docId){
+    try{
+        await db.collection('contacts').doc(docId).update({deleted:false,deletedAt:firebase.firestore.FieldValue.delete()});
+        toast('Restored!','success');loadRecycleBin();
+    }catch(e){toast('Restore failed: '+e.message,'error');}
+}
+async function permanentDeleteContact(docId){
+    if(!confirm('Permanently delete? This cannot be undone.'))return;
+    try{await db.collection('contacts').doc(docId).delete();toast('Permanently deleted.','success');loadRecycleBin();}
+    catch(e){toast('Delete failed: '+e.message,'error');}
+}
+
+// ═══════════════════════════════════════
+//  MERGE DUPLICATES
+// ═══════════════════════════════════════
+let _mergeGroups=[];
+
+function contactCompletenessScore(c){
+    let s=0;
+    if(c.fullName)s+=2;
+    if(c.firstName)s+=1;
+    if(c.lastName)s+=1;
+    if(c.company)s+=2;
+    if(c.title)s+=2;
+    if(c.department)s+=1;
+    if(c.notes)s+=1;
+    if(c.website)s+=1;
+    if(c.linkedin)s+=1;
+    if(c.twitter)s+=1;
+    if(c.source)s+=1;
+    s+=(c.emails||[]).filter(e=>e.address).length*2;
+    s+=(c.phones||[]).filter(p=>p.number).length*2;
+    s+=(c.addresses||[]).filter(a=>a.street||a.city).length*2;
+    return s;
+}
+
+function findDuplicateGroups(){
+    const byKey={};
+    contacts.forEach(c=>{
+        const keys=new Set();
+        (c.emails||[]).forEach(e=>{const k=normalizeEmail(e.address);if(k)keys.add('e:'+k);});
+        const n=normalizeName(c.fullName);
+        if(n)keys.add('n:'+n);
+        keys.forEach(k=>{if(!byKey[k])byKey[k]=[];byKey[k].push(c);});
+    });
+    const seen=new Set();
+    const groups=[];
+    Object.values(byKey).forEach(list=>{
+        const unique=[];
+        list.forEach(c=>{if(!unique.some(u=>u._docId===c._docId))unique.push(c);});
+        if(unique.length<2)return;
+        const sig=unique.map(u=>u._docId).sort().join('|');
+        if(seen.has(sig))return;
+        seen.add(sig);
+        groups.push(unique);
+    });
+    return groups;
+}
+
+function openMergeDuplicates(){
+    _mergeGroups=findDuplicateGroups();
+    const body=document.getElementById('merge-modal-body');
+    const mergeAllBtn=document.getElementById('btn-merge-all');
+    if(!_mergeGroups.length){
+        body.innerHTML='<div style="padding:20px 4px;text-align:center;color:var(--text-secondary);">✅ No duplicate contacts found!</div>';
+        mergeAllBtn.style.display='none';
+    } else {
+        mergeAllBtn.style.display='';
+        body.innerHTML=_mergeGroups.map((group,gi)=>{
+            const sorted=[...group].sort((a,b)=>contactCompletenessScore(b)-contactCompletenessScore(a));
+            const primary=sorted[0];
+            const rows=sorted.map((c,i)=>{
+                const score=contactCompletenessScore(c);
+                const tag=i===0
+                    ?'<span style="font-size:0.7rem;background:#22c55e;color:#fff;border-radius:10px;padding:1px 7px;margin-left:6px;">KEEP</span>'
+                    :'<span style="font-size:0.7rem;background:#ef4444;color:#fff;border-radius:10px;padding:1px 7px;margin-left:6px;">MERGE</span>';
+                const email=(c.emails||[])[0]?.address||'';
+                const phone=(c.phones||[])[0]?.number||'';
+                return `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);gap:8px;">
+                    <div style="font-size:0.85rem;min-width:0;flex:1;">
+                        <strong>${esc(c.fullName||'(unnamed)')}</strong>${tag}
+                        <div style="font-size:0.75rem;color:var(--text-secondary);margin-top:2px;">
+                            ${[esc(c.company),esc(email),esc(phone)].filter(Boolean).join(' · ')||'—'}
+                        </div>
+                    </div>
+                    <div style="font-size:0.72rem;color:var(--text-secondary);white-space:nowrap;">score ${score}</div>
+                </div>`;
+            }).join('');
+            return `<div style="background:var(--bg-card);border-radius:8px;padding:12px 14px;margin-bottom:12px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;gap:8px;flex-wrap:wrap;">
+                    <strong style="font-size:0.9rem;">${esc(primary.fullName||'(unnamed)')}</strong>
+                    <button class="btn btn-primary btn-sm" onclick="mergeGroup(${gi})">Merge (${group.length})</button>
+                </div>
+                ${rows}
+            </div>`;
+        }).join('');
+    }
+    document.getElementById('merge-modal-overlay').classList.add('show');
+}
+
+function closeMergeModal(e){
+    if(e&&e.target!==document.getElementById('merge-modal-overlay'))return;
+    document.getElementById('merge-modal-overlay').classList.remove('show');
+}
+
+function unionBy(arr1,arr2,keyFn){
+    const out=[...(arr1||[])];
+    const seen=new Set(out.map(x=>(keyFn(x)||'').toLowerCase()).filter(Boolean));
+    (arr2||[]).forEach(x=>{
+        const k=(keyFn(x)||'').toLowerCase();
+        if(!k){out.push(x);return;}
+        if(!seen.has(k)){seen.add(k);out.push(x);}
+    });
+    return out;
+}
+
+function mergeContactData(primary,duplicates){
+    const merged={...primary};
+    const scalarFields=['fullName','firstName','lastName','company','title','department','website','linkedin','twitter','source','lastSeenAt'];
+    duplicates.forEach(d=>{
+        scalarFields.forEach(f=>{if(!merged[f]&&d[f])merged[f]=d[f];});
+        merged.emails=unionBy(merged.emails,d.emails,e=>e.address);
+        merged.phones=unionBy(merged.phones,d.phones,p=>(p.number||'').replace(/\D/g,''));
+        merged.addresses=unionBy(merged.addresses,d.addresses,a=>[a.street,a.city,a.state,a.zip].filter(Boolean).join(' ').toLowerCase());
+        const notes=[merged.notes,d.notes].filter(Boolean);
+        const uniqueNotes=[...new Set(notes)];
+        merged.notes=uniqueNotes.join('\n---\n');
+    });
+    return merged;
+}
+
+async function mergeGroup(gi){
+    const group=_mergeGroups[gi];if(!group)return;
+    const sorted=[...group].sort((a,b)=>contactCompletenessScore(b)-contactCompletenessScore(a));
+    const primary=sorted[0];
+    const dupes=sorted.slice(1);
+    try{
+        const merged=mergeContactData(primary,dupes);
+        const {_docId,createdAt,...updateData}=merged;
+        updateData.updatedAt=firebase.firestore.FieldValue.serverTimestamp();
+        updateData.deleted=false;
+        await db.collection('contacts').doc(primary._docId).update(updateData);
+        for(const d of dupes){
+            await db.collection('contacts').doc(d._docId).update({deleted:true,deletedAt:firebase.firestore.FieldValue.serverTimestamp()});
+        }
+        toast(`✅ Merged ${dupes.length} duplicate${dupes.length!==1?'s':''} into "${primary.fullName||'contact'}"`,'success');
+        openMergeDuplicates();
+    }catch(e){toast('Merge failed: '+e.message,'error');}
+}
+
+async function mergeAllGroups(){
+    if(!_mergeGroups.length)return;
+    const btn=document.getElementById('btn-merge-all');
+    btn.disabled=true;btn.textContent='⏳ Merging…';
+    const groupsSnapshot=[..._mergeGroups];
+    for(let i=0;i<groupsSnapshot.length;i++){
+        _mergeGroups=groupsSnapshot;
+        await mergeGroup(i);
+        await new Promise(r=>setTimeout(r,400));
+    }
+    btn.disabled=false;btn.textContent='🔀 Merge All Groups';
+    openMergeDuplicates();
+}
+
+// ═══════════════════════════════════════
+//  MICROSOFT 365 INTEGRATION
+// ═══════════════════════════════════════
+function initMSAL(){
+    if(!ms365ClientId||msalClient)return;
+    msalClient=new msal.PublicClientApplication({
+        auth:{
+            clientId:ms365ClientId,
+            authority:`https://login.microsoftonline.com/${ms365TenantId||'common'}`,
+            redirectUri:window.location.origin+window.location.pathname
+        },
+        cache:{cacheLocation:'sessionStorage',storeAuthStateInCookie:false}
+    });
+    const accounts=msalClient.getAllAccounts();
+    if(accounts.length)msAccount=accounts[0];
+}
+
+async function connectMS365(){
+    try{
+        if(!msalClient)initMSAL();
+        if(!msalClient){showToast('Paste your Azure Client ID first',true);return;}
+        const result=await msalClient.loginPopup({scopes:['Mail.Read'],prompt:'select_account'});
+        msAccount=result.account;
+        renderMS365Setup();
+        renderMS365SettingsArea();
+    }catch(e){
+        if(!e.message?.includes('user_cancelled')&&!e.message?.includes('interaction_in_progress')){
+            showToast('Sign-in failed: '+e.message,true);
+        }
+    }
+}
+
+function disconnectMS365(){
+    if(msalClient&&msAccount)msalClient.logoutPopup({account:msAccount}).catch(()=>{});
+    msAccount=null;
+    document.getElementById('ms365-folder-area').style.display='none';
+    document.getElementById('ms365-results-area').style.display='none';
+    renderMS365Setup();
+    renderMS365SettingsArea();
+}
+
+async function getMS365Token(){
+    if(!msalClient||!msAccount)throw new Error('Not connected to Microsoft 365');
+    try{
+        const r=await msalClient.acquireTokenSilent({scopes:['Mail.Read'],account:msAccount});
+        return r.accessToken;
+    }catch{
+        const r=await msalClient.acquireTokenPopup({scopes:['Mail.Read'],account:msAccount});
+        return r.accessToken;
+    }
+}
+
+async function saveMS365ClientId(inputPrefix){
+    const prefix=inputPrefix||'ms365';
+    const val=(document.getElementById(prefix+'-client-id-input')?.value||'').trim();
+    const tenant=(document.getElementById(prefix+'-tenant-id-input')?.value||'').trim();
+    if(!val){showToast('Enter a Client ID',true);return;}
+    await db.collection('settings').doc('ms365').set({clientId:val,tenantId:tenant}).catch(()=>{});
+    ms365ClientId=val;ms365TenantId=tenant;
+    initMSAL();
+    renderMS365Setup();
+    renderMS365SettingsArea();
+    showToast('Microsoft 365 settings saved','success');
+}
+
+function clearMS365ClientId(){
+    if(!confirm('Clear the stored Azure Client ID?'))return;
+    ms365ClientId='';ms365TenantId='';msalClient=null;msAccount=null;
+    db.collection('settings').doc('ms365').delete().catch(()=>{});
+    renderMS365Setup();
+    renderMS365SettingsArea();
+}
+
+function renderMS365Setup(){
+    const setupArea=document.getElementById('ms365-setup-area');
+    const folderArea=document.getElementById('ms365-folder-area');
+    if(!setupArea)return;
+
+    if(msAccount){
+        setupArea.innerHTML=`
+            <div class="ms365-connected-row">
+                <span style="font-size:1.3rem;">✅</span>
+                <div style="flex:1;">
+                    <div style="font-size:0.88rem;font-weight:600;color:var(--text-primary);">${esc(msAccount.username)}</div>
+                    <div style="font-size:0.78rem;color:var(--text-secondary);">${esc(msAccount.name||'Microsoft 365')}</div>
+                </div>
+                <button class="btn btn-ghost btn-sm" onclick="disconnectMS365()">Disconnect</button>
+            </div>`;
+        folderArea.style.display='block';
+        loadMS365Folders();
+        return;
+    }
+
+    if(ms365ClientId){
+        setupArea.innerHTML=`
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">
+                <span style="font-size:0.82rem;color:var(--text-secondary);">Azure Client ID:</span>
+                <code style="font-size:0.78rem;">${esc(ms365ClientId)}</code>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+                <span style="font-size:0.82rem;color:var(--text-secondary);">Tenant:</span>
+                <code style="font-size:0.78rem;">${esc(ms365TenantId||'common')}</code>
+                <button class="btn btn-ghost btn-sm" onclick="clearMS365ClientId()">Change</button>
+            </div>
+            <button class="btn btn-primary" onclick="connectMS365()">🔐 Sign in to Microsoft 365</button>`;
+        folderArea.style.display='none';
+        return;
+    }
+
+    const redirectUri=window.location.origin+window.location.pathname;
+    setupArea.innerHTML=`
+        <div class="ms365-setup-box">
+            <div class="ms365-setup-title">One-time Azure setup (5 min)</div>
+            <ol>
+                <li>Go to <strong>portal.azure.com</strong> → Azure Active Directory → App registrations → <strong>New registration</strong></li>
+                <li>Name it anything (e.g. "Farmboss Contacts"). Under <em>Redirect URI</em> choose <strong>Single-page application (SPA)</strong> and enter:<br>
+                    <code>${esc(redirectUri)}</code></li>
+                <li>Click Register. Then go to <strong>API permissions → Add a permission → Microsoft Graph → Delegated</strong> → search <strong>Mail.Read</strong> → Add permissions</li>
+                <li>From the Overview page, copy the <strong>Application (client) ID</strong> and the <strong>Directory (tenant) ID</strong> and paste them below</li>
+            </ol>
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+                <input type="text" id="ms365-client-id-input" placeholder="Application (client) ID"
+                    style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.85rem;background:var(--bg-secondary);color:var(--text-primary);">
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <input type="text" id="ms365-tenant-id-input" placeholder="Directory (tenant) ID — leave blank for multi-tenant"
+                    style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.85rem;background:var(--bg-secondary);color:var(--text-primary);">
+                <button class="btn btn-primary" onclick="saveMS365ClientId('ms365')">Save</button>
+            </div>
+        </div>`;
+    folderArea.style.display='none';
+}
+
+function renderMS365SettingsArea(){
+    const area=document.getElementById('ms365-settings-area');
+    if(!area)return;
+    if(msAccount){
+        area.innerHTML=`
+            <div class="ms365-connected-row">
+                <span style="font-size:1.3rem;">✅</span>
+                <div style="flex:1;">
+                    <div style="font-size:0.88rem;font-weight:600;color:var(--text-primary);">${esc(msAccount.username)}</div>
+                    <div style="font-size:0.78rem;color:var(--text-secondary);">Signed in to Microsoft 365</div>
+                </div>
+                <button class="btn btn-ghost btn-sm" onclick="disconnectMS365()">Disconnect</button>
+            </div>
+            <div style="font-size:0.8rem;color:var(--text-secondary);">Azure Client ID: <code style="font-size:0.78rem;">${esc(ms365ClientId)}</code>${ms365TenantId?` · Tenant: <code style="font-size:0.78rem;">${esc(ms365TenantId)}</code>`:''} <button class="btn btn-ghost btn-sm" style="margin-left:8px;" onclick="clearMS365ClientId()">Change</button></div>`;
+        return;
+    }
+    if(ms365ClientId){
+        area.innerHTML=`
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">
+                <span style="font-size:0.82rem;color:var(--text-secondary);">Azure Client ID:</span>
+                <code style="font-size:0.78rem;">${esc(ms365ClientId)}</code>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+                <span style="font-size:0.82rem;color:var(--text-secondary);">Tenant:</span>
+                <code style="font-size:0.78rem;">${esc(ms365TenantId||'common')}</code>
+                <button class="btn btn-ghost btn-sm" onclick="clearMS365ClientId()">Change</button>
+            </div>
+            <button class="btn btn-primary" onclick="connectMS365()">🔐 Sign in to Microsoft 365</button>`;
+        return;
+    }
+    area.innerHTML=`
+        <div class="ms365-setup-box">
+            <div class="ms365-setup-title">Connect Microsoft 365</div>
+            <p style="font-size:0.84rem;color:var(--text-secondary);margin-bottom:10px;">Paste your Azure app's Client ID and Tenant ID. See the Import from Email view for full setup instructions.</p>
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+                <input type="text" id="ms365s-client-id-input" placeholder="Application (client) ID"
+                    style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.85rem;background:var(--bg-secondary);color:var(--text-primary);">
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <input type="text" id="ms365s-tenant-id-input" placeholder="Directory (tenant) ID — leave blank for multi-tenant"
+                    style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.85rem;background:var(--bg-secondary);color:var(--text-primary);">
+                <button class="btn btn-primary" onclick="saveMS365ClientId('ms365s')">Save</button>
+            </div>
+        </div>`;
+}
+
+async function fetchMS365FolderTree(token,parentId,depth){
+    const base=parentId
+        ?`https://graph.microsoft.com/v1.0/me/mailFolders/${encodeURIComponent(parentId)}/childFolders`
+        :'https://graph.microsoft.com/v1.0/me/mailFolders';
+    const res=await fetch(`${base}?$top=100&$select=id,displayName,totalItemCount,childFolderCount`,{
+        headers:{Authorization:'Bearer '+token}
+    });
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.error?.message||'Failed to load folders');
+    const out=[];
+    for(const f of (data.value||[])){
+        out.push({id:f.id,name:f.displayName,count:f.totalItemCount,depth});
+        if(f.childFolderCount>0&&depth<5){
+            const children=await fetchMS365FolderTree(token,f.id,depth+1);
+            out.push(...children);
+        }
+    }
+    return out;
+}
+
+async function loadMS365Folders(){
+    const folderArea=document.getElementById('ms365-folder-area');
+    folderArea.innerHTML='<div style="font-size:0.84rem;color:var(--text-secondary);">Loading folders…</div>';
+    try{
+        const token=await getMS365Token();
+        const folders=await fetchMS365FolderTree(token,null,0);
+        folderArea.innerHTML=`
+            <div style="font-size:0.82rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:8px;">Select a mail folder to scan</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <select id="ms365-folder-select" style="flex:1;min-width:200px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.88rem;background:var(--bg-secondary);color:var(--text-primary);">
+                    <option value="">— choose a folder —</option>
+                    ${folders.map(f=>`<option value="${esc(f.id)}">${'\u00A0\u00A0'.repeat(f.depth)}${f.depth?'↳ ':''}${esc(f.name)} (${f.count} emails)</option>`).join('')}
+                </select>
+                <label style="font-size:0.82rem;color:var(--text-secondary);display:flex;align-items:center;gap:6px;">
+                    Max emails:
+                    <input type="number" id="ms365-max-emails" value="100" min="1" max="5000" step="50"
+                        style="width:90px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:0.88rem;background:var(--bg-secondary);color:var(--text-primary);">
+                </label>
+                <button class="btn btn-primary" onclick="startMS365ContactScan()">📨 Scan</button>
+            </div>
+            <p style="font-size:0.78rem;color:var(--text-secondary);margin-top:8px;">Tip: Inbox or a "Clients" sub-folder works well. The scanner extracts contact info from email signatures and merges with existing contacts by email match.</p>`;
+    }catch(e){
+        folderArea.innerHTML=`<div style="color:var(--danger);font-size:0.85rem;">${esc(e.message)}</div>`;
+    }
+}
+
+// ═══════════════════════════════════════
+//  EMAIL SCAN + AI EXTRACTION
+// ═══════════════════════════════════════
+let _scanPreviewItems=[];
+
+async function startMS365ContactScan(){
+    const sel=document.getElementById('ms365-folder-select');
+    const folderId=sel?sel.value:'';
+    if(!folderId){showToast('Select a folder first',true);return;}
+    if(!apiKey){showToast('Set your API key in Settings first',true);return;}
+
+    const resultsArea=document.getElementById('ms365-results-area');
+    resultsArea.style.display='block';
+    const maxInput=document.getElementById('ms365-max-emails');
+    const maxEmails=Math.max(1,Math.min(5000,parseInt(maxInput?.value,10)||100));
+
+    try{
+        const token=await getMS365Token();
+
+        let messages=[];
+        let url=`https://graph.microsoft.com/v1.0/me/mailFolders/${encodeURIComponent(folderId)}/messages?$select=id,subject,body,from,receivedDateTime,hasAttachments&$top=50&$orderby=receivedDateTime%20desc`;
+        resultsArea.innerHTML=renderProgressBox('Fetching emails…',0,maxEmails);
+        while(url&&messages.length<maxEmails){
+            const res=await fetch(url,{headers:{Authorization:'Bearer '+token}});
+            const data=await res.json();
+            if(!res.ok)throw new Error(data.error?.message||'Failed to fetch emails');
+            messages=messages.concat(data.value||[]);
+            url=data['@odata.nextLink']||null;
+            resultsArea.innerHTML=renderProgressBox('Fetching emails…',Math.min(messages.length,maxEmails),maxEmails);
+        }
+        if(messages.length>maxEmails)messages=messages.slice(0,maxEmails);
+        if(!messages.length){
+            resultsArea.innerHTML='<div style="font-size:0.85rem;color:var(--text-secondary);padding:12px 0;">No emails found in this folder.</div>';
+            return;
+        }
+
+        const allExtracted=[];
+        for(let i=0;i<messages.length;i+=5){
+            resultsArea.innerHTML=renderProgressBox('Analyzing signatures with AI…',i,messages.length);
+            const batch=messages.slice(i,i+5);
+            const batchContacts=await extractContactsFromEmails(batch);
+            allExtracted.push(...batchContacts);
+        }
+
+        if(!allExtracted.length){
+            resultsArea.innerHTML='<div style="font-size:0.85rem;color:var(--text-secondary);padding:12px 0;">No signature blocks detected. Try another folder.</div>';
+            return;
+        }
+
+        _scanPreviewItems=dedupeAndMatchPreview(allExtracted);
+        renderScanPreview();
+    }catch(e){
+        resultsArea.innerHTML=`<div style="color:var(--danger);font-size:0.85rem;padding:12px 0;">Error: ${esc(e.message)}</div>`;
+    }
+}
+
+function renderProgressBox(label,done,total){
+    const pct=total?Math.round(done/total*100):0;
+    return `<div class="progress-box">
+        <div class="spinner" style="margin:0 auto 10px;"></div>
+        <div class="progress-label">${esc(label)} ${done} / ${total}</div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;"></div></div>
+    </div>`;
+}
+
+async function extractContactsFromEmails(batch){
+    const content=[];
+    batch.forEach((msg,idx)=>{
+        const raw=msg.body?.content||'';
+        const body=msg.body?.contentType==='html'?stripHtml(raw):raw;
+        const truncated=body.substring(0,3000);
+        const fromAddr=msg.from?.emailAddress?.address||'';
+        const fromName=msg.from?.emailAddress?.name||'';
+        content.push({
+            type:'text',
+            text:`--- EMAIL ${idx+1} ---\nFrom: ${fromName} <${fromAddr}>\nDate: ${msg.receivedDateTime||''}\nSubject: ${msg.subject||''}\n\n${truncated}`
+        });
+    });
+    content.push({
+        type:'text',
+        text:`These are ${batch.length} emails. For each email, find the sender's signature block (usually at the bottom after a closing like "Thanks,", "Best,", "Regards,", "Sincerely,", or after "--"). Extract structured contact info from the signature.
+
+Return ONLY a JSON array, one entry per email in order (use null for emails with no usable signature):
+[
+  {
+    "fullName":"Jane Smith",
+    "firstName":"Jane",
+    "lastName":"Smith",
+    "emails":[{"address":"jane@acme.com","label":"work"}],
+    "phones":[{"number":"(555) 123-4567","label":"office"}],
+    "company":"Acme Corp",
+    "title":"Director of Sales",
+    "department":"Sales",
+    "addresses":[{"street":"123 Main St","city":"Springfield","state":"IL","zip":"62701","country":"USA","label":"office"}],
+    "website":"https://acme.com",
+    "linkedin":"linkedin.com/in/janesmith",
+    "twitter":"@janesmith"
+  },
+  null,
+  ...
+]
+
+Rules:
+- Phone labels: "office", "mobile", "fax", "direct" — infer from context (e.g. "C:", "M:", "cell" → mobile; "F:" → fax; "D:" → direct; default "office").
+- Email labels: "work" by default.
+- Use empty string "" for missing scalar fields, empty array [] for missing list fields.
+- Only extract real signature data; skip auto-replies, newsletters, and generic marketing emails.
+- No explanation, just the JSON array.`
+    });
+
+    try{
+        let res;
+        if(proxyUrl){
+            res=await fetch(proxyUrl,{
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({apiKey,model:aiModel,max_tokens:3072,stream:false,messages:[{role:'user',content}]})
+            });
+        } else {
+            res=await fetch('https://api.anthropic.com/v1/messages',{
+                method:'POST',mode:'cors',
+                headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true'},
+                body:JSON.stringify({model:aiModel,max_tokens:3072,messages:[{role:'user',content}]})
+            });
+        }
+        const text=await res.text();
+        const j=JSON.parse(text);
+        if(!res.ok)throw new Error(j?.error?.message||'API error');
+        const rawResp=(j?.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
+        const match=rawResp.match(/\[[\s\S]*\]/);
+        if(!match)return [];
+        const arr=JSON.parse(match[0]);
+        if(!Array.isArray(arr))return [];
+        const out=[];
+        arr.forEach((obj,idx)=>{
+            if(!obj||typeof obj!=='object')return;
+            if(!obj.fullName&&!(obj.emails&&obj.emails.length))return;
+            const msg=batch[idx];
+            const fromAddr=msg?.from?.emailAddress?.address||'';
+            const received=msg?.receivedDateTime||'';
+            if(fromAddr&&!(obj.emails||[]).some(e=>normalizeEmail(e.address)===normalizeEmail(fromAddr))){
+                obj.emails=[...(obj.emails||[]),{address:fromAddr,label:'work'}];
+            }
+            obj.source=fromAddr?`Email from ${fromAddr}`:'Email signature';
+            obj.lastSeenAt=received?received.slice(0,10):'';
+            out.push(obj);
+        });
+        return out;
+    }catch(err){
+        console.warn('Signature extraction batch failed:',err.message);
+        return [];
+    }
+}
+
+function dedupeAndMatchPreview(items){
+    const byKey=new Map();
+    const result=[];
+    items.forEach(item=>{
+        const primaryEmail=normalizeEmail((item.emails||[])[0]?.address||'');
+        const nameKey=normalizeName(item.fullName);
+        const key=primaryEmail||('n:'+nameKey);
+        if(!key)return;
+        if(byKey.has(key)){
+            const existing=byKey.get(key);
+            existing.emails=unionBy(existing.emails,item.emails,e=>e.address);
+            existing.phones=unionBy(existing.phones,item.phones,p=>(p.number||'').replace(/\D/g,''));
+            existing.addresses=unionBy(existing.addresses,item.addresses,a=>[a.street,a.city,a.state,a.zip].filter(Boolean).join(' ').toLowerCase());
+            ['fullName','firstName','lastName','company','title','department','website','linkedin','twitter','source','lastSeenAt'].forEach(f=>{if(!existing[f]&&item[f])existing[f]=item[f];});
+            return;
+        }
+        byKey.set(key,item);
+        result.push(item);
+    });
+
+    return result.map(item=>{
+        const existing=findExistingContactForItem(item);
+        return {
+            item,
+            checked:true,
+            existingDocId:existing?existing._docId:null,
+            existingName:existing?existing.fullName:''
+        };
+    });
+}
+
+function findExistingContactForItem(item){
+    const emailSet=new Set((item.emails||[]).map(e=>normalizeEmail(e.address)).filter(Boolean));
+    if(emailSet.size){
+        const match=contacts.find(c=>(c.emails||[]).some(e=>emailSet.has(normalizeEmail(e.address))));
+        if(match)return match;
+    }
+    const n=normalizeName(item.fullName);
+    if(n){
+        const match=contacts.find(c=>normalizeName(c.fullName)===n&&(c.company||'').toLowerCase()===(item.company||'').toLowerCase());
+        if(match)return match;
+    }
+    return null;
+}
+
+function renderScanPreview(){
+    const resultsArea=document.getElementById('ms365-results-area');
+    if(!_scanPreviewItems.length){
+        resultsArea.innerHTML='<div style="font-size:0.85rem;color:var(--text-secondary);padding:12px 0;">No contacts extracted.</div>';
+        return;
+    }
+    const total=_scanPreviewItems.length;
+    const dupCount=_scanPreviewItems.filter(p=>p.existingDocId).length;
+    const newCount=total-dupCount;
+    resultsArea.innerHTML=`
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+            <strong style="font-size:0.95rem;">${total} contact${total!==1?'s':''} extracted</strong>
+            <span style="font-size:0.82rem;color:var(--text-secondary);">${newCount} new · ${dupCount} match${dupCount!==1?'es':''} existing</span>
+            <div style="margin-left:auto;display:flex;gap:8px;">
+                <button class="btn btn-ghost btn-sm" onclick="toggleAllPreview(true)">☑ Check All</button>
+                <button class="btn btn-ghost btn-sm" onclick="toggleAllPreview(false)">☐ Uncheck All</button>
+                <button class="btn btn-primary" onclick="saveSelectedPreview()">💾 Save Selected</button>
+            </div>
+        </div>
+        <div id="preview-list"></div>`;
+    renderPreviewList();
+}
+
+function renderPreviewList(){
+    const list=document.getElementById('preview-list');
+    if(!list)return;
+    list.innerHTML=_scanPreviewItems.map((p,i)=>{
+        const item=p.item;
+        const emailChips=(item.emails||[]).map(e=>`<span class="chip"><span class="chip-label">${esc(e.label||'email')}</span>${esc(e.address)}</span>`).join('');
+        const phoneChips=(item.phones||[]).map(ph=>`<span class="chip"><span class="chip-label">${esc(ph.label||'tel')}</span>${esc(ph.number)}</span>`).join('');
+        const addrChips=(item.addresses||[]).map(a=>{
+            const parts=[a.street,a.city,a.state,a.zip,a.country].filter(Boolean).join(', ');
+            return parts?`<span class="chip">${esc(parts)}</span>`:'';
+        }).join('');
+        const meta=[item.company,item.title,item.department].filter(Boolean).join(' · ');
+        const dupBadge=p.existingDocId?`<span class="badge badge-mobile" style="margin-left:6px;">Merges into ${esc(p.existingName||'existing')}</span>`:'<span class="badge badge-personal" style="margin-left:6px;">New</span>';
+        return `<div class="preview-card ${p.existingDocId?'duplicate':''}">
+            <input type="checkbox" ${p.checked?'checked':''} onchange="_scanPreviewItems[${i}].checked=this.checked">
+            <div class="preview-body">
+                <div class="preview-name">${esc(item.fullName||'(no name)')}${dupBadge}</div>
+                ${meta?`<div class="preview-meta">${esc(meta)}</div>`:''}
+                <div style="margin-top:6px;">${emailChips}${phoneChips}${addrChips}</div>
+                <div class="preview-edit-grid">
+                    <input type="text" value="${esc(item.fullName||'')}" oninput="_scanPreviewItems[${i}].item.fullName=this.value" placeholder="Full name">
+                    <input type="text" value="${esc(item.company||'')}" oninput="_scanPreviewItems[${i}].item.company=this.value" placeholder="Company">
+                    <input type="text" value="${esc(item.title||'')}" oninput="_scanPreviewItems[${i}].item.title=this.value" placeholder="Title">
+                    <input type="text" value="${esc((item.emails||[])[0]?.address||'')}" oninput="updatePreviewPrimaryEmail(${i},this.value)" placeholder="Primary email">
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function updatePreviewPrimaryEmail(i,val){
+    const item=_scanPreviewItems[i].item;
+    const clean=val.trim();
+    if(!(item.emails&&item.emails.length)){item.emails=[{address:clean,label:'work'}];}
+    else{item.emails[0]={...item.emails[0],address:clean};}
+    const existing=findExistingContactForItem(item);
+    _scanPreviewItems[i].existingDocId=existing?existing._docId:null;
+    _scanPreviewItems[i].existingName=existing?existing.fullName:'';
+}
+
+function toggleAllPreview(on){
+    _scanPreviewItems.forEach(p=>p.checked=on);
+    renderPreviewList();
+}
+
+async function saveSelectedPreview(){
+    const selected=_scanPreviewItems.filter(p=>p.checked);
+    if(!selected.length){showToast('Nothing selected',true);return;}
+    let created=0,updated=0,failed=0;
+    const resultsArea=document.getElementById('ms365-results-area');
+    for(let i=0;i<selected.length;i++){
+        resultsArea.innerHTML=renderProgressBox('Saving contacts…',i,selected.length);
+        const p=selected[i];
+        const item=p.item;
+        try{
+            const data={
+                fullName:item.fullName||'',
+                firstName:item.firstName||(item.fullName||'').split(/\s+/).slice(0,-1).join(' ')||'',
+                lastName:item.lastName||(item.fullName||'').split(/\s+/).slice(-1)[0]||'',
+                company:item.company||'',title:item.title||'',department:item.department||'',
+                emails:(item.emails||[]).filter(e=>e.address).map(e=>({address:String(e.address).trim(),label:e.label||''})),
+                phones:(item.phones||[]).filter(ph=>ph.number).map(ph=>({number:String(ph.number).trim(),label:ph.label||''})),
+                addresses:(item.addresses||[]).filter(a=>a.street||a.city||a.state||a.zip||a.country).map(a=>({...a})),
+                website:item.website||'',linkedin:item.linkedin||'',twitter:item.twitter||'',
+                source:item.source||'Email signature',
+                lastSeenAt:item.lastSeenAt||'',
+                notes:item.notes||'',
+                updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
+                deleted:false,
+            };
+            if(p.existingDocId){
+                const existing=contacts.find(c=>c._docId===p.existingDocId);
+                if(existing){
+                    const merged=mergeContactData(existing,[data]);
+                    const {_docId,createdAt,...updateData}=merged;
+                    updateData.updatedAt=firebase.firestore.FieldValue.serverTimestamp();
+                    updateData.deleted=false;
+                    await db.collection('contacts').doc(p.existingDocId).update(updateData);
+                    updated++;
+                } else {
+                    data.createdAt=firebase.firestore.FieldValue.serverTimestamp();
+                    await db.collection('contacts').add(data);
+                    created++;
+                }
+            } else {
+                data.createdAt=firebase.firestore.FieldValue.serverTimestamp();
+                await db.collection('contacts').add(data);
+                created++;
+            }
+        }catch(err){
+            console.warn('Save failed for contact:',err.message);
+            failed++;
+        }
+    }
+    resultsArea.innerHTML=`<div style="padding:14px;background:var(--bg-card);border-radius:10px;font-size:0.9rem;">
+        ✅ Saved ${created} new, updated ${updated} existing${failed?', '+failed+' failed':''}.
+        <button class="btn btn-ghost btn-sm" style="margin-left:10px;" onclick="showView('contacts')">View Contacts</button>
+    </div>`;
+    toast(`Saved ${created} new · ${updated} merged${failed?' · '+failed+' failed':''}`,failed?'warn':'success');
+}
+
+// ═══════════════════════════════════════
+//  SETTINGS
+// ═══════════════════════════════════════
+async function saveApiKey(){
+    const key=document.getElementById('api-key-input').value.trim();
+    if(!key){toast('Enter a key first.','error');return;}
+    await db.collection('settings').doc('apikey').set({key});
+    apiKey=key;toast('API key saved!','success');
+}
+async function testApiKey(){
+    const key=document.getElementById('api-key-input').value.trim();
+    const proxy=document.getElementById('api-proxy-input').value.trim();
+    if(!key){toast('Enter a key first.','error');return;}
+    const el=document.getElementById('api-status');el.style.display='block';el.className='api-status';el.textContent='Testing…';
+    try{
+        const testPayload={model:aiModel,max_tokens:10,messages:[{role:'user',content:'Hi'}]};
+        let res;
+        if(proxy){res=await fetch(proxy,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...testPayload,apiKey:key})});}
+        else{res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',mode:'cors',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true'},body:JSON.stringify(testPayload)});}
+        if(res.ok){el.className='api-status ok';el.textContent='✅ Connected! AI features are ready.';}
+        else{const d=await res.json().catch(()=>({}));el.className='api-status err';el.textContent=`❌ ${d.error?.message||res.status}`;}
+    }catch(err){el.className='api-status err';el.textContent=`❌ ${err.message}`;}
+}
+async function saveProxyUrl(){
+    const url=document.getElementById('api-proxy-input').value.trim();
+    await db.collection('settings').doc('proxy').set({url});
+    proxyUrl=url;
+    toast(url?'Proxy saved!':'Proxy cleared.','success');
+}
+
+// ═══════════════════════════════════════
+//  CSV EXPORT
+// ═══════════════════════════════════════
+function exportContactsCSV(){
+    const hdrs=['Full Name','First','Last','Company','Title','Department','Primary Email','All Emails','Primary Phone','All Phones','Website','LinkedIn','Twitter','Source','Last Seen','Notes'];
+    const rows=contacts.map(c=>{
+        const emails=(c.emails||[]).map(e=>e.address).filter(Boolean);
+        const phones=(c.phones||[]).map(p=>p.number).filter(Boolean);
+        return [c.fullName,c.firstName,c.lastName,c.company,c.title,c.department,emails[0]||'',emails.join('; '),phones[0]||'',phones.join('; '),c.website,c.linkedin,c.twitter,c.source,c.lastSeenAt,c.notes]
+            .map(v=>`"${String(v??'').replace(/"/g,'""')}"`);
+    });
+    const csv=[hdrs.join(','),...rows.map(r=>r.join(','))].join('\n');
+    const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(new Blob([csv],{type:'text/csv'})),download:`farmboss-contacts-${new Date().toISOString().slice(0,10)}.csv`});
+    a.click();URL.revokeObjectURL(a.href);toast('CSV exported!','success');
+}
+</script>
+</body>
+</html>

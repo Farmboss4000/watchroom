@@ -6,6 +6,7 @@
     <title>Farmboss Livestock</title>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
@@ -484,6 +485,19 @@
         <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:10px;font-style:italic;">AI-researched current US cattle market prices (fed cattle, feeders, cull cows). Every refresh is logged. Informational only — consult a livestock broker or USDA AMS for trading decisions.</p>
         <div id="cattle-price-status" style="font-size:0.85rem;color:var(--text-secondary);min-height:20px;margin-bottom:8px;"></div>
         <div id="cattle-price-result"></div>
+    </div>
+    <div class="card">
+        <div class="card-title">
+            <div class="card-title-left">📈 Fed Steers — 10-Year Price History</div>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <span id="fed-history-meta" style="font-size:0.78rem;color:var(--text-secondary);"></span>
+                <button class="btn btn-primary btn-sm" id="btn-refresh-fed-history" onclick="refreshFedSteerHistory()">🔄 Refresh History</button>
+            </div>
+        </div>
+        <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:10px;font-style:italic;">Approximate annual-average live fed steer prices (5-area weighted, USD/cwt) over the past 10 years. Researched by AI from USDA AMS data; verify against official sources for trading decisions.</p>
+        <div id="fed-history-status" style="font-size:0.85rem;color:var(--text-secondary);min-height:20px;margin-bottom:8px;"></div>
+        <canvas id="fed-history-chart" style="max-height:300px;"></canvas>
+        <div id="fed-history-commentary" style="font-size:0.84rem;color:var(--text-secondary);margin-top:10px;"></div>
     </div>
     <div class="card">
         <div class="card-title"><div class="card-title-left">📊 Inventory by Animal Type</div></div>
@@ -1110,6 +1124,7 @@ async function initApp() {
         populateCatSelect(); populateBreedList(); syncCatFilters();
         showView('dashboard');
         loadLatestCattlePrice();
+        loadFedSteerHistory();
     } catch(err) {
         document.getElementById('loading-screen').innerHTML =
             `<p style="color:var(--danger);padding:20px;text-align:center;">
@@ -2302,6 +2317,128 @@ async function deleteCattlePriceEntry(id) {
         toast('Deleted');
         openCattlePriceHistory();
     } catch(e) { toast('Failed to delete: ' + e.message, true); }
+}
+
+// ═══════════════════════════════════════
+//  FED STEER 10-YEAR HISTORY CHART
+// ═══════════════════════════════════════
+let _fedHistoryChart = null;
+
+async function refreshFedSteerHistory() {
+    const statusEl = document.getElementById('fed-history-status');
+    const btn = document.getElementById('btn-refresh-fed-history');
+    btn.disabled = true; btn.textContent = '⏳ Researching…';
+    statusEl.textContent = 'Pulling 10-year fed steer history…';
+    statusEl.style.color = 'var(--text-secondary)';
+    try {
+        const currentYear = new Date().getFullYear();
+        const startYear = currentYear - 9;
+        const prompt = `You are an agricultural market analyst. Provide annual-average US fed steer prices (live, 5-area weighted, USD/cwt) for each calendar year from ${startYear} through ${currentYear}. Use realistic figures based on USDA AMS Livestock Market News historical data. The current year should be a year-to-date average.
+
+Return ONLY valid JSON with this exact shape:
+{
+  "unit": "USD/cwt",
+  "category": "Fed Steers (live, 5-area)",
+  "points": [
+    { "year": ${startYear}, "avgPrice": 135.00 },
+    { "year": ${startYear+1}, "avgPrice": 128.50 },
+    ...
+    { "year": ${currentYear}, "avgPrice": 185.00 }
+  ],
+  "commentary": "2-3 sentences on the overall price trend over the decade — cycle peaks, troughs, and current drivers."
+}
+
+Include exactly 10 years. Numbers must be realistic (fed steer prices have ranged roughly $110-$200/cwt in the last decade). No preamble, no code fences, JSON only.`;
+        const raw = await callClaudeTextOnly(prompt, 1200);
+        if (!raw) return;
+        const match = raw.match(/\{[\s\S]*\}/);
+        if (!match) throw new Error('Could not parse AI response.');
+        const data = JSON.parse(match[0]);
+        const nowIso = new Date().toISOString();
+        try {
+            await db.collection('livestock_reports').doc('fed_steer_history').set({
+                data,
+                fetchedAt: nowIso,
+                yearsSpan: (data.points||[]).length
+            });
+        } catch(saveErr) { console.warn('Fed history save failed', saveErr); }
+        renderFedSteerHistory(data, nowIso);
+        statusEl.textContent = `✅ Refreshed ${(data.points||[]).length}-year series.`;
+        statusEl.style.color = 'var(--success)';
+    } catch(err) {
+        statusEl.textContent = '❌ ' + err.message;
+        statusEl.style.color = 'var(--danger)';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '🔄 Refresh History';
+    }
+}
+
+function renderFedSteerHistory(data, fetchedAt) {
+    const canvas = document.getElementById('fed-history-chart');
+    const meta = document.getElementById('fed-history-meta');
+    const commentaryEl = document.getElementById('fed-history-commentary');
+    if (!canvas) return;
+    if (meta && fetchedAt) {
+        const when = new Date(fetchedAt);
+        meta.textContent = isNaN(when) ? '' : `Last refreshed ${when.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})}`;
+    }
+    const points = Array.isArray(data?.points) ? [...data.points].sort((a,b)=>(a.year||0)-(b.year||0)) : [];
+    if (!points.length) {
+        if (_fedHistoryChart) { _fedHistoryChart.destroy(); _fedHistoryChart = null; }
+        canvas.style.display = 'none';
+        if (commentaryEl) commentaryEl.innerHTML = '<p style="color:var(--text-secondary);font-size:0.88rem;">No historical data yet — click Refresh History.</p>';
+        return;
+    }
+    canvas.style.display = '';
+    if (commentaryEl) commentaryEl.textContent = data.commentary || '';
+    if (typeof Chart === 'undefined') {
+        if (commentaryEl) commentaryEl.innerHTML += '<div style="color:var(--danger);margin-top:8px;">Chart library failed to load — reload the page.</div>';
+        return;
+    }
+    if (_fedHistoryChart) _fedHistoryChart.destroy();
+    _fedHistoryChart = new Chart(canvas, {
+        type: 'line',
+        data: {
+            labels: points.map(p => String(p.year)),
+            datasets: [{
+                label: 'Fed Steers (USD/cwt, annual avg)',
+                data: points.map(p => Number(p.avgPrice)),
+                borderColor: '#16a34a',
+                backgroundColor: 'rgba(22,163,74,0.12)',
+                borderWidth: 2.5,
+                pointRadius: 4,
+                pointBackgroundColor: '#16a34a',
+                tension: 0.3,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: ctx => ` $${Number(ctx.parsed.y).toFixed(2)} /cwt` } }
+            },
+            scales: {
+                x: { grid: { color: 'rgba(0,0,0,0.06)' }, ticks: { color: '#6b7280' } },
+                y: { ticks: { color: '#6b7280', callback: v => '$' + Number(v).toFixed(0) }, grid: { color: 'rgba(0,0,0,0.06)' } }
+            }
+        }
+    });
+}
+
+async function loadFedSteerHistory() {
+    try {
+        const snap = await db.collection('livestock_reports').doc('fed_steer_history').get();
+        if (!snap.exists) {
+            const commentaryEl = document.getElementById('fed-history-commentary');
+            if (commentaryEl) commentaryEl.innerHTML = '<p style="color:var(--text-secondary);font-size:0.88rem;">No historical data yet — click <strong>🔄 Refresh History</strong> to pull 10 years of fed steer averages.</p>';
+            return;
+        }
+        const d = snap.data();
+        if (d && d.data) renderFedSteerHistory(d.data, d.fetchedAt || null);
+    } catch(e) { console.warn('Fed history load failed', e); }
 }
 </script>
 </body>

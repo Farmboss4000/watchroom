@@ -692,6 +692,7 @@ let tripDocuments = [];
 let apiKey = '';
 let proxyUrl = '';
 let ms365ClientId = '';
+let ms365TenantId = '';
 let msalClient = null;
 let msAccount = null;
 let worldMapInst = null;
@@ -760,7 +761,10 @@ async function loadSettings() {
     const pd = await db.collection('settings').doc('proxy').get().catch(() => null);
     if (pd?.exists) proxyUrl = pd.data().url || '';
     const md = await db.collection('settings').doc('ms365').get().catch(() => null);
-    if (md?.exists) ms365ClientId = md.data().clientId || '';
+    if (md?.exists) {
+        ms365ClientId = md.data().clientId || '';
+        ms365TenantId = md.data().tenantId || '';
+    }
     if (ms365ClientId) initMSAL();
 }
 
@@ -797,9 +801,13 @@ function renderMS365Setup() {
 
     if (ms365ClientId) {
         setupArea.innerHTML = `
-            <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">
                 <span style="font-size:0.82rem;color:var(--text-secondary);">Azure Client ID:</span>
                 <code style="font-size:0.78rem;">${esc(ms365ClientId)}</code>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+                <span style="font-size:0.82rem;color:var(--text-secondary);">Tenant:</span>
+                <code style="font-size:0.78rem;">${esc(ms365TenantId || 'common')}</code>
                 <button class="btn btn-ghost btn-sm" onclick="clearMS365ClientId()">Change</button>
             </div>
             <button class="btn btn-primary" onclick="connectMS365()">🔐 Sign in to Microsoft 365</button>`;
@@ -817,10 +825,14 @@ function renderMS365Setup() {
                 <li>Name it anything (e.g. "Globetrotting"). Under <em>Redirect URI</em> choose <strong>Single-page application (SPA)</strong> and enter:<br>
                     <code>${esc(redirectUri)}</code></li>
                 <li>Click Register. Then go to <strong>API permissions → Add a permission → Microsoft Graph → Delegated</strong> → search <strong>Mail.Read</strong> → Add permissions</li>
-                <li>Copy the <strong>Application (client) ID</strong> from the Overview page and paste it below</li>
+                <li>From the Overview page, copy the <strong>Application (client) ID</strong> and the <strong>Directory (tenant) ID</strong> and paste them below</li>
             </ol>
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+                <input type="text" id="ms365-client-id-input" placeholder="Application (client) ID"
+                    style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.85rem;background:var(--bg-secondary);color:var(--text-primary);">
+            </div>
             <div style="display:flex;gap:8px;align-items:center;">
-                <input type="text" id="ms365-client-id-input" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                <input type="text" id="ms365-tenant-id-input" placeholder="Directory (tenant) ID — leave blank for multi-tenant"
                     style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.85rem;background:var(--bg-secondary);color:var(--text-primary);">
                 <button class="btn btn-primary" onclick="saveMS365ClientId()">Save</button>
             </div>
@@ -830,15 +842,18 @@ function renderMS365Setup() {
 
 async function saveMS365ClientId() {
     const val = (document.getElementById('ms365-client-id-input').value || '').trim();
+    const tenant = (document.getElementById('ms365-tenant-id-input').value || '').trim();
     if (!val) return;
-    await db.collection('settings').doc('ms365').set({ clientId: val }).catch(() => {});
+    await db.collection('settings').doc('ms365').set({ clientId: val, tenantId: tenant }).catch(() => {});
     ms365ClientId = val;
+    ms365TenantId = tenant;
     initMSAL();
     renderMS365Setup();
 }
 
 function clearMS365ClientId() {
     ms365ClientId = '';
+    ms365TenantId = '';
     msalClient = null;
     msAccount = null;
     db.collection('settings').doc('ms365').delete().catch(() => {});
@@ -850,7 +865,7 @@ function initMSAL() {
     msalClient = new msal.PublicClientApplication({
         auth: {
             clientId: ms365ClientId,
-            authority: 'https://login.microsoftonline.com/common',
+            authority: `https://login.microsoftonline.com/${ms365TenantId || 'common'}`,
             redirectUri: window.location.origin + window.location.pathname
         },
         cache: { cacheLocation: 'sessionStorage', storeAuthStateInCookie: false }

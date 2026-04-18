@@ -971,7 +971,7 @@ async function startMS365Scan() {
 
         // Fetch up to maxEmails, newest first
         let messages = [];
-        let url = `https://graph.microsoft.com/v1.0/me/mailFolders/${encodeURIComponent(folderId)}/messages?$select=id,subject,body,from,receivedDateTime&$top=50&$orderby=receivedDateTime%20desc`;
+        let url = `https://graph.microsoft.com/v1.0/me/mailFolders/${encodeURIComponent(folderId)}/messages?$select=id,subject,body,from,receivedDateTime,hasAttachments&$top=50&$orderby=receivedDateTime%20desc`;
         while (url && messages.length < maxEmails) {
             const res  = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
             const data = await res.json();
@@ -992,7 +992,7 @@ async function startMS365Scan() {
         for (let i = 0; i < messages.length; i += 5) {
             resultsArea.innerHTML = `<div style="text-align:center;padding:20px 0;"><div class="spinner" style="margin:0 auto 10px;"></div><div style="font-size:0.85rem;color:var(--text-secondary);">Analyzing emails with AI… (${i} / ${messages.length})</div></div>`;
             const batch = messages.slice(i, i + 5);
-            const batchTrips = await extractTripsFromEmails(batch);
+            const batchTrips = await extractTripsFromEmails(batch, token);
             allExtracted.push(...batchTrips);
         }
 
@@ -1025,34 +1025,73 @@ async function startMS365Scan() {
     }
 }
 
-async function extractTripsFromEmails(batch) {
-    const emailBlocks = batch.map((msg, idx) => {
+async function fetchMS365Attachments(msgId, token) {
+    try {
+        const r = await fetch(`https://graph.microsoft.com/v1.0/me/messages/${encodeURIComponent(msgId)}/attachments?$select=id,name,contentType,size,contentBytes,@odata.type`, {
+            headers: { Authorization: 'Bearer ' + token }
+        });
+        const d = await r.json();
+        if (!r.ok) return [];
+        return (d.value || []).filter(a => a['@odata.type'] === '#microsoft.graph.fileAttachment' && a.contentBytes);
+    } catch { return []; }
+}
+
+async function extractTripsFromEmails(batch, token) {
+    const MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024; // 4MB per attachment
+    const content = [];
+
+    for (let idx = 0; idx < batch.length; idx++) {
+        const msg = batch[idx];
         const raw = msg.body?.content || '';
         const body = msg.body?.contentType === 'html'
             ? raw.replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 2500)
             : raw.substring(0, 2500);
-        return `--- EMAIL ${idx + 1} ---\nSubject: ${msg.subject || ''}\nDate: ${msg.receivedDateTime || ''}\nFrom: ${msg.from?.emailAddress?.address || ''}\n\n${body}`;
-    }).join('\n\n');
+        content.push({
+            type: 'text',
+            text: `--- EMAIL ${idx + 1} ---\nSubject: ${msg.subject || ''}\nDate: ${msg.receivedDateTime || ''}\nFrom: ${msg.from?.emailAddress?.address || ''}\n\n${body}`
+        });
 
-    const prompt = `${emailBlocks}
+        if (msg.hasAttachments && token) {
+            const atts = await fetchMS365Attachments(msg.id, token);
+            for (const a of atts) {
+                if (a.size > MAX_ATTACHMENT_BYTES) continue;
+                const ct = (a.contentType || '').toLowerCase();
+                if (ct === 'application/pdf') {
+                    content.push({ type: 'text', text: `[Attachment for EMAIL ${idx + 1}: ${a.name}]` });
+                    content.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: a.contentBytes } });
+                } else if (ct === 'image/jpeg' || ct === 'image/png' || ct === 'image/jpg' || ct === 'image/webp' || ct === 'image/gif') {
+                    content.push({ type: 'text', text: `[Attachment for EMAIL ${idx + 1}: ${a.name}]` });
+                    content.push({ type: 'image', source: { type: 'base64', media_type: ct === 'image/jpg' ? 'image/jpeg' : ct, data: a.contentBytes } });
+                } else if (ct.startsWith('text/') || ct === 'message/rfc822' || ct === 'text/calendar' || a.name?.match(/\.(txt|ics|eml|csv)$/i)) {
+                    try {
+                        const decoded = atob(a.contentBytes).substring(0, 5000);
+                        content.push({ type: 'text', text: `[Attachment for EMAIL ${idx + 1}: ${a.name}]\n${decoded}` });
+                    } catch {}
+                }
+            }
+        }
+    }
 
-These are ${batch.length} emails from a travel folder. For each email that contains a travel booking, flight confirmation, hotel reservation, or trip itinerary, extract the trip details.
+    content.push({
+        type: 'text',
+        text: `These are ${batch.length} emails (with any attachments) from a travel folder. For each email that contains a travel booking, flight confirmation, hotel reservation, or trip itinerary, extract the trip details. Use both email body and attachments.
 Return ONLY a JSON array (empty array [] if none found):
 [{"name":"descriptive trip name","departureDate":"YYYY-MM-DD or null","returnDate":"YYYY-MM-DD or null","destinations":[{"city":"","state":"","country":""}],"notes":"one-line summary"},...]
-Rules: ignore newsletters, promotions, and non-travel emails. One JSON object per distinct trip. No explanation, just the array.`;
+Rules: ignore newsletters, promotions, and non-travel emails. One JSON object per distinct trip. No explanation, just the array.`
+    });
 
     try {
         const res = await fetch(proxyUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ apiKey, model: 'claude-opus-4-6', max_tokens: 2048, stream: false,
-                messages: [{ role: 'user', content: prompt }] })
+                messages: [{ role: 'user', content }] })
         });
         const text = await res.text();
         const j = JSON.parse(text);
         if (!res.ok) throw new Error(j?.error?.message || 'API error');
-        const raw = (j?.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
-        const match = raw.match(/\[[\s\S]*\]/);
+        const rawResp = (j?.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+        const match = rawResp.match(/\[[\s\S]*\]/);
         if (!match) return [];
         const arr = JSON.parse(match[0]);
         return Array.isArray(arr) ? arr.filter(t => (t.destinations?.length || t.departureDate) && t.name) : [];

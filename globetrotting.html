@@ -940,9 +940,14 @@ async function loadMS365Folders() {
                     <option value="">— choose a folder —</option>
                     ${folders.map(f => `<option value="${esc(f.id)}">${'\u00A0\u00A0'.repeat(f.depth)}${f.depth ? '↳ ' : ''}${esc(f.name)} (${f.count} emails)</option>`).join('')}
                 </select>
+                <label style="font-size:0.82rem;color:var(--text-secondary);display:flex;align-items:center;gap:6px;">
+                    Max emails:
+                    <input type="number" id="ms365-max-emails" value="100" min="1" max="5000" step="50"
+                        style="width:90px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:0.88rem;background:var(--bg-secondary);color:var(--text-primary);">
+                </label>
                 <button class="btn btn-primary" onclick="startMS365Scan()">📨 Scan for Trips</button>
             </div>
-            <p style="font-size:0.78rem;color:var(--text-secondary);margin-top:8px;">Tip: In Outlook, create a folder called "Travel" and move your booking confirmations, flight tickets, and hotel reservations there.</p>`;
+            <p style="font-size:0.78rem;color:var(--text-secondary);margin-top:8px;">Tip: In Outlook, create a folder called "Travel" and move your booking confirmations, flight tickets, and hotel reservations there. Large scans may take several minutes — the analyzer processes 5 emails per API call.</p>`;
     } catch(e) {
         folderArea.innerHTML = `<div style="color:var(--danger);font-size:0.85rem;">${esc(e.message)}</div>`;
     }
@@ -958,30 +963,34 @@ async function startMS365Scan() {
     resultsArea.style.display = 'block';
     resultsArea.innerHTML = `<div style="text-align:center;padding:20px 0;"><div class="spinner" style="margin:0 auto 10px;"></div><div style="font-size:0.85rem;color:var(--text-secondary);">Fetching emails…</div></div>`;
 
+    const maxInput = document.getElementById('ms365-max-emails');
+    const maxEmails = Math.max(1, Math.min(5000, parseInt(maxInput?.value, 10) || 100));
+
     try {
         const token = await getMS365Token();
 
-        // Fetch up to 100 emails, newest first
+        // Fetch up to maxEmails, newest first
         let messages = [];
         let url = `https://graph.microsoft.com/v1.0/me/mailFolders/${encodeURIComponent(folderId)}/messages?$select=id,subject,body,from,receivedDateTime&$top=50&$orderby=receivedDateTime%20desc`;
-        while (url && messages.length < 100) {
+        while (url && messages.length < maxEmails) {
             const res  = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error?.message || 'Failed to fetch emails');
             messages = messages.concat(data.value || []);
             url = data['@odata.nextLink'] || null;
+            resultsArea.innerHTML = `<div style="text-align:center;padding:20px 0;"><div class="spinner" style="margin:0 auto 10px;"></div><div style="font-size:0.85rem;color:var(--text-secondary);">Fetching emails… (${Math.min(messages.length, maxEmails)} / ${maxEmails})</div></div>`;
         }
+        if (messages.length > maxEmails) messages = messages.slice(0, maxEmails);
 
         if (!messages.length) {
             resultsArea.innerHTML = `<div style="font-size:0.85rem;color:var(--text-secondary);padding:12px 0;">No emails found in this folder.</div>`;
             return;
         }
 
-        resultsArea.innerHTML = `<div style="text-align:center;padding:20px 0;"><div class="spinner" style="margin:0 auto 10px;"></div><div style="font-size:0.85rem;color:var(--text-secondary);">Analyzing ${messages.length} emails with AI…</div></div>`;
-
         // Process in batches of 5
         const allExtracted = [];
         for (let i = 0; i < messages.length; i += 5) {
+            resultsArea.innerHTML = `<div style="text-align:center;padding:20px 0;"><div class="spinner" style="margin:0 auto 10px;"></div><div style="font-size:0.85rem;color:var(--text-secondary);">Analyzing emails with AI… (${i} / ${messages.length})</div></div>`;
             const batch = messages.slice(i, i + 5);
             const batchTrips = await extractTripsFromEmails(batch);
             allExtracted.push(...batchTrips);

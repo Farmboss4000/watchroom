@@ -586,11 +586,28 @@
     <div class="card">
         <div class="card-title">
             <div class="card-title-left">🚨 Drug Interaction Check</div>
-            <button class="btn btn-primary btn-sm" id="btn-check-interactions" onclick="checkDrugInteractions()">🔍 Check for Interactions</button>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <span id="interaction-meta" style="font-size:0.78rem;color:var(--text-secondary);"></span>
+                <button class="btn btn-ghost btn-sm" id="btn-interaction-history" onclick="openInteractionHistory()">📚 History</button>
+                <button class="btn btn-primary btn-sm" id="btn-check-interactions" onclick="checkDrugInteractions()">🔍 Check for Interactions</button>
+            </div>
         </div>
         <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:10px;font-style:italic;">AI screens all <strong>active</strong> medications (across all people) for potentially negative interactions. This is an informational aid — always confirm with a pharmacist or prescriber.</p>
         <div id="interaction-status" style="font-size:0.85rem;color:var(--text-secondary);min-height:20px;margin-bottom:8px;"></div>
         <div id="interaction-result"></div>
+    </div>
+    <div class="card">
+        <div class="card-title">
+            <div class="card-title-left">🩺 Overall Prescription Course</div>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <span id="rx-course-meta" style="font-size:0.78rem;color:var(--text-secondary);"></span>
+                <button class="btn btn-ghost btn-sm" id="btn-rx-course-history" onclick="openRxCourseHistory()">📚 History</button>
+                <button class="btn btn-primary btn-sm" id="btn-rx-course" onclick="generateRxCourse()">🔬 Generate Course</button>
+            </div>
+        </div>
+        <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:10px;font-style:italic;">AI reviews each person's <strong>active</strong> medications together and describes what health conditions the overall combination is most likely addressing. Informational only; always consult your pharmacist or prescriber.</p>
+        <div id="rx-course-status" style="font-size:0.85rem;color:var(--text-secondary);min-height:20px;margin-bottom:8px;"></div>
+        <div id="rx-course-result"></div>
     </div>
     <div class="card">
         <div class="card-title">
@@ -694,6 +711,30 @@
         <div id="rx-history-body" style="max-height:60vh;overflow-y:auto;"></div>
         <div class="modal-actions">
             <button class="btn btn-ghost" onclick="closeRxOverviewHistory()">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- DRUG INTERACTION HISTORY MODAL -->
+<div class="modal-overlay" id="interaction-history-modal" onclick="if(event.target===this)closeInteractionHistory()">
+    <div class="modal" style="max-width:640px;">
+        <div class="modal-title">📚 Drug Interaction Check History</div>
+        <div class="modal-sub" id="interaction-history-sub" style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:14px;">—</div>
+        <div id="interaction-history-body" style="max-height:60vh;overflow-y:auto;"></div>
+        <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="closeInteractionHistory()">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- RX COURSE HISTORY MODAL -->
+<div class="modal-overlay" id="rx-course-history-modal" onclick="if(event.target===this)closeRxCourseHistory()">
+    <div class="modal" style="max-width:640px;">
+        <div class="modal-title">📚 Overall Prescription Course History</div>
+        <div class="modal-sub" id="rx-course-history-sub" style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:14px;">—</div>
+        <div id="rx-course-history-body" style="max-height:60vh;overflow-y:auto;"></div>
+        <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="closeRxCourseHistory()">Close</button>
         </div>
     </div>
 </div>
@@ -914,6 +955,8 @@ async function initApp(){
         // Paint the cached prescription overview into the dashboard + reports so users see it
         // without having to regenerate (and so it's the same across devices)
         loadCachedRxOverview();
+        loadCachedInteractionCheck();
+        loadCachedRxCourse();
     }catch(err){
         document.getElementById('loading-screen').innerHTML=`<p style="color:var(--danger);padding:20px;text-align:center;">Error: ${err.message}<br><br><button class="btn btn-ghost" onclick="doSignOut()">Sign Out</button></p>`;
     }
@@ -1527,7 +1570,19 @@ If no clinically meaningful interactions exist, return {"interactions": [], "sum
         const jsonMatch=raw.match(/\{[\s\S]*\}/);
         if(!jsonMatch) throw new Error('Could not parse AI response.');
         const data=JSON.parse(jsonMatch[0]);
-        renderInteractionResult(data);
+        const nowIso = new Date().toISOString();
+        let savedId = null;
+        try{
+            const ref = await db.collection('drug_interactions_history').add({
+                data,
+                generatedAt: nowIso,
+                medCount: active.length,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            savedId = ref.id;
+        }catch(saveErr){ console.warn('Interaction history save failed', saveErr); }
+        _currentInteractionCheckId = savedId;
+        renderInteractionResult(data, nowIso);
         const cnt=(data.interactions||[]).length;
         statusEl.textContent=cnt?`✅ Check complete — ${cnt} interaction${cnt!==1?'s':''} flagged.`:'✅ No interactions flagged.';
         statusEl.style.color=cnt?'#b45309':'var(--success,#16a34a)';
@@ -1535,11 +1590,322 @@ If no clinically meaningful interactions exist, return {"interactions": [], "sum
         statusEl.textContent='❌ '+err.message;
         statusEl.style.color='var(--danger)';
     }finally{
-        btn.disabled=false; btn.textContent='🔍 Check for Interactions';
+        btn.disabled=false;
+        btn.textContent = _currentInteractionCheckId ? '🔄 Re-check Interactions' : '🔍 Check for Interactions';
     }
 }
 
-function renderInteractionResult(data){
+let _currentInteractionCheckId = null;
+
+async function loadCachedInteractionCheck(){
+    try{
+        const snap = await db.collection('drug_interactions_history').orderBy('createdAt','desc').limit(1).get();
+        if (!snap.empty){
+            const doc = snap.docs[0];
+            const d = doc.data();
+            if (d && d.data){
+                _currentInteractionCheckId = doc.id;
+                renderInteractionResult(d.data, d.generatedAt || null);
+                const btn = document.getElementById('btn-check-interactions');
+                if (btn) btn.textContent = '🔄 Re-check Interactions';
+            }
+        }
+    }catch(e){ console.warn('Interaction history load failed', e); }
+}
+
+async function openInteractionHistory(){
+    const modal = document.getElementById('interaction-history-modal');
+    const body = document.getElementById('interaction-history-body');
+    const sub = document.getElementById('interaction-history-sub');
+    modal.style.display = 'flex';
+    void modal.offsetWidth;
+    modal.classList.add('show');
+    body.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-secondary);">Loading…</div>';
+    sub.textContent = '';
+    try{
+        const snap = await db.collection('drug_interactions_history').orderBy('createdAt','desc').limit(100).get();
+        if (snap.empty){
+            body.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-secondary);">No interaction checks yet. Click <strong>🔍 Check for Interactions</strong> to run your first one.</div>';
+            sub.textContent = '';
+            return;
+        }
+        const docs = snap.docs.map(d => ({_id:d.id, ...d.data()}));
+        sub.textContent = `${docs.length} past check${docs.length!==1?'s':''} · newest first. The most recent is always shown on the Reports page.`;
+        body.innerHTML = docs.map(d => {
+            const when = d.generatedAt ? new Date(d.generatedAt) : null;
+            const whenStr = when && !isNaN(when)
+                ? when.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})
+                : '—';
+            const mc = d.medCount || 0;
+            const ic = (d.data?.interactions||[]).length;
+            const isCurrent = d._id === _currentInteractionCheckId;
+            return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:${isCurrent?'#eef2ff':'#fff'};gap:10px;">
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:0.9rem;font-weight:600;">${esc(whenStr)}${isCurrent?' <span style="color:var(--accent);font-size:0.72rem;font-weight:700;letter-spacing:0.4px;">· CURRENT</span>':''}</div>
+                    <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:2px;">${mc} medication${mc!==1?'s':''} screened · ${ic} interaction${ic!==1?'s':''} flagged</div>
+                </div>
+                <div style="display:flex;gap:6px;flex-shrink:0;">
+                    <button class="btn btn-ghost btn-sm" onclick="viewInteractionEntry('${d._id}')">👁 View</button>
+                    <button class="btn btn-ghost btn-sm" style="color:#b91c1c;" onclick="deleteInteractionEntry('${d._id}')">🗑</button>
+                </div>
+            </div>`;
+        }).join('');
+    }catch(e){
+        body.innerHTML = `<div style="padding:20px;text-align:center;color:var(--danger);">Failed to load history: ${esc(e.message)}</div>`;
+    }
+}
+
+function closeInteractionHistory(){
+    const m = document.getElementById('interaction-history-modal');
+    m.classList.remove('show');
+    m.style.display = 'none';
+}
+
+async function viewInteractionEntry(id){
+    try{
+        const snap = await db.collection('drug_interactions_history').doc(id).get();
+        if (!snap.exists){ toast('Entry not found.','error'); return; }
+        const d = snap.data();
+        _currentInteractionCheckId = id;
+        renderInteractionResult(d.data, d.generatedAt || null);
+        closeInteractionHistory();
+        toast('Loaded past check','success');
+    }catch(e){ toast('Failed to load: '+e.message,'error'); }
+}
+
+async function deleteInteractionEntry(id){
+    if (!confirm('Delete this past interaction check? This cannot be undone.')) return;
+    try{
+        await db.collection('drug_interactions_history').doc(id).delete();
+        if (_currentInteractionCheckId === id) _currentInteractionCheckId = null;
+        toast('Check deleted','success');
+        openInteractionHistory();
+    }catch(e){ toast('Failed to delete: '+e.message,'error'); }
+}
+
+// ── OVERALL PRESCRIPTION COURSE ──
+let _currentRxCourseId = null;
+
+async function generateRxCourse(){
+    const active = buildActiveMedsList();
+    const statusEl = document.getElementById('rx-course-status');
+    const btn = document.getElementById('btn-rx-course');
+    if (!active.length){
+        statusEl.textContent = 'No active medications to analyze.';
+        statusEl.style.color = 'var(--text-secondary)';
+        document.getElementById('rx-course-result').innerHTML = '';
+        return;
+    }
+    const byPerson = {};
+    active.forEach(m => { (byPerson[m.person] = byPerson[m.person] || []).push(m); });
+
+    btn.disabled = true; btn.textContent = '⏳ Analyzing…';
+    statusEl.textContent = 'Reviewing prescription course…';
+    statusEl.style.color = 'var(--text-secondary)';
+
+    try{
+        const sections = Object.entries(byPerson).map(([person, list]) => {
+            const lines = list.map(m => `- ${m.medName}${m.genericName?` (${m.genericName})`:''}${m.dosage?` ${m.dosage}`:''}${m.frequency?` — ${m.frequency}`:''}${m.medClass?` [${m.medClass}]`:''}${m.purpose?` — purpose noted: ${m.purpose}`:''}`).join('\n');
+            return `PERSON: ${person}\n${lines}`;
+        }).join('\n\n');
+        const prompt = `You are a clinical pharmacist. For each person below, look at their full list of ACTIVE medications as a whole and infer what combination of health conditions the overall prescription course is most likely addressing. Group medications by the condition they are likely treating. Do not invent conditions; only infer from standard indications for the drugs listed.
+
+${sections}
+
+Return ONLY a valid JSON object with this exact shape:
+{
+  "people": [
+    {
+      "person": "name",
+      "summary": "2-4 sentence plain-English summary of what this person's overall prescription course appears to be treating and how the medications work together.",
+      "conditions": [
+        {
+          "condition": "Likely condition (e.g., Type 2 Diabetes)",
+          "confidence": "High" | "Moderate" | "Low",
+          "supportingMeds": ["Med A", "Med B"],
+          "rationale": "1 short sentence on why these meds together suggest this condition."
+        }
+      ],
+      "unclassified": ["Med names that don't fit a clear condition group"]
+    }
+  ],
+  "overallSummary": "One-sentence plain-English summary across all people."
+}
+
+Keep language accessible (6th-grade reading level). If a person has only one medication, still include a brief entry. If no condition is clearly inferable, set conditions to [] and explain in the summary.`;
+        const raw = await callClaudeText(prompt, 3500);
+        const jsonMatch = raw.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error('Could not parse AI response.');
+        const data = JSON.parse(jsonMatch[0]);
+        const nowIso = new Date().toISOString();
+        let savedId = null;
+        try{
+            const ref = await db.collection('rx_course_history').add({
+                data,
+                generatedAt: nowIso,
+                medCount: active.length,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            savedId = ref.id;
+        }catch(saveErr){ console.warn('Course history save failed', saveErr); }
+        _currentRxCourseId = savedId;
+        renderRxCourse(data, nowIso);
+        const pc = (data.people||[]).length;
+        statusEl.textContent = `✅ Course analysis complete for ${pc} ${pc===1?'person':'people'}.`;
+        statusEl.style.color = 'var(--success,#16a34a)';
+    }catch(err){
+        statusEl.textContent = '❌ ' + err.message;
+        statusEl.style.color = 'var(--danger)';
+    }finally{
+        btn.disabled = false;
+        btn.textContent = _currentRxCourseId ? '🔄 Refresh Course' : '🔬 Generate Course';
+    }
+}
+
+function renderRxCourse(data, generatedAt){
+    const meta = document.getElementById('rx-course-meta');
+    if (meta){
+        if (generatedAt){
+            const when = new Date(generatedAt);
+            const whenStr = isNaN(when) ? '' : when.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
+            meta.textContent = whenStr ? `Last run ${whenStr}` : '';
+        } else {
+            meta.textContent = '';
+        }
+    }
+    const el = document.getElementById('rx-course-result');
+    if (!el) return;
+    const people = data.people || [];
+    if (!people.length){
+        el.innerHTML = `<div style="padding:14px;background:#f3f4f6;border:1px solid var(--border);border-radius:8px;font-size:0.9rem;color:var(--text-secondary);">No analysis available.</div>`;
+        return;
+    }
+    const overall = data.overallSummary ? `<div style="padding:10px 14px;background:#f3f4f6;border-left:3px solid #6366f1;border-radius:4px;font-size:0.88rem;margin-bottom:14px;">${esc(data.overallSummary)}</div>` : '';
+    const confStyle = c => {
+        const k = (c||'').toLowerCase();
+        if (k.startsWith('high')) return 'background:#dcfce7;color:#166534;border-color:#86efac;';
+        if (k.startsWith('mod')) return 'background:#fef3c7;color:#92400e;border-color:#fbbf24;';
+        return 'background:#e0f2fe;color:#075985;border-color:#7dd3fc;';
+    };
+    el.innerHTML = overall + people.map(p => {
+        const conds = (p.conditions||[]).map(c => `
+            <div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-top:8px;background:#fff;">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+                    <span style="font-weight:600;font-size:0.92rem;">${esc(c.condition||'—')}</span>
+                    <span style="font-size:0.72rem;font-weight:700;padding:2px 8px;border-radius:999px;border:1px solid;letter-spacing:0.3px;text-transform:uppercase;${confStyle(c.confidence)}">${esc(c.confidence||'—')}</span>
+                </div>
+                <div style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:4px;">${esc((c.supportingMeds||[]).join(', ') || '—')}</div>
+                <div style="font-size:0.85rem;">${esc(c.rationale||'')}</div>
+            </div>`).join('');
+        const unclassified = (p.unclassified||[]).length
+            ? `<div style="font-size:0.8rem;color:var(--text-secondary);margin-top:8px;"><strong>Unclassified:</strong> ${esc((p.unclassified||[]).join(', '))}</div>`
+            : '';
+        return `<div style="border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px;background:#fafafa;">
+            <div style="font-weight:700;font-size:1rem;margin-bottom:6px;">👤 ${esc(p.person||'—')}</div>
+            <div style="font-size:0.9rem;line-height:1.5;margin-bottom:6px;">${esc(p.summary||'')}</div>
+            ${conds}
+            ${unclassified}
+        </div>`;
+    }).join('');
+}
+
+async function loadCachedRxCourse(){
+    try{
+        const snap = await db.collection('rx_course_history').orderBy('createdAt','desc').limit(1).get();
+        if (!snap.empty){
+            const doc = snap.docs[0];
+            const d = doc.data();
+            if (d && d.data){
+                _currentRxCourseId = doc.id;
+                renderRxCourse(d.data, d.generatedAt || null);
+                const btn = document.getElementById('btn-rx-course');
+                if (btn) btn.textContent = '🔄 Refresh Course';
+            }
+        }
+    }catch(e){ console.warn('Course load failed', e); }
+}
+
+async function openRxCourseHistory(){
+    const modal = document.getElementById('rx-course-history-modal');
+    const body = document.getElementById('rx-course-history-body');
+    const sub = document.getElementById('rx-course-history-sub');
+    modal.style.display = 'flex';
+    void modal.offsetWidth;
+    modal.classList.add('show');
+    body.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-secondary);">Loading…</div>';
+    sub.textContent = '';
+    try{
+        const snap = await db.collection('rx_course_history').orderBy('createdAt','desc').limit(100).get();
+        if (snap.empty){
+            body.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-secondary);">No course analyses yet. Click <strong>🔬 Generate Course</strong> to create your first one.</div>';
+            sub.textContent = '';
+            return;
+        }
+        const docs = snap.docs.map(d => ({_id:d.id, ...d.data()}));
+        sub.textContent = `${docs.length} past analys${docs.length!==1?'es':'is'} · newest first. The most recent is always shown on the Reports page.`;
+        body.innerHTML = docs.map(d => {
+            const when = d.generatedAt ? new Date(d.generatedAt) : null;
+            const whenStr = when && !isNaN(when)
+                ? when.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})
+                : '—';
+            const mc = d.medCount || 0;
+            const pc = (d.data?.people||[]).length;
+            const isCurrent = d._id === _currentRxCourseId;
+            return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:${isCurrent?'#eef2ff':'#fff'};gap:10px;">
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:0.9rem;font-weight:600;">${esc(whenStr)}${isCurrent?' <span style="color:var(--accent);font-size:0.72rem;font-weight:700;letter-spacing:0.4px;">· CURRENT</span>':''}</div>
+                    <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:2px;">${pc} ${pc===1?'person':'people'} · ${mc} medication${mc!==1?'s':''}</div>
+                </div>
+                <div style="display:flex;gap:6px;flex-shrink:0;">
+                    <button class="btn btn-ghost btn-sm" onclick="viewRxCourseEntry('${d._id}')">👁 View</button>
+                    <button class="btn btn-ghost btn-sm" style="color:#b91c1c;" onclick="deleteRxCourseEntry('${d._id}')">🗑</button>
+                </div>
+            </div>`;
+        }).join('');
+    }catch(e){
+        body.innerHTML = `<div style="padding:20px;text-align:center;color:var(--danger);">Failed to load history: ${esc(e.message)}</div>`;
+    }
+}
+
+function closeRxCourseHistory(){
+    const m = document.getElementById('rx-course-history-modal');
+    m.classList.remove('show');
+    m.style.display = 'none';
+}
+
+async function viewRxCourseEntry(id){
+    try{
+        const snap = await db.collection('rx_course_history').doc(id).get();
+        if (!snap.exists){ toast('Entry not found.','error'); return; }
+        const d = snap.data();
+        _currentRxCourseId = id;
+        renderRxCourse(d.data, d.generatedAt || null);
+        closeRxCourseHistory();
+        toast('Loaded past course analysis','success');
+    }catch(e){ toast('Failed to load: '+e.message,'error'); }
+}
+
+async function deleteRxCourseEntry(id){
+    if (!confirm('Delete this past course analysis? This cannot be undone.')) return;
+    try{
+        await db.collection('rx_course_history').doc(id).delete();
+        if (_currentRxCourseId === id) _currentRxCourseId = null;
+        toast('Analysis deleted','success');
+        openRxCourseHistory();
+    }catch(e){ toast('Failed to delete: '+e.message,'error'); }
+}
+
+function renderInteractionResult(data, generatedAt){
+    const meta = document.getElementById('interaction-meta');
+    if (meta){
+        if (generatedAt){
+            const when = new Date(generatedAt);
+            const whenStr = isNaN(when) ? '' : when.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
+            meta.textContent = whenStr ? `Last run ${whenStr}` : '';
+        } else {
+            meta.textContent = '';
+        }
+    }
     const el=document.getElementById('interaction-result');
     const list=data.interactions||[];
     if(!list.length){

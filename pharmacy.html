@@ -306,6 +306,7 @@
             <div class="card-title-left">💊 Prescription Overview</div>
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
                 <span id="dash-rx-overview-meta" style="font-size:0.78rem;color:var(--text-secondary);"></span>
+                <button class="btn btn-ghost btn-sm" id="btn-dash-rx-overview-history" onclick="openRxOverviewHistory()">📚 History</button>
                 <button class="btn btn-primary btn-sm" id="btn-dash-rx-overview" onclick="generateRxOverview('dash')">🔬 Generate Overview</button>
             </div>
         </div>
@@ -594,7 +595,11 @@
     <div class="card">
         <div class="card-title">
             <div class="card-title-left">💊 Prescription Overview</div>
-            <button class="btn btn-primary btn-sm" id="btn-rx-overview" onclick="generateRxOverview()">🔬 Generate Overview</button>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <span id="rx-overview-meta" style="font-size:0.78rem;color:var(--text-secondary);"></span>
+                <button class="btn btn-ghost btn-sm" id="btn-rx-overview-history" onclick="openRxOverviewHistory()">📚 History</button>
+                <button class="btn btn-primary btn-sm" id="btn-rx-overview" onclick="generateRxOverview()">🔬 Generate Overview</button>
+            </div>
         </div>
         <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:10px;font-style:italic;">AI-generated summary of each active medication — what it treats and common side effects. Informational only; always consult your pharmacist or prescriber.</p>
         <div id="rx-overview-status" style="font-size:0.85rem;color:var(--text-secondary);min-height:20px;margin-bottom:8px;"></div>
@@ -681,6 +686,18 @@
 </div><!-- /app -->
 
 <!-- DETAIL MODAL -->
+<!-- RX OVERVIEW HISTORY MODAL -->
+<div class="modal-overlay" id="rx-overview-history-modal" onclick="if(event.target===this)closeRxOverviewHistory()">
+    <div class="modal" style="max-width:640px;">
+        <div class="modal-title">📚 Prescription Overview History</div>
+        <div class="modal-sub" id="rx-history-sub" style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:14px;">—</div>
+        <div id="rx-history-body" style="max-height:60vh;overflow-y:auto;"></div>
+        <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="closeRxOverviewHistory()">Close</button>
+        </div>
+    </div>
+</div>
+
 <div class="modal-overlay" id="detail-modal">
     <div class="modal" style="max-width:600px;">
         <div class="modal-title" id="detail-title"></div>
@@ -1553,9 +1570,10 @@ function renderInteractionResult(data){
 
 // ── RX OVERVIEW ───────────────────────────────────────────────────
 const RX_OVERVIEW_TARGETS = {
-    reports: { status:'rx-overview-status', result:'rx-overview-result', btn:'btn-rx-overview', meta:null },
+    reports: { status:'rx-overview-status', result:'rx-overview-result', btn:'btn-rx-overview', meta:'rx-overview-meta' },
     dash:    { status:'dash-rx-overview-status', result:'dash-rx-overview-result', btn:'btn-dash-rx-overview', meta:'dash-rx-overview-meta' }
 };
+let _currentRxOverviewId = null; // which history entry is currently shown
 
 async function generateRxOverview(target='reports'){
     const t = RX_OVERVIEW_TARGETS[target] || RX_OVERVIEW_TARGETS.reports;
@@ -1602,48 +1620,147 @@ Keep language accessible (6th-grade reading level). Keep each list to 3–6 item
         const jsonMatch=raw.match(/\{[\s\S]*\}/);
         if(!jsonMatch) throw new Error('Could not parse AI response.');
         const data=JSON.parse(jsonMatch[0]);
-        // Cache to Firestore so every device/browser sees the same overview
+        // Save as a history entry so every past refresh is retained
+        const nowIso = new Date().toISOString();
+        let savedId = null;
         try{
-            await db.collection('rx_reports').doc('overview').set({
+            const ref = await db.collection('rx_overview_history').add({
                 data,
-                generatedAt: new Date().toISOString(),
-                medCount: active.length
+                generatedAt: nowIso,
+                medCount: active.length,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
-        }catch(saveErr){ console.warn('Overview cache save failed', saveErr); }
-        renderRxOverviewAll(data, new Date().toISOString());
+            savedId = ref.id;
+        }catch(saveErr){ console.warn('Overview history save failed', saveErr); }
+        _currentRxOverviewId = savedId;
+        renderRxOverviewAll(data, nowIso);
         statusEl.textContent=`✅ Generated overview for ${(data.entries||[]).length} medication${(data.entries||[]).length!==1?'s':''}.`;
         statusEl.style.color='var(--success,#16a34a)';
     }catch(err){
         statusEl.textContent='❌ '+err.message;
         statusEl.style.color='var(--danger)';
     }finally{
-        btn.disabled=false; btn.textContent='🔬 Generate Overview';
+        btn.disabled=false;
+        // After a successful run the overview is showing, so label matches Refresh. If nothing rendered
+        // (error or no meds), keep the original Generate label.
+        btn.textContent = _currentRxOverviewId ? '🔄 Refresh Overview' : '🔬 Generate Overview';
     }
 }
 
 // Render into every target that has a result container (dashboard + reports)
 function renderRxOverviewAll(data, generatedAt){
     for (const key of Object.keys(RX_OVERVIEW_TARGETS)){
-        if (document.getElementById(RX_OVERVIEW_TARGETS[key].result)){
-            renderRxOverview(data, key);
-            const t = RX_OVERVIEW_TARGETS[key];
-            if (t.meta && generatedAt){
-                const when = new Date(generatedAt);
-                const whenStr = isNaN(when) ? '' : when.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
-                const meta = document.getElementById(t.meta);
-                if (meta) meta.textContent = whenStr ? `Generated ${whenStr}` : '';
+        const t = RX_OVERVIEW_TARGETS[key];
+        if (!document.getElementById(t.result)) continue;
+        renderRxOverview(data, key);
+        if (t.meta){
+            const meta = document.getElementById(t.meta);
+            if (meta){
+                if (generatedAt){
+                    const when = new Date(generatedAt);
+                    const whenStr = isNaN(when) ? '' : when.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
+                    meta.textContent = whenStr ? `Last run ${whenStr}` : '';
+                } else {
+                    meta.textContent = '';
+                }
             }
         }
+        // Swap the generate button to a refresh label once an overview is shown
+        const btn = document.getElementById(t.btn);
+        if (btn && !btn.disabled) btn.textContent = '🔄 Refresh Overview';
     }
 }
 
 async function loadCachedRxOverview(){
     try{
-        const snap = await db.collection('rx_reports').doc('overview').get();
-        if (!snap.exists) return;
+        // Preferred: latest entry from history collection
+        const snap = await db.collection('rx_overview_history').orderBy('createdAt','desc').limit(1).get();
+        if (!snap.empty){
+            const doc = snap.docs[0];
+            const d = doc.data();
+            if (d && d.data){
+                _currentRxOverviewId = doc.id;
+                renderRxOverviewAll(d.data, d.generatedAt || null);
+                return;
+            }
+        }
+        // Fallback: old single-doc cache (pre-history implementation)
+        const legacy = await db.collection('rx_reports').doc('overview').get();
+        if (legacy.exists){
+            const d = legacy.data();
+            if (d && d.data) renderRxOverviewAll(d.data, d.generatedAt || null);
+        }
+    }catch(e){ console.warn('Overview load failed', e); }
+}
+
+// ── HISTORY MODAL ──
+async function openRxOverviewHistory(){
+    const modal = document.getElementById('rx-overview-history-modal');
+    const body = document.getElementById('rx-history-body');
+    const sub = document.getElementById('rx-history-sub');
+    modal.style.display = 'flex';
+    void modal.offsetWidth;
+    modal.classList.add('show');
+    body.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-secondary);">Loading…</div>';
+    sub.textContent = '';
+    try{
+        const snap = await db.collection('rx_overview_history').orderBy('createdAt','desc').limit(100).get();
+        if (snap.empty){
+            body.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-secondary);">No overviews generated yet. Click <strong>🔬 Generate Overview</strong> to create your first one.</div>';
+            sub.textContent = '';
+            return;
+        }
+        const docs = snap.docs.map(d => ({_id:d.id, ...d.data()}));
+        sub.textContent = `${docs.length} past overview${docs.length!==1?'s':''} · newest first. The most recent is always shown on the dashboard.`;
+        body.innerHTML = docs.map(d => {
+            const when = d.generatedAt ? new Date(d.generatedAt) : null;
+            const whenStr = when && !isNaN(when)
+                ? when.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})
+                : '—';
+            const mc = d.medCount || (d.data?.entries||[]).length || 0;
+            const isCurrent = d._id === _currentRxOverviewId;
+            return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:${isCurrent?'#eef2ff':'#fff'};gap:10px;">
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:0.9rem;font-weight:600;">${esc(whenStr)}${isCurrent?' <span style="color:var(--accent);font-size:0.72rem;font-weight:700;letter-spacing:0.4px;">· CURRENT</span>':''}</div>
+                    <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:2px;">${mc} medication${mc!==1?'s':''}</div>
+                </div>
+                <div style="display:flex;gap:6px;flex-shrink:0;">
+                    <button class="btn btn-ghost btn-sm" onclick="viewRxOverviewEntry('${d._id}')">👁 View</button>
+                    <button class="btn btn-ghost btn-sm" style="color:#b91c1c;" onclick="deleteRxOverviewEntry('${d._id}')">🗑</button>
+                </div>
+            </div>`;
+        }).join('');
+    }catch(e){
+        body.innerHTML = `<div style="padding:20px;text-align:center;color:var(--danger);">Failed to load history: ${esc(e.message)}</div>`;
+    }
+}
+
+function closeRxOverviewHistory(){
+    const m = document.getElementById('rx-overview-history-modal');
+    m.classList.remove('show');
+    m.style.display = 'none';
+}
+
+async function viewRxOverviewEntry(id){
+    try{
+        const snap = await db.collection('rx_overview_history').doc(id).get();
+        if (!snap.exists){ toast('Entry not found.','error'); return; }
         const d = snap.data();
-        if (d && d.data) renderRxOverviewAll(d.data, d.generatedAt || null);
-    }catch(e){ console.warn('Overview cache load failed', e); }
+        _currentRxOverviewId = id;
+        renderRxOverviewAll(d.data, d.generatedAt || null);
+        closeRxOverviewHistory();
+        toast('Loaded past overview','success');
+    }catch(e){ toast('Failed to load: '+e.message,'error'); }
+}
+
+async function deleteRxOverviewEntry(id){
+    if (!confirm('Delete this past overview? This cannot be undone.')) return;
+    try{
+        await db.collection('rx_overview_history').doc(id).delete();
+        if (_currentRxOverviewId === id) _currentRxOverviewId = null;
+        toast('Overview deleted','success');
+        openRxOverviewHistory(); // refresh the modal
+    }catch(e){ toast('Failed to delete: '+e.message,'error'); }
 }
 
 function renderRxOverview(data, target='reports'){

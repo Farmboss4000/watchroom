@@ -950,11 +950,14 @@ function renderVendors(){
         const contactCount=(v.contacts||[]).length;
         const primary=(v.contacts||[])[0];
         const contactStr=contactCount?`${esc(primary.name||'—')}${contactCount>1?` <span style="color:var(--text-secondary);">+${contactCount-1}</span>`:''}`:'—';
-        const acctCount=(v.accounts||[]).length;
+        const acctNums=(v.accounts||[]).map(a=>a.accountNumber).filter(Boolean);
+        const acctStr=acctNums.length
+            ? acctNums.map(n=>`<span class="mono" style="font-size:0.78rem;">${esc(n)}</span>`).join('<br>')
+            : '—';
         return`<tr>
             <td style="cursor:pointer" onclick="editVendor('${v._docId}')"><strong>${esc(v.name)||'—'}</strong>${v.phone?`<br><span style="font-size:0.75rem;color:var(--text-secondary);">${esc(v.phone)}</span>`:''}</td>
             <td>${contactStr}</td>
-            <td>${acctCount?acctCount+' account'+(acctCount!==1?'s':''):'—'}</td>
+            <td>${acctStr}</td>
             <td>${v.transactionCount||0}</td>
             <td>${v.totalSpend>0?`<span class="link-total" onclick="jumpToVendorTransactions('${v._docId}','${esc(v.name)}')">${fmtMoney(v.totalSpend)}</span>`:'—'}</td>
             <td>${fmtDate(v.lastDate)}</td>

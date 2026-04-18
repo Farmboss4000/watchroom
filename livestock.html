@@ -2180,8 +2180,15 @@ function renderCattlePrice(data, fetchedAt) {
         const when = new Date(fetchedAt);
         meta.textContent = isNaN(when) ? '' : `Last refreshed ${when.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})}`;
     }
-    const prices = (data && data.prices) || [];
-    if (!prices.length) { el.innerHTML = '<p style="color:var(--text-secondary);font-size:0.88rem;">No price data yet — click Refresh Price.</p>'; return; }
+    // Only show fed-steer rows (filter out legacy categories like feeders, heifers, cull cows, boxed beef, futures)
+    const allPrices = (data && data.prices) || [];
+    const prices = allPrices.filter(p => {
+        const cat = (p.category || '').toLowerCase();
+        if (!/fed steer|600/.test(cat)) return false;
+        if (/feeder/.test(cat)) return false;
+        return true;
+    });
+    if (!prices.length) { el.innerHTML = '<p style="color:var(--text-secondary);font-size:0.88rem;">No fed steer data yet — click Refresh Price.</p>'; return; }
     const trendIcon = t => {
         const k = (t||'').toLowerCase();
         if (k.startsWith('up')) return '<span style="color:#16a34a;font-weight:600;">▲</span>';

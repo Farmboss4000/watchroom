@@ -338,6 +338,7 @@
         <div class="toolbar">
             <input type="text" id="vnd-search" placeholder="Search vendors..." oninput="renderVendors()">
             <button class="btn btn-primary btn-sm" onclick="showView('add-vendor')">+ Add Vendor</button>
+            <button class="btn btn-ghost btn-sm" id="btn-merge-dupes" onclick="openMergeDuplicates()">🔀 Merge Duplicates</button>
         </div>
         <div class="table-wrapper">
             <table id="vnd-table"><thead><tr>
@@ -512,6 +513,21 @@
 </main>
 </div><!-- end #app -->
 
+<!-- MERGE DUPLICATES MODAL -->
+<div class="modal-overlay" id="merge-modal-overlay" onclick="closeMergeModal(event)">
+    <div class="modal" style="max-width:560px;max-height:80vh;display:flex;flex-direction:column;">
+        <div class="modal-hdr" style="flex-shrink:0;">
+            <div><div class="modal-title">🔀 Merge Duplicate Vendors</div><div style="font-size:0.78rem;color:var(--text-secondary);margin-top:2px;">Each group below has multiple records with the same name. The one with the most transactions is kept; others are merged into it.</div></div>
+            <button class="modal-close" onclick="closeMergeModal()">✕</button>
+        </div>
+        <div id="merge-modal-body" style="overflow-y:auto;flex:1;padding:4px 0;"></div>
+        <div class="modal-actions" style="flex-shrink:0;">
+            <button class="btn btn-primary btn-sm" id="btn-merge-all" onclick="mergeAllGroups()">🔀 Merge All Groups</button>
+            <button class="btn btn-ghost btn-sm" onclick="closeMergeModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+
 <div id="toast" class="toast"></div>
 <div id="print-area"><div id="print-content"></div></div>
 
@@ -546,6 +562,8 @@ function makeDedupeKey(vendorId,date,amount,invoiceNumber){return `${vendorId||'
 function typeBadgeClass(t){const x=(t||'').toLowerCase();if(x==='invoice')return 'badge-invoice';if(x==='bill')return 'badge-bill';if(x==='receipt')return 'badge-receipt';return 'badge-default';}
 
 // AUTH
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMergeModal(); });
+
 auth.onAuthStateChanged(user=>{
     if(user){
         document.getElementById('login-screen').style.display='none';
@@ -1034,6 +1052,117 @@ async function softDeleteDoc(collection,docId,siteTag){
     const binRef=await db.collection('recycle_bin').add({originalCollection:collection,originalDocId:docId,site:siteTag,deletedAt:firebase.firestore.FieldValue.serverTimestamp(),data:snap.data()});
     await ref.delete();return binRef.id;
 }
+// ── MERGE DUPLICATES ──
+let _mergeGroups = [];
+
+function findDuplicateGroups() {
+    // Group vendors by normalised name
+    const byName = {};
+    vendors.forEach(v => {
+        const key = (v.name||'').trim().toLowerCase();
+        if (!key) return;
+        if (!byName[key]) byName[key] = [];
+        byName[key].push(v);
+    });
+    // Only keep groups with 2+ records
+    return Object.values(byName).filter(g => g.length > 1);
+}
+
+function openMergeDuplicates() {
+    _mergeGroups = findDuplicateGroups();
+    const body = document.getElementById('merge-modal-body');
+    const mergeAllBtn = document.getElementById('btn-merge-all');
+    if (!_mergeGroups.length) {
+        body.innerHTML = '<div style="padding:20px 4px;text-align:center;color:var(--text-secondary);">✅ No duplicate vendors found!</div>';
+        mergeAllBtn.style.display = 'none';
+    } else {
+        mergeAllBtn.style.display = '';
+        body.innerHTML = _mergeGroups.map((group, gi) => {
+            // Sort: most transactions first = keep that one
+            const sorted = [...group].sort((a,b) => {
+                const ca = transactions.filter(t=>t.vendorId===a._docId).length;
+                const cb = transactions.filter(t=>t.vendorId===b._docId).length;
+                return cb - ca;
+            });
+            const primary = sorted[0];
+            const dupes = sorted.slice(1);
+            const rows = sorted.map((v, i) => {
+                const txnCount = transactions.filter(t=>t.vendorId===v._docId).length;
+                const tag = i === 0
+                    ? `<span style="font-size:0.7rem;background:#22c55e;color:#fff;border-radius:10px;padding:1px 7px;margin-left:6px;">KEEP</span>`
+                    : `<span style="font-size:0.7rem;background:#ef4444;color:#fff;border-radius:10px;padding:1px 7px;margin-left:6px;">MERGE</span>`;
+                return `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);">
+                    <div style="font-size:0.85rem;">${esc(v.name)}${tag}<span style="font-size:0.75rem;color:var(--text-secondary);margin-left:8px;">${txnCount} transaction${txnCount!==1?'s':''}</span></div>
+                    <div style="font-size:0.75rem;color:var(--text-secondary);font-family:monospace;">${v._docId.slice(0,8)}…</div>
+                </div>`;
+            }).join('');
+            return `<div style="background:var(--bg-card);border-radius:8px;padding:12px 14px;margin-bottom:12px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                    <strong style="font-size:0.9rem;">${esc(primary.name)}</strong>
+                    <button class="btn btn-primary btn-sm" onclick="mergeGroup(${gi})">Merge (${group.length})</button>
+                </div>
+                ${rows}
+            </div>`;
+        }).join('');
+    }
+    document.getElementById('merge-modal-overlay').classList.add('show');
+}
+
+function closeMergeModal(e) {
+    if (e && e.target !== document.getElementById('merge-modal-overlay')) return;
+    document.getElementById('merge-modal-overlay').classList.remove('show');
+}
+
+async function mergeGroup(gi) {
+    const group = _mergeGroups[gi];
+    if (!group) return;
+    const sorted = [...group].sort((a,b) => {
+        const ca = transactions.filter(t=>t.vendorId===a._docId).length;
+        const cb = transactions.filter(t=>t.vendorId===b._docId).length;
+        return cb - ca;
+    });
+    const primary = sorted[0];
+    const dupes = sorted.slice(1);
+    try {
+        const batch = db.batch();
+        // Re-link all transactions from duplicate vendors (by vendorId OR matching vendorName only)
+        transactions.forEach(t => {
+            const isLinkedToDupe = dupes.some(d => d._docId === t.vendorId);
+            const isNameOnlyMatch = !t.vendorId && (t.vendorName||'').trim().toLowerCase() === primary.name.trim().toLowerCase();
+            if (isLinkedToDupe || isNameOnlyMatch) {
+                batch.update(db.collection('vendors_transactions').doc(t._docId), {
+                    vendorId: primary._docId,
+                    vendorName: primary.name
+                });
+            }
+        });
+        await batch.commit();
+        // Soft-delete duplicate vendor records
+        for (const dupe of dupes) {
+            await softDeleteDoc('vendors_vendors', dupe._docId, 'vendors');
+        }
+        toast(`✅ Merged ${dupes.length} duplicate${dupes.length!==1?'s':''} into "${primary.name}"`, 'success');
+        // Refresh the modal
+        openMergeDuplicates();
+    } catch(e) {
+        toast('Merge failed: ' + e.message, 'error');
+    }
+}
+
+async function mergeAllGroups() {
+    if (!_mergeGroups.length) return;
+    const btn = document.getElementById('btn-merge-all');
+    btn.disabled = true; btn.textContent = '⏳ Merging…';
+    for (let i = 0; i < _mergeGroups.length; i++) {
+        await mergeGroup(i);
+        // Small delay between groups so onSnapshot has time to update
+        await new Promise(r => setTimeout(r, 400));
+    }
+    btn.disabled = false; btn.textContent = '🔀 Merge All Groups';
+    // Refresh once more after all done
+    openMergeDuplicates();
+}
+
 async function deleteVendor(docId){
     const v=vendors.find(x=>x._docId===docId);if(!v)return;
     const count=transactions.filter(t=>t.vendorId===docId).length;

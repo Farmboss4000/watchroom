@@ -529,6 +529,7 @@
                 <div class="form-actions">
                     <button class="btn btn-primary" onclick="saveTrip()">💾 Save Trip</button>
                     <button class="btn btn-ghost" onclick="cancelForm()">Cancel</button>
+                    <button class="btn btn-danger" id="form-delete-btn" onclick="deleteTripFromForm()" style="display:none;margin-left:auto;">🗑 Delete Trip</button>
                 </div>
             </div>
         </div>
@@ -1375,6 +1376,8 @@ function resetForm() {
     document.getElementById('form-resummarize').style.display = 'none';
     renderTripDocsList();
     document.getElementById('form-title').textContent = 'Add New Trip';
+    const delBtn = document.getElementById('form-delete-btn');
+    if (delBtn) delBtn.style.display = 'none';
     document.getElementById('f-name').value = '';
     document.getElementById('f-status').value = 'planned';
     document.getElementById('f-dep').value = '';
@@ -1395,6 +1398,8 @@ function loadFormForEdit(id) {
     editingId = id;
     formDests = (t.destinations || []).map(d => ({...d}));
     document.getElementById('form-title').textContent = 'Edit Trip';
+    const delBtn = document.getElementById('form-delete-btn');
+    if (delBtn) delBtn.style.display = 'inline-flex';
     document.getElementById('f-name').value = t.name || '';
     document.getElementById('f-status').value = t.status || 'planned';
     document.getElementById('f-dep').value = t.departureDate || '';
@@ -1510,6 +1515,17 @@ async function softDelete(id) {
     await db.collection('globetrotting_trips').doc(id).update({ deleted: true });
     await loadTrips();
     renderAll();
+    showToast('Trip moved to recycle bin');
+}
+
+async function deleteTripFromForm() {
+    if (!editingId) return;
+    if (!confirm('Move this trip to the recycle bin?')) return;
+    await db.collection('globetrotting_trips').doc(editingId).update({ deleted: true });
+    await loadTrips();
+    resetForm();
+    renderAll();
+    showView('trips');
     showToast('Trip moved to recycle bin');
 }
 

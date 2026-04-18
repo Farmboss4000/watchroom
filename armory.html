@@ -545,6 +545,7 @@
         <button onclick="showView('reports')">Reports</button>
         <button onclick="showView('categories')">Categories</button>
         <button onclick="showView('packing-list')">Packing List</button>
+        <button onclick="showView('gun-trusts')">📋 Gun Trusts</button>
         <button onclick="showView('settings')">⚙ Settings</button>
         <button onclick="showView('recycle-bin')">🗑 Recycle Bin</button>
         <button onclick="showView('diary')">📓 Diary</button>
@@ -1240,6 +1241,69 @@ service cloud.firestore {
     </div>
 </div>
 
+<!-- ══ GUN TRUSTS ══ -->
+<div id="view-gun-trusts" class="view">
+    <div class="toolbar">
+        <div class="toolbar-left">
+            <h2 style="font-size:1.1rem;font-weight:700;">📋 Gun Trusts</h2>
+            <span style="font-size:0.82rem;color:var(--text-secondary);">Legal trusts holding NFA or firearm assets — AI summarized &amp; searchable</span>
+        </div>
+        <div style="display:flex;gap:8px;">
+            <button class="btn btn-primary btn-sm" onclick="openTrustModal()">+ Add Gun Trust</button>
+        </div>
+    </div>
+    <div class="card">
+        <div class="toolbar" style="margin-bottom:12px;">
+            <input type="text" id="trust-search" placeholder="🔍 Search trusts, trustees, beneficiaries..." oninput="renderTrustsList()" style="flex:1;min-width:240px;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:0.88rem;">
+        </div>
+        <div id="trusts-list"></div>
+        <div id="trusts-empty" class="empty" style="display:none;"><div class="empty-icon">📋</div><p>No gun trusts filed yet.</p><p style="font-size:0.82rem;margin-top:8px;">Click <strong>+ Add Gun Trust</strong> to upload a trust document and let AI extract the details.</p></div>
+    </div>
+</div>
+
+<!-- ══ GUN TRUST MODAL ══ -->
+<div class="modal-overlay" id="trust-modal" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;align-items:flex-start;justify-content:center;z-index:9500;padding:20px;overflow-y:auto;">
+    <div class="modal" style="background:#fff;border-radius:10px;padding:24px;width:100%;max-width:720px;margin:20px auto;max-height:none;">
+        <div class="modal-title" id="trust-modal-title" style="font-size:1.15rem;font-weight:700;margin-bottom:4px;">Add Gun Trust</div>
+        <div class="modal-sub" style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:16px;">Upload the trust document, then let AI extract the details — or edit manually.</div>
+        <input type="hidden" id="trust-edit-doc-id">
+
+        <!-- Upload + AI section -->
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:16px;">
+            <label style="display:block;font-size:0.8rem;font-weight:600;color:#374151;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.4px;">Trust Document (PDF or image)</label>
+            <input type="file" id="trust-file" accept="image/*,application/pdf" onchange="onTrustFileSelected(this)" style="margin-bottom:8px;">
+            <div id="trust-file-preview" style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:10px;"></div>
+            <button type="button" class="btn btn-primary btn-sm" id="btn-analyze-trust" onclick="analyzeTrust()" disabled>🤖 Analyze with AI</button>
+            <span id="trust-ai-status" style="font-size:0.82rem;margin-left:10px;color:var(--text-secondary);"></span>
+        </div>
+
+        <!-- Manual fields -->
+        <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+            <div class="form-group" style="grid-column:1/-1;"><label>Trust Name *</label><input type="text" id="tf-name" placeholder="e.g. Stoebner Family Gun Trust" required></div>
+            <div class="form-group"><label>Grantor (Settlor)</label><input type="text" id="tf-grantor" placeholder="Person who created the trust"></div>
+            <div class="form-group"><label>Effective Date</label><input type="date" id="tf-effective"></div>
+            <div class="form-group"><label>State</label><input type="text" id="tf-state" placeholder="e.g. South Dakota"></div>
+            <div class="form-group"><label>Trust Type</label><select id="tf-type"><option value="Revocable">Revocable</option><option value="Irrevocable">Irrevocable</option><option value="Single-Shot">Single-Shot</option><option value="Other">Other</option></select></div>
+            <div class="form-group" style="grid-column:1/-1;"><label>Trustees (comma-separated)</label><input type="text" id="tf-trustees" placeholder="e.g. John Smith, Jane Smith"></div>
+            <div class="form-group" style="grid-column:1/-1;"><label>Successor Trustees</label><input type="text" id="tf-successors" placeholder="Who takes over if primary trustee can't serve"></div>
+            <div class="form-group" style="grid-column:1/-1;"><label>Beneficiaries</label><input type="text" id="tf-beneficiaries" placeholder="e.g. Sarah Smith, Michael Smith"></div>
+            <div class="form-group" style="grid-column:1/-1;"><label>NFA Items Covered</label><input type="text" id="tf-nfa" placeholder="e.g. Suppressors, Short-Barreled Rifles, Machine Guns"></div>
+            <div class="form-group" style="grid-column:1/-1;"><label>Linked Firearms (from inventory)</label>
+                <select id="tf-linked-firearms" multiple style="min-height:120px;"></select>
+                <div style="font-size:0.75rem;color:var(--text-secondary);margin-top:4px;">Hold Ctrl/Cmd to select multiple</div>
+            </div>
+            <div class="form-group" style="grid-column:1/-1;"><label>AI Summary</label><textarea id="tf-summary" rows="5" placeholder="Plain-English summary of what the trust does, who's covered, and key provisions."></textarea></div>
+            <div class="form-group" style="grid-column:1/-1;"><label>Notes</label><textarea id="tf-notes" rows="2" placeholder="Attorney contact, review notes, etc."></textarea></div>
+        </div>
+
+        <div class="modal-actions" style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;">
+            <button type="button" class="btn btn-primary" onclick="saveTrust()">💾 Save Trust</button>
+            <button type="button" class="btn btn-ghost" onclick="closeTrustModal()">Cancel</button>
+            <a id="trust-doc-link" href="" target="_blank" class="btn btn-ghost" style="display:none;margin-left:auto;">📄 Open Document</a>
+        </div>
+    </div>
+</div>
+
 <!-- ══ DIARY ══ -->
 <div id="view-diary" class="view">
     <div class="card" style="margin-bottom:16px;">
@@ -1459,7 +1523,13 @@ let formPhotos = {
     form4:     { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false }
 };
 
-const VIEWS = ['dashboard','add-item','inventory','reports','categories','packing-list','settings','recycle-bin','diary'];
+const VIEWS = ['dashboard','add-item','inventory','reports','categories','packing-list','gun-trusts','settings','recycle-bin','diary'];
+
+// Gun Trusts state
+let trusts = [];
+let unsubTrusts = null;
+let nextTrustId = 5001;
+let trustFile = { file:null, base64:null, mimeType:null, existingUrl:null };
 
 // ═══════════════════════════════════════
 //  AUTH
@@ -1476,7 +1546,8 @@ auth.onAuthStateChanged(user => {
         document.getElementById('loading-screen').style.display = 'none';
         document.getElementById('app').style.display            = 'none';
         if (unsubItems) { unsubItems(); unsubItems = null; }
-        items = [];
+        if (unsubTrusts) { unsubTrusts(); unsubTrusts = null; }
+        items = []; trusts = [];
     }
 });
 
@@ -1536,6 +1607,13 @@ async function initApp() {
             renderDashboard(); renderInventory(); renderReport(); renderCaliberReport(); renderCompatibilityReport();
             if (firstLoad) { firstLoad = false; autoRefreshMarketValues(); }
         });
+        // Load nextTrustId and subscribe to gun trusts
+        const trustsCfg = await db.collection('config').doc('trusts').get();
+        if (trustsCfg.exists && trustsCfg.data().nextTrustId) nextTrustId = trustsCfg.data().nextTrustId;
+        unsubTrusts = db.collection('gun_trusts').onSnapshot(snap => {
+            trusts = snap.docs.map(doc => ({ _docId:doc.id, ...doc.data() }));
+            renderTrustsList();
+        }, err => console.warn('trusts snap err', err));
         document.getElementById('loading-screen').style.display = 'none';
         document.getElementById('app').style.display            = 'flex';
         populateCatSelect(); populateMfrList(); populateCalList(); syncCatFilters();
@@ -1594,6 +1672,271 @@ function showView(v) {
     if (v==='recycle-bin')  loadRecycleBin();
     if (v === 'diary') initDiary();
     if (v === 'packing-list') { syncCatFilters(); renderPackingPicker(); }
+    if (v === 'gun-trusts') renderTrustsList();
+}
+
+// ═══════════════════════════════════════
+//  GUN TRUSTS
+// ═══════════════════════════════════════
+function escHtml(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):'';}
+
+async function saveTrustsConfig(){
+    await db.collection('config').doc('trusts').set({ nextTrustId });
+}
+
+function renderTrustsList(){
+    const container = document.getElementById('trusts-list');
+    const empty = document.getElementById('trusts-empty');
+    if (!container) return;
+    const q = (document.getElementById('trust-search')?.value||'').toLowerCase();
+    const filtered = trusts.filter(t => {
+        if (!q) return true;
+        const blob = [t.name, t.grantor, t.state, (t.trustees||[]).join(' '), (t.beneficiaries||[]).join(' '), t.nfaItems, t.summary, t.notes].join(' ').toLowerCase();
+        return blob.includes(q);
+    }).sort((a,b) => (a.name||'').localeCompare(b.name||''));
+    if (!filtered.length) { container.innerHTML = ''; empty.style.display = 'block'; return; }
+    empty.style.display = 'none';
+    container.innerHTML = filtered.map(t => {
+        const trusteeStr = (t.trustees||[]).join(', ') || '—';
+        const beneStr = (t.beneficiaries||[]).join(', ') || '—';
+        const linkedCount = (t.linkedFirearms||[]).length;
+        return `<div style="border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:10px;background:var(--bg-secondary);cursor:pointer;transition:box-shadow 0.15s;" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,0.08)'" onmouseout="this.style.boxShadow=''" onclick="editTrust('${t._docId}')">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:8px;">
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:1rem;font-weight:700;color:var(--text-primary);">📋 ${escHtml(t.name)||'Unnamed Trust'}</div>
+                    <div style="font-size:0.8rem;color:var(--text-secondary);margin-top:2px;">${escHtml(t.trustType)||'—'} · ${escHtml(t.state)||'—'} · Effective ${escHtml(t.effectiveDate)||'—'}</div>
+                </div>
+                <div style="display:flex;gap:6px;flex-shrink:0;" onclick="event.stopPropagation()">
+                    ${t.documentUrl?`<a href="${escHtml(t.documentUrl)}" target="_blank" class="btn btn-ghost btn-sm" title="Open document">📄</a>`:''}
+                    <button class="btn btn-ghost btn-sm" onclick="editTrust('${t._docId}')">✏️</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteTrust('${t._docId}')">✗</button>
+                </div>
+            </div>
+            <div style="font-size:0.85rem;color:var(--text-primary);margin-bottom:6px;"><strong>Grantor:</strong> ${escHtml(t.grantor)||'—'}</div>
+            <div style="font-size:0.85rem;color:var(--text-primary);margin-bottom:6px;"><strong>Trustees:</strong> ${escHtml(trusteeStr)}</div>
+            <div style="font-size:0.85rem;color:var(--text-primary);margin-bottom:6px;"><strong>Beneficiaries:</strong> ${escHtml(beneStr)}</div>
+            ${t.nfaItems?`<div style="font-size:0.85rem;color:var(--text-primary);margin-bottom:6px;"><strong>NFA Covers:</strong> ${escHtml(t.nfaItems)}</div>`:''}
+            ${linkedCount?`<div style="font-size:0.8rem;color:var(--accent);margin-bottom:6px;">🔗 ${linkedCount} linked firearm${linkedCount!==1?'s':''}</div>`:''}
+            ${t.summary?`<div style="font-size:0.82rem;color:var(--text-secondary);line-height:1.5;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">${escHtml(t.summary)}</div>`:''}
+        </div>`;
+    }).join('');
+}
+
+function populateLinkedFirearmsSelect(selectedIds) {
+    const sel = document.getElementById('tf-linked-firearms');
+    if (!sel) return;
+    const selected = new Set(selectedIds || []);
+    const sorted = [...items].sort((a,b) => {
+        const aKey = (a.manufacturer||'') + ' ' + (a.model||'');
+        const bKey = (b.manufacturer||'') + ' ' + (b.model||'');
+        return aKey.localeCompare(bKey);
+    });
+    sel.innerHTML = sorted.map(it => {
+        const label = `#${it.id} — ${escHtml(it.manufacturer||'')} ${escHtml(it.model||'')} ${it.serialNumber?'('+escHtml(it.serialNumber)+')':''}`.trim();
+        return `<option value="${escHtml(it._docId)}" ${selected.has(it._docId)?'selected':''}>${label}</option>`;
+    }).join('');
+}
+
+function openTrustModal(docId) {
+    trustFile = { file:null, base64:null, mimeType:null, existingUrl:null };
+    document.getElementById('trust-edit-doc-id').value = docId || '';
+    document.getElementById('trust-modal-title').textContent = docId ? 'Edit Gun Trust' : 'Add Gun Trust';
+    document.getElementById('trust-ai-status').textContent = '';
+    document.getElementById('trust-file-preview').innerHTML = '';
+    document.getElementById('trust-file').value = '';
+    const docLink = document.getElementById('trust-doc-link');
+
+    if (docId) {
+        const t = trusts.find(x => x._docId === docId);
+        if (!t) return;
+        document.getElementById('tf-name').value = t.name || '';
+        document.getElementById('tf-grantor').value = t.grantor || '';
+        document.getElementById('tf-effective').value = t.effectiveDate || '';
+        document.getElementById('tf-state').value = t.state || '';
+        document.getElementById('tf-type').value = t.trustType || 'Revocable';
+        document.getElementById('tf-trustees').value = (t.trustees||[]).join(', ');
+        document.getElementById('tf-successors').value = t.successors || '';
+        document.getElementById('tf-beneficiaries').value = (t.beneficiaries||[]).join(', ');
+        document.getElementById('tf-nfa').value = t.nfaItems || '';
+        document.getElementById('tf-summary').value = t.summary || '';
+        document.getElementById('tf-notes').value = t.notes || '';
+        populateLinkedFirearmsSelect(t.linkedFirearms || []);
+        if (t.documentUrl) {
+            trustFile.existingUrl = t.documentUrl;
+            document.getElementById('trust-file-preview').innerHTML = `Existing document on file. <a href="${escHtml(t.documentUrl)}" target="_blank" style="color:var(--accent);">View</a>. Upload a new file to replace it.`;
+            docLink.href = t.documentUrl; docLink.style.display = '';
+        } else { docLink.style.display = 'none'; }
+        document.getElementById('btn-analyze-trust').disabled = !(t.documentUrl || trustFile.base64);
+    } else {
+        ['tf-name','tf-grantor','tf-effective','tf-state','tf-trustees','tf-successors','tf-beneficiaries','tf-nfa','tf-summary','tf-notes'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('tf-type').value = 'Revocable';
+        populateLinkedFirearmsSelect([]);
+        docLink.style.display = 'none';
+        document.getElementById('btn-analyze-trust').disabled = true;
+    }
+    document.getElementById('trust-modal').style.display = 'flex';
+}
+
+function closeTrustModal() {
+    document.getElementById('trust-modal').style.display = 'none';
+}
+document.getElementById('trust-modal').addEventListener('click', e => { if (e.target === document.getElementById('trust-modal')) closeTrustModal(); });
+
+async function onTrustFileSelected(input) {
+    const file = input.files[0];
+    if (!file) return;
+    trustFile.file = file;
+    trustFile.mimeType = file.type === 'application/pdf' ? 'application/pdf' : 'image/jpeg';
+    const previewEl = document.getElementById('trust-file-preview');
+    previewEl.textContent = `📄 ${file.name} (${(file.size/1024).toFixed(0)} KB) ready`;
+    // Read as base64 for AI
+    if (file.type === 'application/pdf') {
+        trustFile.base64 = await new Promise(r => { const fr = new FileReader(); fr.onload = e => r(e.target.result.split(',')[1]); fr.readAsDataURL(file); });
+    } else {
+        // Compress images to save tokens
+        const dataUrl = await new Promise(resolve => {
+            const url = URL.createObjectURL(file), img = new Image();
+            img.onload = () => {
+                URL.revokeObjectURL(url);
+                let w = img.naturalWidth, h = img.naturalHeight, maxPx = 1920;
+                if (w > maxPx || h > maxPx) { if (w >= h) { h = Math.round(h*maxPx/w); w = maxPx; } else { w = Math.round(w*maxPx/h); h = maxPx; } }
+                const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                resolve(canvas.toDataURL('image/jpeg', 0.88));
+            };
+            img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+            img.src = url;
+        });
+        trustFile.base64 = dataUrl ? dataUrl.split(',')[1] : null;
+    }
+    document.getElementById('btn-analyze-trust').disabled = !trustFile.base64;
+}
+
+async function analyzeTrust() {
+    if (!apiKey) { toast('Set your API key in Settings first.','error'); return; }
+    if (!trustFile.base64) { toast('Upload a document first.','error'); return; }
+    const btn = document.getElementById('btn-analyze-trust');
+    const statusEl = document.getElementById('trust-ai-status');
+    btn.disabled = true; btn.textContent = '⏳ Analyzing…';
+    statusEl.textContent = 'Extracting trust details…';
+    statusEl.style.color = 'var(--text-secondary)';
+    try {
+        const prompt = `You are a paralegal analyzing a gun trust (NFA trust or firearms trust) document. Extract the key information. Return ONLY a valid JSON object with these exact keys:
+- name: the full official name of the trust (e.g., "Stoebner Family Gun Trust")
+- grantor: the person who created/settled the trust
+- effectiveDate: YYYY-MM-DD (empty if unknown)
+- state: state of formation/governing law
+- trustType: one of ["Revocable","Irrevocable","Single-Shot","Other"]
+- trustees: array of trustee names
+- successors: string listing successor trustees (who takes over if primary can't serve)
+- beneficiaries: array of beneficiary names
+- nfaItems: string describing NFA items the trust covers (e.g., "Suppressors, Short-Barreled Rifles, Machine Guns")
+- summary: 3-5 sentence plain-English summary of what the trust does, who's named, and any notable provisions
+- notes: any other important observations (restrictions, attorney name, review triggers)
+Use empty string/array if not found.`;
+        const raw = await callClaude(trustFile.base64, trustFile.mimeType, prompt, { retries: 2 });
+        if (!raw) throw new Error('No response');
+        const jsonMatch = raw.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error('Could not parse AI response');
+        const r = JSON.parse(jsonMatch[0]);
+        if (r.name) document.getElementById('tf-name').value = r.name;
+        if (r.grantor) document.getElementById('tf-grantor').value = r.grantor;
+        if (r.effectiveDate) document.getElementById('tf-effective').value = r.effectiveDate;
+        if (r.state) document.getElementById('tf-state').value = r.state;
+        if (r.trustType) document.getElementById('tf-type').value = r.trustType;
+        if (Array.isArray(r.trustees)) document.getElementById('tf-trustees').value = r.trustees.join(', ');
+        if (r.successors) document.getElementById('tf-successors').value = r.successors;
+        if (Array.isArray(r.beneficiaries)) document.getElementById('tf-beneficiaries').value = r.beneficiaries.join(', ');
+        if (r.nfaItems) document.getElementById('tf-nfa').value = r.nfaItems;
+        if (r.summary) document.getElementById('tf-summary').value = r.summary;
+        if (r.notes) document.getElementById('tf-notes').value = r.notes;
+        statusEl.textContent = '✅ Extracted. Review and save.';
+        statusEl.style.color = 'var(--success)';
+    } catch (err) {
+        statusEl.textContent = '❌ ' + err.message;
+        statusEl.style.color = 'var(--danger)';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '🤖 Analyze with AI';
+    }
+}
+
+async function uploadTrustDoc(file) {
+    const ext = file.name ? file.name.split('.').pop() : (file.type === 'application/pdf' ? 'pdf' : 'jpg');
+    const path = `gun_trusts/${Date.now()}_trust.${ext}`;
+    const ref = storage.ref().child(path);
+    await ref.put(file);
+    return await ref.getDownloadURL();
+}
+
+async function saveTrust() {
+    const name = document.getElementById('tf-name').value.trim();
+    if (!name) { toast('Trust name is required.','error'); return; }
+    const docId = document.getElementById('trust-edit-doc-id').value;
+    const linkedSel = document.getElementById('tf-linked-firearms');
+    const linkedFirearms = Array.from(linkedSel.selectedOptions).map(o => o.value);
+
+    const data = {
+        name,
+        grantor: document.getElementById('tf-grantor').value.trim(),
+        effectiveDate: document.getElementById('tf-effective').value,
+        state: document.getElementById('tf-state').value.trim(),
+        trustType: document.getElementById('tf-type').value,
+        trustees: document.getElementById('tf-trustees').value.split(',').map(s => s.trim()).filter(Boolean),
+        successors: document.getElementById('tf-successors').value.trim(),
+        beneficiaries: document.getElementById('tf-beneficiaries').value.split(',').map(s => s.trim()).filter(Boolean),
+        nfaItems: document.getElementById('tf-nfa').value.trim(),
+        summary: document.getElementById('tf-summary').value.trim(),
+        notes: document.getElementById('tf-notes').value.trim(),
+        linkedFirearms,
+    };
+
+    try {
+        // Upload new doc if selected
+        if (trustFile.file) {
+            data.documentUrl = await uploadTrustDoc(trustFile.file);
+            data.documentMimeType = trustFile.mimeType;
+        } else if (trustFile.existingUrl) {
+            data.documentUrl = trustFile.existingUrl;
+        }
+        if (docId) {
+            await db.collection('gun_trusts').doc(docId).update(data);
+            toast('Trust updated.','success');
+        } else {
+            data.id = nextTrustId++;
+            data.addedAt = new Date().toISOString();
+            await db.collection('gun_trusts').add(data);
+            await saveTrustsConfig();
+            toast('Trust saved!','success');
+        }
+        closeTrustModal();
+    } catch (err) {
+        toast('Save failed: ' + err.message, 'error');
+    }
+}
+
+function editTrust(docId) { openTrustModal(docId); }
+
+async function deleteTrust(docId) {
+    const t = trusts.find(x => x._docId === docId);
+    if (!t) return;
+    if (!confirm(`Move "${t.name || 'this trust'}" to Recycle Bin?`)) return;
+    try {
+        const ref = db.collection('gun_trusts').doc(docId);
+        const snap = await ref.get();
+        if (!snap.exists) return;
+        await db.collection('recycle_bin').add({
+            originalCollection: 'gun_trusts',
+            originalDocId: docId,
+            site: 'armory',
+            deletedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            data: snap.data()
+        });
+        await ref.delete();
+        toast('Trust moved to Recycle Bin.','success');
+    } catch (err) {
+        toast('Delete failed: ' + err.message, 'error');
+    }
 }
 
 // ═══════════════════════════════════════

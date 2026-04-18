@@ -240,6 +240,7 @@
         <button class="active" onclick="showView('dashboard')">Dashboard</button>
         <button onclick="showView('upload')">📥 Upload Documents</button>
         <button onclick="showView('documents')">📚 Documents</button>
+        <button onclick="showView('overview')">📖 Overview</button>
         <button onclick="showView('relationships')">🔗 Relationships</button>
         <button onclick="showView('flow')">📊 Flow Diagram</button>
         <button onclick="showView('settings')">⚙ Settings</button>
@@ -332,6 +333,20 @@
             </tr></thead><tbody id="docs-tbody"></tbody></table>
         </div>
         <div id="docs-empty" class="empty" style="display:none;"><div class="empty-icon">📜</div><p>No documents yet. Use Upload Documents to get started.</p></div>
+    </div>
+</div>
+
+<!-- OVERVIEW -->
+<div id="view-overview" class="view">
+    <div class="card">
+        <div class="card-title">
+            <div class="card-title-left">📖 Family-Friendly Overview</div>
+            <button class="btn btn-primary" id="btn-generate-overview" onclick="generateOverview()">✨ Generate Overview</button>
+        </div>
+        <p style="font-size:0.9rem;color:var(--text-secondary);margin-bottom:16px;font-style:italic;">A warm, plain-English narrative about your family's estate plan — what you have, what it means, and what stands out. Designed to be shareable with family members who aren't estate planning experts.</p>
+        <div class="stats-grid" id="overview-stats-grid" style="margin-bottom:20px;"></div>
+        <div id="overview-status" style="font-size:0.82rem;color:var(--text-secondary);min-height:18px;margin-bottom:8px;"></div>
+        <div id="overview-result" class="analysis-panel" style="display:none;"></div>
     </div>
 </div>
 
@@ -449,7 +464,7 @@ let nextId=1;
 let docsSortField='addedAt',docsSortDir='desc';
 let apiKey='',proxyUrl='',aiModel='claude-sonnet-4-5';
 let unsubDocs=null;
-const VIEWS=['dashboard','upload','documents','relationships','flow','settings','recycle-bin'];
+const VIEWS=['dashboard','upload','documents','overview','relationships','flow','settings','recycle-bin'];
 
 // UTILS
 function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):'';}
@@ -522,6 +537,7 @@ function showView(v){
     if(v==='documents'){populateCategoryFilters();renderDocuments();}
     if(v==='upload'){document.getElementById('bulk-actions').style.display=bulkQueue.length?'flex':'none';renderBulkQueue();}
     if(v==='recycle-bin')loadRecycleBin();
+    if(v==='overview')renderOverviewStats();
     window.scrollTo(0,0);
 }
 
@@ -1018,6 +1034,98 @@ Related Entities: ${d.relatedEntities||''}
 Tags: ${d.tags||''}
 Summary: ${d.summary||''}
 `).join('\n');
+}
+
+// OVERVIEW (family-friendly narrative)
+function renderOverviewStats(){
+    const grid=document.getElementById('overview-stats-grid');if(!grid)return;
+    const total=documents.length;
+    const parties=new Set();
+    documents.forEach(d=>(d.parties||[]).forEach(p=>parties.add(p)));
+    const catCount=new Set(documents.map(d=>d.category).filter(Boolean)).size;
+    const now=new Date().toISOString().slice(0,10);
+    const expiring=documents.filter(d=>d.expirationDate&&d.expirationDate>=now&&d.expirationDate<=new Date(Date.now()+180*86400000).toISOString().slice(0,10)).length;
+    grid.innerHTML=`
+        <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Documents</div></div>
+        <div class="stat-card"><div class="stat-value">${parties.size}</div><div class="stat-label">People / Entities</div></div>
+        <div class="stat-card"><div class="stat-value">${catCount}</div><div class="stat-label">Categories</div></div>
+        <div class="stat-card" style="border-color:${expiring?'#f59e0b':'var(--border)'};"><div class="stat-value" style="color:${expiring?'#f59e0b':''};">${expiring}</div><div class="stat-label">Expiring in 180d</div></div>`;
+}
+
+async function generateOverview(){
+    if(!apiKey){toast('Set API key in Settings first.','error');return;}
+    if(!documents.length){toast('No documents to summarize yet.','error');return;}
+    const btn=document.getElementById('btn-generate-overview'),statusEl=document.getElementById('overview-status'),resultEl=document.getElementById('overview-result');
+    btn.disabled=true;btn.textContent='⏳ Writing…';
+    statusEl.textContent='Reading through your archive and writing a family-friendly overview…';
+    statusEl.style.color='var(--text-secondary)';
+    resultEl.style.display='none';
+    // Pre-compute stats the AI can reference
+    const total=documents.length;
+    const parties=new Set();documents.forEach(d=>(d.parties||[]).forEach(p=>parties.add(p)));
+    const catCounts={};documents.forEach(d=>{if(d.category)catCounts[d.category]=(catCounts[d.category]||0)+1;});
+    const catList=Object.entries(catCounts).sort((a,b)=>b[1]-a[1]).map(([c,n])=>`${c}: ${n}`).join(', ');
+    const recentDocs=[...documents].sort((a,b)=>(b.addedAt||'').localeCompare(a.addedAt||'')).slice(0,5);
+    const recentList=recentDocs.map(d=>`- ${d.title||'Untitled'} (${d.category||'—'}, ${d.effectiveDate||'no date'}, parties: ${(d.parties||[]).join(', ')||'—'})`).join('\n');
+    try{
+        const prompt=`You are writing a warm, family-friendly overview of someone's estate planning archive. Your audience is a family member who is NOT a lawyer or estate professional — they want to understand what their loved one has put in place, in plain English, without jargon.
+
+Tone guidelines:
+- Conversational and reassuring, like a trusted friend explaining things
+- Use short sentences and clear language
+- Briefly explain what each type of document does (in one sentence) for a non-lawyer
+- Use emoji sparingly to add warmth (one per section header is plenty)
+- End on an encouraging, positive note that validates the planning work done
+
+Format in markdown with these sections:
+
+# Your Family's Estate Plan — A Friendly Overview
+
+## 📊 The Big Picture
+Overall stats in plain English (document count, people count).
+
+## 📚 What Kinds of Documents You Have
+One subsection per category present. For each, explain in one friendly sentence what that type of document does, then note the count. Order by count (most first).
+
+## 👨‍👩‍👧‍👦 Most Recent Additions
+Highlight the 3-5 most recently added documents with who they involve.
+
+## 💡 What Stands Out
+Observations about the archive — strengths of the plan, any gaps (missing life insurance? no business documents? etc.), and anything notable about the people involved.
+
+## ✅ Easy Next Steps
+3-5 actionable but gentle suggestions.
+
+End with one warm, encouraging sentence (1-2 lines) thanking them for their careful planning and reassuring them that their family is well-prepared.
+
+CONTEXT:
+
+Total: ${total} documents
+People/entities: ${parties.size} (including: ${[...parties].slice(0,15).join(', ')}${parties.size>15?', …':''})
+Categories: ${catList}
+
+Most recent 5 documents:
+${recentList}
+
+Full archive detail (for reference):
+${buildDocsCorpus()}`;
+        const raw=await callClaudeText(prompt,4096);
+        if(!raw)return;
+        let html=esc(raw);
+        html=html.replace(/^# (.+)$/gm,'<h1 style="font-size:1.4rem;font-weight:800;color:var(--accent);margin:8px 0 14px;font-family:Georgia,serif;">$1</h1>');
+        html=html.replace(/^## (.+)$/gm,'<h2>$1</h2>');
+        html=html.replace(/^### (.+)$/gm,'<h3>$1</h3>');
+        html=html.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+        html=html.replace(/\*(.+?)\*/g,'<em>$1</em>');
+        html=html.replace(/^- (.+)$/gm,'<li>$1</li>');
+        html=html.replace(/^\d+\. (.+)$/gm,'<li>$1</li>');
+        html=html.replace(/(<li>.*?<\/li>(?:\s*<li>.*?<\/li>)*)/gs,(m)=>'<ul>'+m+'</ul>');
+        html=html.replace(/<\/ul>\s*<ul>/g,'');
+        resultEl.innerHTML=html;resultEl.style.display='block';
+        statusEl.textContent=`✅ Overview ready — ${total} document${total!==1?'s':''} reviewed.`;
+        statusEl.style.color='var(--success)';
+    }catch(err){statusEl.textContent='❌ Error: '+err.message;statusEl.style.color='var(--danger)';}
+    finally{btn.disabled=false;btn.textContent='✨ Regenerate Overview';}
 }
 
 async function analyzeRelationships(){

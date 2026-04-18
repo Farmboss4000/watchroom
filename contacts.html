@@ -349,7 +349,7 @@
 <div id="view-import" class="view">
     <div class="card">
         <div class="card-title"><div class="card-title-left">📨 Import Contacts from Email</div></div>
-        <p style="font-size:0.88rem;color:var(--text-secondary);margin-bottom:16px;">Scan a Microsoft 365 mail folder. AI extracts email signatures into structured contacts. Existing matches (by email) are union-merged rather than duplicated.</p>
+        <p style="font-size:0.88rem;color:var(--text-secondary);margin-bottom:16px;">Scan a Microsoft 365 mail folder. AI extracts email signatures into structured contacts. All selected contacts are saved as new — use <strong>Merge Duplicates</strong> afterward to combine any matches with existing contacts.</p>
         <div id="ms365-setup-area"></div>
         <div id="ms365-folder-area" style="display:none;"></div>
         <div id="ms365-results-area" style="display:none;margin-top:14px;"></div>
@@ -1164,7 +1164,7 @@ async function loadMS365Folders(){
                 </label>
                 <button class="btn btn-primary" onclick="startMS365ContactScan()">📨 Scan</button>
             </div>
-            <p style="font-size:0.78rem;color:var(--text-secondary);margin-top:8px;">Tip: Inbox or a "Clients" sub-folder works well. The scanner extracts contact info from email signatures and merges with existing contacts by email match.</p>`;
+            <p style="font-size:0.78rem;color:var(--text-secondary);margin-top:8px;">Tip: Inbox or a "Clients" sub-folder works well. The scanner extracts contact info from email signatures and saves each as a new contact — run Merge Duplicates afterward to combine any matches.</p>`;
     }catch(e){
         folderArea.innerHTML=`<div style="color:var(--danger);font-size:0.85rem;">${esc(e.message)}</div>`;
     }
@@ -1381,7 +1381,7 @@ function renderScanPreview(){
     resultsArea.innerHTML=`
         <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
             <strong style="font-size:0.95rem;">${total} contact${total!==1?'s':''} extracted</strong>
-            <span style="font-size:0.82rem;color:var(--text-secondary);">${newCount} new · ${dupCount} match${dupCount!==1?'es':''} existing</span>
+            <span style="font-size:0.82rem;color:var(--text-secondary);">${newCount} new · ${dupCount} possible duplicate${dupCount!==1?'s':''} — all will be saved as new; use Merge Duplicates to combine</span>
             <div style="margin-left:auto;display:flex;gap:8px;">
                 <button class="btn btn-ghost btn-sm" onclick="toggleAllPreview(true)">☑ Check All</button>
                 <button class="btn btn-ghost btn-sm" onclick="toggleAllPreview(false)">☐ Uncheck All</button>
@@ -1404,7 +1404,7 @@ function renderPreviewList(){
             return parts?`<span class="chip">${esc(parts)}</span>`:'';
         }).join('');
         const meta=[item.company,item.title,item.department].filter(Boolean).join(' · ');
-        const dupBadge=p.existingDocId?`<span class="badge badge-mobile" style="margin-left:6px;">Merges into ${esc(p.existingName||'existing')}</span>`:'<span class="badge badge-personal" style="margin-left:6px;">New</span>';
+        const dupBadge=p.existingDocId?`<span class="badge badge-mobile" style="margin-left:6px;">Possible duplicate of ${esc(p.existingName||'existing')}</span>`:'<span class="badge badge-personal" style="margin-left:6px;">New</span>';
         return `<div class="preview-card ${p.existingDocId?'duplicate':''}">
             <input type="checkbox" ${p.checked?'checked':''} onchange="_scanPreviewItems[${i}].checked=this.checked">
             <div class="preview-body">
@@ -1440,7 +1440,7 @@ function toggleAllPreview(on){
 async function saveSelectedPreview(){
     const selected=_scanPreviewItems.filter(p=>p.checked);
     if(!selected.length){showToast('Nothing selected',true);return;}
-    let created=0,updated=0,failed=0;
+    let created=0,failed=0;
     const resultsArea=document.getElementById('ms365-results-area');
     for(let i=0;i<selected.length;i++){
         resultsArea.innerHTML=renderProgressBox('Saving contacts…',i,selected.length);
@@ -1462,35 +1462,19 @@ async function saveSelectedPreview(){
                 updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
                 deleted:false,
             };
-            if(p.existingDocId){
-                const existing=contacts.find(c=>c._docId===p.existingDocId);
-                if(existing){
-                    const merged=mergeContactData(existing,[data]);
-                    const {_docId,createdAt,...updateData}=merged;
-                    updateData.updatedAt=firebase.firestore.FieldValue.serverTimestamp();
-                    updateData.deleted=false;
-                    await db.collection('contacts').doc(p.existingDocId).update(updateData);
-                    updated++;
-                } else {
-                    data.createdAt=firebase.firestore.FieldValue.serverTimestamp();
-                    await db.collection('contacts').add(data);
-                    created++;
-                }
-            } else {
-                data.createdAt=firebase.firestore.FieldValue.serverTimestamp();
-                await db.collection('contacts').add(data);
-                created++;
-            }
+            data.createdAt=firebase.firestore.FieldValue.serverTimestamp();
+            await db.collection('contacts').add(data);
+            created++;
         }catch(err){
             console.warn('Save failed for contact:',err.message);
             failed++;
         }
     }
     resultsArea.innerHTML=`<div style="padding:14px;background:var(--bg-card);border-radius:10px;font-size:0.9rem;">
-        ✅ Saved ${created} new, updated ${updated} existing${failed?', '+failed+' failed':''}.
+        ✅ Saved ${created} new${failed?', '+failed+' failed':''}. Use <strong>Merge Duplicates</strong> to combine any matches with existing contacts.
         <button class="btn btn-ghost btn-sm" style="margin-left:10px;" onclick="showView('contacts')">View Contacts</button>
     </div>`;
-    toast(`Saved ${created} new · ${updated} merged${failed?' · '+failed+' failed':''}`,failed?'warn':'success');
+    toast(`Saved ${created} new${failed?' · '+failed+' failed':''}`,failed?'warn':'success');
 }
 
 // ═══════════════════════════════════════

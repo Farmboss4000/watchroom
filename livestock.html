@@ -473,6 +473,19 @@
 
     <div class="stats-grid" id="stats-grid"></div>
     <div class="card">
+        <div class="card-title">
+            <div class="card-title-left">🐄 US Cattle Market Price</div>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <span id="cattle-price-meta" style="font-size:0.78rem;color:var(--text-secondary);"></span>
+                <button class="btn btn-ghost btn-sm" onclick="openCattlePriceHistory()">📚 History</button>
+                <button class="btn btn-primary btn-sm" id="btn-refresh-cattle-price" onclick="refreshCattlePrice()">🔄 Refresh Price</button>
+            </div>
+        </div>
+        <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:10px;font-style:italic;">AI-researched current US cattle market prices (fed cattle, feeders, cull cows). Every refresh is logged. Informational only — consult a livestock broker or USDA AMS for trading decisions.</p>
+        <div id="cattle-price-status" style="font-size:0.85rem;color:var(--text-secondary);min-height:20px;margin-bottom:8px;"></div>
+        <div id="cattle-price-result"></div>
+    </div>
+    <div class="card">
         <div class="card-title"><div class="card-title-left">📊 Inventory by Animal Type</div></div>
         <div class="cat-breakdown" id="cat-breakdown"></div>
     </div>
@@ -845,6 +858,18 @@ service firebase.storage {
 </main>
 </div><!-- end #app -->
 
+<!-- ══ CATTLE PRICE HISTORY MODAL ══ -->
+<div class="modal-overlay" id="cattle-price-history-modal" onclick="if(event.target===this)closeCattlePriceHistory()">
+    <div class="modal" style="max-width:700px;">
+        <div class="modal-title">📚 Cattle Market Price History</div>
+        <div class="modal-sub" id="cattle-history-sub" style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:14px;">—</div>
+        <div id="cattle-history-body" style="max-height:60vh;overflow-y:auto;"></div>
+        <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="closeCattlePriceHistory()">Close</button>
+        </div>
+    </div>
+</div>
+
 <!-- ══ BARCODE MODAL ══ -->
 <div class="modal-overlay" id="barcode-modal">
     <div class="modal" style="max-width:560px;">
@@ -1084,6 +1109,7 @@ async function initApp() {
         document.getElementById('app').style.display            = 'block';
         populateCatSelect(); populateBreedList(); syncCatFilters();
         showView('dashboard');
+        loadLatestCattlePrice();
     } catch(err) {
         document.getElementById('loading-screen').innerHTML =
             `<p style="color:var(--danger);padding:20px;text-align:center;">
@@ -2047,6 +2073,235 @@ async function permanentDeleteBinItem(binId) {
     } catch(e) {
         toast('Error: ' + e.message, true);
     }
+}
+
+// ═══════════════════════════════════════
+//  CATTLE MARKET PRICE
+// ═══════════════════════════════════════
+let _currentCattlePriceId = null;
+
+async function callClaudeTextOnly(prompt, maxTokens = 1400) {
+    if (!apiKey) { toast('Set your Anthropic API key in Settings first.', true); return null; }
+    const msgPayload = {
+        model: aiModel, max_tokens: maxTokens,
+        messages: [{ role: 'user', content: [{ type: 'text', text: prompt }] }]
+    };
+    let res;
+    try {
+        if (proxyUrl) {
+            res = await fetch(proxyUrl, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ...msgPayload, apiKey }) });
+        } else {
+            res = await fetch('https://api.anthropic.com/v1/messages', {
+                method:'POST', mode:'cors',
+                headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true'},
+                body: JSON.stringify(msgPayload)
+            });
+        }
+    } catch(e) { throw new Error('Network error — set up a Proxy URL in Settings to fix CORS issues.'); }
+    if (!res.ok) {
+        let msg = `API error ${res.status}`;
+        try { const d = await res.json(); msg = d.error?.message || msg; if (res.status===401) msg='Invalid API key — re-enter in Settings.'; } catch(e) {}
+        throw new Error(msg);
+    }
+    const data = await res.json();
+    return data.content[0].text;
+}
+
+async function refreshCattlePrice() {
+    const statusEl = document.getElementById('cattle-price-status');
+    const btn = document.getElementById('btn-refresh-cattle-price');
+    btn.disabled = true; btn.textContent = '⏳ Researching…';
+    statusEl.textContent = 'Researching current US cattle market prices…';
+    statusEl.style.color = 'var(--text-secondary)';
+    try {
+        const prompt = `You are an agricultural market analyst. Provide the current US cattle market prices based on the most recent USDA AMS / CME data you have. Use realistic current-market figures; do not fabricate. Return ONLY valid JSON with this exact shape:
+{
+  "asOfDate": "YYYY-MM-DD or textual date range",
+  "currency": "USD",
+  "prices": [
+    { "category": "Fed Steers (live, 5-area)", "price": 185.25, "unit": "USD/cwt", "trend": "up|down|flat", "note": "brief context" },
+    { "category": "Fed Heifers (live, 5-area)", "price": 184.50, "unit": "USD/cwt", "trend": "flat", "note": "" },
+    { "category": "Feeder Steers (600-700 lb, Oklahoma City)", "price": 280.00, "unit": "USD/cwt", "trend": "up", "note": "" },
+    { "category": "Feeder Heifers (600-700 lb, Oklahoma City)", "price": 260.00, "unit": "USD/cwt", "trend": "up", "note": "" },
+    { "category": "Cull Cows (utility/commercial)", "price": 130.00, "unit": "USD/cwt", "trend": "flat", "note": "" },
+    { "category": "Boxed Beef Cutout (Choice)", "price": 310.00, "unit": "USD/cwt", "trend": "up", "note": "" },
+    { "category": "CME Live Cattle (nearby futures)", "price": 185.00, "unit": "USD/cwt", "trend": "flat", "note": "" },
+    { "category": "CME Feeder Cattle (nearby futures)", "price": 265.00, "unit": "USD/cwt", "trend": "up", "note": "" }
+  ],
+  "commentary": "2-3 sentences on the current state of the US cattle market: supply, demand, key drivers.",
+  "sources": ["USDA AMS Livestock Market News", "CME Group", "Drovers Daily Market Report"]
+}
+Use the best figures you have. Keep numbers realistic. No preamble, no code fences, JSON only.`;
+        const raw = await callClaudeTextOnly(prompt, 1600);
+        if (!raw) return;
+        const match = raw.match(/\{[\s\S]*\}/);
+        if (!match) throw new Error('Could not parse AI response.');
+        const data = JSON.parse(match[0]);
+        const nowIso = new Date().toISOString();
+        let savedId = null;
+        try {
+            const ref = await db.collection('cattle_price_history').add({
+                data,
+                fetchedAt: nowIso,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            savedId = ref.id;
+        } catch(saveErr) { console.warn('Price history save failed', saveErr); }
+        _currentCattlePriceId = savedId;
+        renderCattlePrice(data, nowIso);
+        statusEl.textContent = `✅ Refreshed (${(data.prices||[]).length} price points logged).`;
+        statusEl.style.color = 'var(--success)';
+    } catch(err) {
+        statusEl.textContent = '❌ ' + err.message;
+        statusEl.style.color = 'var(--danger)';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '🔄 Refresh Price';
+    }
+}
+
+function renderCattlePrice(data, fetchedAt) {
+    const el = document.getElementById('cattle-price-result');
+    const meta = document.getElementById('cattle-price-meta');
+    if (!el) return;
+    if (meta && fetchedAt) {
+        const when = new Date(fetchedAt);
+        meta.textContent = isNaN(when) ? '' : `Last refreshed ${when.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})}`;
+    }
+    const prices = (data && data.prices) || [];
+    if (!prices.length) { el.innerHTML = '<p style="color:var(--text-secondary);font-size:0.88rem;">No price data yet — click Refresh Price.</p>'; return; }
+    const trendIcon = t => {
+        const k = (t||'').toLowerCase();
+        if (k.startsWith('up')) return '<span style="color:#16a34a;font-weight:600;">▲</span>';
+        if (k.startsWith('down')) return '<span style="color:#dc2626;font-weight:600;">▼</span>';
+        return '<span style="color:var(--text-secondary);">—</span>';
+    };
+    const fmtPrice = (p, unit) => {
+        const n = Number(p);
+        if (!isFinite(n)) return '—';
+        return `$${n.toLocaleString('en-US',{minimumFractionDigits:2, maximumFractionDigits:2})} <span style="font-size:0.72rem;color:var(--text-secondary);">${(unit||'').replace('USD/','')}</span>`;
+    };
+    const rows = prices.map(p => `<tr style="border-top:1px solid var(--border);">
+        <td style="padding:8px 10px;font-size:0.86rem;">${esc(p.category||'')}</td>
+        <td style="padding:8px 10px;text-align:right;font-size:0.95rem;font-weight:600;white-space:nowrap;">${fmtPrice(p.price, p.unit)}</td>
+        <td style="padding:8px 10px;text-align:center;font-size:0.9rem;">${trendIcon(p.trend)}</td>
+        <td style="padding:8px 10px;font-size:0.78rem;color:var(--text-secondary);">${esc(p.note||'')}</td>
+    </tr>`).join('');
+    const asOf = data.asOfDate ? `<span style="font-size:0.78rem;color:var(--text-secondary);margin-left:6px;">· as of ${esc(data.asOfDate)}</span>` : '';
+    const sources = Array.isArray(data.sources) && data.sources.length
+        ? `<div style="font-size:0.76rem;color:var(--text-secondary);margin-top:8px;">Sources referenced: ${data.sources.map(s=>esc(s)).join(' · ')}</div>` : '';
+    const commentary = data.commentary
+        ? `<div style="padding:10px 12px;background:#f0fdf4;border-left:3px solid #16a34a;border-radius:4px;font-size:0.86rem;margin-bottom:10px;">${esc(data.commentary)}</div>` : '';
+    el.innerHTML = `
+        ${commentary}
+        <div style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:6px;">Currency: ${esc(data.currency||'USD')}${asOf}</div>
+        <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+            <table style="width:100%;border-collapse:collapse;">
+                <thead style="background:var(--bg-card,#f0f2f5);">
+                    <tr>
+                        <th style="text-align:left;padding:8px 10px;font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-secondary);">Category</th>
+                        <th style="text-align:right;padding:8px 10px;font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-secondary);">Price</th>
+                        <th style="text-align:center;padding:8px 10px;font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-secondary);">Trend</th>
+                        <th style="text-align:left;padding:8px 10px;font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-secondary);">Note</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
+        ${sources}
+    `;
+}
+
+async function loadLatestCattlePrice() {
+    try {
+        const snap = await db.collection('cattle_price_history').orderBy('createdAt','desc').limit(1).get();
+        if (snap.empty) {
+            const el = document.getElementById('cattle-price-result');
+            if (el) el.innerHTML = '<p style="color:var(--text-secondary);font-size:0.88rem;">No price data yet — click <strong>🔄 Refresh Price</strong> to pull the current US cattle market.</p>';
+            return;
+        }
+        const doc = snap.docs[0];
+        const d = doc.data();
+        if (d && d.data) {
+            _currentCattlePriceId = doc.id;
+            renderCattlePrice(d.data, d.fetchedAt || null);
+        }
+    } catch(e) { console.warn('Latest cattle price load failed', e); }
+}
+
+async function openCattlePriceHistory() {
+    const modal = document.getElementById('cattle-price-history-modal');
+    const body = document.getElementById('cattle-history-body');
+    const sub = document.getElementById('cattle-history-sub');
+    modal.style.display = 'flex';
+    void modal.offsetWidth;
+    modal.classList.add('show');
+    body.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-secondary);">Loading…</div>';
+    sub.textContent = '';
+    try {
+        const snap = await db.collection('cattle_price_history').orderBy('createdAt','desc').limit(100).get();
+        if (snap.empty) {
+            body.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-secondary);">No refreshes logged yet.</div>';
+            return;
+        }
+        const docs = snap.docs.map(d => ({ _id:d.id, ...d.data() }));
+        sub.textContent = `${docs.length} refresh${docs.length!==1?'es':''} logged · newest first.`;
+        body.innerHTML = docs.map(d => {
+            const when = d.fetchedAt ? new Date(d.fetchedAt) : null;
+            const whenStr = when && !isNaN(when)
+                ? when.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})
+                : '—';
+            const prices = (d.data && d.data.prices) || [];
+            const fed = prices.find(p => /fed steer/i.test(p.category||''));
+            const feeder = prices.find(p => /feeder steer/i.test(p.category||''));
+            const summary = [
+                fed ? `Fed: $${Number(fed.price).toFixed(2)}` : null,
+                feeder ? `Feeder: $${Number(feeder.price).toFixed(2)}` : null,
+                `${prices.length} points`
+            ].filter(Boolean).join(' · ');
+            const isCurrent = d._id === _currentCattlePriceId;
+            return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:${isCurrent?'#ecfdf5':'#fff'};gap:10px;">
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:0.9rem;font-weight:600;">${esc(whenStr)}${isCurrent?' <span style="color:var(--accent);font-size:0.72rem;font-weight:700;letter-spacing:0.4px;">· CURRENT</span>':''}</div>
+                    <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:2px;">${esc(summary)}</div>
+                </div>
+                <div style="display:flex;gap:6px;flex-shrink:0;">
+                    <button class="btn btn-ghost btn-sm" onclick="viewCattlePriceEntry('${d._id}')">👁 View</button>
+                    <button class="btn btn-ghost btn-sm" style="color:#b91c1c;" onclick="deleteCattlePriceEntry('${d._id}')">🗑</button>
+                </div>
+            </div>`;
+        }).join('');
+    } catch(e) {
+        body.innerHTML = `<div style="padding:20px;text-align:center;color:var(--danger);">Failed to load: ${esc(e.message)}</div>`;
+    }
+}
+
+function closeCattlePriceHistory() {
+    const m = document.getElementById('cattle-price-history-modal');
+    m.classList.remove('show');
+    m.style.display = 'none';
+}
+
+async function viewCattlePriceEntry(id) {
+    try {
+        const snap = await db.collection('cattle_price_history').doc(id).get();
+        if (!snap.exists) { toast('Entry not found.', true); return; }
+        const d = snap.data();
+        _currentCattlePriceId = id;
+        renderCattlePrice(d.data, d.fetchedAt || null);
+        closeCattlePriceHistory();
+        toast('Loaded past price');
+    } catch(e) { toast('Failed to load: ' + e.message, true); }
+}
+
+async function deleteCattlePriceEntry(id) {
+    if (!confirm('Delete this price log entry?')) return;
+    try {
+        await db.collection('cattle_price_history').doc(id).delete();
+        if (_currentCattlePriceId === id) _currentCattlePriceId = null;
+        toast('Deleted');
+        openCattlePriceHistory();
+    } catch(e) { toast('Failed to delete: ' + e.message, true); }
 }
 </script>
 </body>

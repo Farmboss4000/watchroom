@@ -475,14 +475,14 @@
     <div class="stats-grid" id="stats-grid"></div>
     <div class="card">
         <div class="card-title">
-            <div class="card-title-left">🐄 US Cattle Market Price</div>
+            <div class="card-title-left">🐄 US Fed Steer Price</div>
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
                 <span id="cattle-price-meta" style="font-size:0.78rem;color:var(--text-secondary);"></span>
                 <button class="btn btn-ghost btn-sm" onclick="openCattlePriceHistory()">📚 History</button>
                 <button class="btn btn-primary btn-sm" id="btn-refresh-cattle-price" onclick="refreshCattlePrice()">🔄 Refresh Price</button>
             </div>
         </div>
-        <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:10px;font-style:italic;">AI-researched current US cattle market prices (fed cattle, feeders, cull cows). Every refresh is logged. Informational only — consult a livestock broker or USDA AMS for trading decisions.</p>
+        <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:10px;font-style:italic;">AI-researched current US fed steer price (live, 5-area weighted) plus the equivalent value for a 600 lb fed steer. Every refresh is logged. Informational only — consult a livestock broker or USDA AMS for trading decisions.</p>
         <div id="cattle-price-status" style="font-size:0.85rem;color:var(--text-secondary);min-height:20px;margin-bottom:8px;"></div>
         <div id="cattle-price-result"></div>
     </div>
@@ -2129,24 +2129,21 @@ async function refreshCattlePrice() {
     statusEl.textContent = 'Researching current US cattle market prices…';
     statusEl.style.color = 'var(--text-secondary)';
     try {
-        const prompt = `You are an agricultural market analyst. Provide the current US cattle market prices based on the most recent USDA AMS / CME data you have. Use realistic current-market figures; do not fabricate. Return ONLY valid JSON with this exact shape:
+        const prompt = `You are an agricultural market analyst. Provide the current US **fed steer** market price based on the most recent USDA AMS / CME data you have. Use realistic current-market figures; do not fabricate.
+
+Return ONLY valid JSON with this exact shape:
 {
   "asOfDate": "YYYY-MM-DD or textual date range",
   "currency": "USD",
   "prices": [
-    { "category": "Fed Steers (live, 5-area)", "price": 185.25, "unit": "USD/cwt", "trend": "up|down|flat", "note": "brief context" },
-    { "category": "Fed Heifers (live, 5-area)", "price": 184.50, "unit": "USD/cwt", "trend": "flat", "note": "" },
-    { "category": "Feeder Steers (600-700 lb, Oklahoma City)", "price": 280.00, "unit": "USD/cwt", "trend": "up", "note": "" },
-    { "category": "Feeder Heifers (600-700 lb, Oklahoma City)", "price": 260.00, "unit": "USD/cwt", "trend": "up", "note": "" },
-    { "category": "Cull Cows (utility/commercial)", "price": 130.00, "unit": "USD/cwt", "trend": "flat", "note": "" },
-    { "category": "Boxed Beef Cutout (Choice)", "price": 310.00, "unit": "USD/cwt", "trend": "up", "note": "" },
-    { "category": "CME Live Cattle (nearby futures)", "price": 185.00, "unit": "USD/cwt", "trend": "flat", "note": "" },
-    { "category": "CME Feeder Cattle (nearby futures)", "price": 265.00, "unit": "USD/cwt", "trend": "up", "note": "" }
+    { "category": "Fed Steers (live, 5-area weighted avg)", "price": 185.25, "unit": "USD/cwt", "trend": "up|down|flat", "note": "brief market context" },
+    { "category": "Fed Steer — 600 lb equivalent", "price": 1111.50, "unit": "USD/head", "trend": "up|down|flat", "note": "computed = (cwt price × 6) for a 600 lb steer at the same per-cwt rate" }
   ],
-  "commentary": "2-3 sentences on the current state of the US cattle market: supply, demand, key drivers.",
-  "sources": ["USDA AMS Livestock Market News", "CME Group", "Drovers Daily Market Report"]
+  "commentary": "2-3 sentences on the current state of the fed steer market: supply, demand, key drivers.",
+  "sources": ["USDA AMS Livestock Market News", "CME Group"]
 }
-Use the best figures you have. Keep numbers realistic. No preamble, no code fences, JSON only.`;
+
+Compute the 600 lb head price as live fed steer cwt price × 6 (600 lb ÷ 100 lb = 6 cwt). Report to two decimals. No preamble, no code fences, JSON only.`;
         const raw = await callClaudeTextOnly(prompt, 1600);
         if (!raw) return;
         const match = raw.match(/\{[\s\S]*\}/);
@@ -2267,13 +2264,12 @@ async function openCattlePriceHistory() {
                 ? when.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})
                 : '—';
             const prices = (d.data && d.data.prices) || [];
-            const fed = prices.find(p => /fed steer/i.test(p.category||''));
-            const feeder = prices.find(p => /feeder steer/i.test(p.category||''));
+            const fedCwt = prices.find(p => /fed steer/i.test(p.category||'') && /cwt/i.test(p.unit||''));
+            const fed600 = prices.find(p => /600/i.test(p.category||'') || /head/i.test(p.unit||''));
             const summary = [
-                fed ? `Fed: $${Number(fed.price).toFixed(2)}` : null,
-                feeder ? `Feeder: $${Number(feeder.price).toFixed(2)}` : null,
-                `${prices.length} points`
-            ].filter(Boolean).join(' · ');
+                fedCwt ? `Fed steer: $${Number(fedCwt.price).toFixed(2)}/cwt` : null,
+                fed600 ? `600 lb: $${Number(fed600.price).toFixed(2)}/head` : null
+            ].filter(Boolean).join(' · ') || `${prices.length} point${prices.length!==1?'s':''}`;
             const isCurrent = d._id === _currentCattlePriceId;
             return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:${isCurrent?'#ecfdf5':'#fff'};gap:10px;">
                 <div style="flex:1;min-width:0;">

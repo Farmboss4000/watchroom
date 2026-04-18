@@ -1312,6 +1312,12 @@ service cloud.firestore {
             </div>
             <div class="form-group" style="grid-column:1/-1;"><label>AI Summary</label><textarea id="tf-summary" rows="5" placeholder="Plain-English summary of what the trust does, who's covered, and key provisions."></textarea></div>
             <div class="form-group" style="grid-column:1/-1;"><label>Notes</label><textarea id="tf-notes" rows="2" placeholder="Attorney contact, review notes, etc."></textarea></div>
+            <div class="form-group" style="grid-column:1/-1;">
+                <label>Additional Documents</label>
+                <div style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:6px;">Attach supporting docs — amendments, Schedule A, Form 1/4 copies, POAs, attorney letters, etc.</div>
+                <div id="trust-addl-docs-list" style="margin-bottom:8px;"></div>
+                <input type="file" id="trust-addl-docs-input" accept="image/*,application/pdf,.doc,.docx,.txt" multiple onchange="onTrustAddlDocsSelected(this)" style="font-size:0.85rem;">
+            </div>
         </div>
 
         <div class="modal-actions" style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;">
@@ -1560,6 +1566,8 @@ let trusts = [];
 let unsubTrusts = null;
 let nextTrustId = 5001;
 let trustFile = { file:null, base64:null, mimeType:null, existingUrl:null, rasterizedPages:null };
+// Additional supporting documents: existing = already-uploaded {url,name,mimeType,uploadedAt}; pending = File objects to upload on save
+let trustAddlDocs = { existing: [], pending: [] };
 
 // ═══════════════════════════════════════
 //  AUTH
@@ -1769,6 +1777,7 @@ function populateLinkedFirearmsSelect(selectedIds) {
 
 function openTrustModal(docId) {
     trustFile = { file:null, base64:null, mimeType:null, existingUrl:null, rasterizedPages:null };
+    trustAddlDocs = { existing: [], pending: [] };
     document.getElementById('trust-edit-doc-id').value = docId || '';
     document.getElementById('trust-modal-title').textContent = docId ? 'Edit Gun Trust' : 'Add Gun Trust';
     document.getElementById('trust-ai-status').textContent = '';
@@ -1776,9 +1785,13 @@ function openTrustModal(docId) {
     document.getElementById('trust-file').value = '';
     const docLink = document.getElementById('trust-doc-link');
 
+    document.getElementById('trust-addl-docs-input').value = '';
+    renderTrustAddlDocsList();
     if (docId) {
         const t = trusts.find(x => x._docId === docId);
         if (!t) return;
+        trustAddlDocs.existing = Array.isArray(t.additionalDocuments) ? t.additionalDocuments.map(d => ({...d})) : [];
+        renderTrustAddlDocsList();
         document.getElementById('tf-name').value = t.name || '';
         document.getElementById('tf-grantor').value = t.grantor || '';
         document.getElementById('tf-effective').value = t.effectiveDate || '';
@@ -2006,6 +2019,60 @@ async function uploadTrustDoc(file) {
     return await ref.getDownloadURL();
 }
 
+// ── ADDITIONAL DOCUMENTS ──
+function onTrustAddlDocsSelected(input) {
+    const files = Array.from(input.files || []);
+    if (!files.length) return;
+    files.forEach(f => trustAddlDocs.pending.push(f));
+    input.value = '';
+    renderTrustAddlDocsList();
+}
+
+function removeTrustAddlDoc(kind, idx) {
+    if (kind === 'existing') {
+        if (!confirm('Remove this document from the trust? (The file stays in storage but is no longer linked.)')) return;
+        trustAddlDocs.existing.splice(idx, 1);
+    } else {
+        trustAddlDocs.pending.splice(idx, 1);
+    }
+    renderTrustAddlDocsList();
+}
+
+function renderTrustAddlDocsList() {
+    const listEl = document.getElementById('trust-addl-docs-list');
+    if (!listEl) return;
+    const rows = [];
+    trustAddlDocs.existing.forEach((d, i) => {
+        const name = d.name || 'Document';
+        const href = d.url || '#';
+        rows.push(`<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;margin-bottom:4px;background:#fff;font-size:0.85rem;">
+            <span style="flex:0 0 auto;">📄</span>
+            <a href="${escHtml(href)}" target="_blank" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--accent);">${escHtml(name)}</a>
+            <span style="font-size:0.72rem;color:var(--text-secondary);flex-shrink:0;">saved</span>
+            <button type="button" class="btn btn-ghost btn-sm" style="padding:2px 8px;color:#b91c1c;" onclick="removeTrustAddlDoc('existing',${i})" title="Remove">✕</button>
+        </div>`);
+    });
+    trustAddlDocs.pending.forEach((f, i) => {
+        const sizeKB = (f.size / 1024).toFixed(0);
+        rows.push(`<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px dashed #3b82f6;border-radius:6px;margin-bottom:4px;background:#eff6ff;font-size:0.85rem;">
+            <span style="flex:0 0 auto;">📄</span>
+            <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(f.name)}</span>
+            <span style="font-size:0.72rem;color:#1e40af;flex-shrink:0;">pending upload · ${sizeKB} KB</span>
+            <button type="button" class="btn btn-ghost btn-sm" style="padding:2px 8px;color:#b91c1c;" onclick="removeTrustAddlDoc('pending',${i})" title="Remove">✕</button>
+        </div>`);
+    });
+    listEl.innerHTML = rows.length ? rows.join('') : '<div style="font-size:0.78rem;color:var(--text-secondary);font-style:italic;padding:4px 0;">No additional documents yet.</div>';
+}
+
+async function uploadAdditionalDoc(file) {
+    const ext = file.name ? file.name.split('.').pop() : 'bin';
+    const path = `gun_trusts/addl/${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
+    const ref = storage.ref().child(path);
+    await ref.put(file);
+    const url = await ref.getDownloadURL();
+    return { url, name: file.name || 'Document', mimeType: file.type || '', uploadedAt: new Date().toISOString() };
+}
+
 async function saveTrust() {
     const name = document.getElementById('tf-name').value.trim();
     if (!name) { toast('Trust name is required.','error'); return; }
@@ -2036,6 +2103,12 @@ async function saveTrust() {
         } else if (trustFile.existingUrl) {
             data.documentUrl = trustFile.existingUrl;
         }
+        // Upload any pending additional documents, then merge with existing (already-uploaded) ones
+        const uploadedAddl = [];
+        for (const f of trustAddlDocs.pending) {
+            uploadedAddl.push(await uploadAdditionalDoc(f));
+        }
+        data.additionalDocuments = [...trustAddlDocs.existing, ...uploadedAddl];
         if (docId) {
             await db.collection('gun_trusts').doc(docId).update(data);
             toast('Trust updated.','success');

@@ -349,7 +349,7 @@
 <div id="view-import" class="view">
     <div class="card">
         <div class="card-title"><div class="card-title-left">📨 Import Contacts from Email</div></div>
-        <p style="font-size:0.88rem;color:var(--text-secondary);margin-bottom:16px;">Scan a Microsoft 365 mail folder. AI extracts email signatures into structured contacts. All selected contacts are saved as new — use <strong>Merge Duplicates</strong> afterward to combine any matches with existing contacts.</p>
+        <p style="font-size:0.88rem;color:var(--text-secondary);margin-bottom:16px;">Scan a Microsoft 365 mail folder. AI extracts email signatures into structured contacts. Each one is saved as a new contact — after saving, run <strong>Merge Duplicates</strong> to combine any matches with existing contacts.</p>
         <div id="ms365-setup-area"></div>
         <div id="ms365-folder-area" style="display:none;"></div>
         <div id="ms365-results-area" style="display:none;margin-top:14px;"></div>
@@ -1344,29 +1344,7 @@ function dedupeAndMatchPreview(items){
         result.push(item);
     });
 
-    return result.map(item=>{
-        const existing=findExistingContactForItem(item);
-        return {
-            item,
-            checked:true,
-            existingDocId:existing?existing._docId:null,
-            existingName:existing?existing.fullName:''
-        };
-    });
-}
-
-function findExistingContactForItem(item){
-    const emailSet=new Set((item.emails||[]).map(e=>normalizeEmail(e.address)).filter(Boolean));
-    if(emailSet.size){
-        const match=contacts.find(c=>(c.emails||[]).some(e=>emailSet.has(normalizeEmail(e.address))));
-        if(match)return match;
-    }
-    const n=normalizeName(item.fullName);
-    if(n){
-        const match=contacts.find(c=>normalizeName(c.fullName)===n&&(c.company||'').toLowerCase()===(item.company||'').toLowerCase());
-        if(match)return match;
-    }
-    return null;
+    return result.map(item=>({ item, checked:true }));
 }
 
 function renderScanPreview(){
@@ -1376,12 +1354,9 @@ function renderScanPreview(){
         return;
     }
     const total=_scanPreviewItems.length;
-    const dupCount=_scanPreviewItems.filter(p=>p.existingDocId).length;
-    const newCount=total-dupCount;
     resultsArea.innerHTML=`
         <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
             <strong style="font-size:0.95rem;">${total} contact${total!==1?'s':''} extracted</strong>
-            <span style="font-size:0.82rem;color:var(--text-secondary);">${newCount} new · ${dupCount} possible duplicate${dupCount!==1?'s':''} — all will be saved as new; use Merge Duplicates to combine</span>
             <div style="margin-left:auto;display:flex;gap:8px;">
                 <button class="btn btn-ghost btn-sm" onclick="toggleAllPreview(true)">☑ Check All</button>
                 <button class="btn btn-ghost btn-sm" onclick="toggleAllPreview(false)">☐ Uncheck All</button>
@@ -1404,11 +1379,10 @@ function renderPreviewList(){
             return parts?`<span class="chip">${esc(parts)}</span>`:'';
         }).join('');
         const meta=[item.company,item.title,item.department].filter(Boolean).join(' · ');
-        const dupBadge=p.existingDocId?`<span class="badge badge-mobile" style="margin-left:6px;">Possible duplicate of ${esc(p.existingName||'existing')}</span>`:'<span class="badge badge-personal" style="margin-left:6px;">New</span>';
-        return `<div class="preview-card ${p.existingDocId?'duplicate':''}">
+        return `<div class="preview-card">
             <input type="checkbox" ${p.checked?'checked':''} onchange="_scanPreviewItems[${i}].checked=this.checked">
             <div class="preview-body">
-                <div class="preview-name">${esc(item.fullName||'(no name)')}${dupBadge}</div>
+                <div class="preview-name">${esc(item.fullName||'(no name)')}</div>
                 ${meta?`<div class="preview-meta">${esc(meta)}</div>`:''}
                 <div style="margin-top:6px;">${emailChips}${phoneChips}${addrChips}</div>
                 <div class="preview-edit-grid">
@@ -1427,9 +1401,6 @@ function updatePreviewPrimaryEmail(i,val){
     const clean=val.trim();
     if(!(item.emails&&item.emails.length)){item.emails=[{address:clean,label:'work'}];}
     else{item.emails[0]={...item.emails[0],address:clean};}
-    const existing=findExistingContactForItem(item);
-    _scanPreviewItems[i].existingDocId=existing?existing._docId:null;
-    _scanPreviewItems[i].existingName=existing?existing.fullName:'';
 }
 
 function toggleAllPreview(on){
@@ -1471,8 +1442,11 @@ async function saveSelectedPreview(){
         }
     }
     resultsArea.innerHTML=`<div style="padding:14px;background:var(--bg-card);border-radius:10px;font-size:0.9rem;">
-        ✅ Saved ${created} new${failed?', '+failed+' failed':''}. Use <strong>Merge Duplicates</strong> to combine any matches with existing contacts.
-        <button class="btn btn-ghost btn-sm" style="margin-left:10px;" onclick="showView('contacts')">View Contacts</button>
+        ✅ Saved ${created} new${failed?', '+failed+' failed':''}.
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-primary btn-sm" onclick="openMergeDuplicates()">🔀 Merge Duplicates</button>
+            <button class="btn btn-ghost btn-sm" onclick="showView('contacts')">View Contacts</button>
+        </div>
     </div>`;
     toast(`Saved ${created} new${failed?' · '+failed+' failed':''}`,failed?'warn':'success');
 }

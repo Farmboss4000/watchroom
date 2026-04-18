@@ -962,6 +962,25 @@
         <div id="purchase-chart-summary" style="display:flex;gap:24px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);"></div>
     </div>
 
+    <!-- ── MARKET VALUE OVER TIME CHART ── -->
+    <div class="card" style="margin-bottom:18px;">
+        <div class="card-title" style="flex-wrap:wrap;gap:10px;">
+            <div class="card-title-left">📊 Market Value Over Time</div>
+            <button class="btn btn-ghost btn-sm" id="btn-capture-value-snapshot"
+                onclick="capturePortfolioSnapshot()" title="Capture a new snapshot now">
+                📸 Capture Snapshot Now
+            </button>
+        </div>
+        <div style="position:relative;height:260px;">
+            <canvas id="portfolio-value-chart"></canvas>
+            <div id="portfolio-chart-empty" style="display:none;position:absolute;inset:0;
+                 align-items:center;justify-content:center;color:var(--text-secondary);font-size:0.9rem;">
+                No value history yet. A daily snapshot is captured automatically once per calendar day.
+            </div>
+        </div>
+        <div id="portfolio-chart-summary" style="display:flex;gap:24px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);"></div>
+    </div>
+
     <!-- ── SUPPRESSOR COMPATIBILITY REPORT ── -->
     <div class="card" style="margin-bottom:18px;" id="suppressor-compat-card">
         <div class="card-title" style="flex-wrap:wrap;gap:10px;">
@@ -1666,7 +1685,7 @@ function showView(v) {
     document.querySelectorAll('nav button').forEach((btn,i) => btn.classList.toggle('active', VIEWS[i]===v));
     if (v==='dashboard')    renderDashboard();
     if (v==='inventory')    { syncCatFilters(); renderInventory(); }
-    if (v==='reports')      { syncCatFilters(); renderReport(); renderPurchaseChart(); renderCaliberReport(); renderCompatibilityReport(); }
+    if (v==='reports')      { syncCatFilters(); renderReport(); renderPurchaseChart(); renderCaliberReport(); renderCompatibilityReport(); loadPortfolioSnapshots().then(() => { checkAndCaptureDaily(); renderMarketValueChart(); }); }
     if (v==='categories')   renderCatTags();
     if (v==='add-item')     { populateCatSelect(); updateMagSection(); }
     if (v==='recycle-bin')  loadRecycleBin();
@@ -3445,6 +3464,162 @@ function renderPurchaseChart() {
             <div style="font-size:0.72rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;">
                 Peak ${groupBy === 'year' ? 'Year' : groupBy === 'quarter' ? 'Quarter' : 'Month'}
                 ${peakVal ? '(' + (chartMode==='count' ? peakVal+' items' : '$'+peakVal.toLocaleString()) + ')' : ''}
+            </div>
+        </div>`;
+}
+
+// ── MARKET VALUE OVER TIME ──
+let portfolioSnapshots = [];
+let portfolioChartInst = null;
+
+function calculatePortfolioValue() {
+    return (items || []).reduce((sum, it) => sum + (Number(it.marketValue) || 0), 0);
+}
+
+async function loadPortfolioSnapshots() {
+    try {
+        const snap = await db.collection('portfolio_value_snapshots').orderBy('date', 'asc').get();
+        portfolioSnapshots = snap.docs.map(doc => ({ _docId: doc.id, ...doc.data() }));
+    } catch(err) {
+        console.warn('Failed to load portfolio snapshots:', err);
+        portfolioSnapshots = [];
+    }
+}
+
+async function capturePortfolioSnapshot() {
+    const totalValue = calculatePortfolioValue();
+    const today = new Date().toISOString().slice(0, 10);
+    const btn = document.getElementById('btn-capture-value-snapshot');
+    const orig = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Saving…'; }
+    try {
+        await db.collection('portfolio_value_snapshots').doc(today).set({
+            date: today,
+            totalValue: totalValue,
+            itemCount: (items || []).length,
+            capturedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        if (typeof toast === 'function') toast('Snapshot captured: $' + totalValue.toLocaleString());
+        await loadPortfolioSnapshots();
+        renderMarketValueChart();
+    } catch(err) {
+        console.error('Snapshot save failed:', err);
+        if (typeof toast === 'function') toast('Failed to save snapshot', true);
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = orig; }
+    }
+}
+
+async function checkAndCaptureDaily() {
+    const today = new Date().toISOString().slice(0, 10);
+    const existing = portfolioSnapshots.find(s => s.date === today);
+    if (!existing && (items || []).length > 0) {
+        await capturePortfolioSnapshot();
+    }
+}
+
+function renderMarketValueChart() {
+    const canvas = document.getElementById('portfolio-value-chart');
+    const emptyEl = document.getElementById('portfolio-chart-empty');
+    const summaryEl = document.getElementById('portfolio-chart-summary');
+    if (!canvas) return;
+
+    if (!portfolioSnapshots.length) {
+        if (emptyEl) emptyEl.style.display = 'flex';
+        if (portfolioChartInst) { portfolioChartInst.destroy(); portfolioChartInst = null; }
+        if (summaryEl) summaryEl.innerHTML = '';
+        return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    const sorted = [...portfolioSnapshots].sort((a,b) => new Date(a.date) - new Date(b.date));
+    const labels = sorted.map(s => {
+        const d = new Date(s.date + 'T00:00:00');
+        return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'2-digit' });
+    });
+    const values = sorted.map(s => Number(s.totalValue) || 0);
+    const itemCounts = sorted.map(s => Number(s.itemCount) || 0);
+
+    if (portfolioChartInst) { portfolioChartInst.destroy(); portfolioChartInst = null; }
+
+    portfolioChartInst = new Chart(canvas, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Collection Value ($)',
+                data: values,
+                borderColor: '#22c55e',
+                backgroundColor: 'rgba(34,197,94,0.12)',
+                borderWidth: 2.5,
+                pointBackgroundColor: '#22c55e',
+                pointBorderColor: '#fff',
+                pointRadius: values.length > 30 ? 2 : 4,
+                pointHoverRadius: 6,
+                fill: true,
+                tension: 0.35
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => ' $' + Number(ctx.parsed.y).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}),
+                        afterLabel: ctx => itemCounts[ctx.dataIndex] ? itemCounts[ctx.dataIndex] + ' items' : ''
+                    }
+                }
+            },
+            scales: {
+                x: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 10 }, maxRotation: 45, autoSkip: true, maxTicksLimit: 12 } },
+                y: {
+                    grid: { color: 'rgba(0,0,0,0.05)' },
+                    ticks: { font: { size: 10 }, callback: v => '$' + Number(v).toLocaleString() },
+                    beginAtZero: false
+                }
+            }
+        }
+    });
+
+    const minVal = Math.min(...values);
+    const maxVal = Math.max(...values);
+    const currentVal = values[values.length - 1];
+    const firstVal = values[0];
+    const change = currentVal - firstVal;
+    const pctChange = firstVal > 0 ? (change / firstVal * 100) : 0;
+    const changeColor = change >= 0 ? '#22c55e' : '#ef4444';
+    const changeSign = change >= 0 ? '+' : '−';
+
+    if (summaryEl) summaryEl.innerHTML = `
+        <div style="text-align:center;">
+            <div style="font-size:1.3rem;font-weight:800;color:#22c55e;">
+                $${currentVal.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}
+            </div>
+            <div style="font-size:0.72rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;">
+                Current Value
+            </div>
+        </div>
+        <div style="text-align:center;">
+            <div style="font-size:1.3rem;font-weight:800;color:${changeColor};">
+                ${changeSign}$${Math.abs(change).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}
+            </div>
+            <div style="font-size:0.72rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;">
+                Change (${changeSign}${Math.abs(pctChange).toFixed(1)}%)
+            </div>
+        </div>
+        <div style="text-align:center;">
+            <div style="font-size:1.3rem;font-weight:800;color:var(--text-primary);">
+                $${maxVal.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})}
+            </div>
+            <div style="font-size:0.72rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;">
+                Peak Value
+            </div>
+        </div>
+        <div style="text-align:center;">
+            <div style="font-size:1.3rem;font-weight:800;color:var(--text-primary);">${sorted.length}</div>
+            <div style="font-size:0.72rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;">
+                Daily Snapshots
             </div>
         </div>`;
 }

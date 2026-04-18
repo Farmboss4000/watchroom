@@ -907,23 +907,38 @@ async function getMS365Token() {
     }
 }
 
+async function fetchMS365FolderTree(token, parentId, depth) {
+    const base = parentId
+        ? `https://graph.microsoft.com/v1.0/me/mailFolders/${encodeURIComponent(parentId)}/childFolders`
+        : 'https://graph.microsoft.com/v1.0/me/mailFolders';
+    const res = await fetch(`${base}?$top=100&$select=id,displayName,totalItemCount,childFolderCount`, {
+        headers: { Authorization: 'Bearer ' + token }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message || 'Failed to load folders');
+    const out = [];
+    for (const f of (data.value || [])) {
+        out.push({ id: f.id, name: f.displayName, count: f.totalItemCount, depth });
+        if (f.childFolderCount > 0 && depth < 5) {
+            const children = await fetchMS365FolderTree(token, f.id, depth + 1);
+            out.push(...children);
+        }
+    }
+    return out;
+}
+
 async function loadMS365Folders() {
     const folderArea = document.getElementById('ms365-folder-area');
     folderArea.innerHTML = '<div style="font-size:0.84rem;color:var(--text-secondary);">Loading folders…</div>';
     try {
         const token = await getMS365Token();
-        const res  = await fetch('https://graph.microsoft.com/v1.0/me/mailFolders?$top=50&$select=id,displayName,totalItemCount', {
-            headers: { Authorization: 'Bearer ' + token }
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error?.message || 'Failed to load folders');
-        const folders = data.value || [];
+        const folders = await fetchMS365FolderTree(token, null, 0);
         folderArea.innerHTML = `
             <div style="font-size:0.82rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:8px;">Select your travel folder</div>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                 <select id="ms365-folder-select" style="flex:1;min-width:200px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.88rem;background:var(--bg-secondary);color:var(--text-primary);">
                     <option value="">— choose a folder —</option>
-                    ${folders.map(f => `<option value="${esc(f.id)}">${esc(f.displayName)} (${f.totalItemCount} emails)</option>`).join('')}
+                    ${folders.map(f => `<option value="${esc(f.id)}">${'\u00A0\u00A0'.repeat(f.depth)}${f.depth ? '↳ ' : ''}${esc(f.name)} (${f.count} emails)</option>`).join('')}
                 </select>
                 <button class="btn btn-primary" onclick="startMS365Scan()">📨 Scan for Trips</button>
             </div>

@@ -292,6 +292,28 @@
     </div>
     <div class="stats-grid" id="stats-grid"></div>
 
+    <!-- DUPLICATE DETECTION BANNER -->
+    <div id="dupe-banner" style="display:none;background:#fef3c7;border:1px solid #f59e0b;border-left:4px solid #d97706;border-radius:8px;padding:14px 18px;margin-bottom:18px;align-items:flex-start;gap:14px;flex-wrap:wrap;">
+        <span style="font-size:1.5rem;">⚠️</span>
+        <div style="flex:1;min-width:200px;">
+            <div style="font-weight:700;font-size:0.95rem;color:#92400e;margin-bottom:3px;" id="dupe-banner-title">Duplicates Detected</div>
+            <div style="font-size:0.85rem;color:#92400e;" id="dupe-banner-text">—</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openDupeReview()">🔍 Review Duplicates</button>
+    </div>
+
+    <!-- DUPLICATE REVIEW MODAL -->
+    <div class="modal-overlay" id="dupe-modal-overlay" onclick="if(event.target===this)closeDupeReview()" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;align-items:flex-start;justify-content:center;z-index:9500;padding:20px;overflow-y:auto;">
+        <div class="modal" style="background:#fff;border-radius:10px;padding:24px;width:100%;max-width:760px;margin:20px auto;">
+            <div class="modal-title" style="font-size:1.15rem;font-weight:700;margin-bottom:4px;">🔍 Duplicate Documents</div>
+            <div class="modal-sub" style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:16px;" id="dupe-modal-sub">Review duplicate documents and recommended removals.</div>
+            <div id="dupe-modal-body"></div>
+            <div class="modal-actions" style="display:flex;gap:10px;margin-top:16px;">
+                <button class="btn btn-ghost" onclick="closeDupeReview()">Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- FAMILY-FRIENDLY OVERVIEW (moved from Overview tab) -->
     <div class="card">
         <div class="card-title">
@@ -650,6 +672,105 @@ function renderDashboard(){
             <td style="font-size:0.82rem;color:var(--text-secondary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc((d.parties||[]).join(', '))||'—'}</td>
           </tr>`).join('')
         :'<tr><td colspan="4" style="text-align:center;color:var(--text-secondary);padding:30px;">No documents yet.</td></tr>';
+    renderDuplicateBanner();
+}
+
+// ── DUPLICATE DETECTION ──
+function normalizeDocTitle(t){
+    if(!t)return '';
+    return String(t).toLowerCase()
+        .replace(/[.,&()'']/g,' ')
+        .replace(/\b(a|an|the|of|and|or)\b/g,'')
+        .replace(/\s+/g,' ')
+        .trim();
+}
+
+function findDuplicateDocs(){
+    // Exact duplicates by (normalized title + category + effectiveDate) OR (title + parties)
+    const buckets={};
+    documents.forEach(d=>{
+        const title=normalizeDocTitle(d.title);
+        if(!title)return;
+        const key1=`${title}|${(d.category||'').toLowerCase()}|${d.effectiveDate||''}`;
+        if(!buckets[key1])buckets[key1]=[];
+        buckets[key1].push(d);
+    });
+    return Object.values(buckets).filter(g=>g.length>1);
+}
+
+function renderDuplicateBanner(){
+    const banner=document.getElementById('dupe-banner');
+    if(!banner)return;
+    const groups=findDuplicateDocs();
+    if(!groups.length){banner.style.display='none';return;}
+    const extra=groups.reduce((s,g)=>s+(g.length-1),0);
+    banner.style.display='flex';
+    document.getElementById('dupe-banner-title').textContent=`${extra} duplicate document${extra!==1?'s':''} detected`;
+    document.getElementById('dupe-banner-text').textContent=`Found ${groups.length} group${groups.length!==1?'s':''} of documents with matching titles, categories, and dates. Review them below to remove extras.`;
+}
+
+function openDupeReview(){
+    const groups=findDuplicateDocs();
+    const body=document.getElementById('dupe-modal-body');
+    const sub=document.getElementById('dupe-modal-sub');
+    if(!groups.length){
+        body.innerHTML='<div style="padding:20px 4px;text-align:center;color:var(--text-secondary);">✅ No duplicate documents found!</div>';
+        sub.textContent='';
+    } else {
+        const extra=groups.reduce((s,g)=>s+(g.length-1),0);
+        sub.textContent=`${extra} duplicate document${extra!==1?'s':''} across ${groups.length} group${groups.length!==1?'s':''}. The oldest document in each group is kept (recommended).`;
+        body.innerHTML=groups.map((group,gi)=>{
+            // Sort by addedAt ascending — keep the oldest (likely the original)
+            const sorted=[...group].sort((a,b)=>(a.addedAt||'').localeCompare(b.addedAt||''));
+            const primary=sorted[0];
+            const rows=sorted.map((d,i)=>{
+                const tag=i===0
+                    ?'<span style="font-size:0.7rem;background:#22c55e;color:#fff;border-radius:10px;padding:1px 7px;margin-left:6px;">KEEP</span>'
+                    :'<span style="font-size:0.7rem;background:#ef4444;color:#fff;border-radius:10px;padding:1px 7px;margin-left:6px;">DUPLICATE</span>';
+                const addedStr=d.addedAt?new Date(d.addedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
+                return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-size:0.88rem;font-weight:500;">${esc(d.title||'Untitled')}${tag}</div>
+                        <div style="font-size:0.75rem;color:var(--text-secondary);margin-top:2px;">${esc(d.category||'—')} · ${fmtDate(d.effectiveDate)||'no date'} · added ${addedStr}</div>
+                    </div>
+                    <div style="display:flex;gap:6px;">
+                        <button class="btn btn-ghost btn-sm" onclick="editDocument('${d._docId}')">👁 View</button>
+                        ${i===0?'':`<button class="btn btn-sm" style="background:#ef4444;color:#fff;" onclick="deleteDuplicateDoc('${d._docId}')">🗑 Remove</button>`}
+                    </div>
+                </div>`;
+            }).join('');
+            return `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:12px;">
+                <div style="font-weight:700;font-size:0.9rem;color:var(--accent);margin-bottom:6px;">Group ${gi+1}: ${group.length} matching document${group.length!==1?'s':''}</div>
+                ${rows}
+            </div>`;
+        }).join('');
+    }
+    const modal=document.getElementById('dupe-modal-overlay');
+    modal.style.display='flex';
+    void modal.offsetWidth;
+    modal.classList.add('show');
+}
+
+function closeDupeReview(){
+    const m=document.getElementById('dupe-modal-overlay');
+    m.classList.remove('show');
+    m.style.display='none';
+}
+
+async function deleteDuplicateDoc(docId){
+    if(!confirm('Move this duplicate document to the recycle bin? You can restore it later if needed.'))return;
+    try{
+        const doc=documents.find(d=>d._docId===docId);
+        if(!doc){toast('Document not found.','error');return;}
+        // Soft-delete: move to recycle bin
+        await db.collection('estate_recycle_bin').add({...doc,deletedAt:firebase.firestore.FieldValue.serverTimestamp(),originalId:docId});
+        await db.collection('estate_documents').doc(docId).delete();
+        toast('Duplicate moved to recycle bin.','success');
+        // Refresh the modal
+        setTimeout(()=>openDupeReview(),300);
+    }catch(err){
+        toast('Failed to remove: '+err.message,'error');
+    }
 }
 
 // DOCUMENTS LIST

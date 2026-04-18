@@ -334,6 +334,11 @@
 <div id="view-vendors" class="view">
     <div class="card">
         <div class="card-title"><div class="card-title-left">💼 Vendors</div><span style="font-size:0.85rem;color:var(--text-secondary)" id="vnd-count">0 vendors</span></div>
+        <div id="dupe-banner" style="display:none;background:#fef3c7;border:1px solid #f59e0b;border-left:4px solid #d97706;border-radius:8px;padding:12px 16px;margin-bottom:12px;display:none;align-items:center;gap:12px;flex-wrap:wrap;">
+            <span style="font-size:1.3rem;">⚠️</span>
+            <div style="flex:1;min-width:200px;font-size:0.9rem;color:#92400e;" id="dupe-banner-text">Duplicates detected.</div>
+            <button class="btn btn-primary btn-sm" onclick="openMergeDuplicates()">🔀 Review &amp; Merge</button>
+        </div>
         <div class="toolbar">
             <input type="text" id="vnd-search" placeholder="Search vendors..." oninput="renderVendors()">
             <button class="btn btn-primary btn-sm" onclick="showView('add-vendor')">+ Add Vendor</button>
@@ -868,6 +873,18 @@ function renderVendors(){
         return va<vb?(vndSortDir==='asc'?-1:1):va>vb?(vndSortDir==='asc'?1:-1):0;
     });
     document.getElementById('vnd-count').textContent=`${filtered.length} vendor${filtered.length!==1?'s':''}`;
+    // Show duplicate banner if duplicates detected
+    const banner = document.getElementById('dupe-banner');
+    if (banner) {
+        const { groupCount, extraCount } = countDuplicateVendors();
+        if (extraCount > 0) {
+            banner.style.display = 'flex';
+            const txt = document.getElementById('dupe-banner-text');
+            if (txt) txt.innerHTML = `<strong>${extraCount} duplicate vendor${extraCount!==1?'s':''}</strong> detected across ${groupCount} group${groupCount!==1?'s':''}. Review and merge them to keep your data clean.`;
+        } else {
+            banner.style.display = 'none';
+        }
+    }
     document.querySelectorAll('#vnd-table thead th').forEach(th=>th.classList.remove('sort-asc','sort-desc'));
     const thIdx={name:0,transactionCount:3,totalSpend:4,lastDate:5};
     const ti=thIdx[vndSortField];
@@ -1054,17 +1071,34 @@ async function softDeleteDoc(collection,docId,siteTag){
 // ── MERGE DUPLICATES ──
 let _mergeGroups = [];
 
+function normalizeVendorName(name) {
+    if (!name) return '';
+    return String(name)
+        .toLowerCase()
+        .replace(/[.,&()'']/g, ' ')       // strip punctuation
+        .replace(/\b(inc|llc|corp|co|company|ltd|limited|dba|the)\b/g, '') // drop common suffixes
+        .replace(/\s+/g, ' ')              // collapse whitespace
+        .trim();
+}
+
 function findDuplicateGroups() {
-    // Group vendors by normalised name
+    // Group vendors by normalised name (aggressive match — handles punctuation, suffixes)
     const byName = {};
     vendors.forEach(v => {
-        const key = (v.name||'').trim().toLowerCase();
+        const key = normalizeVendorName(v.name);
         if (!key) return;
         if (!byName[key]) byName[key] = [];
         byName[key].push(v);
     });
     // Only keep groups with 2+ records
     return Object.values(byName).filter(g => g.length > 1);
+}
+
+function countDuplicateVendors() {
+    const groups = findDuplicateGroups();
+    let count = 0;
+    groups.forEach(g => { count += g.length - 1; }); // extras beyond the primary
+    return { groupCount: groups.length, extraCount: count };
 }
 
 function openMergeDuplicates() {

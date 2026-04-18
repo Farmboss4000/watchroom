@@ -1355,6 +1355,18 @@ service cloud.firestore {
 </main>
 </div><!-- end #app -->
 
+<!-- ══ STAT OVERVIEW MODAL ══ -->
+<div class="modal-overlay" id="stat-overview-modal" onclick="if(event.target===this)closeStatOverview()">
+    <div class="modal" style="max-width:720px;max-height:85vh;overflow-y:auto;">
+        <div class="modal-title" id="stat-overview-title">Overview</div>
+        <div class="modal-sub" id="stat-overview-sub"></div>
+        <div id="stat-overview-body" style="margin-top:14px;"></div>
+        <div class="modal-actions" style="margin-top:16px;">
+            <button class="btn btn-ghost" onclick="closeStatOverview()">Close</button>
+        </div>
+    </div>
+</div>
+
 <!-- ══ BARCODE MODAL ══ -->
 <div class="modal-overlay" id="barcode-modal">
     <div class="modal" style="max-width:580px;max-height:90vh;overflow-y:auto;">
@@ -1993,11 +2005,11 @@ function renderDashboard() {
         .filter(i => FIREARM_CATS.has((i.category||'').toLowerCase()))
         .reduce((s,i) => s + (Number(i.quantity)||1), 0);
     document.getElementById('stats-grid').innerHTML = `
-        <div class="stat-card"><div class="stat-value">${totalLines}</div><div class="stat-label">Total Line Items</div></div>
-        <div class="stat-card"><div class="stat-value">${totalQty}</div><div class="stat-label">Total Quantity</div></div>
-        <div class="stat-card"><div class="stat-value">${categories.length}</div><div class="stat-label">Categories</div></div>
-        <div class="stat-card"><div class="stat-value">${recent}</div><div class="stat-label">Added This Month</div></div>
-        <div class="stat-card" style="border-color:#a78bfa;"><div class="stat-value" style="color:#a78bfa;">${totalFirearms}</div><div class="stat-label">Total Firearms<div style="font-size:0.65rem;opacity:0.55;font-weight:400;margin-top:2px;">Pistol · Rifle · Revolver · Shotgun</div></div></div>
+        <div class="stat-card" style="cursor:pointer;" onclick="openStatOverview('total-lines')" title="View all line items"><div class="stat-value">${totalLines}</div><div class="stat-label">Total Line Items</div></div>
+        <div class="stat-card" style="cursor:pointer;" onclick="openStatOverview('total-qty')" title="View quantity breakdown"><div class="stat-value">${totalQty}</div><div class="stat-label">Total Quantity</div></div>
+        <div class="stat-card" style="cursor:pointer;" onclick="openStatOverview('categories')" title="View category breakdown"><div class="stat-value">${categories.length}</div><div class="stat-label">Categories</div></div>
+        <div class="stat-card" style="cursor:pointer;" onclick="openStatOverview('added-month')" title="View recently added"><div class="stat-value">${recent}</div><div class="stat-label">Added This Month</div></div>
+        <div class="stat-card" style="border-color:#a78bfa;cursor:pointer;" onclick="openStatOverview('firearms')" title="View firearms breakdown"><div class="stat-value" style="color:#a78bfa;">${totalFirearms}</div><div class="stat-label">Total Firearms<div style="font-size:0.65rem;opacity:0.55;font-weight:400;margin-top:2px;">Pistol · Rifle · Revolver · Shotgun</div></div></div>
         <div class="stat-card" style="border-color:#60a5fa;" onclick="toggleBlur('dash-purchase')" title="Click to reveal">
             <div class="stat-value stat-value-blurred" id="dash-purchase" style="color:#60a5fa;font-size:1.4rem;">${totalPurchase}</div>
             <div class="stat-label">${priceLabel}</div>
@@ -3034,6 +3046,129 @@ function filterInventoryByCategory(cat) {
     showView('inventory');
     const sel = document.getElementById('inv-filter-cat');
     if (sel) { sel.value = cat; renderInventory(); }
+}
+
+// ── STAT OVERVIEW MODAL ──
+function escHtmlStat(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function openStatOverview(metric) {
+    const titleEl = document.getElementById('stat-overview-title');
+    const subEl = document.getElementById('stat-overview-sub');
+    const bodyEl = document.getElementById('stat-overview-body');
+    const modal = document.getElementById('stat-overview-modal');
+    if (!titleEl || !bodyEl) return;
+
+    let title = '', sub = '', body = '';
+
+    if (metric === 'total-lines') {
+        title = '📋 All Line Items';
+        sub = `${items.length} total entries in the inventory.`;
+        const byCat = {};
+        items.forEach(i => {
+            const c = i.category || 'Uncategorized';
+            if (!byCat[c]) byCat[c] = [];
+            byCat[c].push(i);
+        });
+        body = `<table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
+            <thead><tr><th style="text-align:left;padding:8px;border-bottom:2px solid var(--border);color:var(--text-secondary);">Category</th><th style="text-align:right;padding:8px;border-bottom:2px solid var(--border);color:var(--text-secondary);">Line Items</th><th style="text-align:right;padding:8px;border-bottom:2px solid var(--border);color:var(--text-secondary);">% of Total</th></tr></thead>
+            <tbody>${Object.entries(byCat).sort((a,b)=>b[1].length-a[1].length).map(([c,arr])=>`
+                <tr><td style="padding:7px 8px;border-bottom:1px solid var(--border);"><a href="#" onclick="closeStatOverview();filterInventoryByCategory('${escHtmlStat(c)}');return false;" style="color:var(--accent);text-decoration:none;font-weight:500;">${escHtmlStat(c)}</a></td>
+                <td style="padding:7px 8px;text-align:right;border-bottom:1px solid var(--border);">${arr.length}</td>
+                <td style="padding:7px 8px;text-align:right;color:var(--text-secondary);border-bottom:1px solid var(--border);">${(arr.length/items.length*100).toFixed(1)}%</td></tr>
+            `).join('')}</tbody></table>`;
+
+    } else if (metric === 'total-qty') {
+        title = '📦 Total Quantity Breakdown';
+        const total = items.reduce((s,i)=>s+(Number(i.quantity)||1),0);
+        const multi = items.filter(i => Number(i.quantity||1) > 1);
+        sub = `${total} total physical units across ${items.length} line items. ${multi.length} line${multi.length!==1?'s':''} have quantity > 1.`;
+        const byCat = {};
+        items.forEach(i => {
+            const c = i.category || 'Uncategorized';
+            byCat[c] = (byCat[c] || 0) + (Number(i.quantity) || 1);
+        });
+        body = `<table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
+            <thead><tr><th style="text-align:left;padding:8px;border-bottom:2px solid var(--border);color:var(--text-secondary);">Category</th><th style="text-align:right;padding:8px;border-bottom:2px solid var(--border);color:var(--text-secondary);">Quantity</th></tr></thead>
+            <tbody>${Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([c,n])=>`
+                <tr><td style="padding:7px 8px;border-bottom:1px solid var(--border);">${escHtmlStat(c)}</td>
+                <td style="padding:7px 8px;text-align:right;font-weight:600;border-bottom:1px solid var(--border);">${n}</td></tr>
+            `).join('')}</tbody></table>
+            ${multi.length ? `<div style="margin-top:16px;"><div style="font-size:0.82rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Line Items With Quantity > 1</div>
+                <div style="font-size:0.85rem;line-height:1.8;">${multi.map(i => `• ${escHtmlStat(i.manufacturer||'')} ${escHtmlStat(i.model||'')} — <strong>${i.quantity}×</strong>`).join('<br>')}</div></div>` : ''}`;
+
+    } else if (metric === 'categories') {
+        title = '🗂️ Category Overview';
+        sub = `${categories.length} categories defined. ${new Set(items.map(i=>i.category).filter(Boolean)).size} in active use.`;
+        const counts = {};
+        items.forEach(i => { counts[i.category] = (counts[i.category]||0)+1; });
+        const maxC = Math.max(...Object.values(counts), 1);
+        body = `<table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
+            <thead><tr><th style="text-align:left;padding:8px;border-bottom:2px solid var(--border);color:var(--text-secondary);">Category</th><th style="text-align:right;padding:8px;border-bottom:2px solid var(--border);color:var(--text-secondary);">Count</th><th style="text-align:left;padding:8px;border-bottom:2px solid var(--border);color:var(--text-secondary);width:40%;">Distribution</th></tr></thead>
+            <tbody>${categories.map(c => {
+                const n = counts[c] || 0;
+                const pct = (n/maxC*100).toFixed(0);
+                return `<tr><td style="padding:7px 8px;border-bottom:1px solid var(--border);"><a href="#" onclick="closeStatOverview();filterInventoryByCategory('${escHtmlStat(c)}');return false;" style="color:var(--accent);text-decoration:none;font-weight:500;">${escHtmlStat(c)}</a></td>
+                    <td style="padding:7px 8px;text-align:right;font-weight:600;border-bottom:1px solid var(--border);">${n}</td>
+                    <td style="padding:7px 8px;border-bottom:1px solid var(--border);"><div style="height:8px;background:var(--bg-secondary);border-radius:4px;overflow:hidden;"><div style="height:100%;width:${pct}%;background:var(--accent);"></div></div></td></tr>`;
+            }).join('')}</tbody></table>`;
+
+    } else if (metric === 'added-month') {
+        title = '🗓️ Added This Month';
+        const ms30 = 30*24*60*60*1000;
+        const recent = items.filter(i => i.addedAt && (Date.now()-new Date(i.addedAt).getTime())<ms30)
+            .sort((a,b) => new Date(b.addedAt) - new Date(a.addedAt));
+        sub = `${recent.length} item${recent.length!==1?'s':''} added in the last 30 days.`;
+        if (!recent.length) {
+            body = '<div style="color:var(--text-secondary);padding:14px 0;text-align:center;">No items added in the last 30 days.</div>';
+        } else {
+            body = `<table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
+                <thead><tr><th style="text-align:left;padding:8px;border-bottom:2px solid var(--border);color:var(--text-secondary);">Item</th><th style="text-align:left;padding:8px;border-bottom:2px solid var(--border);color:var(--text-secondary);">Category</th><th style="text-align:right;padding:8px;border-bottom:2px solid var(--border);color:var(--text-secondary);">Date Added</th></tr></thead>
+                <tbody>${recent.map(i => `
+                    <tr><td style="padding:7px 8px;border-bottom:1px solid var(--border);">${escHtmlStat([i.manufacturer,i.model].filter(Boolean).join(' ')||i.name||'(unnamed)')}</td>
+                    <td style="padding:7px 8px;border-bottom:1px solid var(--border);color:var(--text-secondary);">${escHtmlStat(i.category||'—')}</td>
+                    <td style="padding:7px 8px;text-align:right;color:var(--text-secondary);border-bottom:1px solid var(--border);">${new Date(i.addedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</td></tr>
+                `).join('')}</tbody></table>`;
+        }
+
+    } else if (metric === 'firearms') {
+        title = '🔫 Firearms Breakdown';
+        const FIREARM_CATS = ['pistol','rifle','revolver','shotgun'];
+        const byFireCat = {};
+        let total = 0;
+        items.forEach(i => {
+            const c = (i.category||'').toLowerCase();
+            if (FIREARM_CATS.includes(c)) {
+                const qty = Number(i.quantity) || 1;
+                if (!byFireCat[c]) byFireCat[c] = { count: 0, qty: 0, items: [] };
+                byFireCat[c].count++;
+                byFireCat[c].qty += qty;
+                byFireCat[c].items.push(i);
+                total += qty;
+            }
+        });
+        sub = `${total} firearm${total!==1?'s':''} across ${Object.values(byFireCat).reduce((s,x)=>s+x.count,0)} line items.`;
+        body = `<table style="width:100%;border-collapse:collapse;font-size:0.88rem;margin-bottom:16px;">
+            <thead><tr><th style="text-align:left;padding:8px;border-bottom:2px solid var(--border);color:var(--text-secondary);">Type</th><th style="text-align:right;padding:8px;border-bottom:2px solid var(--border);color:var(--text-secondary);">Line Items</th><th style="text-align:right;padding:8px;border-bottom:2px solid var(--border);color:var(--text-secondary);">Quantity</th></tr></thead>
+            <tbody>${FIREARM_CATS.map(c => {
+                const d = byFireCat[c] || { count: 0, qty: 0 };
+                return `<tr><td style="padding:7px 8px;border-bottom:1px solid var(--border);text-transform:capitalize;"><a href="#" onclick="closeStatOverview();filterInventoryByCategory('${c.charAt(0).toUpperCase()+c.slice(1)}');return false;" style="color:var(--accent);text-decoration:none;font-weight:500;text-transform:capitalize;">${c}</a></td>
+                <td style="padding:7px 8px;text-align:right;border-bottom:1px solid var(--border);">${d.count}</td>
+                <td style="padding:7px 8px;text-align:right;font-weight:600;border-bottom:1px solid var(--border);">${d.qty}</td></tr>`;
+            }).join('')}<tr style="background:var(--bg-secondary);"><td style="padding:9px 8px;font-weight:700;">Total</td><td style="padding:9px 8px;text-align:right;font-weight:700;">${Object.values(byFireCat).reduce((s,x)=>s+x.count,0)}</td><td style="padding:9px 8px;text-align:right;font-weight:700;color:#a78bfa;">${total}</td></tr></tbody></table>`;
+    }
+
+    titleEl.textContent = title;
+    subEl.textContent = sub;
+    bodyEl.innerHTML = body;
+    modal.style.display = 'flex';
+    void modal.offsetWidth;
+    modal.classList.add('show');
+}
+
+function closeStatOverview() {
+    const m = document.getElementById('stat-overview-modal');
+    m.classList.remove('show');
+    m.style.display = 'none';
 }
 
 // ═══════════════════════════════════════

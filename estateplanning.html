@@ -216,7 +216,6 @@
 <div id="login-screen">
     <div class="login-site-links">
         <a href="index.html">🏠 HQ</a>
-        <a href="addison.html">🩺 Addison</a>
         <a href="dontpush.html">🚫 Don't Push</a>
         <a href="estateplanning.html" class="active">📜 Estate Planning</a>
     </div>
@@ -684,8 +683,48 @@ function normalizeDocTitle(t){
         .trim();
 }
 
+function normalizeForCompare(s){
+    if(!s)return '';
+    return String(s).toLowerCase().replace(/[^\w\s]/g,' ').replace(/\s+/g,' ').trim();
+}
+function contentTokens(s){
+    const n=normalizeForCompare(s);
+    if(!n)return new Set();
+    return new Set(n.split(' ').filter(w=>w.length>2));
+}
+function jaccardSim(a,b){
+    if(!a.size&&!b.size)return 1;
+    if(!a.size||!b.size)return 0;
+    let inter=0;a.forEach(w=>{if(b.has(w))inter++;});
+    const union=a.size+b.size-inter;
+    return union?inter/union:0;
+}
+function docsContentMatch(a,b){
+    // Strong signals: same stored file
+    if(a.documentUrl&&b.documentUrl&&a.documentUrl===b.documentUrl)return true;
+    const aFn=(a.fileName||'').toLowerCase().trim();
+    const bFn=(b.fileName||'').toLowerCase().trim();
+    if(aFn&&bFn&&aFn===bFn)return true;
+    // Compare AI-generated summaries (the best proxy for file contents we have)
+    const sA=contentTokens(a.summary);
+    const sB=contentTokens(b.summary);
+    if(sA.size>=4&&sB.size>=4){
+        return jaccardSim(sA,sB)>=0.6;
+    }
+    // Fall back to parties overlap when summaries are thin/missing
+    const pA=new Set((a.parties||[]).map(p=>String(p).toLowerCase().trim()).filter(Boolean));
+    const pB=new Set((b.parties||[]).map(p=>String(p).toLowerCase().trim()).filter(Boolean));
+    if(pA.size>=2&&pB.size>=2){
+        return jaccardSim(pA,pB)>=0.7;
+    }
+    // Not enough content to confirm — don't flag as duplicate
+    return false;
+}
+
 function findDuplicateDocs(){
-    // Exact duplicates by (normalized title + category + effectiveDate) OR (title + parties)
+    // Candidate match by (normalized title + category + effectiveDate),
+    // then confirm via content similarity (summary / filename / parties)
+    // before reporting as a duplicate.
     const buckets={};
     documents.forEach(d=>{
         const title=normalizeDocTitle(d.title);
@@ -694,7 +733,18 @@ function findDuplicateDocs(){
         if(!buckets[key1])buckets[key1]=[];
         buckets[key1].push(d);
     });
-    return Object.values(buckets).filter(g=>g.length>1);
+    const groups=[];
+    Object.values(buckets).forEach(bucket=>{
+        if(bucket.length<2)return;
+        // Cluster within the bucket by content match; only report clusters with >1 doc
+        const clusters=[];
+        bucket.forEach(d=>{
+            const c=clusters.find(cl=>docsContentMatch(cl[0],d));
+            if(c)c.push(d);else clusters.push([d]);
+        });
+        clusters.forEach(cl=>{if(cl.length>1)groups.push(cl);});
+    });
+    return groups;
 }
 
 function renderDuplicateBanner(){

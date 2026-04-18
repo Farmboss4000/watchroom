@@ -383,6 +383,14 @@
                 <div id="contacts-container"></div>
             </div>
 
+            <div class="card" id="vendor-docs-card" style="margin-top:0;padding:16px;display:none;">
+                <div class="card-title">
+                    <div class="card-title-left">📄 Documents <span id="vendor-docs-count" style="font-size:0.8rem;color:var(--text-secondary);font-weight:500;margin-left:6px;"></span></div>
+                    <button type="button" class="btn btn-ghost btn-sm" id="vendor-docs-view-all" onclick="jumpToCurrentVendorTransactions()">View all transactions →</button>
+                </div>
+                <div id="vendor-docs-container"></div>
+            </div>
+
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary" id="vnd-form-submit">Save Vendor</button>
                 <button type="button" class="btn btn-ghost" onclick="resetVendorForm();showView('vendors')">Cancel</button>
@@ -396,7 +404,7 @@
     <div class="card">
         <div class="card-title"><div class="card-title-left">💰 Transactions</div><span style="font-size:0.85rem;color:var(--text-secondary)" id="txn-count">0 transactions</span></div>
         <div class="toolbar">
-            <input type="text" id="txn-search" placeholder="Search..." oninput="renderTransactions()">
+            <input type="text" id="txn-search" placeholder="Search..." oninput="renderTransactions()" autocomplete="off" name="txn-search-q">
             <select id="txn-filter-vendor" onchange="renderTransactions()"><option value="">All Vendors</option></select>
             <select id="txn-filter-type" onchange="renderTransactions()">
                 <option value="">All Types</option>
@@ -789,6 +797,51 @@ function renderContactsRows(){
 }
 function addContactRow(){formContacts.push({name:'',role:'',email:'',phone:'',notes:''});renderContactsRows();}
 
+function renderVendorDocs(vendorId){
+    const card=document.getElementById('vendor-docs-card');
+    const container=document.getElementById('vendor-docs-container');
+    const countEl=document.getElementById('vendor-docs-count');
+    if(!card||!container)return;
+    if(!vendorId){card.style.display='none';return;}
+    card.style.display='block';
+    const vTxns=transactions.filter(t=>t.vendorId===vendorId).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    const withDocs=vTxns.filter(t=>t.documentUrl);
+    countEl.textContent=`${withDocs.length} with document${withDocs.length!==1?'s':''} · ${vTxns.length} total transaction${vTxns.length!==1?'s':''}`;
+    if(!vTxns.length){
+        container.innerHTML='<p style="font-size:0.82rem;color:var(--text-secondary);">No transactions or documents yet for this vendor.</p>';
+        return;
+    }
+    container.innerHTML=`<div style="max-height:340px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;">
+        <table style="width:100%;font-size:0.85rem;border-collapse:collapse;">
+            <thead style="background:var(--bg-card);position:sticky;top:0;">
+                <tr>
+                    <th style="text-align:left;padding:8px 10px;font-weight:600;">Date</th>
+                    <th style="text-align:left;padding:8px 10px;font-weight:600;">Invoice #</th>
+                    <th style="text-align:left;padding:8px 10px;font-weight:600;">Type</th>
+                    <th style="text-align:right;padding:8px 10px;font-weight:600;">Amount</th>
+                    <th style="text-align:center;padding:8px 10px;font-weight:600;">Document</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${vTxns.map(t=>`<tr style="border-top:1px solid var(--border);">
+                    <td style="padding:6px 10px;white-space:nowrap;">${fmtDate(t.date)||'—'}</td>
+                    <td class="mono" style="padding:6px 10px;font-size:0.8rem;">${esc(t.invoiceNumber)||'—'}</td>
+                    <td style="padding:6px 10px;"><span class="badge ${typeBadgeClass(t.type)}">${esc(t.type)||'—'}</span></td>
+                    <td class="amount-pos" style="padding:6px 10px;text-align:right;white-space:nowrap;">${fmtMoney(t.amount)}</td>
+                    <td style="padding:6px 10px;text-align:center;">${t.documentUrl?`<a href="${esc(t.documentUrl)}" target="_blank" class="btn btn-ghost btn-sm">📄 Open</a>`:'<span style="color:var(--text-secondary);font-size:0.78rem;">—</span>'}</td>
+                </tr>`).join('')}
+            </tbody>
+        </table>
+    </div>`;
+}
+
+function jumpToCurrentVendorTransactions(){
+    const docId=document.getElementById('vnd-edit-doc-id').value;
+    if(!docId)return;
+    const v=vendors.find(x=>x._docId===docId);
+    jumpToVendorTransactions(docId, v?.name||'');
+}
+
 function resetVendorForm(){
     document.getElementById('vnd-edit-doc-id').value='';
     document.getElementById('vendor-form').reset();
@@ -796,6 +849,7 @@ function resetVendorForm(){
     document.getElementById('vnd-form-submit').textContent='Save Vendor';
     formAccounts=[];formContacts=[];
     renderAccountsRows();renderContactsRows();
+    renderVendorDocs(null);
 }
 function editVendor(docId){
     const v=vendors.find(x=>x._docId===docId);if(!v)return;
@@ -812,6 +866,7 @@ function editVendor(docId){
     renderAccountsRows();renderContactsRows();
     document.getElementById('vnd-form-title').textContent=`✏️ Edit Vendor — ${esc(v.name||'')}`;
     document.getElementById('vnd-form-submit').textContent='Update Vendor';
+    renderVendorDocs(v._docId);
 }
 document.getElementById('vendor-form').addEventListener('submit',async e=>{
     e.preventDefault();

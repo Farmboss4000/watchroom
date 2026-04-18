@@ -223,7 +223,6 @@
         <a href="knives.html">🔪 Knives</a>
         <a href="pharmacy.html" class="active">💊 Pharmacy</a>
         <a href="vendors.html">💼 Vendors</a>
-        <a href="addison.html">🩺 Addison</a>
         <a href="estateplanning.html">📜 Estate Planning</a>
     </div>
     <div class="login-box">
@@ -302,6 +301,18 @@
     </div>
     <div id="alert-banners"></div>
     <div class="stats-grid" id="stats-grid"></div>
+    <div class="card">
+        <div class="card-title">
+            <div class="card-title-left">💊 Prescription Overview</div>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <span id="dash-rx-overview-meta" style="font-size:0.78rem;color:var(--text-secondary);"></span>
+                <button class="btn btn-primary btn-sm" id="btn-dash-rx-overview" onclick="generateRxOverview('dash')">🔬 Generate Overview</button>
+            </div>
+        </div>
+        <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:10px;font-style:italic;">For each active medication — what it treats, how it works, and potential side effects. Informational only; always consult your pharmacist or prescriber.</p>
+        <div id="dash-rx-overview-status" style="font-size:0.85rem;color:var(--text-secondary);min-height:20px;margin-bottom:8px;"></div>
+        <div id="dash-rx-overview-result"></div>
+    </div>
     <div class="card">
         <div class="card-title"><div class="card-title-left">👤 Medications by Person</div></div>
         <div class="cat-breakdown" id="person-breakdown"></div>
@@ -573,6 +584,24 @@
 <div id="view-reports" class="view">
     <div class="card">
         <div class="card-title">
+            <div class="card-title-left">🚨 Drug Interaction Check</div>
+            <button class="btn btn-primary btn-sm" id="btn-check-interactions" onclick="checkDrugInteractions()">🔍 Check for Interactions</button>
+        </div>
+        <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:10px;font-style:italic;">AI screens all <strong>active</strong> medications (across all people) for potentially negative interactions. This is an informational aid — always confirm with a pharmacist or prescriber.</p>
+        <div id="interaction-status" style="font-size:0.85rem;color:var(--text-secondary);min-height:20px;margin-bottom:8px;"></div>
+        <div id="interaction-result"></div>
+    </div>
+    <div class="card">
+        <div class="card-title">
+            <div class="card-title-left">💊 Prescription Overview</div>
+            <button class="btn btn-primary btn-sm" id="btn-rx-overview" onclick="generateRxOverview()">🔬 Generate Overview</button>
+        </div>
+        <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:10px;font-style:italic;">AI-generated summary of each active medication — what it treats and common side effects. Informational only; always consult your pharmacist or prescriber.</p>
+        <div id="rx-overview-status" style="font-size:0.85rem;color:var(--text-secondary);min-height:20px;margin-bottom:8px;"></div>
+        <div id="rx-overview-result"></div>
+    </div>
+    <div class="card">
+        <div class="card-title">
             <div class="card-title-left">📊 Medications by Class</div>
         </div>
         <div class="cat-breakdown" id="class-breakdown"></div>
@@ -616,6 +645,27 @@
         </div>
         <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:8px;">Save Settings</button>
     </div>
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">🔑 Anthropic API Key</div></div>
+        <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:12px;">Required for AI-powered drug interaction analysis. This is shared across all Farmboss apps.</p>
+        <div class="api-key-row">
+            <div class="form-group" style="margin-bottom:0;">
+                <label>API Key</label>
+                <input type="password" id="api-key-input" placeholder="sk-ant-api03-…">
+            </div>
+            <button class="btn btn-primary" onclick="saveApiKey()">Save Key</button>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">🌐 CORS Proxy URL (optional)</div></div>
+        <div class="api-key-row">
+            <div class="form-group" style="margin-bottom:0;">
+                <label>Proxy URL</label>
+                <input type="text" id="api-proxy-input" placeholder="https://your-proxy.workers.dev/">
+            </div>
+            <button class="btn btn-primary" onclick="saveProxyUrl()">Save Proxy</button>
+        </div>
+    </div>
 </div>
 
 <!-- RECYCLE BIN -->
@@ -657,6 +707,7 @@ const auth=firebase.auth(), db=firebase.firestore(), storage=firebase.storage();
 
 let items=[], invSortField='medName', invSortDir='asc', unsubItems=null;
 let alertDays=7, detailItemId=null;
+let apiKey='', proxyUrl='', aiModel='claude-sonnet-4-5';
 let formPhotos={
     label:{file:null,base64:null,mimeType:null,existingUrl:null,deleted:false},
     pill:{file:null,base64:null,mimeType:null,existingUrl:null,deleted:false}
@@ -828,6 +879,13 @@ async function initApp(){
         const cfgDoc=await db.collection('rx_config').doc('data').get();
         if(cfgDoc.exists){ const d=cfgDoc.data(); if(d.alertDays) alertDays=d.alertDays; }
         document.getElementById('alert-days-input').value=alertDays;
+        // Load shared API key + proxy used by all Farmboss apps
+        try{
+            const keyDoc=await db.collection('settings').doc('apikey').get();
+            if(keyDoc.exists && keyDoc.data().key){ apiKey=keyDoc.data().key; const el=document.getElementById('api-key-input'); if(el) el.value=apiKey; }
+            const proxyDoc=await db.collection('settings').doc('proxy').get();
+            if(proxyDoc.exists && proxyDoc.data().url){ proxyUrl=proxyDoc.data().url; const el=document.getElementById('api-proxy-input'); if(el) el.value=proxyUrl; }
+        }catch(e){ console.warn('API config load failed', e); }
         unsubItems=db.collection('rx_items').onSnapshot(snap=>{
             items=snap.docs.map(doc=>({_docId:doc.id,...doc.data()}));
             renderDashboard(); renderInventory(); renderRefills(); renderReport();
@@ -836,6 +894,9 @@ async function initApp(){
         document.getElementById('loading-screen').style.display='none';
         document.getElementById('app').style.display='block';
         showView('dashboard');
+        // Paint the cached prescription overview into the dashboard + reports so users see it
+        // without having to regenerate (and so it's the same across devices)
+        loadCachedRxOverview();
     }catch(err){
         document.getElementById('loading-screen').innerHTML=`<p style="color:var(--danger);padding:20px;text-align:center;">Error: ${err.message}<br><br><button class="btn btn-ghost" onclick="doSignOut()">Sign Out</button></p>`;
     }
@@ -1347,6 +1408,279 @@ function toast(msg,type=''){
     t.className='toast'+(type?' '+type:''); t.classList.add('show');
     setTimeout(()=>t.classList.remove('show'),3000);
 }
+
+// ── AI / API KEY ──────────────────────────────────────────────────
+async function saveApiKey(){
+    const v=(document.getElementById('api-key-input')?.value||'').trim();
+    if(!v){ toast('Enter an API key first.','error'); return; }
+    try{ await db.collection('settings').doc('apikey').set({key:v}); apiKey=v; toast('API key saved.','success'); }
+    catch(e){ toast('Failed to save: '+e.message,'error'); }
+}
+async function saveProxyUrl(){
+    const v=(document.getElementById('api-proxy-input')?.value||'').trim();
+    try{ await db.collection('settings').doc('proxy').set({url:v}); proxyUrl=v; toast('Proxy saved.','success'); }
+    catch(e){ toast('Failed to save: '+e.message,'error'); }
+}
+async function callClaudeText(prompt, maxTokens=2048){
+    if(!apiKey){ toast('Set API key in Settings first.','error'); return null; }
+    const msgPayload={ model:aiModel, max_tokens:maxTokens, messages:[{role:'user',content:[{type:'text',text:prompt}]}] };
+    let res;
+    try{
+        if(proxyUrl){
+            res=await fetch(proxyUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...msgPayload,apiKey})});
+        } else {
+            res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',mode:'cors',
+                headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true'},
+                body:JSON.stringify(msgPayload)});
+        }
+    }catch(networkErr){ throw new Error('Network error — set up a Proxy URL in Settings to fix CORS issues.'); }
+    if(!res.ok){
+        let msg=`API error ${res.status}`;
+        try{ const d=await res.json(); msg=d.error?.message||msg; if(res.status===401) msg='Invalid API key — check Settings.'; }catch(e){}
+        throw new Error(msg);
+    }
+    const data=await res.json();
+    return data.content[0].text;
+}
+
+// ── INTERACTION CHECK ─────────────────────────────────────────────
+function buildActiveMedsList(){
+    return items.filter(i=>i.status==='Active').map(i=>({
+        person:i.person||'Unknown',
+        medName:i.medName||'',
+        genericName:i.genericName||'',
+        dosage:i.dosage||'',
+        frequency:i.frequency||'',
+        medClass:i.medClass||'',
+        purpose:i.purpose||''
+    }));
+}
+
+async function checkDrugInteractions(){
+    const active=buildActiveMedsList();
+    const statusEl=document.getElementById('interaction-status');
+    const resultEl=document.getElementById('interaction-result');
+    const btn=document.getElementById('btn-check-interactions');
+    if(active.length<2){
+        statusEl.textContent='Need at least 2 active medications to check for interactions.';
+        statusEl.style.color='var(--text-secondary)';
+        resultEl.innerHTML='';
+        return;
+    }
+    // Group by person — interactions are only meaningful within one person
+    const byPerson={};
+    active.forEach(m=>{ (byPerson[m.person]=byPerson[m.person]||[]).push(m); });
+    const peopleWithMulti=Object.entries(byPerson).filter(([,list])=>list.length>=2);
+    if(!peopleWithMulti.length){
+        statusEl.textContent='No person has 2+ active medications to cross-check.';
+        statusEl.style.color='var(--text-secondary)';
+        resultEl.innerHTML='';
+        return;
+    }
+    btn.disabled=true; btn.textContent='⏳ Checking…';
+    statusEl.textContent='Screening for interactions…';
+    statusEl.style.color='var(--text-secondary)';
+    resultEl.innerHTML='';
+    try{
+        const sections=peopleWithMulti.map(([person,list])=>{
+            const lines=list.map(m=>`- ${m.medName}${m.genericName?` (${m.genericName})`:''}${m.dosage?` ${m.dosage}`:''}${m.frequency?` — ${m.frequency}`:''}${m.medClass?` [${m.medClass}]`:''}`).join('\n');
+            return `PERSON: ${person}\n${lines}`;
+        }).join('\n\n');
+        const prompt=`You are a clinical pharmacist screening for potentially NEGATIVE drug-drug interactions between medications taken by the SAME person. Only flag real interactions — do not invent them. Cross-check only within each person listed.
+
+${sections}
+
+Return ONLY a valid JSON object with this exact shape:
+{
+  "interactions": [
+    {
+      "person": "name",
+      "drugs": ["Drug A", "Drug B"],
+      "severity": "High" | "Moderate" | "Low",
+      "description": "What the interaction is, mechanistically.",
+      "effect": "What could happen clinically (e.g., increased bleeding risk, serotonin syndrome).",
+      "recommendation": "What the patient/prescriber should do."
+    }
+  ],
+  "summary": "One-sentence plain-English overall summary."
+}
+
+If no clinically meaningful interactions exist, return {"interactions": [], "summary": "No significant interactions found among the listed medications."}`;
+        const raw=await callClaudeText(prompt, 2500);
+        const jsonMatch=raw.match(/\{[\s\S]*\}/);
+        if(!jsonMatch) throw new Error('Could not parse AI response.');
+        const data=JSON.parse(jsonMatch[0]);
+        renderInteractionResult(data);
+        const cnt=(data.interactions||[]).length;
+        statusEl.textContent=cnt?`✅ Check complete — ${cnt} interaction${cnt!==1?'s':''} flagged.`:'✅ No interactions flagged.';
+        statusEl.style.color=cnt?'#b45309':'var(--success,#16a34a)';
+    }catch(err){
+        statusEl.textContent='❌ '+err.message;
+        statusEl.style.color='var(--danger)';
+    }finally{
+        btn.disabled=false; btn.textContent='🔍 Check for Interactions';
+    }
+}
+
+function renderInteractionResult(data){
+    const el=document.getElementById('interaction-result');
+    const list=data.interactions||[];
+    if(!list.length){
+        el.innerHTML=`<div style="padding:14px;background:#dcfce7;border:1px solid #86efac;border-radius:8px;color:#166534;font-size:0.9rem;">✅ ${data.summary||'No significant interactions found.'}</div>`;
+        return;
+    }
+    const sevStyle=s=>{
+        const k=(s||'').toLowerCase();
+        if(k.startsWith('high')||k.startsWith('major')||k.startsWith('severe')) return 'background:#fee2e2;color:#991b1b;border-color:#fca5a5;';
+        if(k.startsWith('mod')) return 'background:#fef3c7;color:#92400e;border-color:#fbbf24;';
+        return 'background:#e0f2fe;color:#075985;border-color:#7dd3fc;';
+    };
+    const summary=data.summary?`<div style="padding:10px 14px;background:#f3f4f6;border-left:3px solid #6366f1;border-radius:4px;font-size:0.88rem;margin-bottom:12px;">${esc(data.summary)}</div>`:'';
+    el.innerHTML=summary+list.map(it=>{
+        const drugs=Array.isArray(it.drugs)?it.drugs.join(' ⇄ '):(it.drugs||'—');
+        return `<div style="border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:10px;background:#fff;">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+                <span style="font-size:0.7rem;font-weight:700;padding:3px 9px;border-radius:10px;border:1px solid;text-transform:uppercase;letter-spacing:0.4px;${sevStyle(it.severity)}">${esc(it.severity||'Unknown')}</span>
+                <strong style="font-size:0.92rem;">${esc(drugs)}</strong>
+                ${it.person?`<span style="font-size:0.78rem;color:var(--text-secondary);">· ${esc(it.person)}</span>`:''}
+            </div>
+            ${it.description?`<div style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:4px;"><strong>Mechanism:</strong> ${esc(it.description)}</div>`:''}
+            ${it.effect?`<div style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:4px;"><strong>Potential effect:</strong> ${esc(it.effect)}</div>`:''}
+            ${it.recommendation?`<div style="font-size:0.85rem;color:#1e40af;margin-top:4px;"><strong>Recommendation:</strong> ${esc(it.recommendation)}</div>`:''}
+        </div>`;
+    }).join('');
+}
+
+// ── RX OVERVIEW ───────────────────────────────────────────────────
+const RX_OVERVIEW_TARGETS = {
+    reports: { status:'rx-overview-status', result:'rx-overview-result', btn:'btn-rx-overview', meta:null },
+    dash:    { status:'dash-rx-overview-status', result:'dash-rx-overview-result', btn:'btn-dash-rx-overview', meta:'dash-rx-overview-meta' }
+};
+
+async function generateRxOverview(target='reports'){
+    const t = RX_OVERVIEW_TARGETS[target] || RX_OVERVIEW_TARGETS.reports;
+    const active=buildActiveMedsList();
+    const statusEl=document.getElementById(t.status);
+    const resultEl=document.getElementById(t.result);
+    const btn=document.getElementById(t.btn);
+    if(!active.length){
+        statusEl.textContent='No active medications on file.';
+        statusEl.style.color='var(--text-secondary)';
+        resultEl.innerHTML='';
+        return;
+    }
+    btn.disabled=true; btn.textContent='⏳ Generating…';
+    statusEl.textContent='Researching each medication…';
+    statusEl.style.color='var(--text-secondary)';
+    resultEl.innerHTML='';
+    try{
+        const medLines=active.map((m,idx)=>`${idx+1}. ${m.medName}${m.genericName?` (${m.genericName})`:''}${m.dosage?` — ${m.dosage}`:''}${m.frequency?` ${m.frequency}`:''}${m.medClass?` [${m.medClass}]`:''} — patient: ${m.person}${m.purpose?` — noted purpose: ${m.purpose}`:''}`).join('\n');
+        const prompt=`You are a clinical pharmacist writing a plain-English reference sheet for a patient. For EACH medication listed, produce a structured entry.
+
+${medLines}
+
+Return ONLY a valid JSON object with this exact shape:
+{
+  "entries": [
+    {
+      "index": 1,
+      "medName": "as listed",
+      "genericName": "generic if applicable",
+      "person": "patient name",
+      "drugClass": "pharmacologic class",
+      "treats": "1-2 sentences on what conditions this is typically prescribed for",
+      "howItWorks": "1 short sentence on mechanism in plain English",
+      "commonSideEffects": ["list", "of", "common side effects"],
+      "seriousSideEffects": ["list of serious/rare side effects to watch for"],
+      "keyWarnings": "Brief note on important warnings, food/drink interactions, or what to avoid (1-2 sentences)."
+    }
+  ]
+}
+
+Keep language accessible (6th-grade reading level). Keep each list to 3–6 items. If a medication is unknown, say so in the treats field.`;
+        const raw=await callClaudeText(prompt, 3500);
+        const jsonMatch=raw.match(/\{[\s\S]*\}/);
+        if(!jsonMatch) throw new Error('Could not parse AI response.');
+        const data=JSON.parse(jsonMatch[0]);
+        // Cache to Firestore so every device/browser sees the same overview
+        try{
+            await db.collection('rx_reports').doc('overview').set({
+                data,
+                generatedAt: new Date().toISOString(),
+                medCount: active.length
+            });
+        }catch(saveErr){ console.warn('Overview cache save failed', saveErr); }
+        renderRxOverviewAll(data, new Date().toISOString());
+        statusEl.textContent=`✅ Generated overview for ${(data.entries||[]).length} medication${(data.entries||[]).length!==1?'s':''}.`;
+        statusEl.style.color='var(--success,#16a34a)';
+    }catch(err){
+        statusEl.textContent='❌ '+err.message;
+        statusEl.style.color='var(--danger)';
+    }finally{
+        btn.disabled=false; btn.textContent='🔬 Generate Overview';
+    }
+}
+
+// Render into every target that has a result container (dashboard + reports)
+function renderRxOverviewAll(data, generatedAt){
+    for (const key of Object.keys(RX_OVERVIEW_TARGETS)){
+        if (document.getElementById(RX_OVERVIEW_TARGETS[key].result)){
+            renderRxOverview(data, key);
+            const t = RX_OVERVIEW_TARGETS[key];
+            if (t.meta && generatedAt){
+                const when = new Date(generatedAt);
+                const whenStr = isNaN(when) ? '' : when.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
+                const meta = document.getElementById(t.meta);
+                if (meta) meta.textContent = whenStr ? `Generated ${whenStr}` : '';
+            }
+        }
+    }
+}
+
+async function loadCachedRxOverview(){
+    try{
+        const snap = await db.collection('rx_reports').doc('overview').get();
+        if (!snap.exists) return;
+        const d = snap.data();
+        if (d && d.data) renderRxOverviewAll(d.data, d.generatedAt || null);
+    }catch(e){ console.warn('Overview cache load failed', e); }
+}
+
+function renderRxOverview(data, target='reports'){
+    const t = RX_OVERVIEW_TARGETS[target] || RX_OVERVIEW_TARGETS.reports;
+    const el=document.getElementById(t.result);
+    if(!el) return;
+    const entries=data.entries||[];
+    if(!entries.length){ el.innerHTML='<p style="color:var(--text-secondary);font-size:0.88rem;">No entries generated.</p>'; return; }
+    const pillList=arr=>Array.isArray(arr)&&arr.length
+        ? `<ul style="margin:4px 0 0 18px;padding:0;">${arr.map(x=>`<li style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:2px;">${esc(x)}</li>`).join('')}</ul>`
+        : '<span style="font-size:0.82rem;color:var(--text-secondary);font-style:italic;">None listed.</span>';
+    el.innerHTML=entries.map(e=>`
+        <div style="border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:12px;background:#fff;">
+            <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+                <strong style="font-size:1.02rem;color:var(--accent);">💊 ${esc(e.medName||'Unknown')}</strong>
+                ${e.genericName?`<span style="font-size:0.85rem;color:var(--text-secondary);">(${esc(e.genericName)})</span>`:''}
+                ${e.person?`<span style="font-size:0.78rem;color:var(--text-secondary);margin-left:auto;">For: ${esc(e.person)}</span>`:''}
+            </div>
+            ${e.drugClass?`<div style="font-size:0.78rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:8px;">${esc(e.drugClass)}</div>`:''}
+            ${e.treats?`<div style="font-size:0.88rem;margin-bottom:6px;"><strong>Used to treat:</strong> ${esc(e.treats)}</div>`:''}
+            ${e.howItWorks?`<div style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:8px;"><strong>How it works:</strong> ${esc(e.howItWorks)}</div>`:''}
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px;">
+                <div>
+                    <div style="font-size:0.82rem;font-weight:600;">Common side effects</div>
+                    ${pillList(e.commonSideEffects)}
+                </div>
+                <div>
+                    <div style="font-size:0.82rem;font-weight:600;color:#991b1b;">Serious — watch for</div>
+                    ${pillList(e.seriousSideEffects)}
+                </div>
+            </div>
+            ${e.keyWarnings?`<div style="font-size:0.84rem;color:#92400e;background:#fef3c7;border-left:3px solid #f59e0b;padding:8px 10px;border-radius:4px;margin-top:10px;"><strong>⚠ Key warning:</strong> ${esc(e.keyWarnings)}</div>`:''}
+        </div>
+    `).join('');
+}
+
+function esc(s){ return s==null?'':String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 </script>
 </body>
 </html>

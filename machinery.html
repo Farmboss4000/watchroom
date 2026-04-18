@@ -393,7 +393,6 @@
         <a href="knives.html">🔪 Knives</a>
         <a href="pharmacy.html">💊 Pharmacy</a>
         <a href="vendors.html">💼 Vendors</a>
-        <a href="addison.html">🩺 Addison</a>
         <a href="estateplanning.html">📜 Estate Planning</a>
     </div>
     <div class="login-box">
@@ -527,10 +526,25 @@
     <div class="card">
         <div class="card-title">
             <div class="card-title-left">📈 Fleet Value Over Time</div>
-            <span id="mch-last-snap" style="font-size:0.8rem;color:var(--text-secondary);"></span>
+            <div style="display:flex;align-items:center;gap:10px;">
+                <span id="mch-last-snap" style="font-size:0.8rem;color:var(--text-secondary);"></span>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="openValueByDate()">📋 Value by Date</button>
+            </div>
         </div>
         <div id="mch-chart-empty" style="color:var(--text-secondary);font-size:0.88rem;padding:20px 0;text-align:center;display:none;">No value history yet — refresh market values to start tracking.</div>
         <canvas id="mch-chart" style="max-height:280px;"></canvas>
+    </div>
+</div>
+
+<!-- VALUE BY DATE MODAL -->
+<div id="value-by-date-modal" class="modal-overlay" onclick="if(event.target===this)closeValueByDate()" style="display:none;">
+    <div class="modal" style="max-width:620px;">
+        <div class="modal-title">📋 Fleet Value by Date</div>
+        <div class="modal-sub" id="vbd-sub" style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:12px;">—</div>
+        <div id="vbd-body" style="max-height:60vh;overflow-y:auto;border:1px solid var(--border);border-radius:6px;"></div>
+        <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="closeValueByDate()">Close</button>
+        </div>
     </div>
 </div>
 
@@ -2530,6 +2544,76 @@ async function autoRefreshMarketValues() {
         await new Promise(r => setTimeout(r, 1500));
     }
     if (stale.length > 3) toast(`${stale.length-3} more items need valuation — click 💲 Refresh All Values.`);
+    // Always capture a daily snapshot of current totals so history fills in even if no items were re-priced.
+    await ensureDailyValueSnapshot('machinery_value_snapshots');
+}
+
+async function ensureDailyValueSnapshot(collection) {
+    try {
+        const today = new Date().toISOString().slice(0,10);
+        const existing = await db.collection(collection).doc(today).get();
+        if (existing.exists) return; // already saved today
+        await saveValueSnapshot(collection);
+    } catch(e) { console.warn('Daily snapshot check failed', e); }
+}
+
+async function openValueByDate() {
+    const modal = document.getElementById('value-by-date-modal');
+    const body = document.getElementById('vbd-body');
+    const sub = document.getElementById('vbd-sub');
+    body.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-secondary);">Loading…</div>';
+    sub.textContent = '';
+    modal.style.display = 'flex';
+    void modal.offsetWidth;
+    modal.classList.add('show');
+    try {
+        const snap = await db.collection('machinery_value_snapshots').orderBy('date','desc').get();
+        const docs = snap.docs.map(d => d.data()).filter(d => d.date && d.totalValue);
+        if (!docs.length) {
+            body.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-secondary);">No value history yet.</div>';
+            return;
+        }
+        sub.textContent = `${docs.length} snapshot${docs.length!==1?'s':''} recorded. Latest: ${docs[0].date}.`;
+        // Compute day-over-day delta (docs is desc; compare to next)
+        const rows = docs.map((d,i) => {
+            const prev = docs[i+1];
+            let delta = '';
+            if (prev) {
+                const diff = Number(d.totalValue) - Number(prev.totalValue);
+                const pct = prev.totalValue ? (diff/Number(prev.totalValue))*100 : 0;
+                const color = diff > 0 ? 'var(--success,#16a34a)' : diff < 0 ? 'var(--danger,#dc2626)' : 'var(--text-secondary)';
+                const sign = diff > 0 ? '+' : '';
+                delta = `<span style="color:${color};font-weight:500;">${sign}$${Math.round(Math.abs(diff)).toLocaleString()}${diff ? ` (${sign}${pct.toFixed(1)}%)` : ''}</span>`;
+            } else {
+                delta = '<span style="color:var(--text-secondary);">—</span>';
+            }
+            return `<tr style="border-top:1px solid var(--border);">
+                <td style="padding:8px 12px;white-space:nowrap;font-weight:500;">${d.date}</td>
+                <td style="padding:8px 12px;text-align:right;font-weight:600;">$${Number(d.totalValue).toLocaleString()}</td>
+                <td style="padding:8px 12px;text-align:right;">${delta}</td>
+                <td style="padding:8px 12px;text-align:right;color:var(--text-secondary);font-size:0.82rem;">${d.itemCount || 0}</td>
+            </tr>`;
+        }).join('');
+        body.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
+            <thead style="background:var(--bg-card,#f0f2f5);position:sticky;top:0;">
+                <tr>
+                    <th style="text-align:left;padding:8px 12px;font-weight:600;">Date</th>
+                    <th style="text-align:right;padding:8px 12px;font-weight:600;">Total Value</th>
+                    <th style="text-align:right;padding:8px 12px;font-weight:600;">Change</th>
+                    <th style="text-align:right;padding:8px 12px;font-weight:600;">Items</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>`;
+    } catch(e) {
+        body.innerHTML = `<div style="padding:20px;text-align:center;color:var(--danger);">Failed to load: ${e.message}</div>`;
+    }
+}
+
+function closeValueByDate() {
+    const modal = document.getElementById('value-by-date-modal');
+    modal.classList.remove('show');
+    modal.style.display = 'none';
 }
 
 // ── RECYCLE BIN ──

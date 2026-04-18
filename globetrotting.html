@@ -9,6 +9,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.umd.js"></script>
     <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
     <style>
         *{box-sizing:border-box;margin:0;padding:0;}
@@ -335,7 +336,6 @@
         <a href="agents.html">🤖 Agents</a>
         <a href="globetrotting.html" class="active">✈️ Globetrotting</a>
         <a href="vendors.html">💼 Vendors</a>
-        <a href="addison.html">🩺 Addison</a>
         <a href="estateplanning.html">📜 Estate Planning</a>
     </div>
     <div class="login-box">
@@ -387,12 +387,35 @@
         <!-- ── DASHBOARD ── -->
         <div class="view" id="view-dashboard">
             <div class="stats-grid" id="dash-stats"></div>
+            <div id="dupe-banner" style="display:none;background:#fef3c7;border:1px solid #f59e0b;border-radius:10px;padding:14px 18px;margin:16px 0;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+                <div style="font-size:1.5rem;">⚠️</div>
+                <div style="flex:1;min-width:240px;">
+                    <div style="font-weight:700;font-size:0.95rem;color:#92400e;margin-bottom:3px;" id="dupe-banner-title">Duplicate trips detected</div>
+                    <div style="font-size:0.82rem;color:#78350f;" id="dupe-banner-text"></div>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="openTripDupeReview()">🔍 Review Duplicates</button>
+            </div>
             <div class="card">
                 <div class="card-title">
                     <span class="card-title-left">Recent Trips</span>
                     <button class="btn btn-primary btn-sm" onclick="showView('add-trip')">＋ Add Trip</button>
                 </div>
                 <div id="dash-recent"></div>
+            </div>
+        </div>
+
+        <!-- ── DUPLICATE REVIEW MODAL ── -->
+        <div class="modal-overlay" id="trip-dupe-overlay" onclick="if(event.target===this)closeTripDupeReview()">
+            <div class="modal" style="max-width:720px;">
+                <div class="modal-hdr">
+                    <div class="modal-title">🔍 Duplicate Trips</div>
+                    <button class="modal-close" onclick="closeTripDupeReview()">✕</button>
+                </div>
+                <div class="modal-sub" id="trip-dupe-sub" style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:14px;"></div>
+                <div id="trip-dupe-body"></div>
+                <div class="modal-actions">
+                    <button class="btn btn-ghost" onclick="closeTripDupeReview()">Close</button>
+                </div>
             </div>
         </div>
 
@@ -1130,6 +1153,7 @@ function renderAll() {
     renderDashboard();
     renderTrips();
     populateYearFilter();
+    renderTripDupeBanner();
 }
 
 // ═══════════════════════════════════════════════
@@ -1409,6 +1433,127 @@ async function softDelete(id) {
     await loadTrips();
     renderAll();
     showToast('Trip moved to recycle bin');
+}
+
+// ═══════════════════════════════════════════════
+//  DUPLICATE DETECTION
+// ═══════════════════════════════════════════════
+function normalizeTripName(n){
+    if(!n)return '';
+    return String(n).toLowerCase()
+        .replace(/[.,&()'’-]/g,' ')
+        .replace(/\b(a|an|the|of|and|or|trip|itinerary|vacation)\b/g,'')
+        .replace(/\s+/g,' ').trim();
+}
+function tripDestKey(t){
+    return (t.destinations||[])
+        .map(d=>[(d.city||'').toLowerCase().trim(),(d.country||'').toLowerCase().trim()].filter(Boolean).join('|'))
+        .filter(Boolean).sort().join('::');
+}
+function tripsLikelyDuplicate(a,b){
+    // Exact date+destinations match → strong duplicate
+    const aDep=a.departureDate||'', bDep=b.departureDate||'';
+    const aRet=a.returnDate||'', bRet=b.returnDate||'';
+    const destA=tripDestKey(a), destB=tripDestKey(b);
+    if(aDep && aDep===bDep && aRet===bRet && destA && destA===destB) return true;
+    // Same normalized name + overlapping dates → likely duplicate
+    const nameA=normalizeTripName(a.name), nameB=normalizeTripName(b.name);
+    if(nameA && nameA===nameB && aDep && aDep===bDep) return true;
+    return false;
+}
+function findDuplicateTrips(){
+    const active=trips.filter(t=>!t.deleted);
+    // Bucket by departureDate first (fast path) — duplicates will almost always share a departure date
+    const buckets={};
+    active.forEach(t=>{
+        const key=t.departureDate||'__nodate__';
+        (buckets[key]=buckets[key]||[]).push(t);
+    });
+    const groups=[];
+    Object.values(buckets).forEach(bucket=>{
+        if(bucket.length<2)return;
+        const clusters=[];
+        bucket.forEach(t=>{
+            const c=clusters.find(cl=>tripsLikelyDuplicate(cl[0],t));
+            if(c)c.push(t); else clusters.push([t]);
+        });
+        clusters.forEach(cl=>{if(cl.length>1)groups.push(cl);});
+    });
+    return groups;
+}
+
+function renderTripDupeBanner(){
+    const banner=document.getElementById('dupe-banner');
+    if(!banner)return;
+    const groups=findDuplicateTrips();
+    if(!groups.length){ banner.style.display='none'; return; }
+    const extra=groups.reduce((s,g)=>s+(g.length-1),0);
+    banner.style.display='flex';
+    document.getElementById('dupe-banner-title').textContent=`${extra} duplicate trip${extra!==1?'s':''} detected`;
+    document.getElementById('dupe-banner-text').textContent=`Found ${groups.length} group${groups.length!==1?'s':''} of trips with matching dates and destinations. Review them to remove extras.`;
+}
+
+function openTripDupeReview(){
+    const groups=findDuplicateTrips();
+    const body=document.getElementById('trip-dupe-body');
+    const sub=document.getElementById('trip-dupe-sub');
+    const overlay=document.getElementById('trip-dupe-overlay');
+    if(!groups.length){
+        body.innerHTML='<div style="padding:20px 4px;text-align:center;color:var(--text-secondary);">✅ No duplicate trips found!</div>';
+        sub.textContent='';
+    } else {
+        const extra=groups.reduce((s,g)=>s+(g.length-1),0);
+        sub.textContent=`${extra} duplicate trip${extra!==1?'s':''} across ${groups.length} group${groups.length!==1?'s':''}. The oldest-added trip in each group is kept (recommended).`;
+        body.innerHTML=groups.map((group,gi)=>{
+            const sorted=[...group].sort((a,b)=>{
+                const ta=(a.createdAt&&a.createdAt.seconds)||0;
+                const tb=(b.createdAt&&b.createdAt.seconds)||0;
+                return ta-tb;
+            });
+            const rows=sorted.map((t,i)=>{
+                const tag=i===0
+                    ? '<span style="font-size:0.7rem;background:#22c55e;color:#fff;border-radius:10px;padding:1px 7px;margin-left:6px;">KEEP</span>'
+                    : '<span style="font-size:0.7rem;background:#ef4444;color:#fff;border-radius:10px;padding:1px 7px;margin-left:6px;">DUPLICATE</span>';
+                const destStr=(t.destinations||[]).map(d=>[d.city,d.country].filter(Boolean).join(', ')).filter(Boolean).join(' → ')||'—';
+                return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);gap:10px;">
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-size:0.9rem;font-weight:600;">${esc(t.name||'Untitled trip')}${tag}</div>
+                        <div style="font-size:0.76rem;color:var(--text-secondary);margin-top:2px;">${fmtDate(t.departureDate)||'no date'} — ${fmtDate(t.returnDate)||'no date'} · ${esc(destStr)}</div>
+                    </div>
+                    <div style="display:flex;gap:6px;flex-shrink:0;">
+                        <button class="btn btn-ghost btn-sm" onclick="openTripDetail('${t._id}')">👁 View</button>
+                        ${i===0?'':`<button class="btn btn-sm" style="background:#ef4444;color:#fff;" onclick="removeDuplicateTrip('${t._id}')">🗑 Remove</button>`}
+                    </div>
+                </div>`;
+            }).join('');
+            return `<div style="background:var(--bg-card,#f0f2f5);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:12px;">
+                <div style="font-weight:700;font-size:0.88rem;color:var(--accent);margin-bottom:6px;">Group ${gi+1}: ${group.length} matching trips</div>
+                ${rows}
+            </div>`;
+        }).join('');
+    }
+    overlay.style.display='flex';
+    void overlay.offsetWidth;
+    overlay.classList.add('show');
+}
+
+function closeTripDupeReview(){
+    const m=document.getElementById('trip-dupe-overlay');
+    m.classList.remove('show');
+    m.style.display='none';
+}
+
+async function removeDuplicateTrip(id){
+    if(!confirm('Move this duplicate trip to the recycle bin? You can restore it later.'))return;
+    try{
+        await db.collection('globetrotting_trips').doc(id).update({ deleted: true });
+        showToast('Duplicate moved to recycle bin');
+        await loadTrips();
+        renderAll();
+        openTripDupeReview(); // refresh the modal contents
+    }catch(e){
+        showToast('Failed to remove: '+e.message, true);
+    }
 }
 
 // Pre-fill form from scanned data
@@ -1785,27 +1930,91 @@ function clearPhotoScan() {
     document.getElementById('photo-scan-status').textContent = '';
 }
 
+async function extractPhotoExif(file) {
+    if (typeof exifr === 'undefined') return null;
+    try {
+        const meta = await exifr.parse(file, { gps: true, tiff: true, exif: true, ifd0: true });
+        if (!meta) return null;
+        const out = {
+            lat: meta.latitude ?? null,
+            lon: meta.longitude ?? null,
+            date: null,
+            camera: [meta.Make, meta.Model].filter(Boolean).join(' ').trim() || null
+        };
+        const dt = meta.DateTimeOriginal || meta.CreateDate || meta.DateTime;
+        if (dt instanceof Date && !isNaN(dt)) out.date = dt.toISOString().slice(0,10);
+        return out;
+    } catch(e) { console.warn('EXIF parse failed for', file.name, e); return null; }
+}
+
+async function reverseGeocode(lat, lon) {
+    try {
+        const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=10&accept-language=en`);
+        const d = await r.json();
+        if (!d || !d.address) return null;
+        const a = d.address;
+        return {
+            city: a.city || a.town || a.village || a.hamlet || a.municipality || a.county || '',
+            state: a.state || a.region || '',
+            country: a.country || '',
+            lat: parseFloat(d.lat) || lat,
+            lon: parseFloat(d.lon) || lon
+        };
+    } catch(e) { return null; }
+}
+
 async function runPhotoScan() {
     if (!photoScanFiles.length) return;
     if (!apiKey || !proxyUrl) { showToast('Set API key & proxy in Agents → Settings first', true); return; }
     const btn = document.getElementById('btn-photo-scan-run');
     const status = document.getElementById('photo-scan-status');
     btn.disabled = true; btn.textContent = '⏳ Analyzing…';
-    status.textContent = `Reading ${photoScanFiles.length} photo${photoScanFiles.length > 1 ? 's' : ''}…`;
+    status.textContent = `Reading EXIF from ${photoScanFiles.length} photo${photoScanFiles.length > 1 ? 's' : ''}…`;
     try {
+        // 1) Pull EXIF (GPS + capture date) from each photo — iPhone photos typically have both.
+        const exifData = [];
+        for (const f of photoScanFiles) {
+            const m = await extractPhotoExif(f);
+            exifData.push({ name: f.name, ...(m || {}) });
+        }
+        const exifWithGps = exifData.filter(e => e.lat != null && e.lon != null);
+        const exifDates = exifData.map(e => e.date).filter(Boolean).sort();
+
+        // 2) Reverse-geocode each unique GPS point to city/country for the prompt + form.
+        status.textContent = exifWithGps.length ? `Reverse-geocoding ${exifWithGps.length} GPS point${exifWithGps.length!==1?'s':''}…` : 'Analyzing photo contents…';
+        const gpsDests = [];
+        const seenCityKey = new Set();
+        for (const e of exifWithGps) {
+            const g = await reverseGeocode(e.lat, e.lon);
+            if (!g) continue;
+            const key = `${(g.city||'').toLowerCase()}|${(g.country||'').toLowerCase()}`;
+            if (key === '|' || seenCityKey.has(key)) continue;
+            seenCityKey.add(key);
+            gpsDests.push(g);
+        }
+
         const contentBlocks = [];
         for (const f of photoScanFiles) {
             const base64 = await fileToBase64(f);
             contentBlocks.push({ type: 'image', source: { type: 'base64', media_type: f.type || 'image/jpeg', data: base64 } });
         }
         const photoCount = photoScanFiles.length;
-        contentBlocks.push({ type: 'text', text: `I have ${photoCount} vacation photo${photoCount > 1 ? 's' : ''}. Please analyze ${photoCount > 1 ? 'all of them' : 'it'} and identify: 1) Where each photo was taken (look for landmarks, signs, architecture, geography, cultural cues), 2) Any visible dates, timestamps, or seasonal clues. Return ONLY a JSON object: {"name": "descriptive trip name based on locations", "departureDate": "YYYY-MM-DD or null", "returnDate": "YYYY-MM-DD or null", "destinations": [{"city": "", "state": "", "country": ""}], "notes": "brief summary of what you identified and confidence level"}. Merge duplicate locations. No explanation, just JSON.` });
+        const exifHint = [];
+        if (gpsDests.length) {
+            exifHint.push(`EXIF GPS data resolved to: ${gpsDests.map(g => [g.city, g.state, g.country].filter(Boolean).join(', ')).join(' · ')}. Trust these locations as authoritative.`);
+        }
+        if (exifDates.length) {
+            const first = exifDates[0], last = exifDates[exifDates.length-1];
+            exifHint.push(first === last ? `EXIF capture date: ${first}. Use this as both departureDate and returnDate unless photo contents indicate a wider range.` : `EXIF capture dates span ${first} to ${last}. Use these as departureDate and returnDate.`);
+        }
+        const hintText = exifHint.length ? `\n\n📷 PHOTO METADATA:\n${exifHint.join('\n')}` : '';
+        contentBlocks.push({ type: 'text', text: `I have ${photoCount} vacation photo${photoCount > 1 ? 's' : ''}. Please analyze ${photoCount > 1 ? 'all of them' : 'it'} and identify: 1) Where each photo was taken (look for landmarks, signs, architecture, geography, cultural cues), 2) Any visible dates, timestamps, or seasonal clues. Return ONLY a JSON object: {"name": "descriptive trip name based on locations", "departureDate": "YYYY-MM-DD or null", "returnDate": "YYYY-MM-DD or null", "destinations": [{"city": "", "state": "", "country": ""}], "notes": "brief summary of what you identified and confidence level"}. Merge duplicate locations. No explanation, just JSON.${hintText}` });
 
         const res = await fetch(proxyUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ apiKey, model: 'claude-opus-4-6', max_tokens: 1024, stream: false,
-                system: 'You are an expert travel photo analyst. Identify locations from visual cues in photos: landmarks, signs, architecture, geography, cultural elements, license plates, menus, and any visible text. Also extract any dates from visible timestamps, watermarks, or contextual clues.',
+                system: 'You are an expert travel photo analyst. Identify locations from visual cues in photos: landmarks, signs, architecture, geography, cultural elements, license plates, menus, and any visible text. Also extract any dates from visible timestamps, watermarks, or contextual clues. When EXIF GPS or capture-date metadata is provided, treat it as ground truth and prefer it over visual guesses.',
                 messages: [{ role: 'user', content: contentBlocks }] })
         });
         const j = JSON.parse(await res.text());
@@ -1815,17 +2024,38 @@ async function runPhotoScan() {
         if (!match) throw new Error('Could not parse AI response');
         const extracted = JSON.parse(match[0]);
 
-        // Geocode destinations
-        if (extracted.destinations?.length) {
-            for (const d of extracted.destinations) {
-                const q = [d.city, d.country].filter(Boolean).join(' ');
-                if (q) {
-                    try {
-                        const gr = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`);
-                        const gd = await gr.json();
-                        if (gd?.length) { d.lat = parseFloat(gd[0].lat); d.lon = parseFloat(gd[0].lon); }
-                    } catch {}
-                }
+        // EXIF dates trump AI guesses — they're ground truth from the camera.
+        if (exifDates.length) {
+            extracted.departureDate = exifDates[0];
+            extracted.returnDate = exifDates[exifDates.length - 1];
+        }
+
+        // Merge EXIF-derived destinations into the AI result. If a city already exists, keep the AI's
+        // entry but attach exact lat/lon. Otherwise append the EXIF destination as authoritative.
+        extracted.destinations = Array.isArray(extracted.destinations) ? extracted.destinations : [];
+        for (const g of gpsDests) {
+            const existing = extracted.destinations.find(d =>
+                (d.city||'').toLowerCase().trim() === (g.city||'').toLowerCase().trim() &&
+                (d.country||'').toLowerCase().trim() === (g.country||'').toLowerCase().trim()
+            );
+            if (existing) {
+                existing.lat = g.lat; existing.lon = g.lon;
+                if (!existing.state && g.state) existing.state = g.state;
+            } else if (g.city || g.country) {
+                extracted.destinations.push(g);
+            }
+        }
+
+        // Geocode any remaining AI destinations that don't have coords yet
+        for (const d of extracted.destinations) {
+            if (d.lat != null && d.lon != null) continue;
+            const q = [d.city, d.country].filter(Boolean).join(' ');
+            if (q) {
+                try {
+                    const gr = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`);
+                    const gd = await gr.json();
+                    if (gd?.length) { d.lat = parseFloat(gd[0].lat); d.lon = parseFloat(gd[0].lon); }
+                } catch {}
             }
         }
 

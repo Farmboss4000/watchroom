@@ -1185,7 +1185,6 @@
         <a href="automotive.html">🚗 Automotive</a>
         <a href="livestock.html">🐄 Livestock</a>
         <a href="vendors.html">💼 Vendors</a>
-        <a href="addison.html">🩺 Addison</a>
         <a href="estateplanning.html">📜 Estate Planning</a>
     </div>
 </div>
@@ -1628,7 +1627,6 @@
         <div class="qotd-modal-sub" id="qotd-modal-sub">Every sarcastic gem that&#39;s graced this dashboard.</div>
         <div id="qotd-history-list"></div>
         <div class="qotd-modal-actions">
-            <button class="qotd-modal-btn ghost" onclick="clearQOTDHistory()">Clear History</button>
             <button class="qotd-modal-btn" onclick="closeQOTDHistory()">Close</button>
         </div>
     </div>
@@ -1760,16 +1758,31 @@
         { text: "I love deadlines. I love the whooshing noise they make as they go by.", author: "Douglas Adams" },
         { text: "I am so clever that sometimes I don't understand a single word of what I am saying.", author: "Oscar Wilde" }
     ];
-    const QOTD_HISTORY_KEY = 'qotd_history_v1';
     const QOTD_HISTORY_MAX = 200;
 
-    function loadQOTDHistory() {
-        try { return JSON.parse(localStorage.getItem(QOTD_HISTORY_KEY) || '[]'); }
-        catch(e) { return []; }
+    async function loadQOTDHistory() {
+        try {
+            const snap = await db.collection('qotd_history')
+                .orderBy('shownAt', 'desc')
+                .limit(QOTD_HISTORY_MAX)
+                .get();
+            // Return in chronological order (oldest first) so existing UI code can reverse/show newest-first
+            return snap.docs.map(d => d.data()).reverse();
+        } catch(e) {
+            console.warn('QOTD history load failed', e);
+            return [];
+        }
     }
-    function saveQOTDHistory(list) {
-        try { localStorage.setItem(QOTD_HISTORY_KEY, JSON.stringify(list.slice(-QOTD_HISTORY_MAX))); }
-        catch(e) { /* localStorage full or unavailable */ }
+
+    async function recordQOTD(quote) {
+        try {
+            await db.collection('qotd_history').add({
+                text: quote.text,
+                author: quote.author,
+                shownAt: new Date().toISOString(),
+                serverTs: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        } catch(e) { console.warn('QOTD history save failed', e); }
     }
 
     function initQOTD() {
@@ -1778,25 +1791,28 @@
         if (el) {
             el.innerHTML = `<span class="qotd-quote-mark">&ldquo;</span>${q.text}<span class="qotd-quote-mark">&rdquo;</span><span class="qotd-author">— ${q.author}</span>`;
         }
-        // Record this display in history
-        const history = loadQOTDHistory();
-        history.push({ text: q.text, author: q.author, shownAt: new Date().toISOString() });
-        saveQOTDHistory(history);
+        // Record this display in shared Firestore history (fire-and-forget)
+        recordQOTD(q);
     }
 
     function escapeHTML(s) {
         return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
-    function openQOTDHistory() {
-        const list = loadQOTDHistory().slice().reverse(); // newest first
+    async function openQOTDHistory() {
         const listEl = document.getElementById('qotd-history-list');
         const subEl = document.getElementById('qotd-modal-sub');
         if (!listEl) return;
+        // Open the modal immediately and show a loading state while we fetch from Firestore
+        document.getElementById('qotd-modal-overlay').classList.add('show');
+        listEl.innerHTML = '<div style="color:var(--text-secondary);text-align:center;padding:20px 0;">Loading history…</div>';
+        if (subEl) subEl.textContent = '';
+
+        const history = await loadQOTDHistory();
+        const list = history.slice().reverse(); // newest first
         if (!list.length) {
             listEl.innerHTML = '<div style="color:var(--text-secondary);text-align:center;padding:20px 0;">No quote history yet.</div>';
         } else {
-            const todayKey = new Date().toDateString();
             listEl.innerHTML = list.map((q, idx) => {
                 const d = new Date(q.shownAt);
                 const isFirst = idx === 0;
@@ -1810,17 +1826,10 @@
             }).join('');
         }
         if (subEl) subEl.textContent = `${list.length} quote${list.length === 1 ? '' : 's'} shown · most recent first`;
-        document.getElementById('qotd-modal-overlay').classList.add('show');
     }
 
     function closeQOTDHistory() {
         document.getElementById('qotd-modal-overlay').classList.remove('show');
-    }
-
-    function clearQOTDHistory() {
-        if (!confirm('Clear all quote history? This cannot be undone.')) return;
-        localStorage.removeItem(QOTD_HISTORY_KEY);
-        openQOTDHistory(); // re-render empty state
     }
 
     // Close modal on Escape

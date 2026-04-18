@@ -9,6 +9,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>if(window.pdfjsLib){pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';}</script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
@@ -1289,8 +1290,8 @@ service cloud.firestore {
 
         <!-- Upload + AI section -->
         <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:16px;">
-            <label style="display:block;font-size:0.8rem;font-weight:600;color:#374151;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.4px;">Trust Document (PDF or image)</label>
-            <input type="file" id="trust-file" accept="image/*,application/pdf" onchange="onTrustFileSelected(this)" style="margin-bottom:8px;">
+            <label style="display:block;font-size:0.8rem;font-weight:600;color:#374151;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.4px;">Trust Document (PDF, image, or Word)</label>
+            <input type="file" id="trust-file" accept="image/*,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onchange="onTrustFileSelected(this)" style="margin-bottom:8px;">
             <div id="trust-file-preview" style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:10px;"></div>
             <button type="button" class="btn btn-primary btn-sm" id="btn-analyze-trust" onclick="analyzeTrust()" disabled>🤖 Analyze with AI</button>
             <span id="trust-ai-status" style="font-size:0.82rem;margin-left:10px;color:var(--text-secondary);"></span>
@@ -1566,7 +1567,7 @@ const VIEWS = ['dashboard','add-item','inventory','reports','categories','packin
 let trusts = [];
 let unsubTrusts = null;
 let nextTrustId = 5001;
-let trustFile = { file:null, base64:null, mimeType:null, existingUrl:null, rasterizedPages:null };
+let trustFile = { file:null, base64:null, mimeType:null, existingUrl:null, rasterizedPages:null, textContent:null };
 // Additional supporting documents: existing = already-uploaded {url,name,mimeType,uploadedAt}; pending = File objects to upload on save
 let trustAddlDocs = { existing: [], pending: [] };
 
@@ -1777,7 +1778,7 @@ function populateLinkedFirearmsSelect(selectedIds) {
 }
 
 function openTrustModal(docId) {
-    trustFile = { file:null, base64:null, mimeType:null, existingUrl:null, rasterizedPages:null };
+    trustFile = { file:null, base64:null, mimeType:null, existingUrl:null, rasterizedPages:null, textContent:null };
     trustAddlDocs = { existing: [], pending: [] };
     document.getElementById('trust-edit-doc-id').value = docId || '';
     document.getElementById('trust-modal-title').textContent = docId ? 'Edit Gun Trust' : 'Add Gun Trust';
@@ -1836,22 +1837,47 @@ async function onTrustFileSelected(input) {
     const file = input.files[0];
     if (!file) return;
     trustFile.file = file;
-    trustFile.mimeType = file.type === 'application/pdf' ? 'application/pdf' : 'image/jpeg';
     trustFile.rasterizedPages = null;
+    trustFile.textContent = null;
+    trustFile.base64 = null;
+    const lowerName = file.name.toLowerCase();
+    const isDocx = lowerName.endsWith('.docx') || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    const isDoc = lowerName.endsWith('.doc') && !isDocx;
+    trustFile.mimeType = file.type === 'application/pdf' ? 'application/pdf' : (isDocx ? 'text/plain' : 'image/jpeg');
     const previewEl = document.getElementById('trust-file-preview');
     const sizeMB = file.size / (1024 * 1024);
     const sizeLabel = sizeMB >= 1 ? `${sizeMB.toFixed(1)} MB` : `${(file.size/1024).toFixed(0)} KB`;
     const MAX_DIRECT_AI_MB = 4.5; // after base64 inflation (~33%), ≈ 6 MB sent
     const isLargePdf = file.type === 'application/pdf' && sizeMB > MAX_DIRECT_AI_MB;
+    if (isDoc) {
+        previewEl.innerHTML = `<div style="color:#b91c1c;background:#fee2e2;border:1px solid #ef4444;padding:8px 12px;border-radius:6px;font-size:0.82rem;">⚠️ Legacy .doc format isn't supported — please save as .docx or PDF and try again.</div>`;
+        document.getElementById('btn-analyze-trust').disabled = true;
+        return;
+    }
     let info = '';
     if (isLargePdf) {
         info = `<div style="color:#1e40af;background:#dbeafe;border:1px solid #3b82f6;padding:8px 12px;border-radius:6px;margin-top:6px;font-size:0.82rem;">ℹ️ Large PDF detected — AI will analyze by rasterizing the first ~15 pages as images (cover, trustees, beneficiaries, NFA section typically appear early).</div>`;
-    } else if (file.type !== 'application/pdf' && sizeMB > MAX_DIRECT_AI_MB) {
+    } else if (!isDocx && file.type !== 'application/pdf' && sizeMB > MAX_DIRECT_AI_MB) {
         info = `<div style="color:#b45309;background:#fef3c7;border:1px solid #f59e0b;padding:8px 12px;border-radius:6px;margin-top:6px;font-size:0.82rem;">⚠️ Large image — will be compressed for AI analysis.</div>`;
     }
     previewEl.innerHTML = `📄 ${file.name} (${sizeLabel}) ready${info}`;
-    // Read as base64 for AI (used when file is small enough to send directly)
-    if (file.type === 'application/pdf') {
+    if (isDocx) {
+        if (typeof mammoth === 'undefined') {
+            previewEl.innerHTML += `<div style="color:#b91c1c;background:#fee2e2;border:1px solid #ef4444;padding:8px 12px;border-radius:6px;margin-top:6px;font-size:0.82rem;">Word parser failed to load — refresh the page and try again.</div>`;
+            document.getElementById('btn-analyze-trust').disabled = true;
+            return;
+        }
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            const result = await mammoth.extractRawText({ arrayBuffer });
+            trustFile.textContent = (result.value || '').trim();
+            if (!trustFile.textContent) throw new Error('No readable text found in document.');
+        } catch (err) {
+            previewEl.innerHTML += `<div style="color:#b91c1c;background:#fee2e2;border:1px solid #ef4444;padding:8px 12px;border-radius:6px;margin-top:6px;font-size:0.82rem;">Could not read Word document: ${err.message}</div>`;
+            document.getElementById('btn-analyze-trust').disabled = true;
+            return;
+        }
+    } else if (file.type === 'application/pdf') {
         if (!isLargePdf) {
             trustFile.base64 = await new Promise(r => { const fr = new FileReader(); fr.onload = e => r(e.target.result.split(',')[1]); fr.readAsDataURL(file); });
         } else {
@@ -1874,8 +1900,8 @@ async function onTrustFileSelected(input) {
         });
         trustFile.base64 = dataUrl ? dataUrl.split(',')[1] : null;
     }
-    // Enable AI button if we have a usable input (base64 directly, or a large PDF we can rasterize)
-    document.getElementById('btn-analyze-trust').disabled = !(trustFile.base64 || isLargePdf);
+    // Enable AI button if we have a usable input (base64 directly, a large PDF we can rasterize, or extracted text)
+    document.getElementById('btn-analyze-trust').disabled = !(trustFile.base64 || isLargePdf || trustFile.textContent);
 }
 
 async function rasterizePdfForAI(file, { maxPages = 15, maxWidth = 1400, quality = 0.75, maxTotalMB = 3.5 } = {}) {
@@ -1907,7 +1933,7 @@ async function rasterizePdfForAI(file, { maxPages = 15, maxWidth = 1400, quality
 
 async function analyzeTrust() {
     if (!apiKey) { toast('Set your API key in Settings first.','error'); return; }
-    if (!trustFile.base64 && !trustFile.file) { toast('Upload a document first.','error'); return; }
+    if (!trustFile.base64 && !trustFile.file && !trustFile.textContent) { toast('Upload a document first.','error'); return; }
     const btn = document.getElementById('btn-analyze-trust');
     const statusEl = document.getElementById('trust-ai-status');
     btn.disabled = true; btn.textContent = '⏳ Analyzing…';
@@ -1915,12 +1941,18 @@ async function analyzeTrust() {
     statusEl.style.color = 'var(--text-secondary)';
     try {
         // Decide how to feed the doc to Claude:
+        //   - Word (.docx): extracted text, sent inline with the prompt
         //   - Small PDF/image: send base64 directly as-is
         //   - Large PDF (>4.5 MB): rasterize first ~15 pages into JPEGs (cached on trustFile)
-        let mediaArg, mimeArg;
+        let mediaArg, mimeArg, textDoc = null;
         const sizeMB = trustFile.file ? trustFile.file.size / (1024*1024) : 0;
         const needsRaster = trustFile.mimeType === 'application/pdf' && (sizeMB > 4.5 || !trustFile.base64);
-        if (needsRaster) {
+        if (trustFile.textContent) {
+            mediaArg = null;
+            mimeArg = null;
+            textDoc = trustFile.textContent;
+            statusEl.textContent = 'Analyzing Word document…';
+        } else if (needsRaster) {
             if (!trustFile.rasterizedPages) {
                 statusEl.textContent = 'Rasterizing PDF pages for AI…';
                 trustFile.rasterizedPages = await rasterizePdfForAI(trustFile.file);
@@ -1946,7 +1978,10 @@ async function analyzeTrust() {
 - summary: 3-5 sentence plain-English summary of what the trust does, who's named, and any notable provisions
 - notes: any other important observations (restrictions, attorney name, review triggers)
 Use empty string/array if not found.`;
-        const raw = await callClaude(mediaArg, mimeArg, prompt, { retries: 2, maxTokens: 2500 });
+        const finalPrompt = textDoc
+            ? `${prompt}\n\n---\nTrust document text:\n${textDoc}`
+            : prompt;
+        const raw = await callClaude(mediaArg, mimeArg, finalPrompt, { retries: 2, maxTokens: 2500 });
         if (!raw) throw new Error('No response');
         const r = parseClaudeJson(raw);
         if (!r) {
@@ -2314,13 +2349,19 @@ function removePhoto(slot) {
 
 async function callClaude(base64OrMedia, mimeType, prompt, { retries = 2, maxTokens = 512 } = {}) {
     if (!apiKey) { toast('Set your Anthropic API key in Settings first.','error'); return null; }
-    // Accept either a single base64 string + mimeType, or an array of {base64, mimeType} media descriptors
+    // Accept either a single base64 string + mimeType, an array of {base64, mimeType} media descriptors,
+    // or null/empty for a text-only prompt.
     const toBlock = (b64, mt) => mt === 'application/pdf'
         ? { type:'document', source:{ type:'base64', media_type:'application/pdf', data:b64 } }
         : { type:'image',    source:{ type:'base64', media_type:mt,                data:b64 } };
-    const mediaBlocks = Array.isArray(base64OrMedia)
-        ? base64OrMedia.map(m => toBlock(m.base64, m.mimeType))
-        : [ toBlock(base64OrMedia, mimeType) ];
+    let mediaBlocks;
+    if (!base64OrMedia) {
+        mediaBlocks = [];
+    } else if (Array.isArray(base64OrMedia)) {
+        mediaBlocks = base64OrMedia.map(m => toBlock(m.base64, m.mimeType));
+    } else {
+        mediaBlocks = [ toBlock(base64OrMedia, mimeType) ];
+    }
     const msgPayload = {
         model: aiModel, max_tokens: maxTokens,
         messages:[{ role:'user', content:[ ...mediaBlocks, { type:'text', text:prompt } ]}]

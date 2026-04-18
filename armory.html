@@ -472,7 +472,6 @@
 
 <!-- ══ SITE SWITCHER ══ -->
 <div class="site-switcher">
-        <span class="site-switcher-label">Farmboss</span>
         <a href="index.html" class="site-link">🏠 HQ</a>
         <a href="armory.html" class="site-link active">🔫 Armory</a>
         <a href="machinery.html" class="site-link">🚜 Machinery</a>
@@ -1793,11 +1792,17 @@ function openTrustModal(docId) {
         docLink.style.display = 'none';
         document.getElementById('btn-analyze-trust').disabled = true;
     }
-    document.getElementById('trust-modal').style.display = 'flex';
+    const tm = document.getElementById('trust-modal');
+    tm.style.display = 'flex';
+    // Force reflow so the opacity transition actually animates, then trigger show
+    void tm.offsetWidth;
+    tm.classList.add('show');
 }
 
 function closeTrustModal() {
-    document.getElementById('trust-modal').style.display = 'none';
+    const tm = document.getElementById('trust-modal');
+    tm.classList.remove('show');
+    tm.style.display = 'none';
 }
 document.getElementById('trust-modal').addEventListener('click', e => { if (e.target === document.getElementById('trust-modal')) closeTrustModal(); });
 

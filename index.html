@@ -401,7 +401,77 @@
             border-radius: 12px;
             padding: 14px 22px;
             margin-bottom: 14px;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
         }
+        .qotd-card:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 18px rgba(0,0,0,0.25);
+            border-left-color: var(--accent-hover);
+        }
+        .qotd-hint {
+            font-size: 0.68rem;
+            color: var(--text-secondary);
+            opacity: 0.6;
+            margin-top: 6px;
+            font-style: normal;
+        }
+        /* QOTD history modal */
+        .qotd-modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1000; opacity: 0; pointer-events: none; transition: opacity 0.2s;
+        }
+        .qotd-modal-overlay.show { opacity: 1; pointer-events: all; }
+        .qotd-modal {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 14px; padding: 24px; width: 100%; max-width: 720px;
+            margin: 16px; max-height: 85vh; overflow-y: auto;
+            transform: scale(0.96); transition: transform 0.2s;
+        }
+        .qotd-modal-overlay.show .qotd-modal { transform: scale(1); }
+        .qotd-modal-title {
+            font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin-bottom: 4px;
+        }
+        .qotd-modal-sub {
+            font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 18px;
+        }
+        .qotd-history-entry {
+            display: flex; gap: 14px; padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .qotd-history-entry:last-child { border-bottom: none; }
+        .qotd-history-date {
+            flex-shrink: 0; width: 110px; font-size: 0.78rem;
+            color: var(--text-secondary); font-weight: 600;
+        }
+        .qotd-history-text {
+            flex: 1; font-style: italic; color: var(--text-primary);
+            line-height: 1.5; font-size: 0.92rem;
+        }
+        .qotd-history-author {
+            display: block; font-style: normal; font-size: 0.78rem;
+            color: var(--text-secondary); margin-top: 3px;
+        }
+        .qotd-history-today {
+            background: rgba(200,169,110,0.08);
+            border-left: 3px solid var(--accent);
+            border-radius: 6px;
+            padding-left: 10px;
+        }
+        .qotd-modal-actions {
+            display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px;
+            padding-top: 12px; border-top: 1px solid var(--border);
+        }
+        .qotd-modal-btn {
+            padding: 7px 16px; background: var(--accent); color: #fff; border: none;
+            border-radius: 7px; cursor: pointer; font-size: 0.82rem; font-weight: 600;
+        }
+        .qotd-modal-btn.ghost {
+            background: transparent; color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+        .qotd-modal-btn:hover { background: var(--accent-hover); }
         .qotd-label {
             font-size: 0.68rem;
             font-weight: 700;
@@ -1077,7 +1147,6 @@
 
 <!-- SITE SWITCHER -->
 <div class="site-switcher">
-        <span class="site-switcher-label">Farmboss</span>
         <a href="index.html" class="site-link active">🏠 HQ</a>
         <a href="armory.html" class="site-link">🔫 Armory</a>
         <a href="machinery.html" class="site-link">🚜 Machinery</a>
@@ -1153,9 +1222,10 @@
     <div class="main-content">
 
         <!-- QUOTE OF THE DAY -->
-        <div class="qotd-card">
+        <div class="qotd-card" onclick="openQOTDHistory()" title="Click to see all quotes shown">
             <div class="qotd-label">💭 Quote of the Day</div>
             <div class="qotd-text" id="qotd-text">…</div>
+            <div class="qotd-hint">Click to view quote history</div>
         </div>
 
         <!-- DATE / TIME / WEATHER -->
@@ -1552,6 +1622,19 @@
     </div>
 </div>
 
+<!-- QUOTE OF THE DAY HISTORY MODAL -->
+<div class="qotd-modal-overlay" id="qotd-modal-overlay" onclick="if(event.target===this)closeQOTDHistory()">
+    <div class="qotd-modal">
+        <div class="qotd-modal-title">💭 Quote of the Day — History</div>
+        <div class="qotd-modal-sub" id="qotd-modal-sub">Every sarcastic gem that&#39;s graced this dashboard.</div>
+        <div id="qotd-history-list"></div>
+        <div class="qotd-modal-actions">
+            <button class="qotd-modal-btn ghost" onclick="clearQOTDHistory()">Clear History</button>
+            <button class="qotd-modal-btn" onclick="closeQOTDHistory()">Close</button>
+        </div>
+    </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -1678,13 +1761,76 @@
         { text: "I love deadlines. I love the whooshing noise they make as they go by.", author: "Douglas Adams" },
         { text: "I am so clever that sometimes I don't understand a single word of what I am saying.", author: "Oscar Wilde" }
     ];
+    const QOTD_HISTORY_KEY = 'qotd_history_v1';
+    const QOTD_HISTORY_MAX = 200;
+
+    function loadQOTDHistory() {
+        try { return JSON.parse(localStorage.getItem(QOTD_HISTORY_KEY) || '[]'); }
+        catch(e) { return []; }
+    }
+    function saveQOTDHistory(list) {
+        try { localStorage.setItem(QOTD_HISTORY_KEY, JSON.stringify(list.slice(-QOTD_HISTORY_MAX))); }
+        catch(e) { /* localStorage full or unavailable */ }
+    }
+
     function initQOTD() {
         const q = SARCASTIC_QUOTES[Math.floor(Math.random() * SARCASTIC_QUOTES.length)];
         const el = document.getElementById('qotd-text');
         if (el) {
             el.innerHTML = `<span class="qotd-quote-mark">&ldquo;</span>${q.text}<span class="qotd-quote-mark">&rdquo;</span><span class="qotd-author">— ${q.author}</span>`;
         }
+        // Record this display in history
+        const history = loadQOTDHistory();
+        history.push({ text: q.text, author: q.author, shownAt: new Date().toISOString() });
+        saveQOTDHistory(history);
     }
+
+    function escapeHTML(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function openQOTDHistory() {
+        const list = loadQOTDHistory().slice().reverse(); // newest first
+        const listEl = document.getElementById('qotd-history-list');
+        const subEl = document.getElementById('qotd-modal-sub');
+        if (!listEl) return;
+        if (!list.length) {
+            listEl.innerHTML = '<div style="color:var(--text-secondary);text-align:center;padding:20px 0;">No quote history yet.</div>';
+        } else {
+            const todayKey = new Date().toDateString();
+            listEl.innerHTML = list.map((q, idx) => {
+                const d = new Date(q.shownAt);
+                const isFirst = idx === 0;
+                const dateStr = d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+                const timeStr = d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+                const todayBadge = isFirst ? ' <span style="color:var(--accent);font-size:0.7rem;font-weight:700;letter-spacing:0.5px;">· CURRENT</span>' : '';
+                return `<div class="qotd-history-entry${isFirst ? ' qotd-history-today' : ''}">
+                    <div class="qotd-history-date">${dateStr}<br><span style="font-weight:400;opacity:0.7;">${timeStr}</span>${todayBadge}</div>
+                    <div class="qotd-history-text">&ldquo;${escapeHTML(q.text)}&rdquo;<span class="qotd-history-author">— ${escapeHTML(q.author)}</span></div>
+                </div>`;
+            }).join('');
+        }
+        if (subEl) subEl.textContent = `${list.length} quote${list.length === 1 ? '' : 's'} shown · most recent first`;
+        document.getElementById('qotd-modal-overlay').classList.add('show');
+    }
+
+    function closeQOTDHistory() {
+        document.getElementById('qotd-modal-overlay').classList.remove('show');
+    }
+
+    function clearQOTDHistory() {
+        if (!confirm('Clear all quote history? This cannot be undone.')) return;
+        localStorage.removeItem(QOTD_HISTORY_KEY);
+        openQOTDHistory(); // re-render empty state
+    }
+
+    // Close modal on Escape
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') {
+            const qm = document.getElementById('qotd-modal-overlay');
+            if (qm && qm.classList.contains('show')) closeQOTDHistory();
+        }
+    });
 
     // ── LIVE COUNTS ──
     const counts = { armory:0, machinery:0, automotive:0, livestock:0, timepieces:0, knives:0, pharmacy:0, insurance:0, realestate:0, agents:0, vendors:0 };

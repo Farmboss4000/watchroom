@@ -168,6 +168,26 @@
         .analysis-panel li{margin-bottom:4px;}
         .analysis-panel strong{color:var(--text-primary);}
         .analysis-panel em{color:var(--accent);font-style:italic;}
+        /* Analysis summary + history */
+        .analysis-summary{background:#fff;border:1.5px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;}
+        .analysis-summary-info{flex:1;min-width:200px;}
+        .analysis-summary-label{font-size:0.74rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:3px;}
+        .analysis-summary-date{font-size:1.02rem;font-weight:700;color:var(--text-primary);}
+        .analysis-summary-meta{font-size:0.82rem;color:var(--text-secondary);margin-top:2px;}
+        .analysis-summary-empty{font-size:0.9rem;color:var(--text-secondary);font-style:italic;}
+        .analysis-history{margin-top:22px;border-top:1px solid var(--border);padding-top:18px;}
+        .analysis-history-title{font-size:0.85rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+        .analysis-history-title .count-pill{background:var(--accent);color:#fff;font-size:0.72rem;padding:1px 8px;border-radius:10px;letter-spacing:0;}
+        .history-item{background:#fff;border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:10px;transition:all 0.15s;}
+        .history-item:hover{border-color:var(--accent);background:#fdf9f3;}
+        .history-item-info{flex:1;min-width:0;}
+        .history-item-date{font-size:0.9rem;font-weight:600;color:var(--text-primary);}
+        .history-item-meta{font-size:0.78rem;color:var(--text-secondary);margin-top:2px;}
+        .history-item.current{border-left:3px solid var(--accent);}
+        .history-item-actions{display:flex;gap:6px;flex-shrink:0;}
+        .btn-icon{background:none;border:1px solid var(--border);color:var(--text-secondary);cursor:pointer;padding:4px 10px;border-radius:6px;font-size:0.78rem;transition:all 0.15s;}
+        .btn-icon:hover{background:var(--bg-card);color:var(--text-primary);}
+        .btn-icon.danger:hover{background:var(--danger);color:#fff;border-color:var(--danger);}
         .mermaid-wrap{background:#fff;border:1px solid var(--border);border-radius:10px;padding:30px;overflow-x:auto;text-align:center;margin-top:16px;}
         .doc-summary-text{font-size:0.85rem;color:var(--text-secondary);line-height:1.6;margin-top:4px;}
         .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#1a1f2e;color:#fff;padding:10px 20px;border-radius:8px;font-size:0.87rem;font-weight:500;opacity:0;transition:all 0.3s;z-index:9999;pointer-events:none;white-space:nowrap;max-width:90vw;}
@@ -217,7 +237,6 @@
 
 <div id="app">
 <div class="site-switcher">
-    <span class="site-switcher-label">Farmboss</span>
     <a href="index.html" class="site-link">🏠 HQ</a>
     <a href="armory.html" class="site-link">🔫 Armory</a>
     <a href="machinery.html" class="site-link">🚜 Machinery</a>
@@ -227,6 +246,7 @@
     <a href="knives.html" class="site-link">🔪 Knives</a>
     <a href="realestate.html" class="site-link">🏡 Real Estate</a>
     <a href="globetrotting.html" class="site-link">✈️ Globetrotting</a>
+    <a href="addison.html" class="site-link">🩺 Addison</a>
     <a href="vendors.html" class="site-link">💼 Vendors</a>
     <a href="estateplanning.html" class="site-link active">📜 Estate Planning</a>
     <a href="dontpush.html" class="site-link">🚫 Don't Push</a>
@@ -240,7 +260,6 @@
         <button class="active" onclick="showView('dashboard')">Dashboard</button>
         <button onclick="showView('upload')">📥 Upload Documents</button>
         <button onclick="showView('documents')">📚 Documents</button>
-        <button onclick="showView('overview')">📖 Overview</button>
         <button onclick="showView('relationships')">🔗 Relationships</button>
         <button onclick="showView('flow')">📊 Flow Diagram</button>
         <button onclick="showView('settings')">⚙ Settings</button>
@@ -272,6 +291,33 @@
         </svg>
     </div>
     <div class="stats-grid" id="stats-grid"></div>
+
+    <!-- FAMILY-FRIENDLY OVERVIEW (moved from Overview tab) -->
+    <div class="card">
+        <div class="card-title">
+            <div class="card-title-left">📖 Family-Friendly Overview</div>
+            <button class="btn btn-primary" id="btn-generate-overview" onclick="generateOverview()">✨ Generate Overview</button>
+        </div>
+        <p style="font-size:0.9rem;color:var(--text-secondary);margin-bottom:16px;font-style:italic;">A warm, plain-English narrative about your family's estate plan — what you have, what it means, and what stands out. Designed to be shareable with family members who aren't estate planning experts.</p>
+        <div class="stats-grid" id="overview-stats-grid" style="margin-bottom:20px;"></div>
+        <div class="analysis-summary" id="overview-summary" style="display:none;">
+            <div class="analysis-summary-info">
+                <div class="analysis-summary-label">Last Generated</div>
+                <div class="analysis-summary-date" id="overview-summary-date">—</div>
+                <div class="analysis-summary-meta" id="overview-summary-meta">—</div>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="generateOverview()">🔄 Refresh Overview</button>
+        </div>
+        <div id="overview-status" style="font-size:0.82rem;color:var(--text-secondary);min-height:18px;margin-bottom:8px;"></div>
+        <div id="overview-result" class="analysis-panel" style="display:none;"></div>
+        <div id="overview-history-wrap" style="display:none;margin-top:20px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-top:14px;border-top:1px solid var(--border);">
+                <div style="font-weight:600;font-size:0.92rem;color:var(--text-primary);">📚 Previous Overviews <span id="overview-history-count" style="color:var(--text-secondary);font-weight:400;font-size:0.82rem;margin-left:6px;"></span></div>
+            </div>
+            <div id="overview-history-list"></div>
+        </div>
+    </div>
+
     <div class="card">
         <div class="card-title"><div class="card-title-left">📚 Documents by Category</div></div>
         <div class="cat-breakdown" id="cat-breakdown"></div>
@@ -336,20 +382,6 @@
     </div>
 </div>
 
-<!-- OVERVIEW -->
-<div id="view-overview" class="view">
-    <div class="card">
-        <div class="card-title">
-            <div class="card-title-left">📖 Family-Friendly Overview</div>
-            <button class="btn btn-primary" id="btn-generate-overview" onclick="generateOverview()">✨ Generate Overview</button>
-        </div>
-        <p style="font-size:0.9rem;color:var(--text-secondary);margin-bottom:16px;font-style:italic;">A warm, plain-English narrative about your family's estate plan — what you have, what it means, and what stands out. Designed to be shareable with family members who aren't estate planning experts.</p>
-        <div class="stats-grid" id="overview-stats-grid" style="margin-bottom:20px;"></div>
-        <div id="overview-status" style="font-size:0.82rem;color:var(--text-secondary);min-height:18px;margin-bottom:8px;"></div>
-        <div id="overview-result" class="analysis-panel" style="display:none;"></div>
-    </div>
-</div>
-
 <!-- RELATIONSHIPS -->
 <div id="view-relationships" class="view">
     <div class="card">
@@ -358,8 +390,20 @@
             <button class="btn btn-primary" id="btn-analyze-rel" onclick="analyzeRelationships()">🔬 Generate Analysis</button>
         </div>
         <p style="font-size:0.9rem;color:var(--text-secondary);margin-bottom:12px;font-style:italic;">AI reviews all documents in your archive and identifies how they interrelate — shared parties, cross-references, beneficiary chains, asset ownership, and gaps.</p>
+        <div id="rel-summary" class="analysis-summary" style="display:none;">
+            <div class="analysis-summary-info">
+                <div class="analysis-summary-label">Last Analysis</div>
+                <div class="analysis-summary-date" id="rel-summary-date">—</div>
+                <div class="analysis-summary-meta" id="rel-summary-meta"></div>
+            </div>
+            <button class="btn btn-primary" id="btn-refresh-rel" onclick="analyzeRelationships()">🔄 Refresh Analysis</button>
+        </div>
         <div id="rel-status" style="font-size:0.82rem;color:var(--text-secondary);min-height:18px;margin-bottom:8px;"></div>
         <div id="rel-result" class="analysis-panel" style="display:none;"></div>
+        <div id="rel-history-wrap" class="analysis-history" style="display:none;">
+            <div class="analysis-history-title">📚 Past Analyses <span class="count-pill" id="rel-history-count">0</span></div>
+            <div id="rel-history-list"></div>
+        </div>
     </div>
 </div>
 
@@ -464,7 +508,7 @@ let nextId=1;
 let docsSortField='addedAt',docsSortDir='desc';
 let apiKey='',proxyUrl='',aiModel='claude-sonnet-4-5';
 let unsubDocs=null;
-const VIEWS=['dashboard','upload','documents','overview','relationships','flow','settings','recycle-bin'];
+const VIEWS=['dashboard','upload','documents','relationships','flow','settings','recycle-bin'];
 
 // UTILS
 function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):'';}
@@ -517,8 +561,11 @@ async function initApp(){
 
         unsubDocs=db.collection('estate_documents').onSnapshot(snap=>{
             documents=snap.docs.map(doc=>({_docId:doc.id,...doc.data()}));
-            renderDashboard();renderDocuments();populateCategoryFilters();
+            renderDashboard();renderDocuments();populateCategoryFilters();renderOverviewStats();
         },err=>console.warn('docs snap err',err));
+
+        // Load overview history for Dashboard
+        loadOverviewHistory();
 
         document.getElementById('loading-screen').style.display='none';
         document.getElementById('app').style.display='block';
@@ -533,11 +580,11 @@ function showView(v){
     VIEWS.forEach(id=>document.getElementById('view-'+id).classList.remove('active'));
     document.getElementById('view-'+v).classList.add('active');
     document.querySelectorAll('nav button').forEach((btn,i)=>btn.classList.toggle('active',VIEWS[i]===v));
-    if(v==='dashboard')renderDashboard();
+    if(v==='dashboard'){renderDashboard();renderOverviewStats();loadOverviewHistory();}
     if(v==='documents'){populateCategoryFilters();renderDocuments();}
     if(v==='upload'){document.getElementById('bulk-actions').style.display=bulkQueue.length?'flex':'none';renderBulkQueue();}
     if(v==='recycle-bin')loadRecycleBin();
-    if(v==='overview')renderOverviewStats();
+    if(v==='relationships')loadRelationshipsHistory();
     window.scrollTo(0,0);
 }
 
@@ -1122,18 +1169,178 @@ ${buildDocsCorpus()}`;
         html=html.replace(/(<li>.*?<\/li>(?:\s*<li>.*?<\/li>)*)/gs,(m)=>'<ul>'+m+'</ul>');
         html=html.replace(/<\/ul>\s*<ul>/g,'');
         resultEl.innerHTML=html;resultEl.style.display='block';
+        // Persist to Firestore for history
+        try{
+            const entry={rawText:raw,documentCount:total,peopleCount:parties.size,createdAt:firebase.firestore.FieldValue.serverTimestamp()};
+            const docRef=await db.collection('estate_overviews').add(entry);
+            currentOverviewId=docRef.id;
+        }catch(saveErr){console.warn('Failed to save overview:',saveErr);toast('Overview generated but failed to save history.','warn');}
+        await loadOverviewHistory();
         statusEl.textContent=`✅ Overview ready — ${total} document${total!==1?'s':''} reviewed.`;
         statusEl.style.color='var(--success)';
     }catch(err){statusEl.textContent='❌ Error: '+err.message;statusEl.style.color='var(--danger)';}
     finally{btn.disabled=false;btn.textContent='✨ Regenerate Overview';}
 }
 
+// ── OVERVIEW HISTORY ──
+let overviewHistory=[], currentOverviewId=null;
+
+function formatOverviewDate(ts){
+    if(!ts)return '—';
+    let d;
+    if(typeof ts==='object'&&ts.seconds)d=new Date(ts.seconds*1000);
+    else if(typeof ts==='string')d=new Date(ts);
+    else if(ts instanceof Date)d=ts;
+    else return '—';
+    return d.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
+}
+
+async function loadOverviewHistory(){
+    try{
+        const snap=await db.collection('estate_overviews').orderBy('createdAt','desc').get();
+        overviewHistory=[];
+        snap.forEach(doc=>overviewHistory.push({_id:doc.id,...doc.data()}));
+    }catch(err){console.warn('Failed to load overview history:',err);overviewHistory=[];}
+    renderOverviewSummary();
+    renderOverviewHistoryList();
+}
+
+function renderOverviewSummary(){
+    const summaryEl=document.getElementById('overview-summary');
+    const dateEl=document.getElementById('overview-summary-date');
+    const metaEl=document.getElementById('overview-summary-meta');
+    const resultEl=document.getElementById('overview-result');
+    const btnTop=document.getElementById('btn-generate-overview');
+    if(!summaryEl)return;
+    if(!overviewHistory.length){
+        summaryEl.style.display='none';
+        if(btnTop)btnTop.textContent='✨ Generate Overview';
+        return;
+    }
+    const latest=overviewHistory[0];
+    summaryEl.style.display='flex';
+    dateEl.textContent=formatOverviewDate(latest.createdAt);
+    const docCount=latest.documentCount||0;
+    metaEl.textContent=`${docCount} document${docCount!==1?'s':''} reviewed`;
+    if(btnTop)btnTop.textContent='🔄 Regenerate';
+    // Auto-display latest if nothing currently showing
+    if(resultEl&&(resultEl.style.display==='none'||!resultEl.innerHTML.trim())){
+        let html=esc(latest.rawText||'');
+        html=html.replace(/^# (.+)$/gm,'<h1 style="font-size:1.4rem;font-weight:800;color:var(--accent);margin:8px 0 14px;font-family:Georgia,serif;">$1</h1>');
+        html=html.replace(/^## (.+)$/gm,'<h2>$1</h2>');
+        html=html.replace(/^### (.+)$/gm,'<h3>$1</h3>');
+        html=html.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+        html=html.replace(/\*(.+?)\*/g,'<em>$1</em>');
+        html=html.replace(/^- (.+)$/gm,'<li>$1</li>');
+        html=html.replace(/^\d+\. (.+)$/gm,'<li>$1</li>');
+        html=html.replace(/(<li>.*?<\/li>(?:\s*<li>.*?<\/li>)*)/gs,(m)=>'<ul>'+m+'</ul>');
+        html=html.replace(/<\/ul>\s*<ul>/g,'');
+        resultEl.innerHTML=html;
+        resultEl.style.display='block';
+        currentOverviewId=latest._id;
+    }
+}
+
+function renderOverviewHistoryList(){
+    const wrap=document.getElementById('overview-history-wrap');
+    const listEl=document.getElementById('overview-history-list');
+    const countEl=document.getElementById('overview-history-count');
+    if(!wrap||!listEl)return;
+    if(overviewHistory.length<=1){wrap.style.display='none';return;}
+    wrap.style.display='block';
+    countEl.textContent=`(${overviewHistory.length})`;
+    listEl.innerHTML=overviewHistory.map(a=>{
+        const docCount=a.documentCount||0;
+        const isCurrent=a._id===currentOverviewId;
+        return `<div class="history-item${isCurrent?' current':''}">
+            <div class="history-item-info">
+                <div class="history-item-date">${esc(formatOverviewDate(a.createdAt))}${isCurrent?' <span style="color:var(--accent);font-size:0.72rem;font-weight:600;">· CURRENT</span>':''}</div>
+                <div class="history-item-meta">${docCount} document${docCount!==1?'s':''} reviewed</div>
+            </div>
+            <div class="history-item-actions">
+                <button class="btn-icon" onclick="viewOverviewEntry('${a._id}')">👁 View</button>
+                <button class="btn-icon danger" onclick="deleteOverviewEntry('${a._id}')">🗑 Delete</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function viewOverviewEntry(id){
+    const entry=overviewHistory.find(a=>a._id===id);
+    if(!entry)return;
+    const resultEl=document.getElementById('overview-result');
+    const statusEl=document.getElementById('overview-status');
+    let html=esc(entry.rawText||'');
+    html=html.replace(/^# (.+)$/gm,'<h1 style="font-size:1.4rem;font-weight:800;color:var(--accent);margin:8px 0 14px;font-family:Georgia,serif;">$1</h1>');
+    html=html.replace(/^## (.+)$/gm,'<h2>$1</h2>');
+    html=html.replace(/^### (.+)$/gm,'<h3>$1</h3>');
+    html=html.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+    html=html.replace(/\*(.+?)\*/g,'<em>$1</em>');
+    html=html.replace(/^- (.+)$/gm,'<li>$1</li>');
+    html=html.replace(/^\d+\. (.+)$/gm,'<li>$1</li>');
+    html=html.replace(/(<li>.*?<\/li>(?:\s*<li>.*?<\/li>)*)/gs,(m)=>'<ul>'+m+'</ul>');
+    html=html.replace(/<\/ul>\s*<ul>/g,'');
+    resultEl.innerHTML=html;
+    resultEl.style.display='block';
+    currentOverviewId=id;
+    const docCount=entry.documentCount||0;
+    statusEl.textContent=`📖 Viewing overview from ${formatOverviewDate(entry.createdAt)} — ${docCount} document${docCount!==1?'s':''} reviewed.`;
+    statusEl.style.color='var(--text-secondary)';
+    renderOverviewHistoryList();
+    resultEl.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+async function deleteOverviewEntry(id){
+    if(!confirm('Delete this saved overview? This cannot be undone.'))return;
+    try{
+        await db.collection('estate_overviews').doc(id).delete();
+        if(currentOverviewId===id){
+            currentOverviewId=null;
+            const resultEl=document.getElementById('overview-result');
+            if(resultEl){resultEl.style.display='none';resultEl.innerHTML='';}
+            const statusEl=document.getElementById('overview-status');
+            if(statusEl)statusEl.textContent='';
+        }
+        toast('Overview deleted.','success');
+        await loadOverviewHistory();
+    }catch(err){toast('Failed to delete: '+err.message,'error');}
+}
+
+// Convert analysis markdown → HTML (shared between new analyses and history items)
+function renderAnalysisMarkdown(raw){
+    let html=esc(raw);
+    html=html.replace(/^## (.+)$/gm,'<h2>$1</h2>');
+    html=html.replace(/^### (.+)$/gm,'<h3>$1</h3>');
+    html=html.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+    html=html.replace(/\*(.+?)\*/g,'<em>$1</em>');
+    html=html.replace(/^- (.+)$/gm,'<li>$1</li>');
+    html=html.replace(/(<li>.*?<\/li>(?:\s*<li>.*?<\/li>)*)/gs,(m)=>'<ul>'+m+'</ul>');
+    html=html.replace(/<\/ul>\s*<ul>/g,'');
+    return html;
+}
+
+// Format a Firestore timestamp (or ISO string) into a human date
+function formatAnalysisDate(ts){
+    if(!ts)return '—';
+    let d;
+    if(typeof ts==='object'&&ts.seconds)d=new Date(ts.seconds*1000);
+    else if(typeof ts==='string')d=new Date(ts);
+    else if(ts instanceof Date)d=ts;
+    else return '—';
+    return d.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
+}
+
+// Cache of loaded analyses + which one is currently displayed
+let relAnalyses=[], currentRelId=null;
+
 async function analyzeRelationships(){
     if(!apiKey){toast('Set API key in Settings first.','error');return;}
     if(!documents.length){toast('No documents to analyze.','error');return;}
-    const btn=document.getElementById('btn-analyze-rel'),statusEl=document.getElementById('rel-status'),resultEl=document.getElementById('rel-result');
+    const btn=document.getElementById('btn-analyze-rel'),btnRefresh=document.getElementById('btn-refresh-rel'),statusEl=document.getElementById('rel-status'),resultEl=document.getElementById('rel-result');
     btn.disabled=true;btn.textContent='⏳ Analyzing…';
+    if(btnRefresh){btnRefresh.disabled=true;btnRefresh.textContent='⏳ Analyzing…';}
     statusEl.textContent='Reviewing all documents and mapping relationships…';
+    statusEl.style.color='var(--text-secondary)';
     resultEl.style.display='none';
     try{
         const prompt=`You are an estate planning attorney reviewing this client's entire document archive. Produce a comprehensive analysis in markdown. Include ALL of the following sections:
@@ -1164,19 +1371,124 @@ Here is the archive:
 ${buildDocsCorpus()}`;
         const raw=await callClaudeText(prompt,4096);
         if(!raw)return;
-        let html=esc(raw);
-        html=html.replace(/^## (.+)$/gm,'<h2>$1</h2>');
-        html=html.replace(/^### (.+)$/gm,'<h3>$1</h3>');
-        html=html.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
-        html=html.replace(/\*(.+?)\*/g,'<em>$1</em>');
-        html=html.replace(/^- (.+)$/gm,'<li>$1</li>');
-        html=html.replace(/(<li>.*?<\/li>(?:\s*<li>.*?<\/li>)*)/gs,(m)=>'<ul>'+m+'</ul>');
-        html=html.replace(/<\/ul>\s*<ul>/g,'');
-        resultEl.innerHTML=html;resultEl.style.display='block';
+
+        // Save to Firestore
+        const entry={rawText:raw,documentCount:documents.length,createdAt:firebase.firestore.FieldValue.serverTimestamp()};
+        let savedId=null;
+        try{
+            const docRef=await db.collection('estate_analyses').add(entry);
+            savedId=docRef.id;
+        }catch(saveErr){console.warn('Failed to save analysis:',saveErr);toast('Analysis generated but failed to save history.','warn');}
+
+        // Display
+        resultEl.innerHTML=renderAnalysisMarkdown(raw);
+        resultEl.style.display='block';
+        currentRelId=savedId;
         statusEl.textContent=`✅ Analysis complete — ${documents.length} document${documents.length!==1?'s':''} reviewed.`;
         statusEl.style.color='var(--success)';
+
+        // Update summary + reload history
+        await loadRelationshipsHistory();
     }catch(err){statusEl.textContent='❌ Error: '+err.message;statusEl.style.color='var(--danger)';}
-    finally{btn.disabled=false;btn.textContent='🔬 Generate Analysis';}
+    finally{
+        btn.disabled=false;btn.textContent='🔬 Generate Analysis';
+        if(btnRefresh){btnRefresh.disabled=false;btnRefresh.textContent='🔄 Refresh Analysis';}
+    }
+}
+
+async function loadRelationshipsHistory(){
+    try{
+        const snap=await db.collection('estate_analyses').orderBy('createdAt','desc').get();
+        relAnalyses=[];
+        snap.forEach(doc=>relAnalyses.push({_id:doc.id,...doc.data()}));
+    }catch(err){console.warn('Failed to load analysis history:',err);relAnalyses=[];}
+    renderRelationshipsSummary();
+    renderRelationshipsHistory();
+}
+
+function renderRelationshipsSummary(){
+    const summaryEl=document.getElementById('rel-summary');
+    const dateEl=document.getElementById('rel-summary-date');
+    const metaEl=document.getElementById('rel-summary-meta');
+    if(!summaryEl)return;
+    if(!relAnalyses.length){summaryEl.style.display='none';return;}
+    const latest=relAnalyses[0];
+    summaryEl.style.display='flex';
+    dateEl.textContent=formatAnalysisDate(latest.createdAt);
+    const docCount=latest.documentCount||0;
+    metaEl.textContent=`${docCount} document${docCount!==1?'s':''} reviewed`;
+
+    // Hide the top "Generate Analysis" button since Refresh appears in the summary now
+    const topBtn=document.getElementById('btn-analyze-rel');
+    if(topBtn)topBtn.style.display='none';
+
+    // Auto-display the latest analysis if nothing is being shown
+    const resultEl=document.getElementById('rel-result');
+    if(resultEl&&resultEl.style.display==='none'){
+        resultEl.innerHTML=renderAnalysisMarkdown(latest.rawText||'');
+        resultEl.style.display='block';
+        currentRelId=latest._id;
+        const statusEl=document.getElementById('rel-status');
+        if(statusEl&&!statusEl.textContent){
+            statusEl.textContent=`✅ Showing analysis from ${formatAnalysisDate(latest.createdAt)} — ${docCount} document${docCount!==1?'s':''} reviewed.`;
+            statusEl.style.color='var(--success)';
+        }
+    }
+}
+
+function renderRelationshipsHistory(){
+    const wrap=document.getElementById('rel-history-wrap');
+    const listEl=document.getElementById('rel-history-list');
+    const countEl=document.getElementById('rel-history-count');
+    if(!wrap||!listEl)return;
+    if(relAnalyses.length<=1){wrap.style.display='none';return;}
+    wrap.style.display='block';
+    countEl.textContent=String(relAnalyses.length);
+    listEl.innerHTML=relAnalyses.map(a=>{
+        const docCount=a.documentCount||0;
+        const isCurrent=a._id===currentRelId;
+        return `<div class="history-item${isCurrent?' current':''}">
+            <div class="history-item-info">
+                <div class="history-item-date">${esc(formatAnalysisDate(a.createdAt))}${isCurrent?' <span style="color:var(--accent);font-size:0.72rem;font-weight:600;">· CURRENT</span>':''}</div>
+                <div class="history-item-meta">${docCount} document${docCount!==1?'s':''} reviewed</div>
+            </div>
+            <div class="history-item-actions">
+                <button class="btn-icon" onclick="viewAnalysisEntry('${a._id}')">👁 View</button>
+                <button class="btn-icon danger" onclick="deleteAnalysisEntry('${a._id}')">🗑 Delete</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function viewAnalysisEntry(id){
+    const entry=relAnalyses.find(a=>a._id===id);
+    if(!entry)return;
+    const resultEl=document.getElementById('rel-result');
+    const statusEl=document.getElementById('rel-status');
+    resultEl.innerHTML=renderAnalysisMarkdown(entry.rawText||'');
+    resultEl.style.display='block';
+    currentRelId=id;
+    const docCount=entry.documentCount||0;
+    statusEl.textContent=`📖 Viewing analysis from ${formatAnalysisDate(entry.createdAt)} — ${docCount} document${docCount!==1?'s':''} reviewed.`;
+    statusEl.style.color='var(--text-secondary)';
+    renderRelationshipsHistory();
+    resultEl.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+async function deleteAnalysisEntry(id){
+    if(!confirm('Delete this saved analysis? This cannot be undone.'))return;
+    try{
+        await db.collection('estate_analyses').doc(id).delete();
+        if(currentRelId===id){
+            currentRelId=null;
+            const resultEl=document.getElementById('rel-result');
+            if(resultEl){resultEl.style.display='none';resultEl.innerHTML='';}
+            const statusEl=document.getElementById('rel-status');
+            if(statusEl){statusEl.textContent='';}
+        }
+        toast('Analysis deleted.','success');
+        await loadRelationshipsHistory();
+    }catch(err){toast('Failed to delete: '+err.message,'error');}
 }
 
 // FLOW DIAGRAM

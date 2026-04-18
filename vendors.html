@@ -681,18 +681,24 @@ function renderDashboard(){
             <div class="reveal-hint">👁 Hover to reveal</div>
         </div>`;
 
-    // Top vendors
-    const spendByVendor={};
-    transactions.forEach(t=>{const k=t.vendorId||t.vendorName||'Unknown';spendByVendor[k]=(spendByVendor[k]||0)+(Number(t.amount)||0);});
-    const entries=Object.entries(spendByVendor).map(([key,amt])=>{
-        const v=vendors.find(x=>x._docId===key);
-        return{key,name:v?v.name:(transactions.find(t=>t.vendorId===key||t.vendorName===key)?.vendorName||'Unknown'),amt,vendorDocId:v?v._docId:key};
-    }).sort((a,b)=>b.amt-a.amt).slice(0,10);
+    // Top vendors — resolve each transaction to its display name, then group
+    // by lowercase name so ID-linked and name-only transactions for the same
+    // vendor are merged into a single bar.
+    const spendByName={};
+    transactions.forEach(t=>{
+        const v=vendors.find(x=>x._docId===t.vendorId);
+        const name=(v?v.name:t.vendorName||'Unknown').trim();
+        const key=name.toLowerCase();
+        if(!spendByName[key]) spendByName[key]={name,amt:0,vendorDocId:v?v._docId:null};
+        spendByName[key].amt+=Number(t.amount)||0;
+        if(v&&!spendByName[key].vendorDocId) spendByName[key].vendorDocId=v._docId;
+    });
+    const entries=Object.values(spendByName).sort((a,b)=>b.amt-a.amt).slice(0,10);
     const maxAmt=entries.length?entries[0].amt:1;
     const topEl=document.getElementById('top-vendors');
     if(!entries.length){topEl.innerHTML='<p style="color:var(--text-secondary);padding:16px 0;">No transactions yet.</p>';}
     else{
-        topEl.innerHTML=entries.map(e=>`<div class="vendor-breakdown-item" data-vendor-id="${esc(e.vendorDocId)}" data-vendor-name="${esc(e.name)}">
+        topEl.innerHTML=entries.map(e=>`<div class="vendor-breakdown-item" data-vendor-id="${esc(e.vendorDocId||'')}" data-vendor-name="${esc(e.name)}">
             <div class="vbi-name">${esc(e.name)}</div>
             <div class="vbi-amt">${fmtMoney(e.amt)}</div>
             <div class="vbi-bar"><div class="vbi-bar-fill" style="width:${(e.amt/maxAmt*100).toFixed(1)}%"></div></div>

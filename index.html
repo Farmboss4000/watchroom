@@ -393,6 +393,44 @@
             padding: 28px 24px 60px;
         }
 
+        /* ── QUOTE OF THE DAY ── */
+        .qotd-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--accent);
+            border-radius: 12px;
+            padding: 14px 22px;
+            margin-bottom: 14px;
+        }
+        .qotd-label {
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+        .qotd-text {
+            font-size: 1rem;
+            font-style: italic;
+            color: var(--text-primary);
+            line-height: 1.45;
+        }
+        .qotd-text .qotd-quote-mark {
+            color: var(--accent);
+            font-size: 1.3rem;
+            font-weight: 700;
+            font-family: Georgia, serif;
+        }
+        .qotd-author {
+            display: inline-block;
+            margin-left: 6px;
+            font-style: normal;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            opacity: 0.85;
+        }
+
         /* ── DATE/TIME/WEATHER ── */
         .dtw-bar {
             background: var(--bg-card);
@@ -1049,6 +1087,7 @@
         <a href="knives.html" class="site-link">🔪 Knives</a>
         <a href="realestate.html" class="site-link">🏡 Real Estate</a>
         <a href="globetrotting.html" class="site-link">✈️ Globetrotting</a>
+        <a href="addison.html" class="site-link">🩺 Addison</a>
         <a href="vendors.html" class="site-link">💼 Vendors</a>
         <a href="estateplanning.html" class="site-link">📜 Estate Planning</a>
         <a href="dontpush.html" class="site-link">🚫 Don't Push</a>
@@ -1112,6 +1151,12 @@
 
     <!-- MAIN CONTENT -->
     <div class="main-content">
+
+        <!-- QUOTE OF THE DAY -->
+        <div class="qotd-card">
+            <div class="qotd-label">💭 Quote of the Day</div>
+            <div class="qotd-text" id="qotd-text">…</div>
+        </div>
 
         <!-- DATE / TIME / WEATHER -->
         <div class="dtw-bar">
@@ -1588,6 +1633,7 @@
 
     function initApp() {
         showScreen('app');
+        initQOTD();
         initLiveCounts();
         initRecentActivity();
         initClock();
@@ -1595,6 +1641,49 @@
         initQuotes();
         initOneLiners();
         loadPortfolioTotals();
+    }
+
+    // ── SARCASTIC QUOTE OF THE DAY ──
+    const SARCASTIC_QUOTES = [
+        { text: "I'm not arguing, I'm just explaining why I'm right.", author: "Unknown" },
+        { text: "I'd agree with you, but then we'd both be wrong.", author: "Unknown" },
+        { text: "Sarcasm: the body's natural defense against stupidity.", author: "Unknown" },
+        { text: "I'm not saying I hate you, but I'd unplug your life support to charge my phone.", author: "Unknown" },
+        { text: "Some cause happiness wherever they go; others, whenever they go.", author: "Oscar Wilde" },
+        { text: "I am ready to meet my Maker. Whether my Maker is prepared for the great ordeal of meeting me is another matter.", author: "Winston Churchill" },
+        { text: "I can resist everything except temptation.", author: "Oscar Wilde" },
+        { text: "Always forgive your enemies; nothing annoys them so much.", author: "Oscar Wilde" },
+        { text: "Light travels faster than sound. This is why some people appear bright until you hear them speak.", author: "Alan Dundes" },
+        { text: "I don't have the energy to pretend to like you today.", author: "Unknown" },
+        { text: "If at first you don't succeed, then skydiving definitely isn't for you.", author: "Steven Wright" },
+        { text: "He has all the virtues I dislike and none of the vices I admire.", author: "Winston Churchill" },
+        { text: "I never forget a face, but in your case I'll be glad to make an exception.", author: "Groucho Marx" },
+        { text: "I feel so miserable without you; it's almost like having you here.", author: "Stephen Bishop" },
+        { text: "He is a self-made man and worships his creator.", author: "John Bright" },
+        { text: "I didn't attend the funeral, but I sent a nice letter saying I approved of it.", author: "Mark Twain" },
+        { text: "The trouble with the rat race is that even if you win, you're still a rat.", author: "Lily Tomlin" },
+        { text: "If you can't be kind, at least be vague.", author: "Judith Martin" },
+        { text: "I'm busy. You're ugly. Have a nice day.", author: "Unknown" },
+        { text: "I'm not lazy. I'm on energy-saving mode.", author: "Unknown" },
+        { text: "The road to success is always under construction.", author: "Lily Tomlin" },
+        { text: "A cynic is a man who, when he smells flowers, looks around for a coffin.", author: "H.L. Mencken" },
+        { text: "I am not young enough to know everything.", author: "Oscar Wilde" },
+        { text: "The only reason I would take up jogging is so I could hear heavy breathing again.", author: "Erma Bombeck" },
+        { text: "I've had a perfectly wonderful evening. But this wasn't it.", author: "Groucho Marx" },
+        { text: "Don't worry about the world coming to an end today. It's already tomorrow in Australia.", author: "Charles M. Schulz" },
+        { text: "Before you judge a man, walk a mile in his shoes. After that, who cares? He's a mile away and you've got his shoes.", author: "Billy Connolly" },
+        { text: "If you think nobody cares if you're alive, try missing a couple of car payments.", author: "Earl Wilson" },
+        { text: "I'm not insensitive, I just don't care.", author: "Unknown" },
+        { text: "People say nothing is impossible, but I do nothing every day.", author: "Winnie the Pooh" },
+        { text: "I love deadlines. I love the whooshing noise they make as they go by.", author: "Douglas Adams" },
+        { text: "I am so clever that sometimes I don't understand a single word of what I am saying.", author: "Oscar Wilde" }
+    ];
+    function initQOTD() {
+        const q = SARCASTIC_QUOTES[Math.floor(Math.random() * SARCASTIC_QUOTES.length)];
+        const el = document.getElementById('qotd-text');
+        if (el) {
+            el.innerHTML = `<span class="qotd-quote-mark">&ldquo;</span>${q.text}<span class="qotd-quote-mark">&rdquo;</span><span class="qotd-author">— ${q.author}</span>`;
+        }
     }
 
     // ── LIVE COUNTS ──
@@ -1805,20 +1894,47 @@
 
     // ── RECENT ACTIVITY ──
     const ACTIVITY_COLS = [
-        { col:'items',            label:'Armory',     icon:'🔫', nameField: i => [i.manufacturer,i.model].filter(Boolean).join(' ') || i.name || i.serialNumber || '(unnamed)' },
-        { col:'automotive_items', label:'Automotive', icon:'🚗', nameField: i => [i.year,i.make,i.model].filter(Boolean).join(' ') || i.name || '(unnamed)' },
-        { col:'machinery_items',  label:'Machinery',  icon:'🚜', nameField: i => [i.make,i.model].filter(Boolean).join(' ') || i.name || '(unnamed)' },
-        { col:'livestock_items',  label:'Livestock',  icon:'🐄', nameField: i => i.name || i.tagNumber || i.id || '(unnamed)' },
-        { col:'timepiece_items',  label:'Timepieces', icon:'⌚', nameField: i => [i.brand,i.model].filter(Boolean).join(' ') || i.reference || '(unnamed)' },
-        { col:'knife_items',      label:'Knives',     icon:'🔪', nameField: i => [i.brand,i.model].filter(Boolean).join(' ') || '(unnamed)' }
+        { col:'items',                 label:'Armory',         icon:'🔫', nameField: i => [i.manufacturer,i.model].filter(Boolean).join(' ') || i.name || i.serialNumber || '(unnamed)' },
+        { col:'automotive_items',      label:'Automotive',     icon:'🚗', nameField: i => [i.year,i.make,i.model].filter(Boolean).join(' ') || i.name || '(unnamed)' },
+        { col:'machinery_items',       label:'Machinery',      icon:'🚜', nameField: i => [i.make,i.model].filter(Boolean).join(' ') || i.name || '(unnamed)' },
+        { col:'livestock_items',       label:'Livestock',      icon:'🐄', nameField: i => i.name || i.tagNumber || i.id || '(unnamed)' },
+        { col:'timepiece_items',       label:'Timepieces',     icon:'⌚', nameField: i => [i.brand,i.model].filter(Boolean).join(' ') || i.reference || '(unnamed)' },
+        { col:'knife_items',           label:'Knives',         icon:'🔪', nameField: i => [i.brand,i.model].filter(Boolean).join(' ') || '(unnamed)' },
+        { col:'addison_items',         label:'Addison',        icon:'📋', nameField: i => i.visitDate || i.provider || i.name || '(unnamed)' },
+        { col:'globetrotting_trips',   label:'Globetrotting',  icon:'✈️', nameField: i => i.destination || i.name || i.title || '(trip)' },
+        { col:'vendors_transactions',  label:'Vendors',        icon:'💼', nameField: i => [i.vendorName, i.amount ? '$'+Number(i.amount).toLocaleString() : null].filter(Boolean).join(' · ') || i.description || '(transaction)' }
     ];
 
+    function docIcon(mimeType) {
+        if (!mimeType) return '📄';
+        if (mimeType.startsWith('image/')) return '🖼️';
+        if (mimeType === 'application/pdf') return '📕';
+        if (mimeType === 'message/rfc822') return '📧';
+        return '📄';
+    }
+
+    function parseTs(val) {
+        if (!val) return null;
+        if (typeof val === 'string') {
+            const d = new Date(val);
+            return isNaN(d.getTime()) ? null : d;
+        }
+        if (val.toDate) return val.toDate();
+        if (val instanceof Date) return val;
+        if (typeof val === 'number') return new Date(val);
+        return null;
+    }
+
     const activityAllItems = {};
+    const activityAllDocs = {};
 
     function renderRecentActivity() {
         const all = [];
         Object.entries(activityAllItems).forEach(([label, items]) => {
             items.forEach(i => all.push(i));
+        });
+        Object.entries(activityAllDocs).forEach(([label, docs]) => {
+            docs.forEach(d => all.push(d));
         });
         all.sort((a,b) => {
             const ta = a._ts || 0, tb = b._ts || 0;
@@ -1835,11 +1951,18 @@
             const border = idx < top15.length - 1 ? 'border-bottom:1px solid var(--border);' : '';
             const dateStr = item._date ? item._date.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
             const timeStr = item._date ? item._date.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:true}) : '';
+            let subLine;
+            if (item._kind === 'document') {
+                const parent = item._parentName ? ` · ${item._parentName}` : '';
+                subLine = `<span style="color:#60a5fa;">📎 Document</span> · ${item._label}${parent}`;
+            } else {
+                subLine = item._label;
+            }
             return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;${border}">
                 <span style="font-size:1.3rem;flex-shrink:0;">${item._icon}</span>
                 <div style="flex:1;min-width:0;">
                     <div style="font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item._name}</div>
-                    <div style="font-size:0.78rem;color:var(--text-secondary);">${item._label}</div>
+                    <div style="font-size:0.78rem;color:var(--text-secondary);">${subLine}</div>
                 </div>
                 <div style="text-align:right;flex-shrink:0;">
                     <div style="font-size:0.8rem;color:var(--text-secondary);">${dateStr}</div>
@@ -1850,30 +1973,71 @@
     }
 
     function initRecentActivity() {
+        // Inline-document collections — flatten both items and their documents[]
         ACTIVITY_COLS.forEach(({ col, label, icon, nameField }) => {
             activityAllItems[label] = [];
+            activityAllDocs[label] = [];
             const unsub = db.collection(col).onSnapshot(snap => {
-                activityAllItems[label] = snap.docs.map(d => {
+                const items = [];
+                const docs = [];
+                snap.docs.forEach(d => {
                     const data = d.data();
-                    let ts = null;
-                    if (data.addedAt) {
-                        if (typeof data.addedAt === 'string') ts = new Date(data.addedAt);
-                        else if (data.addedAt.toDate) ts = data.addedAt.toDate();
-                    }
-                    return {
+                    const parentName = nameField(data);
+                    const ts = parseTs(data.addedAt) || parseTs(data.createdAt) || parseTs(data.uploadedAt);
+                    items.push({
                         _docId: d.id,
                         _ts: ts ? ts.getTime() : 0,
                         _date: ts,
                         _label: label,
                         _icon: icon,
-                        _name: nameField(data),
+                        _name: parentName,
+                        _kind: 'item',
                         ...data
-                    };
+                    });
+                    // Flatten inline documents
+                    if (Array.isArray(data.documents)) {
+                        data.documents.forEach(doc => {
+                            if (!doc || doc.deleted) return;
+                            const dts = parseTs(doc.addedAt) || parseTs(doc.uploadedAt);
+                            if (!dts) return; // skip docs without timestamps
+                            docs.push({
+                                _ts: dts.getTime(),
+                                _date: dts,
+                                _label: label,
+                                _icon: docIcon(doc.mimeType || doc.type),
+                                _name: doc.name || doc.title || '(document)',
+                                _kind: 'document',
+                                _parentName: parentName
+                            });
+                        });
+                    }
                 });
+                activityAllItems[label] = items;
+                activityAllDocs[label] = docs;
                 renderRecentActivity();
             }, () => {});
             unsubbers.push(unsub);
         });
+
+        // Standalone documents — Estate Planning
+        activityAllDocs['Estate Planning'] = [];
+        const unsubEstate = db.collection('estate_documents').onSnapshot(snap => {
+            activityAllDocs['Estate Planning'] = snap.docs.map(d => {
+                const data = d.data();
+                const ts = parseTs(data.uploadedAt) || parseTs(data.updatedAt) || parseTs(data.addedAt);
+                return {
+                    _ts: ts ? ts.getTime() : 0,
+                    _date: ts,
+                    _label: 'Estate Planning',
+                    _icon: '📜',
+                    _name: data.title || data.name || '(document)',
+                    _kind: 'document',
+                    _parentName: data.category || null
+                };
+            });
+            renderRecentActivity();
+        }, () => {});
+        unsubbers.push(unsubEstate);
     }
 
     // ── CLOCK ──

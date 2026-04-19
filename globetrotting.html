@@ -91,6 +91,9 @@
         .stat-list-pill{padding:10px 4px;font-size:0.88rem;font-weight:500;color:var(--text-primary);border-bottom:1px solid var(--border);}
         .stat-list-pill:last-child{border-bottom:none;}
         .stat-list-pill.state-pill{font-family:inherit;font-size:0.88rem;letter-spacing:normal;}
+        .stat-list-pill.editable{display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;}
+        .stat-list-pill.editable:hover{background:var(--bg-secondary);}
+        .stat-list-pill .edit-icon{font-size:0.82rem;color:var(--text-secondary);flex-shrink:0;}
         .stat-list-count{font-size:0.78rem;color:var(--text-secondary);margin-bottom:12px;}
         .stat-value{font-size:2rem;font-weight:800;color:var(--accent);line-height:1;margin-bottom:4px;}
         .stat-label{font-size:0.77rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;}
@@ -2701,9 +2704,15 @@ function openStatList(type) {
                 const full = STATE_NAMES[item] || item;
                 return `<span class="stat-list-pill state-pill" title="${esc(full)}">${esc(item)} — ${esc(full)}</span>`;
             }
+            if (type === 'countries') {
+                return `<span class="stat-list-pill editable" onclick="editCountryValue(${JSON.stringify(item).replace(/"/g,'&quot;')})" title="Tap to rename or remove"><span>${esc(item)}</span><span class="edit-icon">✏️</span></span>`;
+            }
             return `<span class="stat-list-pill">${esc(item)}</span>`;
         }).join('');
-        body.innerHTML = `<div class="stat-list-count">${countWord} · alphabetical</div><div class="stat-list-pills">${pills}</div>`;
+        const hint = type === 'countries'
+            ? '<div class="stat-list-count" style="color:var(--text-secondary);font-size:0.78rem;margin-bottom:4px;">Tap a country to rename it across every trip (leave blank to remove).</div>'
+            : '';
+        body.innerHTML = `<div class="stat-list-count">${countWord} · alphabetical</div>${hint}<div class="stat-list-pills">${pills}</div>`;
     }
     overlay.classList.add('show');
 }
@@ -2711,6 +2720,51 @@ function openStatList(type) {
 function closeStatList(e) {
     if (e && e.target !== document.getElementById('stat-list-overlay')) return;
     document.getElementById('stat-list-overlay').classList.remove('show');
+}
+
+async function editCountryValue(oldValue) {
+    const input = prompt(`Rename "${oldValue}" across all trips.\nLeave blank to remove this country from every destination.`, oldValue);
+    if (input === null) return; // cancelled
+    const newValue = input.trim();
+    if (newValue === oldValue.trim()) return; // no change
+    const matchKey = oldValue.trim().toLowerCase();
+    const affected = [];
+    trips.forEach(t => {
+        if (!Array.isArray(t.destinations)) return;
+        let changed = false;
+        const updated = t.destinations.map(d => {
+            if ((d.country || '').trim().toLowerCase() === matchKey) {
+                changed = true;
+                return { ...d, country: newValue };
+            }
+            return d;
+        });
+        if (changed) affected.push({ id: t._id, destinations: updated });
+    });
+    if (!affected.length) { showToast('No trips matched', true); return; }
+    try {
+        // Firestore batch supports up to 500 writes per commit.
+        for (let i = 0; i < affected.length; i += 400) {
+            const batch = db.batch();
+            affected.slice(i, i + 400).forEach(a => {
+                batch.update(db.collection('globetrotting_trips').doc(a.id), { destinations: a.destinations });
+            });
+            await batch.commit();
+        }
+        showToast(newValue
+            ? `Renamed "${oldValue}" → "${newValue}" on ${affected.length} trip${affected.length!==1?'s':''}`
+            : `Removed "${oldValue}" from ${affected.length} trip${affected.length!==1?'s':''}`);
+        // Update local state and re-render
+        affected.forEach(a => {
+            const t = trips.find(x => x._id === a.id);
+            if (t) t.destinations = a.destinations;
+        });
+        renderDashboard();
+        renderTrips();
+        openStatList('countries');
+    } catch (err) {
+        showToast('Update failed: ' + err.message, true);
+    }
 }
 
 function modalAddDocs() {

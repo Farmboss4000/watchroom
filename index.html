@@ -7,7 +7,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" defer></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1208,7 +1208,7 @@
     <!-- HERO -->
     <div class="hero">
         <div class="hero-photo">
-            <img src="farmboss.jpeg" alt="Farmboss">
+            <img src="farmboss.jpeg" alt="Farmboss" loading="lazy" decoding="async">
             <div class="hero-photo-caption">your Supreme Leader &mdash; Farmboss</div>
         </div>
         <div class="hero-text">
@@ -1714,14 +1714,24 @@
 
     function initApp() {
         showScreen('app');
-        initQOTD();
-        initLiveCounts();
-        initRecentActivity();
+        // Render-critical: clock + quote visible in the hero/top area.
         initClock();
-        initWeather();
-        initQuotes();
-        initOneLiners();
-        loadPortfolioTotals();
+        initQOTD();
+        // Defer Firestore listeners + API fetches until after first paint so the
+        // hero renders before ~20 realtime subscriptions + a weather fetch kick off.
+        const startDeferred = () => {
+            initLiveCounts();
+            initRecentActivity();
+            initWeather();
+            initQuotes();
+            initOneLiners();
+            loadPortfolioTotals();
+        };
+        if ('requestIdleCallback' in window) {
+            requestIdleCallback(startDeferred, { timeout: 1500 });
+        } else {
+            requestAnimationFrame(() => setTimeout(startDeferred, 0));
+        }
     }
 
     // ── SARCASTIC QUOTE OF THE DAY ──
@@ -1859,6 +1869,11 @@
     }
 
     function updateAnalyticsCharts() {
+        // Chart.js is deferred; a snapshot may arrive before it loads. Retry once it's ready.
+        if (typeof Chart === 'undefined') {
+            window.addEventListener('load', () => { if (typeof Chart !== 'undefined') updateAnalyticsCharts(); }, { once: true });
+            return;
+        }
         const labels = ['Armory','Machinery','Automotive','Livestock','Timepieces','Knives','Pharmacy','Insurance','Real Estate','Agents','Vendors'];
         const keys   = ['armory','machinery','automotive','livestock','timepieces','knives','pharmacy','insurance','realestate','agents','vendors'];
         const data   = keys.map(k => counts[k] || 0);

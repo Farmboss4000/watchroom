@@ -2200,7 +2200,7 @@
         const now  = new Date();
         const tz   = wxTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
         const date = now.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric', timeZone: tz });
-        const time = now.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', hour12:false, timeZone: tz });
+        const time = now.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit', hour12:true, timeZone: tz });
         document.getElementById('dtw-clock').textContent = `${date}  ·  ${time}`;
     }
     function initClock() {

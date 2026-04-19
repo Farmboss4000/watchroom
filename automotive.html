@@ -186,6 +186,12 @@
             color:#fff; width:22px; height:22px; border-radius:50%; cursor:pointer; font-size:12px;
             display:flex; align-items:center; justify-content:center; }
         .photo-file-input input { font-size:0.78rem; color:var(--text-secondary); width:100%; }
+        .photo-file-input input.hidden-file-input { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
+        .btn-photos-pick { display:inline-flex; align-items:center; justify-content:center; gap:6px;
+            padding:8px 12px; font-size:0.82rem; font-weight:600; color:var(--text);
+            background:var(--bg-card); border:1px solid var(--border); border-radius:8px;
+            cursor:pointer; width:100%; }
+        .btn-photos-pick:hover { background:var(--bg-secondary); }
 
         /* ── TABLE ── */
         .toolbar { display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; align-items:center; }
@@ -746,7 +752,8 @@
                             <button type="button" class="remove-photo" onclick="removePhoto('plate')">✕</button>
                         </div>
                         <div class="photo-file-input">
-                            <input type="file" id="file-plate" accept="image/*" onchange="onPhotoSelected('plate',this)">
+                            <input type="file" id="file-plate" class="hidden-file-input" accept="image/*" onchange="onPhotoSelected('plate',this)">
+                            <button type="button" class="btn-photos-pick" onclick="document.getElementById('file-plate').click()">📷 Choose from Photos</button>
                         </div>
                         <button type="button" class="btn-ai" id="btn-plate-ocr" onclick="extractLicensePlate()" disabled>🔍 Read Plate with AI</button>
                     </div>

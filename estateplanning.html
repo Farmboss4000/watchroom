@@ -733,7 +733,7 @@ async function handleTeaPartyFiles(files){
         document.getElementById('tea-tbody').prepend(row);
         try{
             const{url,path}=await uploadTeaPartyFile(file);
-            await db.collection('estate_tea_party').add({
+            const docRef=await db.collection('estate_tea_party').add({
                 title:file.name.replace(/\.[^.]+$/,''),
                 description:'',
                 fileName:file.name,
@@ -745,6 +745,20 @@ async function handleTeaPartyFiles(files){
                 addedAt:new Date().toISOString(),
             });
             toast(`Added ${file.name} to the tea party.`,'success');
+            // Auto-scan with AI using the in-memory file (bypasses Storage CORS)
+            const isPdf=file.type==='application/pdf'||file.name.toLowerCase().endsWith('.pdf');
+            const isImage=(file.type||'').startsWith('image/');
+            if(apiKey&&(isPdf||isImage)){
+                (async()=>{
+                    try{await db.collection('estate_tea_party').doc(docRef.id).update({aiStatus:'scanning'});}catch(e){}
+                    const liveDoc={_docId:docRef.id,title:file.name.replace(/\.[^.]+$/,''),description:'',fileName:file.name,fileUrl:url,filePath:path,fileMimeType:file.type||'',fileSize:file.size||0};
+                    try{
+                        await scanTeaDocFromBlob(docRef.id,liveDoc,file);
+                    }catch(err){
+                        try{await db.collection('estate_tea_party').doc(docRef.id).update({aiStatus:'error',aiError:err.message||'Scan failed'});}catch(e){}
+                    }
+                })();
+            }
         }catch(err){
             toast(`Upload failed: ${err.message}`,'error');
         }
@@ -941,26 +955,37 @@ async function blobToBase64(blob){
     return new Promise((res,rej)=>{const fr=new FileReader();fr.onload=e=>res(e.target.result.split(',')[1]);fr.onerror=rej;fr.readAsDataURL(blob);});
 }
 
-async function scanTeaPartyDoc(docId){
-    const d=teaPartyDocs.find(x=>x._docId===docId);
-    if(!d||!d.fileUrl)return;
-    if(!apiKey){toast('Set your API key in Settings first.','error');return;}
-    const isPdf=(d.fileMimeType==='application/pdf')||(d.fileName||'').toLowerCase().endsWith('.pdf');
-    const isImage=(d.fileMimeType||'').startsWith('image/');
-    if(!isPdf&&!isImage){toast('AI scan supports PDFs and images only.','error');return;}
-    try{await db.collection('estate_tea_party').doc(docId).update({aiStatus:'scanning',aiError:firebase.firestore.FieldValue.delete()});}catch(e){}
+function pickFilesFromDisk(multiple,accept,hintMsg){
+    return new Promise(resolve=>{
+        if(hintMsg)toast(hintMsg,'info');
+        const input=document.createElement('input');
+        input.type='file';
+        if(accept)input.accept=accept;
+        if(multiple)input.multiple=true;
+        input.style.display='none';
+        document.body.appendChild(input);
+        let done=false;
+        const finish=files=>{if(done)return;done=true;input.remove();resolve(files);};
+        input.onchange=()=>finish(Array.from(input.files||[]));
+        const onFocus=()=>{window.removeEventListener('focus',onFocus);setTimeout(()=>{if(!done&&(!input.files||!input.files.length))finish([]);},300);};
+        window.addEventListener('focus',onFocus);
+        input.click();
+    });
+}
+
+async function fetchBlobForTeaDoc(d){
     try{
-        let blob;
-        try{
-            const res=await fetch(d.fileUrl);
-            if(!res.ok)throw new Error(`Download failed (HTTP ${res.status})`);
-            blob=await res.blob();
-        }catch(netErr){
-            throw new Error('Fetch failed — likely Firebase Storage CORS. '+(netErr.message||netErr));
-        }
-        const base64=await blobToBase64(blob);
-        const mime=isPdf?'application/pdf':(d.fileMimeType||'image/jpeg');
-        const prompt=`You are analyzing a document uploaded to a private file library. Read it and return ONLY a valid JSON object with these keys:
+        const res=await fetch(d.fileUrl);
+        if(!res.ok)return null;
+        return await res.blob();
+    }catch(e){return null;}
+}
+
+async function scanTeaDocFromBlob(docId,d,blob){
+    const isPdf=(d.fileMimeType==='application/pdf')||(d.fileName||'').toLowerCase().endsWith('.pdf')||blob.type==='application/pdf';
+    const base64=await blobToBase64(blob);
+    const mime=isPdf?'application/pdf':(d.fileMimeType||blob.type||'image/jpeg');
+    const prompt=`You are analyzing a document uploaded to a private file library. Read it and return ONLY a valid JSON object with these keys:
 title (short concise title, max 8 words),
 description (1-2 sentence plain-English summary of what the document is and its purpose),
 docType (one short lowercase category like "receipt", "letter", "photo", "contract", "statement", "note", "form", "tax_return", "w2", "1099", "k1", "tax_document", "report"),
@@ -1004,65 +1029,88 @@ taxData must have this exact shape when present:
 }
 
 Use empty strings, empty arrays, and null for fields you cannot confidently extract. Do not invent values. Numbers must be raw numbers (not strings), with no commas or dollar signs.`;
-        const raw=await callClaude(base64,mime,prompt,2048);
-        if(!raw)throw new Error('No AI response');
-        const jsonMatch=raw.match(/\{[\s\S]*\}/);
-        if(!jsonMatch)throw new Error('Could not parse AI response');
-        const r=JSON.parse(jsonMatch[0]);
-        const update={
-            aiStatus:'scanned',
-            aiScannedAt:new Date().toISOString(),
-            aiTitle:(r.title||'').toString().trim(),
-            aiDescription:(r.description||'').toString().trim(),
-            aiDocType:(r.docType||'').toString().trim(),
-            aiTags:Array.isArray(r.tags)?r.tags.filter(Boolean).map(t=>t.toString().trim()).slice(0,8):[],
-            aiKeyPeople:Array.isArray(r.keyPeople)?r.keyPeople.filter(Boolean).map(t=>t.toString().trim()).slice(0,10):[],
-            aiKeyDates:Array.isArray(r.keyDates)?r.keyDates.filter(Boolean).map(t=>t.toString().trim()).slice(0,10):[],
-            aiError:firebase.firestore.FieldValue.delete(),
+    const raw=await callClaude(base64,mime,prompt,2048);
+    if(!raw)throw new Error('No AI response');
+    const jsonMatch=raw.match(/\{[\s\S]*\}/);
+    if(!jsonMatch)throw new Error('Could not parse AI response');
+    const r=JSON.parse(jsonMatch[0]);
+    const update={
+        aiStatus:'scanned',
+        aiScannedAt:new Date().toISOString(),
+        aiTitle:(r.title||'').toString().trim(),
+        aiDescription:(r.description||'').toString().trim(),
+        aiDocType:(r.docType||'').toString().trim(),
+        aiTags:Array.isArray(r.tags)?r.tags.filter(Boolean).map(t=>t.toString().trim()).slice(0,8):[],
+        aiKeyPeople:Array.isArray(r.keyPeople)?r.keyPeople.filter(Boolean).map(t=>t.toString().trim()).slice(0,10):[],
+        aiKeyDates:Array.isArray(r.keyDates)?r.keyDates.filter(Boolean).map(t=>t.toString().trim()).slice(0,10):[],
+        aiError:firebase.firestore.FieldValue.delete(),
+    };
+    if(r.taxData&&typeof r.taxData==='object'&&r.taxData.isTaxDocument){
+        const td=r.taxData;
+        const cleanNum=v=>{if(v===null||v===undefined||v==='')return null;const n=Number(v);return isNaN(n)?null:n;};
+        const fields=td.fields||{};
+        update.taxData={
+            isTaxDocument:true,
+            isReturn:!!td.isReturn,
+            taxYear:cleanNum(td.taxYear),
+            jurisdiction:(td.jurisdiction||'').toString().toLowerCase(),
+            stateCode:(td.stateCode||'').toString().toUpperCase(),
+            formType:(td.formType||'').toString(),
+            filingStatus:(td.filingStatus||'').toString(),
+            taxpayerName:(td.taxpayerName||'').toString(),
+            fields:{
+                wages:cleanNum(fields.wages),
+                interestIncome:cleanNum(fields.interestIncome),
+                dividendIncome:cleanNum(fields.dividendIncome),
+                capitalGains:cleanNum(fields.capitalGains),
+                iraDistributions:cleanNum(fields.iraDistributions),
+                socialSecurity:cleanNum(fields.socialSecurity),
+                otherIncome:cleanNum(fields.otherIncome),
+                totalIncome:cleanNum(fields.totalIncome),
+                agi:cleanNum(fields.agi),
+                deduction:cleanNum(fields.deduction),
+                deductionType:(fields.deductionType||'').toString(),
+                taxableIncome:cleanNum(fields.taxableIncome),
+                totalTax:cleanNum(fields.totalTax),
+                withholding:cleanNum(fields.withholding),
+                estimatedPayments:cleanNum(fields.estimatedPayments),
+                credits:cleanNum(fields.credits),
+                totalPayments:cleanNum(fields.totalPayments),
+                refund:cleanNum(fields.refund),
+                owed:cleanNum(fields.owed),
+                dependents:cleanNum(fields.dependents),
+            },
         };
-        if(r.taxData&&typeof r.taxData==='object'&&r.taxData.isTaxDocument){
-            const td=r.taxData;
-            const cleanNum=v=>{if(v===null||v===undefined||v==='')return null;const n=Number(v);return isNaN(n)?null:n;};
-            const fields=td.fields||{};
-            update.taxData={
-                isTaxDocument:true,
-                isReturn:!!td.isReturn,
-                taxYear:cleanNum(td.taxYear),
-                jurisdiction:(td.jurisdiction||'').toString().toLowerCase(),
-                stateCode:(td.stateCode||'').toString().toUpperCase(),
-                formType:(td.formType||'').toString(),
-                filingStatus:(td.filingStatus||'').toString(),
-                taxpayerName:(td.taxpayerName||'').toString(),
-                fields:{
-                    wages:cleanNum(fields.wages),
-                    interestIncome:cleanNum(fields.interestIncome),
-                    dividendIncome:cleanNum(fields.dividendIncome),
-                    capitalGains:cleanNum(fields.capitalGains),
-                    iraDistributions:cleanNum(fields.iraDistributions),
-                    socialSecurity:cleanNum(fields.socialSecurity),
-                    otherIncome:cleanNum(fields.otherIncome),
-                    totalIncome:cleanNum(fields.totalIncome),
-                    agi:cleanNum(fields.agi),
-                    deduction:cleanNum(fields.deduction),
-                    deductionType:(fields.deductionType||'').toString(),
-                    taxableIncome:cleanNum(fields.taxableIncome),
-                    totalTax:cleanNum(fields.totalTax),
-                    withholding:cleanNum(fields.withholding),
-                    estimatedPayments:cleanNum(fields.estimatedPayments),
-                    credits:cleanNum(fields.credits),
-                    totalPayments:cleanNum(fields.totalPayments),
-                    refund:cleanNum(fields.refund),
-                    owed:cleanNum(fields.owed),
-                    dependents:cleanNum(fields.dependents),
-                },
-            };
-        }else{
-            update.taxData=firebase.firestore.FieldValue.delete();
+    }else{
+        update.taxData=firebase.firestore.FieldValue.delete();
+    }
+    const defaultTitle=(d.fileName||'').replace(/\.[^.]+$/,'');
+    if(update.aiTitle&&(!d.title||d.title===defaultTitle))update.title=update.aiTitle;
+    if(update.aiDescription&&!d.description)update.description=update.aiDescription;
+    await db.collection('estate_tea_party').doc(docId).update(update);
+}
+
+async function scanTeaPartyDoc(docId,providedBlob=null){
+    const d=teaPartyDocs.find(x=>x._docId===docId);
+    if(!d)return;
+    if(!apiKey){toast('Set your API key in Settings first.','error');return;}
+    const isPdf=(d.fileMimeType==='application/pdf')||(d.fileName||'').toLowerCase().endsWith('.pdf');
+    const isImage=(d.fileMimeType||'').startsWith('image/');
+    if(!isPdf&&!isImage){toast('AI scan supports PDFs and images only.','error');return;}
+    try{await db.collection('estate_tea_party').doc(docId).update({aiStatus:'scanning',aiError:firebase.firestore.FieldValue.delete()});}catch(e){}
+    try{
+        let blob=providedBlob;
+        if(!blob)blob=await fetchBlobForTeaDoc(d);
+        if(!blob){
+            const accept=isPdf?'application/pdf':'image/*';
+            const picked=await pickFilesFromDisk(false,accept,`Select "${d.fileName}" from your computer to scan (Storage CORS blocks direct fetch).`);
+            if(picked.length)blob=picked[0];
         }
-        const defaultTitle=(d.fileName||'').replace(/\.[^.]+$/,'');
-        if(update.aiTitle&&(!d.title||d.title===defaultTitle))update.title=update.aiTitle;
-        if(update.aiDescription&&!d.description)update.description=update.aiDescription;
-        await db.collection('estate_tea_party').doc(docId).update(update);
+        if(!blob){
+            try{await db.collection('estate_tea_party').doc(docId).update({aiStatus:firebase.firestore.FieldValue.delete(),aiError:firebase.firestore.FieldValue.delete()});}catch(e){}
+            return;
+        }
+        await scanTeaDocFromBlob(docId,d,blob);
         toast(`Scanned ${d.fileName||'file'}.`,'success');
     }catch(err){
         try{await db.collection('estate_tea_party').doc(docId).update({aiStatus:'error',aiError:err.message||'Scan failed'});}catch(e){}
@@ -1077,15 +1125,56 @@ async function scanAllTeaPartyDocs(){
         return (isPdf||isImage)&&(!d.aiStatus||d.aiStatus==='error');
     });
     if(!pending.length){toast('Nothing to scan.','info');return;}
+    if(!apiKey){toast('Set your API key in Settings first.','error');return;}
     const status=document.getElementById('tea-scan-status');
+    if(status)status.textContent=`Checking access to ${pending.length} file${pending.length===1?'':'s'}…`;
+    const testBlob=await fetchBlobForTeaDoc(pending[0]);
     let done=0;
-    for(const d of pending){
-        if(status)status.textContent=`Scanning ${done+1}/${pending.length}…`;
-        await scanTeaPartyDoc(d._docId);
+    if(testBlob){
+        if(status)status.textContent=`Scanning 1/${pending.length}…`;
+        try{
+            await db.collection('estate_tea_party').doc(pending[0]._docId).update({aiStatus:'scanning',aiError:firebase.firestore.FieldValue.delete()});
+            await scanTeaDocFromBlob(pending[0]._docId,pending[0],testBlob);
+            toast(`Scanned ${pending[0].fileName||'file'}.`,'success');
+        }catch(err){
+            try{await db.collection('estate_tea_party').doc(pending[0]._docId).update({aiStatus:'error',aiError:err.message||'Scan failed'});}catch(e){}
+            toast('Scan failed: '+(err.message||err),'error');
+        }
         done++;
+        for(let i=1;i<pending.length;i++){
+            if(status)status.textContent=`Scanning ${done+1}/${pending.length}…`;
+            await scanTeaPartyDoc(pending[i]._docId);
+            done++;
+        }
+    }else{
+        if(status)status.textContent=`Storage fetch blocked. Pick ${pending.length} file${pending.length===1?'':'s'}…`;
+        const picked=await pickFilesFromDisk(true,'image/*,application/pdf',`Storage CORS blocks direct scan. Select the ${pending.length} file${pending.length===1?'':'s'} you want to scan — filenames are matched automatically.`);
+        if(!picked.length){
+            toast('Scan cancelled.','info');
+            if(status)status.textContent='';
+            return;
+        }
+        const byName={};
+        picked.forEach(f=>{byName[f.name.toLowerCase()]=f;});
+        const matches=[],missing=[];
+        pending.forEach(d=>{
+            const f=byName[(d.fileName||'').toLowerCase()];
+            if(f)matches.push({d,f});else missing.push(d);
+        });
+        if(!matches.length){
+            toast('None of the selected files matched. Pick the exact files from your library.','error');
+            if(status)status.textContent='';
+            return;
+        }
+        if(missing.length)toast(`Matched ${matches.length} · ${missing.length} unmatched (filename mismatch).`,'info');
+        for(const{d,f}of matches){
+            if(status)status.textContent=`Scanning ${done+1}/${matches.length}…`;
+            await scanTeaPartyDoc(d._docId,f);
+            done++;
+        }
     }
     if(status)status.textContent=`Done. Scanned ${done}.`;
-    setTimeout(()=>{if(status)status.textContent='';},5000);
+    setTimeout(()=>{if(status)status.textContent='';},6000);
 }
 async function editTeaPartyDoc(docId){
     const d=teaPartyDocs.find(x=>x._docId===docId);if(!d)return;

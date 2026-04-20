@@ -4,9 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Farmboss Tea Party</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs" type="module"></script>
+    <script type="module">
+        import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs';
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs';
+        window.pdfjsLib = pdfjsLib;
+    </script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
     <style>
         *{box-sizing:border-box;margin:0;padding:0;}
         :root{
@@ -128,6 +135,36 @@
         .history-item-meta{font-size:0.78rem;color:var(--text-secondary);margin-top:2px;}
         .history-item.current{border-left:3px solid var(--accent);}
         .history-item-actions{display:flex;gap:6px;flex-shrink:0;}
+        .toolbar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;}
+        .toolbar input[type="text"]{flex:1;min-width:200px;padding:8px 12px;border:1px solid var(--border);border-radius:5px;font-size:0.87rem;font-family:inherit;background:var(--bg-secondary);color:var(--text-primary);}
+        .toolbar input:focus{outline:none;border-color:var(--accent);}
+        .toolbar select{padding:8px 12px;border:1px solid var(--border);border-radius:5px;font-size:0.87rem;font-family:inherit;background:var(--bg-secondary);color:var(--text-primary);cursor:pointer;}
+        .bulk-drop-zone{border:2px dashed var(--border);border-radius:10px;padding:48px 20px;text-align:center;cursor:pointer;transition:all 0.2s;background:var(--bg-card);margin-bottom:20px;}
+        .bulk-drop-zone:hover,.bulk-drop-zone.dragover{border-color:var(--accent);background:var(--accent-dim);}
+        .bulk-drop-icon{font-size:3rem;margin-bottom:8px;}
+        .bulk-drop-title{font-size:1.15rem;font-weight:700;color:var(--text-primary);margin-bottom:4px;font-family:'Georgia',serif;}
+        .bulk-drop-sub{font-size:0.85rem;color:var(--text-secondary);font-style:italic;}
+        .bulk-actions{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;}
+        .bulk-progress-bar{width:100%;height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-bottom:12px;}
+        .bulk-progress-fill{height:100%;background:var(--accent);transition:width 0.3s;}
+        .bulk-queue{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;margin-top:20px;}
+        .bulk-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;overflow:hidden;position:relative;transition:box-shadow 0.15s;}
+        .bulk-card.done{border-color:var(--success);}
+        .bulk-card.error{border-color:var(--danger);}
+        .bulk-card-img{width:100%;height:140px;object-fit:cover;display:block;background:var(--bg-card);cursor:pointer;}
+        .bulk-card-img-placeholder{width:100%;height:140px;display:flex;align-items:center;justify-content:center;font-size:3rem;background:var(--bg-card);}
+        .bulk-card-body{padding:12px 14px;}
+        .bulk-card-status{font-size:0.78rem;font-weight:700;padding:3px 10px;border-radius:20px;display:inline-block;margin-bottom:8px;}
+        .status-pending{background:rgba(100,100,100,0.15);color:var(--text-secondary);}
+        .status-scanning{background:rgba(37,99,235,0.15);color:var(--info);}
+        .status-ready{background:rgba(22,163,74,0.15);color:var(--success);}
+        .status-saved{background:rgba(22,163,74,0.25);color:var(--success);}
+        .status-error{background:rgba(220,38,38,0.15);color:var(--danger);}
+        .bulk-card-field{font-size:0.82rem;margin-bottom:6px;}
+        .bulk-card-field strong{display:block;font-size:0.72rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:2px;}
+        .bulk-card-field input,.bulk-card-field select,.bulk-card-field textarea{width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:4px;font-size:0.82rem;font-family:inherit;background:var(--bg-secondary);color:var(--text-primary);}
+        .bulk-card-remove{position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.5);color:#fff;border:none;width:24px;height:24px;border-radius:50%;cursor:pointer;font-size:0.8rem;line-height:1;z-index:2;}
+        .bulk-card-remove:hover{background:var(--danger);}
         @media(max-width:700px){
             header{padding:6px 12px;gap:10px;}
             .logo-area{flex:1;}
@@ -192,6 +229,8 @@
     </div>
     <nav>
         <button class="active" onclick="showView('years')">📊 Tax Years</button>
+        <button onclick="showView('upload')">📥 Upload Documents</button>
+        <button onclick="showView('documents')">📚 Documents</button>
         <button onclick="showView('settings')">⚙ Settings</button>
     </nav>
     <div class="header-right">
@@ -263,11 +302,85 @@
     </div>
 </div>
 
+<!-- UPLOAD -->
+<div id="view-upload" class="view">
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">📥 Upload Tax Documents</div></div>
+        <p style="font-size:0.9rem;color:var(--text-secondary);margin-bottom:16px;font-style:italic;">Drop 1040s, W-2s, 1099s, K-1s, Schedules, state returns, or other tax paperwork. AI will identify the doc type, tax year, and key figures.</p>
+        <div class="bulk-drop-zone" id="bulk-drop-zone" onclick="document.getElementById('bulk-file-input').click()"
+            ondragover="event.preventDefault();this.classList.add('dragover')"
+            ondragleave="this.classList.remove('dragover')"
+            ondrop="event.preventDefault();this.classList.remove('dragover');handleBulkFiles(event.dataTransfer.files)">
+            <div class="bulk-drop-icon">🫖</div>
+            <div class="bulk-drop-title">Drop tax documents here</div>
+            <div class="bulk-drop-sub">or click to select (PDF, JPG, PNG)</div>
+            <input type="file" id="bulk-file-input" accept="image/*,application/pdf" multiple style="display:none" onchange="handleBulkFiles(this.files);this.value='';">
+        </div>
+        <div class="bulk-actions" id="bulk-actions" style="display:none;">
+            <button class="btn btn-primary" id="btn-bulk-scan" onclick="runBulkScan()">🤖 Analyze All with AI</button>
+            <button class="btn btn-ghost" onclick="clearBulkQueue()">Clear All</button>
+            <button class="btn btn-primary" id="btn-bulk-save-all" onclick="saveBulkAll()" style="display:none;">💾 Save All to Archive</button>
+            <span style="font-size:0.82rem;color:var(--text-secondary);" id="bulk-count-label"></span>
+        </div>
+        <div class="bulk-progress-bar" id="bulk-progress-bar" style="display:none;"><div class="bulk-progress-fill" id="bulk-progress-fill" style="width:0%"></div></div>
+        <div class="bulk-queue" id="bulk-queue"></div>
+    </div>
+</div>
+
+<!-- DOCUMENTS -->
+<div id="view-documents" class="view">
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">📚 Tax Document Archive</div><span style="font-size:0.85rem;color:var(--text-secondary)" id="docs-count">0 documents</span></div>
+        <div class="toolbar">
+            <input type="text" id="docs-search" placeholder="Search title, summary, parties, year..." oninput="renderDocuments()">
+            <select id="docs-filter-type" onchange="renderDocuments()"><option value="">All Doc Types</option></select>
+            <select id="docs-filter-year" onchange="renderDocuments()"><option value="">All Tax Years</option></select>
+        </div>
+        <div class="table-wrapper">
+            <table id="docs-table"><thead><tr>
+                <th>Title</th>
+                <th>Type</th>
+                <th>Tax Year</th>
+                <th>Summary</th>
+                <th>Parties</th>
+                <th>Actions</th>
+            </tr></thead><tbody id="docs-tbody"></tbody></table>
+        </div>
+        <div id="docs-empty" class="empty" style="display:none;"><div class="empty-icon">🫖</div><p>No tax documents yet. Use <strong>Upload Documents</strong> to get started.</p></div>
+    </div>
+</div>
+
+<!-- DOC EDIT MODAL -->
+<div class="modal-overlay" id="doc-modal" onclick="if(event.target===this)closeDocModal()">
+    <div class="modal">
+        <div class="modal-title" id="doc-modal-title">Edit Tax Document</div>
+        <div class="modal-sub">Review and update AI-extracted details.</div>
+        <input type="hidden" id="doc-edit-doc-id">
+        <div class="form-grid" style="grid-template-columns:1fr 1fr;">
+            <div class="form-group full-width"><label>Title *</label><input type="text" id="df-title" required></div>
+            <div class="form-group"><label>Doc Type</label><input type="text" id="df-doctype" placeholder="1040, W-2, 1099-INT, K-1, Schedule C…"></div>
+            <div class="form-group"><label>Tax Year</label><input type="number" id="df-taxyear" min="1900" max="2100"></div>
+            <div class="form-group"><label>Effective Date</label><input type="date" id="df-effective-date"></div>
+            <div class="form-group"><label>Expiration / Review Date</label><input type="date" id="df-expiration-date"></div>
+            <div class="form-group full-width"><label>Summary</label><textarea id="df-summary" rows="4"></textarea></div>
+            <div class="form-group full-width"><label>Parties (comma-separated)</label><input type="text" id="df-parties" placeholder="e.g. Jeffrey M. Stoebner, Acme Corp, IRS"></div>
+            <div class="form-group full-width"><label>Key Figures / Tags</label><input type="text" id="df-tags" placeholder="e.g. AGI 756317, withholding 205973, wages 450000"></div>
+            <div class="form-group full-width"><label>Notes</label><textarea id="df-notes" rows="2"></textarea></div>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-primary" onclick="saveDocEdit()">Save</button>
+            <button class="btn btn-ghost" onclick="closeDocModal()">Cancel</button>
+            <button class="btn btn-danger" id="df-delete-btn" onclick="deleteDocument()" style="display:none;">🗑 Delete</button>
+            <a id="df-doc-link" href="" target="_blank" class="btn btn-info" style="display:none;">📄 Open Document</a>
+        </div>
+    </div>
+</div>
+
 <!-- SETTINGS -->
 <div id="view-settings" class="view">
     <div class="card">
         <div class="card-title"><div class="card-title-left">🔑 Anthropic API Key</div></div>
-        <p style="font-size:0.88rem;color:var(--text-secondary);margin-bottom:16px;font-style:italic;">Required for the AI-generated tax history summary. Shared with the other Farmboss sites.</p>
+        <p style="font-size:0.88rem;color:var(--text-secondary);margin-bottom:16px;font-style:italic;">Required for AI document analysis and the tax history summary. Shared with the other Farmboss sites.</p>
         <div class="api-key-row">
             <div class="form-group" style="margin-bottom:0;"><label>API Key</label><input type="password" id="api-key-input" placeholder="sk-ant-api03-…"></div>
             <button class="btn btn-primary" onclick="saveApiKey()">Save Key</button>
@@ -324,13 +437,16 @@ firebase.initializeApp({
     messagingSenderId:"911514107783",
     appId:"1:911514107783:web:20e8a729fd66577c28dd22"
 });
-const auth=firebase.auth(),db=firebase.firestore();
+const auth=firebase.auth(),db=firebase.firestore(),storage=firebase.storage();
 
 // STATE
 let taxYears=[];
+let documents=[];
 let apiKey='',proxyUrl='',aiModel='claude-sonnet-4-5';
-let unsubTaxYears=null;
-const VIEWS=['years','settings'];
+let unsubTaxYears=null,unsubDocs=null;
+let docsSortField='taxYear',docsSortDir='desc';
+const VIEWS=['years','upload','documents','settings'];
+const TAX_CATEGORY='Tax Document';
 
 // UTILS
 function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):'';}
@@ -372,7 +488,8 @@ auth.onAuthStateChanged(user=>{
         document.getElementById('loading-screen').style.display='none';
         document.getElementById('app').style.display='none';
         if(unsubTaxYears){unsubTaxYears();unsubTaxYears=null;}
-        taxYears=[];
+        if(unsubDocs){unsubDocs();unsubDocs=null;}
+        taxYears=[];documents=[];
     }
 });
 document.getElementById('login-form').addEventListener('submit',async e=>{
@@ -401,6 +518,11 @@ async function initApp(){
             renderTaxYears();
         },err=>console.warn('tax years snap err',err));
 
+        unsubDocs=db.collection('estate_documents').where('category','==',TAX_CATEGORY).onSnapshot(snap=>{
+            documents=snap.docs.map(doc=>({_docId:doc.id,...doc.data()}));
+            renderDocuments();populateDocFilters();
+        },err=>console.warn('docs snap err',err));
+
         loadTaxSummaryHistory();
 
         document.getElementById('loading-screen').style.display='none';
@@ -415,6 +537,8 @@ function showView(v){
     VIEWS.forEach(id=>document.getElementById('view-'+id).classList.remove('active'));
     document.getElementById('view-'+v).classList.add('active');
     document.querySelectorAll('nav button').forEach((btn,i)=>btn.classList.toggle('active',VIEWS[i]===v));
+    if(v==='documents'){populateDocFilters();renderDocuments();}
+    if(v==='upload'){document.getElementById('bulk-actions').style.display=bulkQueue.length?'flex':'none';renderBulkQueue();}
     window.scrollTo(0,0);
 }
 
@@ -781,6 +905,395 @@ async function deleteTaxSummaryEntry(id){
         await loadTaxSummaryHistory();
         toast('Summary deleted.','success');
     }catch(err){toast('Delete failed: '+err.message,'error');}
+}
+
+// ─────────────────────────────────────────
+// DOCUMENTS
+// ─────────────────────────────────────────
+function fmtDate(d){if(!d)return '—';try{return new Date(d+'T00:00:00').toLocaleDateString();}catch(e){return d;}}
+
+function populateDocFilters(){
+    const typeSel=document.getElementById('docs-filter-type');
+    const yearSel=document.getElementById('docs-filter-year');
+    if(typeSel){
+        const cur=typeSel.value;
+        const types=[...new Set(documents.map(d=>d.docType).filter(Boolean))].sort();
+        typeSel.innerHTML='<option value="">All Doc Types</option>'+types.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('');
+        if(cur&&[...typeSel.options].some(o=>o.value===cur))typeSel.value=cur;
+    }
+    if(yearSel){
+        const cur=yearSel.value;
+        const years=[...new Set(documents.map(d=>d.taxYear).filter(Boolean))].sort((a,b)=>b-a);
+        yearSel.innerHTML='<option value="">All Tax Years</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
+        if(cur&&[...yearSel.options].some(o=>o.value===cur))yearSel.value=cur;
+    }
+}
+
+function renderDocuments(){
+    const tbody=document.getElementById('docs-tbody');
+    const empty=document.getElementById('docs-empty');
+    const countEl=document.getElementById('docs-count');
+    if(!tbody)return;
+    const search=(document.getElementById('docs-search')?.value||'').toLowerCase().trim();
+    const filterType=document.getElementById('docs-filter-type')?.value||'';
+    const filterYear=document.getElementById('docs-filter-year')?.value||'';
+    let list=[...documents];
+    if(filterType)list=list.filter(d=>d.docType===filterType);
+    if(filterYear)list=list.filter(d=>String(d.taxYear)===filterYear);
+    if(search){
+        list=list.filter(d=>{
+            const hay=[d.title,d.summary,(d.parties||[]).join(' '),d.docType,d.taxYear,d.tags,d.notes].filter(Boolean).join(' ').toLowerCase();
+            return hay.includes(search);
+        });
+    }
+    list.sort((a,b)=>{
+        const av=a[docsSortField], bv=b[docsSortField];
+        const ax=av===undefined||av===null||av===''?'':av;
+        const bx=bv===undefined||bv===null||bv===''?'':bv;
+        if(ax<bx)return docsSortDir==='asc'?-1:1;
+        if(ax>bx)return docsSortDir==='asc'?1:-1;
+        return 0;
+    });
+    if(countEl)countEl.textContent=`${list.length} of ${documents.length} document${documents.length!==1?'s':''}`;
+    if(!list.length){tbody.innerHTML='';if(empty)empty.style.display='block';return;}
+    if(empty)empty.style.display='none';
+    tbody.innerHTML=list.map(d=>{
+        const openBtn=d.docUrl?`<a href="${esc(d.docUrl)}" target="_blank" class="btn-icon" title="Open">📄</a>`:'';
+        return `<tr>
+            <td style="cursor:pointer;" onclick="editDocument('${d._docId}')"><strong>${esc(d.title)||'Untitled'}</strong></td>
+            <td>${d.docType?`<span class="badge badge-tax">${esc(d.docType)}</span>`:'—'}</td>
+            <td style="font-weight:700;">${esc(String(d.taxYear||'—'))}</td>
+            <td style="font-size:0.82rem;color:var(--text-secondary);max-width:360px;">${esc(d.summary||'').slice(0,180)}${(d.summary||'').length>180?'…':''}</td>
+            <td style="font-size:0.82rem;">${esc((d.parties||[]).join(', '))||'—'}</td>
+            <td style="white-space:nowrap;">
+                ${openBtn}
+                <button class="btn-icon" onclick="editDocument('${d._docId}')">✎</button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function editDocument(docId){
+    const d=documents.find(x=>x._docId===docId);
+    if(!d){toast('Document not found.','error');return;}
+    document.getElementById('doc-modal-title').textContent=`Edit: ${d.title||'Tax Document'}`;
+    document.getElementById('doc-edit-doc-id').value=docId;
+    document.getElementById('df-title').value=d.title||'';
+    document.getElementById('df-doctype').value=d.docType||'';
+    document.getElementById('df-taxyear').value=d.taxYear||'';
+    document.getElementById('df-effective-date').value=d.effectiveDate||'';
+    document.getElementById('df-expiration-date').value=d.expirationDate||'';
+    document.getElementById('df-summary').value=d.summary||'';
+    document.getElementById('df-parties').value=(d.parties||[]).join(', ');
+    document.getElementById('df-tags').value=d.tags||'';
+    document.getElementById('df-notes').value=d.notes||'';
+    const link=document.getElementById('df-doc-link');
+    if(d.docUrl){link.href=d.docUrl;link.style.display='inline-flex';}else{link.style.display='none';}
+    document.getElementById('df-delete-btn').style.display='inline-flex';
+    document.getElementById('doc-modal').classList.add('show');
+}
+
+function closeDocModal(){document.getElementById('doc-modal').classList.remove('show');}
+
+async function saveDocEdit(){
+    const docId=document.getElementById('doc-edit-doc-id').value;
+    if(!docId)return;
+    const title=document.getElementById('df-title').value.trim();
+    if(!title){toast('Title is required.','error');return;}
+    const data={
+        title,
+        docType:document.getElementById('df-doctype').value.trim(),
+        taxYear:parseInt(document.getElementById('df-taxyear').value)||null,
+        effectiveDate:document.getElementById('df-effective-date').value||'',
+        expirationDate:document.getElementById('df-expiration-date').value||'',
+        summary:document.getElementById('df-summary').value.trim(),
+        parties:document.getElementById('df-parties').value.split(',').map(s=>s.trim()).filter(Boolean),
+        tags:document.getElementById('df-tags').value.trim(),
+        notes:document.getElementById('df-notes').value.trim(),
+        category:TAX_CATEGORY,
+        updatedAt:new Date().toISOString()
+    };
+    try{
+        await db.collection('estate_documents').doc(docId).update(data);
+        closeDocModal();
+        toast('Document updated.','success');
+    }catch(err){toast('Save failed: '+err.message,'error');}
+}
+
+async function deleteDocument(){
+    const docId=document.getElementById('doc-edit-doc-id').value;
+    if(!docId)return;
+    const d=documents.find(x=>x._docId===docId);
+    if(!confirm(`Delete "${d?.title||'this document'}"? This cannot be undone.`))return;
+    try{
+        await db.collection('estate_documents').doc(docId).delete();
+        closeDocModal();
+        toast('Document deleted.','success');
+    }catch(err){toast('Delete failed: '+err.message,'error');}
+}
+
+// ─────────────────────────────────────────
+// BULK UPLOAD + AI SCAN
+// ─────────────────────────────────────────
+let bulkQueue=[];
+let bulkScanAbort=null;
+
+function handleBulkFiles(files){
+    const valid=Array.from(files).filter(f=>f.type.startsWith('image/')||f.type==='application/pdf');
+    if(!valid.length){toast('Please select images or PDFs.','error');return;}
+    valid.forEach(file=>{
+        bulkQueue.push({id:Date.now()+Math.random(),file,base64:null,mimeType:file.type==='application/pdf'?'application/pdf':'image/jpeg',status:'pending',result:null});
+    });
+    renderBulkQueue();
+    document.getElementById('bulk-actions').style.display='flex';
+    document.getElementById('btn-bulk-save-all').style.display='none';
+    updateBulkCountLabel();
+}
+function clearBulkQueue(){bulkQueue=[];document.getElementById('bulk-queue').innerHTML='';document.getElementById('bulk-actions').style.display='none';document.getElementById('bulk-count-label').textContent='';}
+function removeBulkItem(id){bulkQueue=bulkQueue.filter(q=>q.id!==id);renderBulkQueue();updateBulkCountLabel();if(!bulkQueue.length)document.getElementById('bulk-actions').style.display='none';}
+function updateBulkCountLabel(){
+    const total=bulkQueue.length,done=bulkQueue.filter(q=>q.status==='saved').length,ready=bulkQueue.filter(q=>q.status==='ready').length;
+    document.getElementById('bulk-count-label').textContent=total?`${total} file${total>1?'s':''} · ${done} saved · ${ready} ready`:'';
+}
+function cancelBulkScan(){if(bulkScanAbort){bulkScanAbort.abort();bulkScanAbort=null;toast('Cancelling scan…','warn');}}
+
+function renderBulkQueue(){
+    const grid=document.getElementById('bulk-queue');
+    if(!bulkQueue.length){grid.innerHTML='';return;}
+    grid.innerHTML=bulkQueue.map(q=>{
+        const isPdf=q.mimeType==='application/pdf';
+        const imgHtml=q.base64&&!isPdf?`<img class="bulk-card-img" src="data:image/jpeg;base64,${q.base64}" onclick="window.open(this.src,'_blank')">`:`<div class="bulk-card-img-placeholder">${isPdf?'📄':'🧾'}</div>`;
+        const statusClass={pending:'status-pending',scanning:'status-scanning',ready:'status-ready',saved:'status-saved',error:'status-error'}[q.status]||'status-pending';
+        const statusLabel={pending:'Pending',scanning:'Analyzing…',ready:'Ready',saved:'Saved ✓',error:'Error'}[q.status]||'Pending';
+        const r=q.result||{};
+        let details='';
+        if(q.status==='ready'||q.status==='saved'){
+            details=`
+                <div class="bulk-card-field"><strong>Title</strong><input type="text" value="${esc(r.title||'')}" oninput="bulkQueue.find(x=>x.id===${q.id}).result.title=this.value"></div>
+                <div class="bulk-card-field"><strong>Doc Type</strong><input type="text" value="${esc(r.docType||'')}" placeholder="1040, W-2, 1099…" oninput="bulkQueue.find(x=>x.id===${q.id}).result.docType=this.value"></div>
+                <div class="bulk-card-field"><strong>Tax Year</strong><input type="number" value="${esc(String(r.taxYear||''))}" oninput="bulkQueue.find(x=>x.id===${q.id}).result.taxYear=parseInt(this.value)||null"></div>
+                <div class="bulk-card-field"><strong>Summary</strong><textarea rows="3" oninput="bulkQueue.find(x=>x.id===${q.id}).result.summary=this.value">${esc(r.summary||'')}</textarea></div>
+                <div class="bulk-card-field"><strong>Parties</strong><input type="text" value="${esc((r.parties||[]).join(', '))}" oninput="bulkQueue.find(x=>x.id===${q.id}).result.parties=this.value.split(',').map(s=>s.trim()).filter(Boolean)"></div>
+                <div class="bulk-card-field"><strong>Key Figures / Tags</strong><input type="text" value="${esc(r.tags||'')}" oninput="bulkQueue.find(x=>x.id===${q.id}).result.tags=this.value"></div>`;
+        } else if(q.status==='error'){
+            details=`<div class="bulk-card-field" style="color:var(--danger);">${esc(q.error||'AI extraction failed')}</div>`;
+        }
+        const saveBtn=q.status==='ready'?`<button class="btn btn-primary btn-sm" style="margin-top:8px;width:100%;" onclick="saveBulkItem(${q.id})">💾 Save to Archive</button>`:'';
+        return `<div class="bulk-card ${q.status}" id="bulk-card-${q.id}">
+            <button class="bulk-card-remove" onclick="removeBulkItem(${q.id})" title="Remove">✕</button>
+            ${imgHtml}
+            <div class="bulk-card-body">
+                <span class="bulk-card-status ${statusClass}">${statusLabel}</span>
+                ${details}
+                ${saveBtn}
+            </div></div>`;
+    }).join('');
+}
+
+async function compressImage(file,maxW=1600,quality=0.82){
+    return new Promise(resolve=>{
+        const img=new Image();
+        img.onload=()=>{
+            let w=img.width,h=img.height;
+            if(w>maxW){h=Math.round(h*maxW/w);w=maxW;}
+            const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
+            canvas.getContext('2d').drawImage(img,0,0,w,h);
+            resolve(canvas.toDataURL('image/jpeg',quality));
+        };
+        img.onerror=()=>resolve(null);
+        const fr=new FileReader();fr.onload=e=>{img.src=e.target.result;};fr.readAsDataURL(file);
+    });
+}
+
+async function extractPdfText(file){
+    if(!window.pdfjsLib)return null;
+    try{
+        const buf=await file.arrayBuffer();
+        const pdf=await window.pdfjsLib.getDocument({data:buf}).promise;
+        let text='';
+        const max=Math.min(pdf.numPages,40);
+        for(let i=1;i<=max;i++){
+            const page=await pdf.getPage(i);
+            const content=await page.getTextContent();
+            text+=content.items.map(it=>it.str).join(' ')+'\n\n';
+        }
+        return {text:text.trim(),pageCount:pdf.numPages};
+    }catch(err){console.warn('PDF extract failed:',err);return null;}
+}
+
+async function callClaudeVision(base64,mimeType,prompt,maxTokens=2048,timeoutMs=90000,abortSignal){
+    if(!apiKey)throw new Error('API key not set');
+    const msgPayload={
+        model:aiModel,max_tokens:maxTokens,
+        messages:[{role:'user',content:[
+            {type:mimeType==='application/pdf'?'document':'image',source:{type:'base64',media_type:mimeType,data:base64}},
+            {type:'text',text:prompt}
+        ]}]
+    };
+    const ctrl=new AbortController();
+    const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
+    if(abortSignal)abortSignal.addEventListener('abort',()=>ctrl.abort());
+    let res;
+    try{
+        if(proxyUrl){res=await fetch(proxyUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...msgPayload,apiKey}),signal:ctrl.signal});}
+        else{res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',mode:'cors',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true'},body:JSON.stringify(msgPayload),signal:ctrl.signal});}
+    }catch(networkErr){clearTimeout(timer);if(networkErr.name==='AbortError')throw new Error('Cancelled');throw new Error('Network error — set up a Proxy URL.');}
+    clearTimeout(timer);
+    if(!res.ok){
+        let e=`API error ${res.status}`;
+        try{const d=await res.json();e=d.error?.message||e;}catch(x){}
+        if(res.status===429){const err=new Error(e);err.isRateLimit=true;err.retryAfter=parseInt(res.headers.get('retry-after'))||60;throw err;}
+        throw new Error(e);
+    }
+    const data=await res.json();return data.content[0].text;
+}
+
+const TAX_SCAN_PROMPT=`You are a tax-document analyzer. Examine this document and extract structured metadata. Return ONLY a valid JSON object with these exact keys:
+- title: concise descriptive name (e.g., "2024 Form 1040 — Stoebner", "2023 W-2 from Acme Corp", "2022 Schedule C — Farm Income")
+- docType: short code for the form (e.g., "1040", "1040-X", "W-2", "1099-INT", "1099-DIV", "1099-MISC", "K-1", "Schedule A", "Schedule B", "Schedule C", "Schedule D", "Schedule E", "State Return", "Property Tax", "Other")
+- taxYear: integer tax year (e.g., 2024). Empty if unknown.
+- summary: 3-5 sentence plain-English summary of what this document says — who filed it, for which year, and the headline numbers.
+- parties: array of names/entities named on the doc (taxpayer, spouse, employer, payer, preparer, bank, etc.)
+- effectiveDate: YYYY-MM-DD of the document date or signature date (empty if unknown)
+- tags: free-form string of notable figures — e.g. "AGI 756317, withholding 205973, wages 450000, refund 15221". Include concrete dollar amounts when visible.
+Use empty string/array if not found.`;
+
+async function scanOneItem(q,abortSignal){
+    q.status='scanning';renderBulkQueue();updateBulkCountLabel();
+    const MAX_RETRIES=3;
+    if(!q.extractedText&&!q.triedTextExtract&&q.mimeType==='application/pdf'){
+        q.triedTextExtract=true;
+        const r=await extractPdfText(q.file);
+        if(r&&r.text&&r.text.length>300){
+            const maxChars=20000;
+            q.extractedText=r.text.length>maxChars?r.text.slice(0,maxChars)+'\n[...truncated...]':r.text;
+            q.pageCount=r.pageCount;
+        }
+    }
+    for(let attempt=0;attempt<=MAX_RETRIES;attempt++){
+        try{
+            if(abortSignal?.aborted)throw new Error('Cancelled');
+            let raw;
+            if(q.extractedText){
+                const textPrompt=`${TAX_SCAN_PROMPT}\n\nText extracted from PDF (${q.pageCount||'?'} pages):\n\n${q.extractedText}`;
+                raw=await callClaudeText(textPrompt,2048,90000);
+            } else {
+                if(!q.base64){
+                    if(q.mimeType==='application/pdf'){q.base64=await new Promise(r=>{const fr=new FileReader();fr.onload=e=>r(e.target.result.split(',')[1]);fr.readAsDataURL(q.file);});}
+                    else{const dataUrl=await compressImage(q.file)||await new Promise(r=>{const fr=new FileReader();fr.onload=e=>r(e.target.result);fr.readAsDataURL(q.file);});q.base64=dataUrl.split(',')[1];}
+                }
+                raw=await callClaudeVision(q.base64,q.mimeType,TAX_SCAN_PROMPT,2048,90000,abortSignal);
+            }
+            const jsonMatch=raw&&raw.match(/\{[\s\S]*\}/);
+            if(!jsonMatch)throw new Error('Could not parse AI response');
+            q.result=JSON.parse(jsonMatch[0]);
+            if(!Array.isArray(q.result.parties))q.result.parties=[];
+            q.status='ready';
+            return;
+        }catch(err){
+            if(err.isRateLimit&&attempt<MAX_RETRIES&&!abortSignal?.aborted){
+                const waitSec=err.retryAfter||60;
+                q.error=`Rate-limited, waiting ${waitSec}s (retry ${attempt+1}/${MAX_RETRIES})…`;
+                renderBulkQueue();
+                for(let i=0;i<waitSec;i++){if(abortSignal?.aborted)throw new Error('Cancelled');await new Promise(r=>setTimeout(r,1000));}
+                q.error='';continue;
+            }
+            q.status='error';q.error=err.message;return;
+        }
+    }
+}
+
+async function runBulkScan(){
+    if(!apiKey){toast('Set API key in Settings first.','error');return;}
+    const pending=bulkQueue.filter(q=>q.status==='pending'||q.status==='error');
+    if(!pending.length){toast('Nothing to scan.','error');return;}
+    const btn=document.getElementById('btn-bulk-scan');
+    btn.disabled=true;btn.textContent='⏳ Analyzing… (click Cancel to stop)';
+    let cancelBtn=document.getElementById('btn-bulk-cancel');
+    if(!cancelBtn){cancelBtn=document.createElement('button');cancelBtn.id='btn-bulk-cancel';cancelBtn.className='btn btn-danger';cancelBtn.textContent='✕ Cancel';cancelBtn.onclick=cancelBulkScan;btn.parentNode.insertBefore(cancelBtn,btn.nextSibling);}else cancelBtn.style.display='';
+    const fill=document.getElementById('bulk-progress-fill');
+    document.getElementById('bulk-progress-bar').style.display='';
+    const statusLbl=document.getElementById('bulk-count-label');
+    bulkScanAbort=new AbortController();
+    const sig=bulkScanAbort.signal;
+    const CONCURRENCY=1;
+    let index=0,done=0;
+    const total=pending.length;
+    async function worker(){
+        while(true){
+            if(sig.aborted)return;
+            const i=index++;if(i>=pending.length)return;
+            await scanOneItem(pending[i],sig);
+            done++;
+            fill.style.width=Math.round(done/total*100)+'%';
+            if(statusLbl)statusLbl.textContent=`${done} / ${total} analyzed`;
+        }
+    }
+    await Promise.all(Array.from({length:Math.min(CONCURRENCY,pending.length)},()=>worker()));
+    renderBulkQueue();updateBulkCountLabel();
+    btn.disabled=false;btn.textContent='🤖 Analyze All with AI';
+    if(cancelBtn)cancelBtn.style.display='none';
+    document.getElementById('bulk-progress-bar').style.display='none';
+    bulkScanAbort=null;
+    const readyCount=bulkQueue.filter(q=>q.status==='ready').length;
+    const errCount=bulkQueue.filter(q=>q.status==='error').length;
+    if(readyCount)document.getElementById('btn-bulk-save-all').style.display='';
+    toast(`Analysis complete — ${readyCount} ready${errCount?', '+errCount+' errors':''}.`,errCount?'warn':'success');
+}
+
+async function uploadDocFile(file,label){
+    const ext=file.name?file.name.split('.').pop():(file.type==='application/pdf'?'pdf':'jpg');
+    const safe=(label||'doc').toLowerCase().replace(/[^a-z0-9]/g,'_').slice(0,40);
+    const path=`tax_docs/${Date.now()}_${safe}.${ext}`;
+    const ref=storage.ref().child(path);
+    await ref.put(file);return await ref.getDownloadURL();
+}
+
+async function saveBulkItem(id){
+    const q=bulkQueue.find(x=>x.id===id);if(!q||q.status!=='ready')return;
+    const card=document.getElementById(`bulk-card-${id}`);
+    const saveBtn=card?card.querySelector('.btn-primary'):null;
+    if(saveBtn){saveBtn.disabled=true;saveBtn.textContent='Saving…';}
+    try{
+        const r=q.result||{};
+        let docUrl='';
+        try{docUrl=await uploadDocFile(q.file,r.title||'tax_doc');}catch(ue){console.warn('File upload failed:',ue);}
+        const data={
+            title:r.title||q.file?.name||'Untitled Tax Document',
+            category:TAX_CATEGORY,
+            docType:r.docType||'',
+            taxYear:r.taxYear||null,
+            summary:r.summary||'',
+            parties:Array.isArray(r.parties)?r.parties:[],
+            effectiveDate:r.effectiveDate||'',
+            tags:r.tags||'',
+            notes:'',
+            docUrl,
+            addedAt:new Date().toISOString()
+        };
+        await db.collection('estate_documents').add(data);
+        q.status='saved';
+        renderBulkQueue();updateBulkCountLabel();
+        toast(`Saved: ${data.title}`,'success');
+    }catch(err){
+        toast('Save failed: '+err.message,'error');
+        if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='💾 Save to Archive';}
+    }
+}
+
+async function saveBulkAll(){
+    const ready=bulkQueue.filter(q=>q.status==='ready');
+    if(!ready.length){toast('Nothing ready to save.','error');return;}
+    if(!confirm(`Save ${ready.length} tax document${ready.length>1?'s':''} to the archive?`))return;
+    const btn=document.getElementById('btn-bulk-save-all');
+    btn.disabled=true;btn.textContent='⏳ Saving…';
+    let ok=0,fail=0;
+    for(const q of ready){
+        try{await saveBulkItem(q.id);ok++;}catch(e){fail++;}
+    }
+    btn.disabled=false;btn.textContent='💾 Save All to Archive';
+    toast(`Saved ${ok}${fail?`, ${fail} failed`:''}.`,fail?'warn':'success');
+    if(!fail)btn.style.display='none';
 }
 </script>
 </body>

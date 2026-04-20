@@ -589,7 +589,7 @@
         <div class="form-grid" style="grid-template-columns:1fr 1fr;">
             <div class="form-group full-width"><label>Title *</label><input type="text" id="df-title" required></div>
             <div class="form-group"><label>Category</label><select id="df-category"></select></div>
-            <div class="form-group"><label>Type</label><select id="df-type"><option>Legal</option><option>Financial</option><option>Insurance</option><option>Property</option><option>Tax</option><option>Business</option><option>Other</option></select></div>
+            <div class="form-group"><label>Type</label><select id="df-type"><option>Legal</option><option>Financial</option><option>Insurance</option><option>Property</option><option>Business</option><option>Other</option></select></div>
             <div class="form-group"><label>Effective Date</label><input type="date" id="df-effective-date"></div>
             <div class="form-group"><label>Expiration / Review Date</label><input type="date" id="df-expiration-date"></div>
             <div class="form-group full-width"><label>Summary</label><textarea id="df-summary" rows="4"></textarea></div>
@@ -627,7 +627,9 @@ if(window.mermaid){mermaid.initialize({startOnLoad:false,theme:'default',securit
 
 // STATE
 let documents=[];
-const DEFAULT_CATEGORIES=['Will','Trust','Power of Attorney','Healthcare Directive','Life Insurance','Property/Deed','Beneficiary Designation','Financial Account','Retirement Account','Investment','Tax Document','Business Entity','Other'];
+const DEFAULT_CATEGORIES=['Will','Trust','Power of Attorney','Healthcare Directive','Life Insurance','Property/Deed','Beneficiary Designation','Financial Account','Retirement Account','Investment','Business Entity','Other'];
+// Tax documents are owned by the Tea Party site — exclude them from Estate Planning everywhere
+const EP_EXCLUDED_CATEGORY='Tax Document';
 let categories=[...DEFAULT_CATEGORIES];
 let nextId=1;
 let docsSortField='addedAt',docsSortDir='desc';
@@ -680,7 +682,7 @@ async function initApp(){
         const cfgDoc=await db.collection('estate_config').doc('data').get();
         if(cfgDoc.exists){
             const d=cfgDoc.data();
-            if(d.categories&&d.categories.length) categories=d.categories;
+            if(d.categories&&d.categories.length) categories=d.categories.filter(c=>c!==EP_EXCLUDED_CATEGORY);
             if(d.nextId) nextId=d.nextId;
         }
         const keyDoc=await db.collection('settings').doc('apikey').get();
@@ -691,7 +693,7 @@ async function initApp(){
         if(modelDoc.exists&&modelDoc.data().model) aiModel=modelDoc.data().model;
 
         unsubDocs=db.collection('estate_documents').onSnapshot(snap=>{
-            documents=snap.docs.map(doc=>({_docId:doc.id,...doc.data()}));
+            documents=snap.docs.map(doc=>({_docId:doc.id,...doc.data()})).filter(d=>d.category!==EP_EXCLUDED_CATEGORY);
             renderDashboard();renderDocuments();populateCategoryFilters();renderOverviewStats();
         },err=>console.warn('docs snap err',err));
 

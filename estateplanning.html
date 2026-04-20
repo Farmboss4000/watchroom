@@ -599,6 +599,10 @@ let docsSortField='addedAt',docsSortDir='desc';
 let apiKey='',proxyUrl='',aiModel='claude-sonnet-4-5';
 let unsubDocs=null;
 let teaPartyDocs=[],unsubTeaParty=null;
+const teaBlobCache=new Map();
+function teaCacheKey(name){return (name||'').toLowerCase();}
+function teaCacheStore(name,blob){if(name&&blob)teaBlobCache.set(teaCacheKey(name),blob);}
+function teaCacheGet(name){return teaBlobCache.get(teaCacheKey(name))||null;}
 const VIEWS=['dashboard','upload','documents','tea-party','relationships','flow','settings','recycle-bin'];
 
 // UTILS
@@ -734,6 +738,7 @@ async function handleTeaPartyFiles(files){
         document.getElementById('tea-tbody').prepend(row);
         try{
             const{url,path}=await uploadTeaPartyFile(file);
+            teaCacheStore(file.name,file);
             const docRef=await db.collection('estate_tea_party').add({
                 title:file.name.replace(/\.[^.]+$/,''),
                 description:'',
@@ -1114,11 +1119,14 @@ async function scanTeaPartyDoc(docId,providedBlob=null){
     try{await db.collection('estate_tea_party').doc(docId).update({aiStatus:'scanning',aiError:firebase.firestore.FieldValue.delete()});}catch(e){}
     try{
         let blob=providedBlob;
+        if(!blob)blob=teaCacheGet(d.fileName);
         if(!blob)blob=await fetchBlobForTeaDoc(d);
         if(!blob){
             const accept=isPdf?'application/pdf':'image/*';
             const picked=await pickFilesFromDisk(false,accept,`Select "${d.fileName}" from your computer to scan (Storage CORS blocks direct fetch).`);
-            if(picked.length)blob=picked[0];
+            if(picked.length){blob=picked[0];teaCacheStore(d.fileName,blob);}
+        }else if(!providedBlob){
+            teaCacheStore(d.fileName,blob);
         }
         if(!blob){
             try{await db.collection('estate_tea_party').doc(docId).update({aiStatus:firebase.firestore.FieldValue.delete(),aiError:firebase.firestore.FieldValue.delete()});}catch(e){}
@@ -1164,40 +1172,54 @@ async function scanAllTeaPartyDocs(){
     if(!pending.length){toast('Nothing to scan.','info');return;}
     if(!apiKey){toast('Set your API key in Settings first.','error');return;}
     const status=document.getElementById('tea-scan-status');
-    if(status)status.textContent=`Checking access to ${pending.length} file${pending.length===1?'':'s'}…`;
-    const testBlob=await fetchBlobForTeaDoc(pending[0]);
+    // Sort so cached blobs run first — they don't need pick/fetch
+    pending.sort((a,b)=>(teaCacheGet(b.fileName)?1:0)-(teaCacheGet(a.fileName)?1:0));
+    const cachedCount=pending.filter(d=>teaCacheGet(d.fileName)).length;
+    const uncachedPending=pending.filter(d=>!teaCacheGet(d.fileName));
     let done=0;
-    if(testBlob){
-        if(status)status.textContent=`Scanning 1/${pending.length}…`;
-        try{
-            await db.collection('estate_tea_party').doc(pending[0]._docId).update({aiStatus:'scanning',aiError:firebase.firestore.FieldValue.delete()});
-            await scanWithRateLimitRetry(()=>scanTeaDocFromBlob(pending[0]._docId,pending[0],testBlob),status,pending[0].fileName||'file');
-            toast(`Scanned ${pending[0].fileName||'file'}.`,'success');
-        }catch(err){
-            try{await db.collection('estate_tea_party').doc(pending[0]._docId).update({aiStatus:'error',aiError:err.message||'Scan failed'});}catch(e){}
-            toast('Scan failed: '+(err.message||err),'error');
+    // If all pending are cached, skip the CORS test and picker entirely
+    if(cachedCount===pending.length){
+        for(let i=0;i<pending.length;i++){
+            if(status)status.textContent=`Scanning ${done+1}/${pending.length} (cached)…`;
+            if(i>0)await new Promise(r=>setTimeout(r,4500));
+            await scanTeaPartyDoc(pending[i]._docId);
+            done++;
         }
-        done++;
-        for(let i=1;i<pending.length;i++){
+        if(status)status.textContent=`Done. Scanned ${done}.`;
+        setTimeout(()=>{if(status)status.textContent='';},6000);
+        return;
+    }
+    if(status)status.textContent=`Checking access to ${pending.length} file${pending.length===1?'':'s'}…`;
+    const firstUncached=uncachedPending[0]||pending[0];
+    const testBlob=await fetchBlobForTeaDoc(firstUncached);
+    if(testBlob){
+        // Cache the test blob so the sort-based ordering picks it up
+        teaCacheStore(firstUncached.fileName,testBlob);
+        for(let i=0;i<pending.length;i++){
             if(status)status.textContent=`Scanning ${done+1}/${pending.length}…`;
-            await new Promise(r=>setTimeout(r,4500));
+            if(i>0)await new Promise(r=>setTimeout(r,4500));
             await scanTeaPartyDoc(pending[i]._docId);
             done++;
         }
     }else{
-        if(status)status.textContent=`Storage fetch blocked. Pick ${pending.length} file${pending.length===1?'':'s'}…`;
-        const picked=await pickFilesFromDisk(true,'image/*,application/pdf',`Storage CORS blocks direct scan. Select the ${pending.length} file${pending.length===1?'':'s'} you want to scan — filenames are matched automatically.`);
+        const needPick=uncachedPending.length;
+        if(status)status.textContent=`Storage fetch blocked. Pick ${needPick} file${needPick===1?'':'s'}…`;
+        const picked=await pickFilesFromDisk(true,'image/*,application/pdf',`Storage CORS blocks direct scan. Select the ${needPick} file${needPick===1?'':'s'} you want to scan — filenames are matched automatically${cachedCount?` (${cachedCount} already cached from this session)`:''}.`);
         if(!picked.length){
             toast('Scan cancelled.','info');
             if(status)status.textContent='';
             return;
         }
         const byName={};
-        picked.forEach(f=>{byName[f.name.toLowerCase()]=f;});
+        picked.forEach(f=>{byName[f.name.toLowerCase()]=f;teaCacheStore(f.name,f);});
         const matches=[],missing=[];
         pending.forEach(d=>{
-            const f=byName[(d.fileName||'').toLowerCase()];
-            if(f)matches.push({d,f});else missing.push(d);
+            const cached=teaCacheGet(d.fileName);
+            if(cached)matches.push({d,f:cached});
+            else{
+                const f=byName[(d.fileName||'').toLowerCase()];
+                if(f)matches.push({d,f});else missing.push(d);
+            }
         });
         if(!matches.length){
             toast('None of the selected files matched. Pick the exact files from your library.','error');

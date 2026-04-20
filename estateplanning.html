@@ -466,6 +466,10 @@
         <div class="card-title"><div class="card-title-left">🎯 Effective Tax Rates</div></div>
         <div id="tea-tax-rates-content"></div>
     </div>
+    <div class="card" id="tea-tax-deductions-card" style="display:none;">
+        <div class="card-title"><div class="card-title-left">📉 Gross Deductions by Year</div></div>
+        <div id="tea-tax-deductions-content"></div>
+    </div>
     <div class="card">
         <div class="card-title">
             <div class="card-title-left">🫖 Tea Party</div>
@@ -969,23 +973,32 @@ function renderTeaTaxReport(){
     renderTeaTaxFedMn();
     renderTeaTaxRefunds();
     renderTeaTaxRates();
+    renderTeaTaxDeductions();
 }
 
 // ── Per-year federal vs Minnesota breakdown (ignores other states) ──
+function teaProcessFiling(byYear,doc,filing){
+    if(!filing||!filing.taxYear)return;
+    const y=filing.taxYear;
+    if(!byYear[y])byYear[y]={year:y,federal:null,minnesota:null,otherStates:[],docsFed:[],docsMn:[]};
+    if(filing.jurisdiction==='federal'){
+        if(filing.isReturn)byYear[y].federal=filing;
+        if(!byYear[y].docsFed.includes(doc))byYear[y].docsFed.push(doc);
+    }else if(filing.jurisdiction==='state'&&filing.stateCode==='MN'){
+        if(filing.isReturn)byYear[y].minnesota=filing;
+        if(!byYear[y].docsMn.includes(doc))byYear[y].docsMn.push(doc);
+    }else if(filing.jurisdiction==='state'){
+        byYear[y].otherStates.push(filing);
+    }
+}
 function teaTaxByYearBreakdown(){
     const byYear={};
     teaPartyDocs.forEach(d=>{
         const td=d.taxData;
-        if(!td?.isTaxDocument||!td.taxYear)return;
-        const y=td.taxYear;
-        if(!byYear[y])byYear[y]={year:y,federal:null,minnesota:null,otherStates:[],docsFed:[],docsMn:[]};
-        if(td.jurisdiction==='federal'&&td.isReturn){byYear[y].federal=td;byYear[y].docsFed.push(d);}
-        else if(td.jurisdiction==='federal'){byYear[y].docsFed.push(d);}
-        else if(td.jurisdiction==='state'&&td.stateCode==='MN'){
-            if(td.isReturn)byYear[y].minnesota=td;
-            byYear[y].docsMn.push(d);
-        }else if(td.jurisdiction==='state'){
-            byYear[y].otherStates.push(td);
+        if(!td?.isTaxDocument)return;
+        teaProcessFiling(byYear,d,td);
+        if(Array.isArray(td.additionalFilings)){
+            td.additionalFilings.forEach(af=>teaProcessFiling(byYear,d,af));
         }
     });
     return Object.values(byYear).sort((a,b)=>a.year-b.year);
@@ -1278,8 +1291,58 @@ function renderTeaTaxRates(){
         </table></div>`;
 }
 
+function renderTeaTaxDeductions(){
+    const card=document.getElementById('tea-tax-deductions-card');
+    const content=document.getElementById('tea-tax-deductions-content');
+    if(!card||!content)return;
+    const years=teaTaxByYearBreakdown().filter(y=>y.federal);
+    if(!years.length){card.style.display='none';return;}
+    const hasAny=years.some(y=>y.federal?.fields?.deduction!=null);
+    if(!hasAny){card.style.display='none';return;}
+    card.style.display='block';
+    const labels=years.map(y=>String(y.year));
+    const deductions=years.map(y=>y.federal?.fields?.deduction??null);
+    const agi=years.map(y=>y.federal?.fields?.agi??null);
+    const chart=teaBarChart([
+        {label:'Federal Deduction',color:'#0891b2',values:deductions},
+    ],labels);
+    const legend=teaChartLegend([
+        {label:'Standard',color:'#0891b2'},
+        {label:'Itemized',color:'#0e7490'},
+    ]);
+    let stdSum=0,itzSum=0,totalSum=0,stdCount=0,itzCount=0;
+    const rows=years.map(y=>{
+        const f=y.federal.fields||{};
+        const amt=f.deduction;
+        const type=(f.deductionType||'').toLowerCase();
+        const pct=(amt!=null&&f.agi&&f.agi>0)?(amt/f.agi*100):null;
+        if(amt!=null){
+            totalSum+=amt;
+            if(type==='itemized'){itzSum+=amt;itzCount++;}
+            else if(type==='standard'){stdSum+=amt;stdCount++;}
+        }
+        const typeBadge=type==='itemized'?'<span class="tea-tag" style="background:rgba(14,116,144,0.15);color:#0e7490;border-color:rgba(14,116,144,0.3);">Itemized</span>':type==='standard'?'<span class="tea-tag" style="background:rgba(8,145,178,0.15);color:#0891b2;border-color:rgba(8,145,178,0.3);">Standard</span>':'<span style="color:var(--text-secondary);font-size:0.78rem;">—</span>';
+        return `<tr>
+            <td><strong>${y.year}</strong></td>
+            <td class="num">${fmtMoney(f.agi)}</td>
+            <td class="num"><strong>${fmtMoney(amt)}</strong></td>
+            <td>${typeBadge}</td>
+            <td class="num">${pct!=null?pct.toFixed(1)+'%':'—'}</td>
+            <td class="num">${fmtMoney(f.taxableIncome)}</td>
+        </tr>`;
+    }).join('');
+    content.innerHTML=`${legend}${chart}
+        <div class="tea-chart-title">Deductions Detail</div>
+        <div class="table-wrapper"><table class="tea-mini-table">
+            <thead><tr><th>Year</th><th>Federal AGI</th><th>Deduction</th><th>Type</th><th>% of AGI</th><th>Taxable Income</th></tr></thead>
+            <tbody>${rows}</tbody>
+            <tfoot><tr><td>Totals</td><td class="num">—</td><td class="num">${fmtMoney(totalSum)}</td><td style="font-size:0.75rem;color:var(--text-secondary);">${stdCount} std · ${itzCount} itz</td><td class="num">—</td><td class="num">—</td></tr></tfoot>
+        </table></div>`;
+}
+
 function exportTeaTaxReportCSV(){
-    const years=teaTaxReturnsByYear();
+    // Use the fan-out breakdown so joint fed+state packets emit separate rows
+    const years=teaTaxByYearBreakdown();
     if(!years.length){toast('No tax returns to export.','error');return;}
     const headers=['Tax Year','Jurisdiction','State','Form','Filing Status','Taxpayer','Wages','Interest','Dividends','Capital Gains','Social Security','Total Income','AGI','Deduction','Deduction Type','Taxable Income','Total Tax','Withholding','Estimated Payments','Credits','Total Payments','Refund','Owed','Dependents','Source File'];
     const rows=[headers.join(',')];
@@ -1289,7 +1352,10 @@ function exportTeaTaxReportCSV(){
         return /[",\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;
     };
     years.forEach(y=>{
-        const all=[...y.federalReturns,...y.stateReturns,...y.supporting];
+        const all=[];
+        if(y.federal)all.push({doc:(y.docsFed[0]||{}),taxData:y.federal});
+        if(y.minnesota)all.push({doc:(y.docsMn[0]||{}),taxData:y.minnesota});
+        y.otherStates.forEach(t=>all.push({doc:{},taxData:t}));
         all.forEach(p=>{
             const t=p.taxData;const f=t.fields||{};
             rows.push([
@@ -1467,8 +1533,11 @@ taxData must have this exact shape when present:
     "refund": number or null (amount refunded, positive),
     "owed": number or null (amount owed, positive),
     "dependents": integer or null
-  }
+  },
+  "additionalFilings": [ ... optional array of other filings in the SAME PDF, each with the same shape (isReturn, taxYear, jurisdiction, stateCode, formType, filingStatus, taxpayerName, fields) — omit this array when there is only one filing ]
 }
+
+IMPORTANT: If one PDF contains BOTH a federal return AND a state return (e.g. a joint federal + state packet like Form 1040 bundled with Minnesota Form M1), set taxData to the federal filing and include the state filing as an entry inside taxData.additionalFilings. Similarly for multi-state packets — the primary filing goes in taxData and every other filing goes into additionalFilings. Use each jurisdiction's own numbers (MN tax, MN withholding, MN AGI from the MN return) — do not reuse federal numbers for the state entry.
 
 Use empty strings, empty arrays, and null for fields you cannot confidently extract. Do not invent values. Numbers must be raw numbers (not strings), with no commas or dollar signs.`;
     let raw;
@@ -1516,41 +1585,48 @@ Use empty strings, empty arrays, and null for fields you cannot confidently extr
         aiError:firebase.firestore.FieldValue.delete(),
     };
     if(r.taxData&&typeof r.taxData==='object'&&r.taxData.isTaxDocument){
-        const td=r.taxData;
         const cleanNum=v=>{if(v===null||v===undefined||v==='')return null;const n=Number(v);return isNaN(n)?null:n;};
-        const fields=td.fields||{};
-        update.taxData={
-            isTaxDocument:true,
-            isReturn:!!td.isReturn,
-            taxYear:cleanNum(td.taxYear),
-            jurisdiction:(td.jurisdiction||'').toString().toLowerCase(),
-            stateCode:(td.stateCode||'').toString().toUpperCase(),
-            formType:(td.formType||'').toString(),
-            filingStatus:(td.filingStatus||'').toString(),
-            taxpayerName:(td.taxpayerName||'').toString(),
-            fields:{
-                wages:cleanNum(fields.wages),
-                interestIncome:cleanNum(fields.interestIncome),
-                dividendIncome:cleanNum(fields.dividendIncome),
-                capitalGains:cleanNum(fields.capitalGains),
-                iraDistributions:cleanNum(fields.iraDistributions),
-                socialSecurity:cleanNum(fields.socialSecurity),
-                otherIncome:cleanNum(fields.otherIncome),
-                totalIncome:cleanNum(fields.totalIncome),
-                agi:cleanNum(fields.agi),
-                deduction:cleanNum(fields.deduction),
-                deductionType:(fields.deductionType||'').toString(),
-                taxableIncome:cleanNum(fields.taxableIncome),
-                totalTax:cleanNum(fields.totalTax),
-                withholding:cleanNum(fields.withholding),
-                estimatedPayments:cleanNum(fields.estimatedPayments),
-                credits:cleanNum(fields.credits),
-                totalPayments:cleanNum(fields.totalPayments),
-                refund:cleanNum(fields.refund),
-                owed:cleanNum(fields.owed),
-                dependents:cleanNum(fields.dependents),
-            },
+        const cleanFiling=(td)=>{
+            const fields=td.fields||{};
+            return{
+                isReturn:!!td.isReturn,
+                taxYear:cleanNum(td.taxYear),
+                jurisdiction:(td.jurisdiction||'').toString().toLowerCase(),
+                stateCode:(td.stateCode||'').toString().toUpperCase(),
+                formType:(td.formType||'').toString(),
+                filingStatus:(td.filingStatus||'').toString(),
+                taxpayerName:(td.taxpayerName||'').toString(),
+                fields:{
+                    wages:cleanNum(fields.wages),
+                    interestIncome:cleanNum(fields.interestIncome),
+                    dividendIncome:cleanNum(fields.dividendIncome),
+                    capitalGains:cleanNum(fields.capitalGains),
+                    iraDistributions:cleanNum(fields.iraDistributions),
+                    socialSecurity:cleanNum(fields.socialSecurity),
+                    otherIncome:cleanNum(fields.otherIncome),
+                    totalIncome:cleanNum(fields.totalIncome),
+                    agi:cleanNum(fields.agi),
+                    deduction:cleanNum(fields.deduction),
+                    deductionType:(fields.deductionType||'').toString(),
+                    taxableIncome:cleanNum(fields.taxableIncome),
+                    totalTax:cleanNum(fields.totalTax),
+                    withholding:cleanNum(fields.withholding),
+                    estimatedPayments:cleanNum(fields.estimatedPayments),
+                    credits:cleanNum(fields.credits),
+                    totalPayments:cleanNum(fields.totalPayments),
+                    refund:cleanNum(fields.refund),
+                    owed:cleanNum(fields.owed),
+                    dependents:cleanNum(fields.dependents),
+                },
+            };
         };
+        update.taxData={isTaxDocument:true,...cleanFiling(r.taxData)};
+        if(Array.isArray(r.taxData.additionalFilings)&&r.taxData.additionalFilings.length){
+            update.taxData.additionalFilings=r.taxData.additionalFilings
+                .filter(af=>af&&typeof af==='object')
+                .map(cleanFiling)
+                .slice(0,5);
+        }
     }else{
         update.taxData=firebase.firestore.FieldValue.delete();
     }

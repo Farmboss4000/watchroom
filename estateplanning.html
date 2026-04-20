@@ -259,6 +259,7 @@
         <button class="active" onclick="showView('dashboard')">Dashboard</button>
         <button onclick="showView('upload')">📥 Upload Documents</button>
         <button onclick="showView('documents')">📚 Documents</button>
+        <button onclick="showView('tea-party')">🫖 Tea Party</button>
         <button onclick="showView('relationships')">🔗 Relationships</button>
         <button onclick="showView('flow')">📊 Flow Diagram</button>
         <button onclick="showView('settings')">⚙ Settings</button>
@@ -403,6 +404,40 @@
     </div>
 </div>
 
+<!-- TEA PARTY -->
+<div id="view-tea-party" class="view">
+    <div class="card">
+        <div class="card-title">
+            <div class="card-title-left">🫖 Tea Party</div>
+            <span style="font-size:0.85rem;color:var(--text-secondary);" id="tea-count">0 files</span>
+        </div>
+        <p style="font-size:0.9rem;color:var(--text-secondary);margin-bottom:16px;font-style:italic;">A quiet document library for anything that belongs at the tea party. Drop files, add a title, come back later.</p>
+        <div class="bulk-drop-zone" id="tea-drop-zone" onclick="document.getElementById('tea-file-input').click()"
+            ondragover="event.preventDefault();this.classList.add('dragover')"
+            ondragleave="this.classList.remove('dragover')"
+            ondrop="event.preventDefault();this.classList.remove('dragover');handleTeaPartyFiles(event.dataTransfer.files)">
+            <div class="bulk-drop-icon">🫖</div>
+            <div class="bulk-drop-title">Drop files for the tea party</div>
+            <div class="bulk-drop-sub">or click to browse — any file type</div>
+            <input type="file" id="tea-file-input" multiple style="display:none;" onchange="handleTeaPartyFiles(this.files);this.value='';">
+        </div>
+        <div class="toolbar" style="margin-top:18px;">
+            <input type="text" id="tea-search" placeholder="Search title or description..." oninput="renderTeaParty()">
+        </div>
+        <div class="table-wrapper">
+            <table><thead><tr>
+                <th>Title</th>
+                <th>Description</th>
+                <th>File</th>
+                <th>Size</th>
+                <th>Uploaded</th>
+                <th class="no-sort">Actions</th>
+            </tr></thead><tbody id="tea-tbody"></tbody></table>
+        </div>
+        <div id="tea-empty" class="empty" style="display:none;"><div class="empty-icon">🫖</div><p>The tea party is empty. Drop a file above to get started.</p></div>
+    </div>
+</div>
+
 <!-- RELATIONSHIPS -->
 <div id="view-relationships" class="view">
     <div class="card">
@@ -529,7 +564,8 @@ let nextId=1;
 let docsSortField='addedAt',docsSortDir='desc';
 let apiKey='',proxyUrl='',aiModel='claude-sonnet-4-5';
 let unsubDocs=null;
-const VIEWS=['dashboard','upload','documents','relationships','flow','settings','recycle-bin'];
+let teaPartyDocs=[],unsubTeaParty=null;
+const VIEWS=['dashboard','upload','documents','tea-party','relationships','flow','settings','recycle-bin'];
 
 // UTILS
 function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):'';}
@@ -550,7 +586,8 @@ auth.onAuthStateChanged(user=>{
         document.getElementById('loading-screen').style.display='none';
         document.getElementById('app').style.display='none';
         if(unsubDocs){unsubDocs();unsubDocs=null;}
-        documents=[];
+        if(unsubTeaParty){unsubTeaParty();unsubTeaParty=null;}
+        documents=[];teaPartyDocs=[];
     }
 });
 document.getElementById('login-form').addEventListener('submit',async e=>{
@@ -585,6 +622,11 @@ async function initApp(){
             renderDashboard();renderDocuments();populateCategoryFilters();renderOverviewStats();
         },err=>console.warn('docs snap err',err));
 
+        unsubTeaParty=db.collection('estate_tea_party').onSnapshot(snap=>{
+            teaPartyDocs=snap.docs.map(doc=>({_docId:doc.id,...doc.data()}));
+            renderTeaParty();
+        },err=>console.warn('tea snap err',err));
+
         // Load overview history for Dashboard
         loadOverviewHistory();
 
@@ -604,6 +646,7 @@ function showView(v){
     if(v==='dashboard'){renderDashboard();renderOverviewStats();loadOverviewHistory();}
     if(v==='documents'){populateCategoryFilters();renderDocuments();}
     if(v==='upload'){document.getElementById('bulk-actions').style.display=bulkQueue.length?'flex':'none';renderBulkQueue();}
+    if(v==='tea-party')renderTeaParty();
     if(v==='recycle-bin')loadRecycleBin();
     if(v==='relationships')loadRelationshipsHistory();
     window.scrollTo(0,0);
@@ -636,6 +679,109 @@ async function dbAddDocument(data){
     await saveConfig();return{...item,_docId:docRef.id};
 }
 async function dbUpdateDocument(docId,data){await db.collection('estate_documents').doc(docId).update(data);}
+
+// TEA PARTY
+async function uploadTeaPartyFile(file){
+    const ext=file.name?file.name.split('.').pop():'bin';
+    const safe=(file.name||'file').toLowerCase().replace(/[^a-z0-9]/g,'_').slice(0,40);
+    const path=`estate_tea_party/${Date.now()}_${safe}`;
+    const ref=storage.ref().child(path);
+    await ref.put(file);
+    return{url:await ref.getDownloadURL(),path};
+}
+async function handleTeaPartyFiles(files){
+    const list=Array.from(files||[]);
+    if(!list.length)return;
+    for(const file of list){
+        const tempId='tea_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+        const row=document.createElement('tr');
+        row.id=tempId;
+        row.innerHTML=`<td colspan="6" style="padding:10px;color:var(--text-secondary);font-size:0.85rem;">⏳ Uploading ${esc(file.name)}…</td>`;
+        document.getElementById('tea-tbody').prepend(row);
+        try{
+            const{url,path}=await uploadTeaPartyFile(file);
+            await db.collection('estate_tea_party').add({
+                title:file.name.replace(/\.[^.]+$/,''),
+                description:'',
+                fileName:file.name,
+                fileUrl:url,
+                filePath:path,
+                fileMimeType:file.type||'',
+                fileSize:file.size||0,
+                uploadedAt:new Date().toISOString(),
+                addedAt:new Date().toISOString(),
+            });
+            toast(`Added ${file.name} to the tea party.`,'success');
+        }catch(err){
+            toast(`Upload failed: ${err.message}`,'error');
+        }
+        row.remove();
+    }
+}
+function teaPartyFormatSize(bytes){
+    if(!bytes||isNaN(bytes))return '—';
+    if(bytes<1024)return bytes+' B';
+    if(bytes<1024*1024)return (bytes/1024).toFixed(1)+' KB';
+    return (bytes/(1024*1024)).toFixed(1)+' MB';
+}
+function teaPartyFileIcon(mime,name){
+    const n=(name||'').toLowerCase();
+    if((mime||'').startsWith('image/'))return '🖼️';
+    if(mime==='application/pdf'||n.endsWith('.pdf'))return '📄';
+    if(n.match(/\.(xlsx?|csv|numbers)$/))return '📊';
+    if(n.match(/\.(docx?|pages|rtf|txt|md)$/))return '📝';
+    if(n.match(/\.(zip|tar|gz|rar|7z)$/))return '🗜️';
+    if(n.match(/\.(mp3|wav|m4a|aac|flac)$/))return '🎵';
+    if(n.match(/\.(mp4|mov|avi|mkv|webm)$/))return '🎬';
+    return '📎';
+}
+function renderTeaParty(){
+    const tbody=document.getElementById('tea-tbody');
+    const empty=document.getElementById('tea-empty');
+    const count=document.getElementById('tea-count');
+    if(!tbody||!empty)return;
+    const q=(document.getElementById('tea-search')?.value||'').toLowerCase();
+    const filtered=teaPartyDocs.filter(d=>!q||[d.title,d.description,d.fileName].some(v=>v?.toString().toLowerCase().includes(q)))
+        .sort((a,b)=>(b.uploadedAt||'').localeCompare(a.uploadedAt||''));
+    if(count)count.textContent=`${teaPartyDocs.length} file${teaPartyDocs.length===1?'':'s'}`;
+    if(!filtered.length){tbody.innerHTML='';empty.style.display='block';return;}
+    empty.style.display='none';
+    tbody.innerHTML=filtered.map(d=>{
+        const dt=d.uploadedAt?new Date(d.uploadedAt).toLocaleDateString():'—';
+        const icon=teaPartyFileIcon(d.fileMimeType,d.fileName);
+        return `<tr>
+            <td><strong>${esc(d.title)||'Untitled'}</strong></td>
+            <td style="max-width:280px;">${esc(d.description)||'<span style="color:var(--text-secondary);">—</span>'}</td>
+            <td style="white-space:nowrap;">${icon} <a href="${esc(d.fileUrl)}" target="_blank" rel="noopener" style="color:var(--accent);">${esc(d.fileName)||'file'}</a></td>
+            <td style="white-space:nowrap;">${teaPartyFormatSize(d.fileSize)}</td>
+            <td style="white-space:nowrap;">${dt}</td>
+            <td style="white-space:nowrap;">
+                <button class="btn btn-primary btn-sm" onclick="editTeaPartyDoc('${d._docId}')">✏️</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteTeaPartyDoc('${d._docId}')">✗</button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+async function editTeaPartyDoc(docId){
+    const d=teaPartyDocs.find(x=>x._docId===docId);if(!d)return;
+    const newTitle=prompt('Title:',d.title||'');
+    if(newTitle===null)return;
+    const newDesc=prompt('Description:',d.description||'');
+    if(newDesc===null)return;
+    try{
+        await db.collection('estate_tea_party').doc(docId).update({title:newTitle.trim(),description:newDesc.trim()});
+        toast('Updated.','success');
+    }catch(err){toast('Update failed: '+err.message,'error');}
+}
+async function deleteTeaPartyDoc(docId){
+    const d=teaPartyDocs.find(x=>x._docId===docId);if(!d)return;
+    if(!confirm(`Remove "${d.title||d.fileName||'this file'}" from the tea party?`))return;
+    try{
+        if(d.filePath){try{await storage.ref().child(d.filePath).delete();}catch(se){console.warn('storage delete failed',se);}}
+        await db.collection('estate_tea_party').doc(docId).delete();
+        toast('Removed.','success');
+    }catch(err){toast('Delete failed: '+err.message,'error');}
+}
 
 // DASHBOARD
 function renderDashboard(){

@@ -1110,11 +1110,34 @@ async function scanTeaPartyDoc(docId,providedBlob=null){
             try{await db.collection('estate_tea_party').doc(docId).update({aiStatus:firebase.firestore.FieldValue.delete(),aiError:firebase.firestore.FieldValue.delete()});}catch(e){}
             return;
         }
-        await scanTeaDocFromBlob(docId,d,blob);
+        await scanWithRateLimitRetry(()=>scanTeaDocFromBlob(docId,d,blob),document.getElementById('tea-scan-status'),d.fileName||'file');
         toast(`Scanned ${d.fileName||'file'}.`,'success');
     }catch(err){
         try{await db.collection('estate_tea_party').doc(docId).update({aiStatus:'error',aiError:err.message||'Scan failed'});}catch(e){}
         toast('Scan failed: '+(err.message||err),'error');
+    }
+}
+
+async function scanWithRateLimitRetry(fn,statusEl,fileLabel,maxAttempts=4){
+    let attempt=0;
+    while(true){
+        try{
+            return await fn();
+        }catch(err){
+            attempt++;
+            if(err.isRateLimit&&attempt<maxAttempts){
+                const baseWait=Math.min(Math.max(parseInt(err.retryAfter)||60,15),120);
+                const wait=baseWait+Math.floor(Math.random()*5);
+                const original=statusEl?statusEl.textContent:'';
+                for(let s=wait;s>0;s--){
+                    if(statusEl)statusEl.textContent=`Rate limited — waiting ${s}s before retrying ${fileLabel}…`;
+                    await new Promise(r=>setTimeout(r,1000));
+                }
+                if(statusEl)statusEl.textContent=original;
+                continue;
+            }
+            throw err;
+        }
     }
 }
 
@@ -1134,7 +1157,7 @@ async function scanAllTeaPartyDocs(){
         if(status)status.textContent=`Scanning 1/${pending.length}…`;
         try{
             await db.collection('estate_tea_party').doc(pending[0]._docId).update({aiStatus:'scanning',aiError:firebase.firestore.FieldValue.delete()});
-            await scanTeaDocFromBlob(pending[0]._docId,pending[0],testBlob);
+            await scanWithRateLimitRetry(()=>scanTeaDocFromBlob(pending[0]._docId,pending[0],testBlob),status,pending[0].fileName||'file');
             toast(`Scanned ${pending[0].fileName||'file'}.`,'success');
         }catch(err){
             try{await db.collection('estate_tea_party').doc(pending[0]._docId).update({aiStatus:'error',aiError:err.message||'Scan failed'});}catch(e){}
@@ -1143,6 +1166,7 @@ async function scanAllTeaPartyDocs(){
         done++;
         for(let i=1;i<pending.length;i++){
             if(status)status.textContent=`Scanning ${done+1}/${pending.length}…`;
+            await new Promise(r=>setTimeout(r,1500));
             await scanTeaPartyDoc(pending[i]._docId);
             done++;
         }
@@ -1169,6 +1193,7 @@ async function scanAllTeaPartyDocs(){
         if(missing.length)toast(`Matched ${matches.length} · ${missing.length} unmatched (filename mismatch).`,'info');
         for(const{d,f}of matches){
             if(status)status.textContent=`Scanning ${done+1}/${matches.length}…`;
+            if(done>0)await new Promise(r=>setTimeout(r,1500));
             await scanTeaPartyDoc(d._docId,f);
             done++;
         }

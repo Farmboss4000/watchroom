@@ -836,24 +836,24 @@ function renderTeaParty(){
     const unscanned=teaPartyDocs.filter(d=>{
         const isPdf=(d.fileMimeType==='application/pdf')||(d.fileName||'').toLowerCase().endsWith('.pdf');
         const isImage=(d.fileMimeType||'').startsWith('image/');
-        return (isPdf||isImage)&&(!d.aiStatus||d.aiStatus==='error');
+        return (isPdf||isImage)&&d.aiStatus!=='scanned';
     }).length;
     const scanAllBtn=document.getElementById('tea-scan-all-btn');
     if(scanAllBtn){scanAllBtn.disabled=unscanned===0;scanAllBtn.textContent=unscanned?`🤖 Analyze ${unscanned} Unscanned`:`🤖 Analyze All Unscanned`;}
-    const errorCount=teaPartyDocs.filter(d=>d.aiStatus==='error').length;
+    const stuckCount=teaPartyDocs.filter(d=>d.aiStatus==='error'||d.aiStatus==='scanning').length;
     const clearBtn=document.getElementById('tea-clear-errors-btn');
-    if(clearBtn){clearBtn.style.display=errorCount?'inline-flex':'none';clearBtn.textContent=`↻ Clear ${errorCount} Scan Error${errorCount===1?'':'s'}`;}
+    if(clearBtn){clearBtn.style.display=stuckCount?'inline-flex':'none';clearBtn.textContent=`↻ Reset ${stuckCount} Stuck Status${stuckCount===1?'':'es'}`;}
     renderTeaTaxReport();
 }
 
 async function clearTeaScanErrors(){
-    const errDocs=teaPartyDocs.filter(d=>d.aiStatus==='error');
-    if(!errDocs.length)return;
-    if(!confirm(`Clear error state on ${errDocs.length} file${errDocs.length===1?'':'s'}? They will show as unscanned so you can re-run Analyze.`))return;
-    for(const d of errDocs){
+    const stuck=teaPartyDocs.filter(d=>d.aiStatus==='error'||d.aiStatus==='scanning');
+    if(!stuck.length)return;
+    if(!confirm(`Reset ${stuck.length} file${stuck.length===1?'':'s'} (error or stuck "scanning" state)? They will show as unscanned so you can re-run Analyze.`))return;
+    for(const d of stuck){
         try{await db.collection('estate_tea_party').doc(d._docId).update({aiStatus:firebase.firestore.FieldValue.delete(),aiError:firebase.firestore.FieldValue.delete()});}catch(e){}
     }
-    toast(`Cleared ${errDocs.length} error${errDocs.length===1?'':'s'}.`,'success');
+    toast(`Reset ${stuck.length} file${stuck.length===1?'':'s'}.`,'success');
 }
 
 // ── TAX YEAR REPORTS ────────────────────────────────────────
@@ -1159,7 +1159,7 @@ async function scanAllTeaPartyDocs(){
     const pending=teaPartyDocs.filter(d=>{
         const isPdf=(d.fileMimeType==='application/pdf')||(d.fileName||'').toLowerCase().endsWith('.pdf');
         const isImage=(d.fileMimeType||'').startsWith('image/');
-        return (isPdf||isImage)&&(!d.aiStatus||d.aiStatus==='error');
+        return (isPdf||isImage)&&d.aiStatus!=='scanned';
     });
     if(!pending.length){toast('Nothing to scan.','info');return;}
     if(!apiKey){toast('Set your API key in Settings first.','error');return;}

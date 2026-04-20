@@ -183,6 +183,16 @@
         .rx-inline-grid input,.rx-inline-grid select,.rx-inline-grid textarea{width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:5px;font-size:0.82rem;font-family:inherit;color:var(--text-primary);background:#fff;}
         .rx-inline-grid input:focus,.rx-inline-grid select:focus,.rx-inline-grid textarea:focus{outline:none;border-color:var(--accent);}
         .rx-card-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;}
+        .rx-scan-row{display:flex;gap:14px;padding:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;margin-bottom:16px;align-items:stretch;}
+        .rx-scan-preview{width:100px;height:100px;flex-shrink:0;border:2px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;background:#fff;overflow:hidden;position:relative;}
+        .rx-scan-preview img{width:100%;height:100%;object-fit:cover;}
+        .rx-scan-preview .rx-scan-pdf{font-size:2rem;}
+        .rx-scan-placeholder{font-size:2rem;color:var(--border);}
+        .rx-scan-controls{flex:1;display:flex;flex-direction:column;gap:6px;min-width:0;}
+        .rx-scan-label{font-size:0.72rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.4px;}
+        .rx-scan-controls input[type=file]{font-size:0.8rem;color:var(--text-secondary);}
+        .rx-scan-actions{display:flex;gap:8px;margin-top:auto;}
+        .rx-scan-status{font-size:0.78rem;color:var(--text-secondary);min-height:16px;}
         .modal-overlay.show .modal{transform:scale(1);}
         .modal-title{font-size:1.1rem;font-weight:700;color:var(--text-primary);margin-bottom:4px;}
         .modal-sub{font-size:0.85rem;color:var(--text-secondary);margin-bottom:16px;}
@@ -758,8 +768,22 @@
 <div class="modal-overlay" id="rx-modal">
     <div class="modal">
         <div class="modal-title" id="rx-modal-title">Add Prescription</div>
-        <div class="modal-sub">Enter prescription details.</div>
+        <div class="modal-sub">Enter prescription details, or upload a label photo to auto-fill.</div>
         <input type="hidden" id="rx-edit-doc-id">
+        <div class="rx-scan-row">
+            <div class="rx-scan-preview" id="rx-scan-preview">
+                <span class="rx-scan-placeholder">📷</span>
+                <button type="button" class="remove-photo" id="rx-scan-remove" onclick="removeRxModalPhoto()" style="display:none;">✕</button>
+            </div>
+            <div class="rx-scan-controls">
+                <label class="rx-scan-label">Label photo or PDF</label>
+                <input type="file" id="rx-scan-input" accept="image/*,application/pdf" onchange="handleRxModalFile(this.files[0]);this.value='';">
+                <div class="rx-scan-actions">
+                    <button type="button" class="btn btn-ai" id="rx-scan-btn" onclick="scanRxModalPhoto()" disabled style="margin-top:0;">🤖 Scan with AI</button>
+                </div>
+                <div class="rx-scan-status" id="rx-scan-status"></div>
+            </div>
+        </div>
         <div class="form-grid" style="grid-template-columns:1fr 1fr;">
             <div class="form-group"><label>Medication Name *</label><input type="text" id="rx-name" placeholder="e.g. Amoxicillin" required></div>
             <div class="form-group"><label>Dosage</label><input type="text" id="rx-dosage" placeholder="e.g. 500mg"></div>
@@ -1571,7 +1595,82 @@ function renderPrescriptions(){
     }).join('');
 }
 
+let rxModalPhoto={base64:null,mimeType:null,thumb:null};
+
+function resetRxModalPhoto(){
+    rxModalPhoto={base64:null,mimeType:null,thumb:null};
+    const prev=document.getElementById('rx-scan-preview');
+    if(prev)prev.innerHTML='<span class="rx-scan-placeholder">📷</span><button type="button" class="remove-photo" id="rx-scan-remove" onclick="removeRxModalPhoto()" style="display:none;">✕</button>';
+    const btn=document.getElementById('rx-scan-btn');if(btn)btn.disabled=true;
+    const st=document.getElementById('rx-scan-status');if(st){st.textContent='';st.style.color='';}
+    const input=document.getElementById('rx-scan-input');if(input)input.value='';
+}
+
+async function handleRxModalFile(file){
+    if(!file)return;
+    const status=document.getElementById('rx-scan-status');
+    const prev=document.getElementById('rx-scan-preview');
+    const btn=document.getElementById('rx-scan-btn');
+    if(file.type==='application/pdf'){
+        rxModalPhoto.mimeType='application/pdf';
+        rxModalPhoto.base64=await new Promise(r=>{const fr=new FileReader();fr.onload=e=>r(e.target.result.split(',')[1]);fr.readAsDataURL(file);});
+        rxModalPhoto.thumb=null;
+        prev.innerHTML=`<span class="rx-scan-pdf">📄</span><button type="button" class="remove-photo" onclick="removeRxModalPhoto()">✕</button>`;
+    }else if(file.type.startsWith('image/')){
+        const dataUrl=await compressImage(file)||await new Promise(r=>{const fr=new FileReader();fr.onload=e=>r(e.target.result);fr.readAsDataURL(file);});
+        rxModalPhoto.mimeType='image/jpeg';
+        rxModalPhoto.base64=dataUrl.split(',')[1];
+        rxModalPhoto.thumb=dataUrl;
+        prev.innerHTML=`<img src="${dataUrl}"><button type="button" class="remove-photo" onclick="removeRxModalPhoto()">✕</button>`;
+    }else{
+        toast('Select an image or PDF.','error');return;
+    }
+    btn.disabled=false;
+    status.textContent='Ready to scan.';status.style.color='';
+}
+
+function removeRxModalPhoto(){resetRxModalPhoto();}
+
+async function scanRxModalPhoto(){
+    if(!rxModalPhoto.base64)return;
+    if(!apiKey){toast('Set your Anthropic API key in Settings first.','error');return;}
+    const btn=document.getElementById('rx-scan-btn'),status=document.getElementById('rx-scan-status');
+    btn.disabled=true;btn.classList.add('scanning');btn.textContent='⏳ Scanning…';
+    status.textContent='Reading label with AI…';status.style.color='';
+    const prompt=`You are a pharmacy label analyst. Read this prescription label or pharmacy printout and extract the fields below. Return ONLY a valid JSON object with these exact keys:
+name (medication/drug name, brand or generic — the primary drug),
+dosage (strength per unit, e.g. "500mg", "10mg/5mL"),
+frequency (sig/directions, e.g. "Twice daily", "1 tablet every 8 hours as needed"),
+physician (prescriber name, e.g. "Dr. Jane Smith"),
+datePrescribed (YYYY-MM-DD, use fill/written date if available),
+condition (indication/reason if stated, else empty),
+pharmacy (pharmacy name, e.g. "CVS", "Walgreens"),
+refills (number of refills remaining, as a string digit or empty),
+notes (any warnings, side-effect cautions, or extra directions in one short line).
+Use empty string for any field you cannot confidently extract. Do not invent values.`;
+    try{
+        const raw=await callClaude(rxModalPhoto.base64,rxModalPhoto.mimeType,prompt);
+        if(!raw)throw new Error('No response from AI');
+        const jsonMatch=raw.match(/\{[\s\S]*\}/);
+        if(!jsonMatch)throw new Error('Could not parse AI response');
+        const r=JSON.parse(jsonMatch[0]);
+        const map={name:'rx-name',dosage:'rx-dosage',frequency:'rx-frequency',physician:'rx-physician',datePrescribed:'rx-date-prescribed',condition:'rx-condition',pharmacy:'rx-pharmacy',refills:'rx-refills',notes:'rx-notes'};
+        const filled=[];
+        Object.entries(map).forEach(([k,id])=>{
+            const v=(r[k]||'').toString().trim();
+            if(v){document.getElementById(id).value=v;filled.push(k);}
+        });
+        status.textContent=filled.length?`✅ Filled: ${filled.join(', ')}.`:'⚠️ Could not extract details.';
+        status.style.color=filled.length?'var(--success)':'var(--text-secondary)';
+    }catch(err){
+        status.textContent='❌ '+err.message;status.style.color='var(--danger)';
+    }finally{
+        btn.disabled=false;btn.classList.remove('scanning');btn.innerHTML='🤖 Scan with AI';
+    }
+}
+
 function openRxModal(docId){
+    resetRxModalPhoto();
     document.getElementById('rx-edit-doc-id').value=docId||'';
     document.getElementById('rx-modal-title').textContent=docId?'Edit Prescription':'Add Prescription';
     if(docId){

@@ -165,6 +165,39 @@
         .bulk-card-field input,.bulk-card-field select,.bulk-card-field textarea{width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:4px;font-size:0.82rem;font-family:inherit;background:var(--bg-secondary);color:var(--text-primary);}
         .bulk-card-remove{position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.5);color:#fff;border:none;width:24px;height:24px;border-radius:50%;cursor:pointer;font-size:0.8rem;line-height:1;z-index:2;}
         .bulk-card-remove:hover{background:var(--danger);}
+        /* Tax report + charts */
+        .tax-badge{display:inline-block;font-size:0.68rem;font-weight:700;padding:2px 8px;border-radius:4px;background:rgba(16,185,129,0.15);color:#047857;margin-right:6px;letter-spacing:0.3px;}
+        .tax-report-table{width:100%;border-collapse:collapse;font-size:0.85rem;}
+        .tax-report-table th{text-align:left;padding:8px 10px;background:var(--bg-card);font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-secondary);border-bottom:2px solid var(--border);white-space:nowrap;}
+        .tax-report-table td{padding:10px;border-bottom:1px solid var(--border);vertical-align:top;}
+        .tax-report-table td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+        .tax-report-table tr:hover td{background:rgba(0,0,0,0.02);}
+        .tax-report-year{font-size:1.1rem;font-weight:800;color:var(--text-primary);}
+        .tax-refund{color:#15803d;font-weight:600;}
+        .tax-owed{color:#b91c1c;font-weight:600;}
+        .tax-state-line{font-size:0.78rem;color:var(--text-secondary);margin-top:3px;}
+        .tax-docs-chips{display:flex;flex-wrap:wrap;gap:4px;}
+        .tax-doc-chip{font-size:0.7rem;background:rgba(16,185,129,0.08);color:#047857;padding:2px 7px;border-radius:10px;border:1px solid rgba(16,185,129,0.2);cursor:pointer;text-decoration:none;}
+        .tax-doc-chip:hover{background:rgba(16,185,129,0.18);}
+        .tea-chart-wrap{margin-top:8px;margin-bottom:12px;}
+        .tea-chart-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.78rem;color:var(--text-secondary);margin-bottom:10px;}
+        .tea-chart-legend .dot{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:6px;vertical-align:middle;}
+        .tea-chart-title{font-size:0.82rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.4px;margin:14px 0 6px;}
+        .tea-mini-table{width:100%;border-collapse:collapse;font-size:0.82rem;margin-top:6px;}
+        .tea-mini-table th{text-align:left;padding:6px 10px;background:var(--bg-card);font-size:0.72rem;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-secondary);border-bottom:1.5px solid var(--border);white-space:nowrap;font-weight:700;}
+        .tea-mini-table td{padding:7px 10px;border-bottom:1px solid var(--border);font-variant-numeric:tabular-nums;}
+        .tea-mini-table td.num{text-align:right;white-space:nowrap;}
+        .tea-mini-table tr:hover td{background:rgba(0,0,0,0.025);}
+        .tea-mini-table tfoot td{font-weight:700;background:var(--bg-card);border-top:2px solid var(--border);}
+        .tea-fed-color{color:#1e40af;}
+        .tea-state-color{color:#c2410c;}
+        .exception-item{background:#fff;border:1px solid var(--border);border-left:3px solid var(--warn);border-radius:6px;padding:10px 14px;margin-bottom:8px;display:flex;gap:12px;align-items:flex-start;}
+        .exception-item.sev-high{border-left-color:var(--danger);}
+        .exception-item.sev-info{border-left-color:var(--info);}
+        .exception-icon{font-size:1.1rem;flex-shrink:0;margin-top:1px;}
+        .exception-body{flex:1;min-width:0;}
+        .exception-title{font-weight:700;font-size:0.9rem;color:var(--text-primary);margin-bottom:2px;}
+        .exception-detail{font-size:0.82rem;color:var(--text-secondary);line-height:1.4;}
         @media(max-width:700px){
             header{padding:6px 12px;gap:10px;}
             .logo-area{flex:1;}
@@ -276,10 +309,54 @@
         </div>
     </div>
 
-    <!-- TAX YEAR REPORTS TABLE -->
+    <!-- EXCEPTION REPORTING -->
+    <div class="card" id="tea-exceptions-card" style="display:none;">
+        <div class="card-title">
+            <div class="card-title-left">⚠️ Exceptions &amp; Things Worth a Closer Look</div>
+            <span id="tea-exceptions-count" style="font-size:0.82rem;color:var(--text-secondary);"></span>
+        </div>
+        <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:12px;font-style:italic;">Automated checks across all scanned tax documents — flags missing years, outlier AGI/income, unusual effective-tax-rate shifts, and withholding-vs-tax mismatches.</p>
+        <div id="tea-exceptions-content"></div>
+    </div>
+
+    <!-- AUTO-EXTRACTED TAX YEAR REPORTS (from scanned returns) -->
+    <div class="card" id="tea-tax-report-card" style="display:none;">
+        <div class="card-title">
+            <div class="card-title-left">📊 Tax Year Reports — Extracted from Returns</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <span style="font-size:0.82rem;color:var(--text-secondary);" id="tea-tax-count"></span>
+                <button class="btn btn-ghost btn-sm" onclick="exportTeaTaxReportCSV()">📥 Export CSV</button>
+            </div>
+        </div>
+        <div id="tea-tax-report-content"></div>
+    </div>
+
+    <!-- CHARTS -->
+    <div class="card" id="tea-tax-trends-card" style="display:none;">
+        <div class="card-title"><div class="card-title-left">📈 Income &amp; AGI Trends</div></div>
+        <div id="tea-tax-trends-content"></div>
+    </div>
+    <div class="card" id="tea-tax-fedstate-card" style="display:none;">
+        <div class="card-title"><div class="card-title-left">🏛️ Federal vs State — Tax Burden</div></div>
+        <div id="tea-tax-fedstate-content"></div>
+    </div>
+    <div class="card" id="tea-tax-refunds-card" style="display:none;">
+        <div class="card-title"><div class="card-title-left">💰 Refunds &amp; Amounts Owed</div></div>
+        <div id="tea-tax-refunds-content"></div>
+    </div>
+    <div class="card" id="tea-tax-rates-card" style="display:none;">
+        <div class="card-title"><div class="card-title-left">🎯 Effective Tax Rates</div></div>
+        <div id="tea-tax-rates-content"></div>
+    </div>
+    <div class="card" id="tea-tax-deductions-card" style="display:none;">
+        <div class="card-title"><div class="card-title-left">📉 Deductions by Year</div></div>
+        <div id="tea-tax-deductions-content"></div>
+    </div>
+
+    <!-- TAX YEAR REPORTS TABLE (manual entry) -->
     <div class="card">
         <div class="card-title">
-            <div class="card-title-left">📊 Tax Year Reports</div>
+            <div class="card-title-left">✍️ Tax Year Reports — Manual Entry</div>
             <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
                 <span style="font-size:0.85rem;color:var(--text-secondary);" id="tax-years-meta">0 years</span>
                 <button class="btn btn-ghost btn-sm" onclick="exportTaxCSV()">📥 Export CSV</button>
@@ -520,7 +597,7 @@ async function initApp(){
 
         unsubDocs=db.collection('estate_documents').where('category','==',TAX_CATEGORY).onSnapshot(snap=>{
             documents=snap.docs.map(doc=>({_docId:doc.id,...doc.data()}));
-            renderDocuments();populateDocFilters();
+            renderDocuments();populateDocFilters();renderTeaTaxReport();
         },err=>console.warn('docs snap err',err));
 
         loadTaxSummaryHistory();
@@ -1156,7 +1233,46 @@ const TAX_SCAN_PROMPT=`You are a tax-document analyzer. Examine this document an
 - parties: array of names/entities named on the doc (taxpayer, spouse, employer, payer, preparer, bank, etc.)
 - effectiveDate: YYYY-MM-DD of the document date or signature date (empty if unknown)
 - tags: free-form string of notable figures — e.g. "AGI 756317, withholding 205973, wages 450000, refund 15221". Include concrete dollar amounts when visible.
-Use empty string/array if not found.`;
+- taxData: object — ONLY populate when the document is clearly a tax return or tax form (1040, 1040-SR, 1040-X, state income tax return, W-2, 1099, K-1, etc.); otherwise null.
+
+taxData must have this exact shape when present:
+{
+  "isTaxDocument": true,
+  "isReturn": boolean (true for actual filed returns like 1040 or state 540; false for supporting docs like W-2, 1099),
+  "taxYear": integer,
+  "jurisdiction": "federal" | "state" | "local",
+  "stateCode": 2-letter USPS code when jurisdiction is state, else empty,
+  "formType": short string like "1040", "1040-SR", "540", "W-2", "1099-INT", "K-1",
+  "filingStatus": "Single" | "MFJ" | "MFS" | "HOH" | "QSS" | empty,
+  "taxpayerName": string,
+  "fields": {
+    "wages": number or null,
+    "interestIncome": number or null,
+    "dividendIncome": number or null,
+    "capitalGains": number or null,
+    "iraDistributions": number or null,
+    "socialSecurity": number or null,
+    "otherIncome": number or null,
+    "totalIncome": number or null,
+    "agi": number or null,
+    "deduction": number or null,
+    "deductionType": "standard" | "itemized" | empty,
+    "taxableIncome": number or null,
+    "totalTax": number or null,
+    "withholding": number or null,
+    "estimatedPayments": number or null,
+    "credits": number or null,
+    "totalPayments": number or null,
+    "refund": number or null (positive amount refunded),
+    "owed": number or null (positive amount owed),
+    "dependents": integer or null
+  },
+  "additionalFilings": [ optional array of other filings in the SAME PDF, each with the same shape (isReturn, taxYear, jurisdiction, stateCode, formType, filingStatus, taxpayerName, fields) — omit when single filing ]
+}
+
+IMPORTANT: If one PDF contains BOTH a federal return AND a state return (e.g. a joint 1040 + state M1 packet), set taxData to the FEDERAL filing and include the state filing inside taxData.additionalFilings. Use each jurisdiction's own numbers — do not reuse federal numbers for the state entry.
+
+Use empty strings, empty arrays, and null for fields you cannot confidently extract. Do not invent values. Numbers must be raw numbers with no commas or dollar signs.`;
 
 async function scanOneItem(q,abortSignal){
     q.status='scanning';renderBulkQueue();updateBulkCountLabel();
@@ -1188,6 +1304,7 @@ async function scanOneItem(q,abortSignal){
             if(!jsonMatch)throw new Error('Could not parse AI response');
             q.result=JSON.parse(jsonMatch[0]);
             if(!Array.isArray(q.result.parties))q.result.parties=[];
+            q.result.taxData=cleanTaxData(q.result.taxData);
             q.status='ready';
             return;
         }catch(err){
@@ -1271,6 +1388,7 @@ async function saveBulkItem(id){
             docUrl,
             addedAt:new Date().toISOString()
         };
+        if(r.taxData)data.taxData=r.taxData;
         await db.collection('estate_documents').add(data);
         q.status='saved';
         renderBulkQueue();updateBulkCountLabel();
@@ -1294,6 +1412,568 @@ async function saveBulkAll(){
     btn.disabled=false;btn.textContent='💾 Save All to Archive';
     toast(`Saved ${ok}${fail?`, ${fail} failed`:''}.`,fail?'warn':'success');
     if(!fail)btn.style.display='none';
+}
+
+// ─────────────────────────────────────────
+// TAX DATA CLEAN-UP + AGGREGATION
+// ─────────────────────────────────────────
+function cleanNum(v){if(v===null||v===undefined||v==='')return null;const n=Number(v);return isNaN(n)?null:n;}
+function cleanFiling(td){
+    const fields=td.fields||{};
+    return{
+        isReturn:!!td.isReturn,
+        taxYear:cleanNum(td.taxYear),
+        jurisdiction:(td.jurisdiction||'').toString().toLowerCase(),
+        stateCode:(td.stateCode||'').toString().toUpperCase(),
+        formType:(td.formType||'').toString(),
+        filingStatus:(td.filingStatus||'').toString(),
+        taxpayerName:(td.taxpayerName||'').toString(),
+        fields:{
+            wages:cleanNum(fields.wages),
+            interestIncome:cleanNum(fields.interestIncome),
+            dividendIncome:cleanNum(fields.dividendIncome),
+            capitalGains:cleanNum(fields.capitalGains),
+            iraDistributions:cleanNum(fields.iraDistributions),
+            socialSecurity:cleanNum(fields.socialSecurity),
+            otherIncome:cleanNum(fields.otherIncome),
+            totalIncome:cleanNum(fields.totalIncome),
+            agi:cleanNum(fields.agi),
+            deduction:cleanNum(fields.deduction),
+            deductionType:(fields.deductionType||'').toString(),
+            taxableIncome:cleanNum(fields.taxableIncome),
+            totalTax:cleanNum(fields.totalTax),
+            withholding:cleanNum(fields.withholding),
+            estimatedPayments:cleanNum(fields.estimatedPayments),
+            credits:cleanNum(fields.credits),
+            totalPayments:cleanNum(fields.totalPayments),
+            refund:cleanNum(fields.refund),
+            owed:cleanNum(fields.owed),
+            dependents:cleanNum(fields.dependents),
+        },
+    };
+}
+function cleanTaxData(td){
+    if(!td||typeof td!=='object'||!td.isTaxDocument)return null;
+    const out={isTaxDocument:true,...cleanFiling(td)};
+    if(Array.isArray(td.additionalFilings)&&td.additionalFilings.length){
+        out.additionalFilings=td.additionalFilings.filter(af=>af&&typeof af==='object').map(cleanFiling).slice(0,8);
+    }
+    return out;
+}
+
+// Flatten documents → list of {doc, filing} (each doc may produce multiple filings)
+function teaAllFilings(){
+    const out=[];
+    documents.forEach(d=>{
+        const td=d.taxData;
+        if(!td||!td.isTaxDocument)return;
+        out.push({doc:d,filing:td});
+        if(Array.isArray(td.additionalFilings)){
+            td.additionalFilings.forEach(af=>out.push({doc:d,filing:af}));
+        }
+    });
+    return out;
+}
+
+function teaTaxReturnsByYear(){
+    const byYear={};
+    teaAllFilings().forEach(({doc,filing})=>{
+        const y=filing.taxYear;
+        if(!y)return;
+        if(!byYear[y])byYear[y]={year:y,federalReturns:[],stateReturns:[],supporting:[]};
+        const payload={doc,taxData:filing};
+        if(filing.isReturn&&filing.jurisdiction==='federal')byYear[y].federalReturns.push(payload);
+        else if(filing.isReturn&&filing.jurisdiction==='state')byYear[y].stateReturns.push(payload);
+        else byYear[y].supporting.push(payload);
+    });
+    return Object.values(byYear).sort((a,b)=>b.year-a.year);
+}
+
+function fmtMoney(v){
+    if(v===null||v===undefined||v==='')return '—';
+    const n=Number(v);
+    if(!isFinite(n))return '—';
+    return (n<0?'-':'')+'$'+Math.abs(Math.round(n)).toLocaleString();
+}
+
+// ─────────────────────────────────────────
+// MAIN TAX REPORT TABLE (auto-extracted)
+// ─────────────────────────────────────────
+function renderTeaTaxReport(){
+    const card=document.getElementById('tea-tax-report-card');
+    const content=document.getElementById('tea-tax-report-content');
+    const countEl=document.getElementById('tea-tax-count');
+    if(!card||!content)return;
+    const years=teaTaxReturnsByYear();
+    if(!years.length){card.style.display='none';return;}
+    card.style.display='block';
+    if(countEl){
+        const nFed=years.reduce((s,y)=>s+y.federalReturns.length,0);
+        const nState=years.reduce((s,y)=>s+y.stateReturns.length,0);
+        const nSup=years.reduce((s,y)=>s+y.supporting.length,0);
+        countEl.textContent=`${years.length} year${years.length!==1?'s':''} · ${nFed} federal · ${nState} state · ${nSup} supporting`;
+    }
+    content.innerHTML=`<div class="table-wrapper"><table class="tax-report-table"><thead><tr>
+        <th>Year</th>
+        <th class="num">Federal AGI</th>
+        <th class="num">Taxable Income</th>
+        <th class="num">Federal Tax</th>
+        <th class="num">Withholding</th>
+        <th class="num">Net (Fed)</th>
+        <th>State Returns</th>
+        <th>Docs</th>
+    </tr></thead><tbody>${years.map(y=>{
+        const fed=y.federalReturns[0]?.taxData;
+        const fedF=fed?.fields||{};
+        const stateLines=y.stateReturns.map(s=>{
+            const f=s.taxData.fields||{};
+            const net=f.refund!=null?`<span class="tax-refund">+${fmtMoney(f.refund).replace('$','$')}</span>`:(f.owed!=null?`<span class="tax-owed">−${fmtMoney(f.owed).replace('$','$')}</span>`:'—');
+            return `<div class="tax-state-line">${esc(s.taxData.stateCode||'State')} (${esc(s.taxData.formType||'')}): AGI ${fmtMoney(f.agi)} · Tax ${fmtMoney(f.totalTax)} · W/H ${fmtMoney(f.withholding)} · Net ${net}</div>`;
+        }).join('')||'<div class="tax-state-line" style="opacity:0.6;">—</div>';
+        const fedNet=fedF.refund!=null?`<span class="tax-refund">+${fmtMoney(fedF.refund).replace('$','$')}</span>`:(fedF.owed!=null?`<span class="tax-owed">−${fmtMoney(fedF.owed).replace('$','$')}</span>`:(fedF.totalTax!=null&&fedF.withholding!=null?(()=>{const d=fedF.withholding-fedF.totalTax;return d>=0?`<span class="tax-refund">+${fmtMoney(d).replace('$','$')}</span>`:`<span class="tax-owed">−${fmtMoney(-d).replace('$','$')}</span>`;})():'—'));
+        const allDocs=[...y.federalReturns,...y.stateReturns,...y.supporting];
+        const chips=allDocs.map(p=>{
+            const td=p.taxData;
+            const label=td.formType||td.jurisdiction||'doc';
+            const href=p.doc.docUrl||'#';
+            return `<a class="tax-doc-chip" href="${esc(href)}" target="_blank" title="${esc(p.doc.title||'')}">${esc(label)}</a>`;
+        }).join('');
+        return `<tr>
+            <td><span class="tax-report-year">${y.year}</span></td>
+            <td class="num">${fmtMoney(fedF.agi)}</td>
+            <td class="num">${fmtMoney(fedF.taxableIncome)}</td>
+            <td class="num">${fmtMoney(fedF.totalTax)}</td>
+            <td class="num">${fmtMoney(fedF.withholding)}</td>
+            <td class="num">${fedNet}</td>
+            <td>${stateLines}</td>
+            <td><div class="tax-docs-chips">${chips}</div></td>
+        </tr>`;
+    }).join('')}</tbody></table></div>`;
+    renderTeaTaxTrends();
+    renderTeaTaxFedState();
+    renderTeaTaxRefunds();
+    renderTeaTaxRates();
+    renderTeaTaxDeductions();
+    renderTeaExceptions();
+}
+
+// Build [{year, fedAgi, fedTaxable, fedTotalTax, fedWithholding, fedRefund/owed, wages, ...}] ordered ascending
+function teaTaxByYearBreakdown(){
+    const years=teaTaxReturnsByYear();
+    return years.slice().reverse().map(y=>{
+        const fed=y.federalReturns[0]?.taxData?.fields||{};
+        const stateTotals={totalTax:0,withholding:0,refund:0,owed:0,hasData:false,states:[]};
+        y.stateReturns.forEach(s=>{
+            const f=s.taxData.fields||{};
+            if(f.totalTax!=null){stateTotals.totalTax+=f.totalTax;stateTotals.hasData=true;}
+            if(f.withholding!=null){stateTotals.withholding+=f.withholding;stateTotals.hasData=true;}
+            if(f.refund!=null){stateTotals.refund+=f.refund;stateTotals.hasData=true;}
+            if(f.owed!=null){stateTotals.owed+=f.owed;stateTotals.hasData=true;}
+            if(s.taxData.stateCode)stateTotals.states.push(s.taxData.stateCode);
+        });
+        return {
+            year:y.year,
+            fedAgi:fed.agi,
+            fedWages:fed.wages,
+            fedTotalIncome:fed.totalIncome,
+            fedTaxable:fed.taxableIncome,
+            fedTotalTax:fed.totalTax,
+            fedWithholding:fed.withholding,
+            fedRefund:fed.refund,
+            fedOwed:fed.owed,
+            fedDeduction:fed.deduction,
+            fedDeductionType:fed.deductionType,
+            stateTotalTax:stateTotals.hasData?stateTotals.totalTax:null,
+            stateWithholding:stateTotals.hasData?stateTotals.withholding:null,
+            stateRefund:stateTotals.hasData?stateTotals.refund:null,
+            stateOwed:stateTotals.hasData?stateTotals.owed:null,
+            stateCodes:stateTotals.states
+        };
+    });
+}
+
+// ─────────────────────────────────────────
+// SVG CHART PRIMITIVES
+// ─────────────────────────────────────────
+function teaChartLegend(entries){
+    return `<div class="tea-chart-legend">${entries.map(e=>`<span><span class="dot" style="background:${e.color}"></span>${esc(e.label)}</span>`).join('')}</div>`;
+}
+
+function teaBarChart(series,xLabels,opts={}){
+    const W=opts.width||720,H=opts.height||220,padL=52,padR=12,padT=10,padB=26;
+    const plotW=W-padL-padR,plotH=H-padT-padB;
+    const n=xLabels.length;
+    if(!n)return '';
+    const groupW=plotW/n;
+    const all=series.flatMap(s=>s.values.filter(v=>v!=null&&isFinite(v)));
+    if(!all.length)return '<div style="color:var(--text-secondary);font-size:0.85rem;">No numeric data yet.</div>';
+    const maxV=Math.max(0,...all),minV=Math.min(0,...all);
+    const range=maxV-minV||1;
+    const y0=padT+plotH*(maxV/range);
+    const toY=v=>padT+plotH*((maxV-v)/range);
+    const barW=Math.max(4,(groupW-8)/series.length);
+    // Y grid: 4 ticks
+    const ticks=[];
+    for(let i=0;i<=4;i++){
+        const v=minV+(range*i/4);
+        const y=toY(v);
+        ticks.push(`<line x1="${padL}" x2="${W-padR}" y1="${y}" y2="${y}" stroke="#e5e5e5" stroke-width="1"/><text x="${padL-6}" y="${y+3}" font-size="10" fill="#777" text-anchor="end" font-family="-apple-system,sans-serif">${fmtMoney(v)}</text>`);
+    }
+    const bars=xLabels.map((lbl,i)=>{
+        const x0=padL+i*groupW+4;
+        return series.map((s,si)=>{
+            const v=s.values[i];
+            if(v==null||!isFinite(v))return '';
+            const y=toY(v),h=Math.abs(toY(0)-y);
+            const top=v>=0?y:toY(0);
+            return `<rect x="${x0+si*barW}" y="${top}" width="${barW-1}" height="${Math.max(1,h)}" fill="${s.color}" rx="2"/>`;
+        }).join('');
+    }).join('');
+    const xText=xLabels.map((lbl,i)=>{
+        const x=padL+i*groupW+groupW/2;
+        return `<text x="${x}" y="${H-8}" font-size="10" fill="#555" text-anchor="middle" font-family="-apple-system,sans-serif">${esc(lbl)}</text>`;
+    }).join('');
+    return `<div class="tea-chart-wrap"><svg viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="xMidYMid meet" style="max-width:100%;height:auto;">
+        ${ticks.join('')}
+        <line x1="${padL}" x2="${W-padR}" y1="${y0}" y2="${y0}" stroke="#999" stroke-width="1"/>
+        ${bars}
+        ${xText}
+    </svg></div>`;
+}
+
+function teaLineChart(series,xLabels,opts={}){
+    const W=opts.width||720,H=opts.height||220,padL=52,padR=12,padT=10,padB=26;
+    const plotW=W-padL-padR,plotH=H-padT-padB;
+    const n=xLabels.length;
+    if(!n)return '';
+    const all=series.flatMap(s=>s.values.filter(v=>v!=null&&isFinite(v)));
+    if(!all.length)return '<div style="color:var(--text-secondary);font-size:0.85rem;">No numeric data yet.</div>';
+    const maxV=Math.max(0,...all),minV=Math.min(0,...all);
+    const range=maxV-minV||1;
+    const toX=i=>padL+(n===1?plotW/2:(i*plotW/(n-1)));
+    const toY=v=>padT+plotH*((maxV-v)/range);
+    const ticks=[];
+    for(let i=0;i<=4;i++){
+        const v=minV+(range*i/4);
+        const y=toY(v);
+        const fmt=opts.percent?((v*100).toFixed(1)+'%'):fmtMoney(v);
+        ticks.push(`<line x1="${padL}" x2="${W-padR}" y1="${y}" y2="${y}" stroke="#e5e5e5" stroke-width="1"/><text x="${padL-6}" y="${y+3}" font-size="10" fill="#777" text-anchor="end" font-family="-apple-system,sans-serif">${fmt}</text>`);
+    }
+    const paths=series.map(s=>{
+        const pts=s.values.map((v,i)=>v!=null&&isFinite(v)?[toX(i),toY(v)]:null);
+        const segs=[];let cur=[];
+        pts.forEach(p=>{if(p)cur.push(p);else{if(cur.length)segs.push(cur);cur=[];}});
+        if(cur.length)segs.push(cur);
+        const line=segs.map(seg=>'M '+seg.map(p=>`${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' L ')).join(' ');
+        const dots=pts.filter(Boolean).map(p=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="${s.color}"/>`).join('');
+        return `<path d="${line}" stroke="${s.color}" stroke-width="2" fill="none" stroke-linejoin="round"/>${dots}`;
+    }).join('');
+    const xText=xLabels.map((lbl,i)=>{
+        const x=toX(i);
+        return `<text x="${x}" y="${H-8}" font-size="10" fill="#555" text-anchor="middle" font-family="-apple-system,sans-serif">${esc(lbl)}</text>`;
+    }).join('');
+    return `<div class="tea-chart-wrap"><svg viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="xMidYMid meet" style="max-width:100%;height:auto;">
+        ${ticks.join('')}
+        ${paths}
+        ${xText}
+    </svg></div>`;
+}
+
+// ─────────────────────────────────────────
+// INCOME & AGI TRENDS
+// ─────────────────────────────────────────
+function renderTeaTaxTrends(){
+    const card=document.getElementById('tea-tax-trends-card');
+    const content=document.getElementById('tea-tax-trends-content');
+    if(!card||!content)return;
+    const rows=teaTaxByYearBreakdown();
+    const hasData=rows.some(r=>r.fedAgi!=null||r.fedTotalIncome!=null||r.fedWages!=null||r.fedTaxable!=null);
+    if(!hasData){card.style.display='none';return;}
+    card.style.display='block';
+    const xLabels=rows.map(r=>String(r.year));
+    const series=[
+        {label:'Total Income',color:'#2563eb',values:rows.map(r=>r.fedTotalIncome)},
+        {label:'Wages (W-2)',color:'#059669',values:rows.map(r=>r.fedWages)},
+        {label:'AGI',color:'#7c3aed',values:rows.map(r=>r.fedAgi)},
+        {label:'Taxable Income',color:'#6366f1',values:rows.map(r=>r.fedTaxable)},
+    ];
+    content.innerHTML=teaChartLegend(series)+teaLineChart(series,xLabels);
+}
+
+// ─────────────────────────────────────────
+// FEDERAL vs STATE TAX BURDEN
+// ─────────────────────────────────────────
+function renderTeaTaxFedState(){
+    const card=document.getElementById('tea-tax-fedstate-card');
+    const content=document.getElementById('tea-tax-fedstate-content');
+    if(!card||!content)return;
+    const rows=teaTaxByYearBreakdown();
+    const hasAnyState=rows.some(r=>r.stateTotalTax!=null);
+    const hasAnyFed=rows.some(r=>r.fedTotalTax!=null);
+    if(!hasAnyFed&&!hasAnyState){card.style.display='none';return;}
+    card.style.display='block';
+    const xLabels=rows.map(r=>String(r.year));
+    const series=[
+        {label:'Federal Tax',color:'#1e40af',values:rows.map(r=>r.fedTotalTax)},
+        {label:'State Tax (total)',color:'#c2410c',values:rows.map(r=>r.stateTotalTax)},
+    ];
+    const tableRows=rows.map(r=>{
+        const sc=r.stateCodes?.length?` <span style="color:var(--text-secondary);font-weight:400;">(${esc(r.stateCodes.join(', '))})</span>`:'';
+        const combined=(r.fedTotalTax||0)+(r.stateTotalTax||0);
+        return `<tr>
+            <td>${r.year}</td>
+            <td class="num tea-fed-color">${fmtMoney(r.fedTotalTax)}</td>
+            <td class="num tea-state-color">${fmtMoney(r.stateTotalTax)}${sc}</td>
+            <td class="num"><strong>${fmtMoney(combined||null)}</strong></td>
+        </tr>`;
+    }).join('');
+    content.innerHTML=teaChartLegend(series)+teaBarChart(series,xLabels)+
+        `<div class="tea-chart-title">By-Year Breakdown</div>
+        <div class="table-wrapper"><table class="tea-mini-table"><thead><tr><th>Year</th><th class="num">Federal Tax</th><th class="num">State Tax</th><th class="num">Combined</th></tr></thead><tbody>${tableRows}</tbody></table></div>`;
+}
+
+// ─────────────────────────────────────────
+// REFUNDS & OWED
+// ─────────────────────────────────────────
+function renderTeaTaxRefunds(){
+    const card=document.getElementById('tea-tax-refunds-card');
+    const content=document.getElementById('tea-tax-refunds-content');
+    if(!card||!content)return;
+    const rows=teaTaxByYearBreakdown();
+    const nets=rows.map(r=>{
+        const fedNet=r.fedRefund!=null?r.fedRefund:(r.fedOwed!=null?-r.fedOwed:(r.fedWithholding!=null&&r.fedTotalTax!=null?r.fedWithholding-r.fedTotalTax:null));
+        const stateNet=r.stateRefund!=null||r.stateOwed!=null?((r.stateRefund||0)-(r.stateOwed||0)||null):(r.stateWithholding!=null&&r.stateTotalTax!=null?r.stateWithholding-r.stateTotalTax:null);
+        return {year:r.year,fedNet,stateNet,combined:fedNet!=null||stateNet!=null?((fedNet||0)+(stateNet||0)):null};
+    });
+    const hasData=nets.some(n=>n.fedNet!=null||n.stateNet!=null);
+    if(!hasData){card.style.display='none';return;}
+    card.style.display='block';
+    const xLabels=nets.map(n=>String(n.year));
+    const series=[
+        {label:'Federal net',color:'#1e40af',values:nets.map(n=>n.fedNet)},
+        {label:'State net',color:'#c2410c',values:nets.map(n=>n.stateNet)},
+    ];
+    const tableRows=nets.map(n=>`<tr>
+        <td>${n.year}</td>
+        <td class="num ${n.fedNet>0?'tax-refund':(n.fedNet<0?'tax-owed':'')}">${n.fedNet==null?'—':(n.fedNet>=0?'+':'-')+fmtMoney(Math.abs(n.fedNet)).replace('-','')}</td>
+        <td class="num ${n.stateNet>0?'tax-refund':(n.stateNet<0?'tax-owed':'')}">${n.stateNet==null?'—':(n.stateNet>=0?'+':'-')+fmtMoney(Math.abs(n.stateNet)).replace('-','')}</td>
+        <td class="num ${n.combined>0?'tax-refund':(n.combined<0?'tax-owed':'')}">${n.combined==null?'—':(n.combined>=0?'+':'-')+fmtMoney(Math.abs(n.combined)).replace('-','')}</td>
+    </tr>`).join('');
+    content.innerHTML=`<p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:10px;">Positive = refund, negative = owed. Net uses explicit refund/owed when available, else falls back to withholding minus total tax.</p>`+teaChartLegend(series)+teaBarChart(series,xLabels)+
+        `<div class="tea-chart-title">By-Year</div>
+        <div class="table-wrapper"><table class="tea-mini-table"><thead><tr><th>Year</th><th class="num">Federal</th><th class="num">State</th><th class="num">Combined</th></tr></thead><tbody>${tableRows}</tbody></table></div>`;
+}
+
+// ─────────────────────────────────────────
+// EFFECTIVE TAX RATES
+// ─────────────────────────────────────────
+function renderTeaTaxRates(){
+    const card=document.getElementById('tea-tax-rates-card');
+    const content=document.getElementById('tea-tax-rates-content');
+    if(!card||!content)return;
+    const rows=teaTaxByYearBreakdown();
+    const rates=rows.map(r=>{
+        const fedRate=r.fedAgi&&r.fedTotalTax!=null?r.fedTotalTax/r.fedAgi:null;
+        const stateRate=r.fedAgi&&r.stateTotalTax!=null?r.stateTotalTax/r.fedAgi:null;
+        const combined=fedRate!=null||stateRate!=null?((fedRate||0)+(stateRate||0)):null;
+        return {year:r.year,fedRate,stateRate,combined};
+    });
+    const hasData=rates.some(r=>r.fedRate!=null||r.stateRate!=null);
+    if(!hasData){card.style.display='none';return;}
+    card.style.display='block';
+    const xLabels=rates.map(r=>String(r.year));
+    const series=[
+        {label:'Federal',color:'#1e40af',values:rates.map(r=>r.fedRate)},
+        {label:'State',color:'#c2410c',values:rates.map(r=>r.stateRate)},
+        {label:'Combined',color:'#7c3aed',values:rates.map(r=>r.combined)},
+    ];
+    const fmtPct=v=>v==null?'—':(v*100).toFixed(2)+'%';
+    const tableRows=rates.map(r=>`<tr>
+        <td>${r.year}</td>
+        <td class="num tea-fed-color">${fmtPct(r.fedRate)}</td>
+        <td class="num tea-state-color">${fmtPct(r.stateRate)}</td>
+        <td class="num"><strong>${fmtPct(r.combined)}</strong></td>
+    </tr>`).join('');
+    content.innerHTML=`<p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:10px;">Effective rate = tax paid ÷ federal AGI for that year.</p>`+teaChartLegend(series)+teaLineChart(series,xLabels,{percent:true})+
+        `<div class="tea-chart-title">By-Year Rates</div>
+        <div class="table-wrapper"><table class="tea-mini-table"><thead><tr><th>Year</th><th class="num">Federal</th><th class="num">State</th><th class="num">Combined</th></tr></thead><tbody>${tableRows}</tbody></table></div>`;
+}
+
+// ─────────────────────────────────────────
+// DEDUCTIONS BY YEAR
+// ─────────────────────────────────────────
+function renderTeaTaxDeductions(){
+    const card=document.getElementById('tea-tax-deductions-card');
+    const content=document.getElementById('tea-tax-deductions-content');
+    if(!card||!content)return;
+    const rows=teaTaxByYearBreakdown();
+    const hasData=rows.some(r=>r.fedDeduction!=null);
+    if(!hasData){card.style.display='none';return;}
+    card.style.display='block';
+    const xLabels=rows.map(r=>String(r.year));
+    const series=[
+        {label:'Federal Deduction',color:'#059669',values:rows.map(r=>r.fedDeduction)},
+    ];
+    const tableRows=rows.map(r=>`<tr>
+        <td>${r.year}</td>
+        <td class="num">${fmtMoney(r.fedDeduction)}</td>
+        <td>${esc(r.fedDeductionType||'—')}</td>
+    </tr>`).join('');
+    content.innerHTML=teaChartLegend(series)+teaBarChart(series,xLabels)+
+        `<div class="tea-chart-title">By-Year</div>
+        <div class="table-wrapper"><table class="tea-mini-table"><thead><tr><th>Year</th><th class="num">Deduction</th><th>Type</th></tr></thead><tbody>${tableRows}</tbody></table></div>`;
+}
+
+// ─────────────────────────────────────────
+// CSV EXPORT (full tax field dump)
+// ─────────────────────────────────────────
+function exportTeaTaxReportCSV(){
+    const years=teaTaxReturnsByYear().slice().reverse(); // oldest first
+    if(!years.length){toast('No tax data to export.','error');return;}
+    const rows=[];
+    const push=(y,label,jurisdiction,stateCode,formType,filing)=>{
+        const f=filing.fields||{};
+        rows.push([
+            y,label,jurisdiction,stateCode||'',formType||'',filing.filingStatus||'',filing.taxpayerName||'',
+            f.wages,f.interestIncome,f.dividendIncome,f.capitalGains,f.iraDistributions,f.socialSecurity,f.otherIncome,
+            f.totalIncome,f.agi,f.deduction,f.deductionType||'',f.taxableIncome,f.totalTax,f.withholding,
+            f.estimatedPayments,f.credits,f.totalPayments,f.refund,f.owed,f.dependents
+        ]);
+    };
+    years.forEach(y=>{
+        y.federalReturns.forEach(p=>push(y.year,'Federal Return','federal','',p.taxData.formType,p.taxData));
+        y.stateReturns.forEach(p=>push(y.year,'State Return','state',p.taxData.stateCode,p.taxData.formType,p.taxData));
+        y.supporting.forEach(p=>push(y.year,'Supporting',p.taxData.jurisdiction,p.taxData.stateCode,p.taxData.formType,p.taxData));
+    });
+    const headers=['Year','Role','Jurisdiction','State','Form','Filing Status','Taxpayer',
+        'Wages','Interest','Dividends','Capital Gains','IRA Dist','Social Sec','Other Income',
+        'Total Income','AGI','Deduction','Deduction Type','Taxable Income','Total Tax','Withholding',
+        'Est Payments','Credits','Total Payments','Refund','Owed','Dependents'];
+    const csv=[headers,...rows].map(r=>r.map(v=>{
+        if(v===null||v===undefined)return '';
+        const s=String(v);
+        return /[",\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;
+    }).join(',')).join('\n');
+    const blob=new Blob([csv],{type:'text/csv'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download=`tea_tax_report_${new Date().toISOString().slice(0,10)}.csv`;a.click();
+    URL.revokeObjectURL(url);
+}
+
+// ─────────────────────────────────────────
+// EXCEPTION REPORTING
+// ─────────────────────────────────────────
+function median(arr){
+    const s=arr.slice().sort((a,b)=>a-b);
+    if(!s.length)return null;
+    const m=Math.floor(s.length/2);
+    return s.length%2?s[m]:(s[m-1]+s[m])/2;
+}
+
+function computeTaxExceptions(){
+    const rows=teaTaxByYearBreakdown();
+    const exceptions=[];
+    if(rows.length<=1)return exceptions;
+
+    // Missing years in the range
+    const years=rows.map(r=>r.year);
+    const minY=Math.min(...years),maxY=Math.max(...years);
+    const present=new Set(years);
+    const missing=[];
+    for(let y=minY;y<=maxY;y++) if(!present.has(y)) missing.push(y);
+    if(missing.length){
+        exceptions.push({severity:'high',icon:'📅',title:`${missing.length} missing year${missing.length>1?'s':''} between ${minY} and ${maxY}`,detail:`No federal return on file for: ${missing.join(', ')}.`});
+    }
+
+    // AGI outliers (>2x median jump or >50% drop)
+    const agiRows=rows.filter(r=>r.fedAgi!=null);
+    if(agiRows.length>=3){
+        const agis=agiRows.map(r=>r.fedAgi);
+        const med=median(agis);
+        agiRows.forEach((r,i)=>{
+            if(i===0)return;
+            const prev=agiRows[i-1].fedAgi;
+            if(!prev)return;
+            const change=(r.fedAgi-prev)/Math.abs(prev);
+            if(change>1.0){
+                exceptions.push({severity:'info',icon:'📈',title:`${r.year}: AGI spike vs ${agiRows[i-1].year}`,detail:`AGI jumped from ${fmtMoney(prev)} to ${fmtMoney(r.fedAgi)} (${(change*100).toFixed(0)}% increase). Verify one-time event vs. trend.`});
+            } else if(change<-0.5){
+                exceptions.push({severity:'info',icon:'📉',title:`${r.year}: AGI drop vs ${agiRows[i-1].year}`,detail:`AGI fell from ${fmtMoney(prev)} to ${fmtMoney(r.fedAgi)} (${(change*100).toFixed(0)}% drop). Check for missing income docs.`});
+            }
+            if(r.fedAgi>med*3||r.fedAgi<med/3){
+                exceptions.push({severity:'info',icon:'🎯',title:`${r.year}: AGI far from median`,detail:`AGI of ${fmtMoney(r.fedAgi)} is far from the ${agiRows.length}-year median of ${fmtMoney(med)}. Likely a special year or possible extraction error.`});
+            }
+        });
+    }
+
+    // Effective tax rate anomalies
+    const rateRows=rows.filter(r=>r.fedAgi&&r.fedTotalTax!=null);
+    if(rateRows.length>=3){
+        const rates=rateRows.map(r=>r.fedTotalTax/r.fedAgi);
+        const med=median(rates);
+        rateRows.forEach((r,i)=>{
+            const rate=r.fedTotalTax/r.fedAgi;
+            if(rate<0.03&&r.fedAgi>30000){
+                exceptions.push({severity:'warn',icon:'🧾',title:`${r.year}: Unusually low federal effective rate`,detail:`Federal tax of ${fmtMoney(r.fedTotalTax)} on AGI ${fmtMoney(r.fedAgi)} is only ${(rate*100).toFixed(1)}% — verify extraction or credits used.`});
+            }
+            if(rate>0.45){
+                exceptions.push({severity:'warn',icon:'🧾',title:`${r.year}: Unusually high federal effective rate`,detail:`Federal tax of ${fmtMoney(r.fedTotalTax)} on AGI ${fmtMoney(r.fedAgi)} is ${(rate*100).toFixed(1)}% — check for extraction errors.`});
+            }
+            if(med!=null&&Math.abs(rate-med)>0.1){
+                exceptions.push({severity:'info',icon:'📊',title:`${r.year}: Effective rate drifts from historical median`,detail:`${(rate*100).toFixed(1)}% vs ${(med*100).toFixed(1)}% median. Difference of ${((rate-med)*100).toFixed(1)} points.`});
+            }
+        });
+    }
+
+    // Withholding vs tax mismatches (big refunds or big owed)
+    rows.forEach(r=>{
+        if(r.fedWithholding!=null&&r.fedTotalTax!=null){
+            const diff=r.fedWithholding-r.fedTotalTax;
+            if(diff>20000){
+                exceptions.push({severity:'info',icon:'💰',title:`${r.year}: Large federal over-withholding`,detail:`Withheld ${fmtMoney(r.fedWithholding)} but owed only ${fmtMoney(r.fedTotalTax)} — ${fmtMoney(diff)} over-withholding. Consider adjusting W-4.`});
+            } else if(diff<-5000){
+                exceptions.push({severity:'high',icon:'⚠️',title:`${r.year}: Large federal shortfall`,detail:`Withheld ${fmtMoney(r.fedWithholding)} against tax of ${fmtMoney(r.fedTotalTax)} — ${fmtMoney(-diff)} under-withholding. Check for estimated-tax or underpayment penalty.`});
+            }
+        }
+    });
+
+    // Missing federal return but supporting docs exist
+    teaTaxReturnsByYear().forEach(y=>{
+        if(!y.federalReturns.length&&(y.stateReturns.length||y.supporting.length)){
+            exceptions.push({severity:'warn',icon:'❓',title:`${y.year}: Supporting docs without federal return`,detail:`Found ${y.supporting.length} supporting doc${y.supporting.length!==1?'s':''} and ${y.stateReturns.length} state return${y.stateReturns.length!==1?'s':''} but no 1040. Upload the federal return for a complete picture.`});
+        }
+    });
+
+    // Missing key fields on scanned returns
+    rows.forEach(r=>{
+        const miss=[];
+        if(r.fedAgi==null)miss.push('AGI');
+        if(r.fedTotalTax==null)miss.push('Total Tax');
+        if(r.fedWithholding==null)miss.push('Withholding');
+        if(miss.length>=2){
+            exceptions.push({severity:'warn',icon:'🔍',title:`${r.year}: Incomplete extraction`,detail:`Federal return is missing: ${miss.join(', ')}. Re-run AI scan or update manually.`});
+        }
+    });
+
+    return exceptions;
+}
+
+function renderTeaExceptions(){
+    const card=document.getElementById('tea-exceptions-card');
+    const content=document.getElementById('tea-exceptions-content');
+    const countEl=document.getElementById('tea-exceptions-count');
+    if(!card||!content)return;
+    const ex=computeTaxExceptions();
+    if(!ex.length){card.style.display='none';return;}
+    card.style.display='block';
+    if(countEl)countEl.textContent=`${ex.length} exception${ex.length!==1?'s':''} flagged`;
+    content.innerHTML=ex.map(e=>`<div class="exception-item sev-${e.severity}">
+        <div class="exception-icon">${e.icon}</div>
+        <div class="exception-body">
+            <div class="exception-title">${esc(e.title)}</div>
+            <div class="exception-detail">${esc(e.detail)}</div>
+        </div>
+    </div>`).join('');
 }
 </script>
 </body>

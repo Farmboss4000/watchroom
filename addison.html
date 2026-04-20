@@ -193,6 +193,9 @@
         .rx-scan-controls input[type=file]{font-size:0.8rem;color:var(--text-secondary);}
         .rx-scan-actions{display:flex;gap:8px;margin-top:auto;}
         .rx-scan-status{font-size:0.78rem;color:var(--text-secondary);min-height:16px;}
+        .rx-overview-summary{background:linear-gradient(135deg,rgba(124,58,237,0.06),rgba(124,58,237,0.02));border:1px solid var(--accent-dim);border-left:4px solid var(--accent);border-radius:10px;padding:14px 18px;margin-bottom:16px;font-size:0.88rem;line-height:1.6;color:var(--text-primary);}
+        .rx-overview-summary strong{color:var(--accent-hover);}
+        .rx-overview-summary .rx-summary-warn{color:#b91c1c;font-weight:600;}
         .rx-overview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;}
         .rx-pill{background:var(--bg-card);border:1px solid var(--border);border-left:4px solid var(--accent);border-radius:10px;padding:14px 16px;cursor:pointer;transition:all 0.15s;display:flex;flex-direction:column;gap:6px;}
         .rx-pill:hover{border-left-color:var(--accent-hover);transform:translateY(-1px);box-shadow:0 4px 12px rgba(124,58,237,0.12);}
@@ -399,6 +402,7 @@
             <div class="card-title-left">💊 Active Prescriptions</div>
             <button class="btn btn-ghost btn-sm" onclick="showView('prescriptions')">View All →</button>
         </div>
+        <div id="rx-overview-summary" class="rx-overview-summary" style="display:none;"></div>
         <div class="rx-overview-grid" id="rx-overview-grid"></div>
         <div id="rx-overview-empty" style="display:none;text-align:center;color:var(--text-secondary);padding:24px 0;font-size:0.9rem;">
             No active prescriptions. <a href="#" onclick="showView('prescriptions');return false;" style="color:var(--accent);">Add one →</a>
@@ -1097,14 +1101,50 @@ function renderDashboard(){
         :'<tr><td colspan="6" style="text-align:center;color:var(--text-secondary);padding:30px;">No visits yet.</td></tr>';
 }
 
+function buildRxSummary(active){
+    if(!active.length)return '';
+    const n=active.length;
+    const med=n===1?'medication':'medications';
+    const meds=active.map(rx=>{
+        const name=rx.name||'unnamed';
+        const dose=rx.dosage?` ${rx.dosage}`:'';
+        const freq=rx.frequency?` — ${rx.frequency.toLowerCase()}`:'';
+        const reason=rx.condition?` for ${rx.condition.toLowerCase()}`:'';
+        return `<strong>${esc(name)}</strong>${esc(dose)}${esc(reason)}${esc(freq)}`;
+    });
+    let list;
+    if(meds.length===1)list=meds[0];
+    else if(meds.length===2)list=meds.join(' and ');
+    else list=meds.slice(0,-1).join(', ')+', and '+meds[meds.length-1];
+    const physicians=[...new Set(active.map(rx=>rx.physician).filter(Boolean))];
+    const pharmacies=[...new Set(active.map(rx=>rx.pharmacy).filter(Boolean))];
+    const noRefill=active.filter(rx=>{const n=parseInt(rx.refills,10);return rx.refills!==''&&!isNaN(n)&&n===0;});
+    const parts=[`Currently managing <strong>${n}</strong> active ${med}: ${list}.`];
+    if(physicians.length){
+        const physList=physicians.length===1?esc(physicians[0]):physicians.length===2?physicians.map(esc).join(' and '):physicians.slice(0,-1).map(esc).join(', ')+', and '+esc(physicians[physicians.length-1]);
+        parts.push(`Prescribed by ${physList}.`);
+    }
+    if(pharmacies.length){
+        const phList=pharmacies.length===1?esc(pharmacies[0]):pharmacies.length===2?pharmacies.map(esc).join(' and '):pharmacies.slice(0,-1).map(esc).join(', ')+', and '+esc(pharmacies[pharmacies.length-1]);
+        parts.push(`Filled at ${phList}.`);
+    }
+    if(noRefill.length){
+        const names=noRefill.map(rx=>esc(rx.name||'a prescription')).join(', ');
+        parts.push(`<span class="rx-summary-warn">⚠️ ${noRefill.length} ${noRefill.length===1?'prescription has':'prescriptions have'} no refills remaining (${names}) — contact the prescriber to renew.</span>`);
+    }
+    return parts.join(' ');
+}
+
 function renderRxOverview(){
     const grid=document.getElementById('rx-overview-grid');
     const empty=document.getElementById('rx-overview-empty');
+    const summary=document.getElementById('rx-overview-summary');
     if(!grid||!empty)return;
     const active=rxItems.filter(rx=>rx.status!=='discontinued')
         .sort((a,b)=>(b.datePrescribed||'').localeCompare(a.datePrescribed||''));
-    if(!active.length){grid.innerHTML='';empty.style.display='block';return;}
+    if(!active.length){grid.innerHTML='';empty.style.display='block';if(summary)summary.style.display='none';return;}
     empty.style.display='none';
+    if(summary){summary.innerHTML=buildRxSummary(active);summary.style.display='block';}
     grid.innerHTML=active.map(rx=>{
         const refillsNum=parseInt(rx.refills,10);
         const refillsDisplay=rx.refills!==''&&!isNaN(refillsNum)

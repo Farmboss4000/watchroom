@@ -798,6 +798,7 @@ function renderTeaParty(){
         const desc=d.aiDescription
             ?`<div class="tea-ai-desc">${aiBadge}${esc(d.aiDescription)}</div>`+(d.description&&d.description!==d.aiDescription?`<div class="tea-ai-meta">Note: ${esc(d.description)}</div>`:'')
             :`<div>${aiBadge}${esc(d.description)||'<span style="color:var(--text-secondary);">—</span>'}</div>`;
+        const errDetail=(d.aiStatus==='error'&&d.aiError)?`<div class="tea-ai-meta" style="color:#b91c1c;">${esc(d.aiError)}</div>`:'';
         const tags=Array.isArray(d.aiTags)&&d.aiTags.length?`<div class="tea-tags">${d.aiTags.map(t=>`<span class="tea-tag">${esc(t)}</span>`).join('')}</div>`:'';
         const people=Array.isArray(d.aiKeyPeople)&&d.aiKeyPeople.length?`<div class="tea-ai-meta">👥 ${d.aiKeyPeople.map(esc).join(', ')}</div>`:'';
         const dates=Array.isArray(d.aiKeyDates)&&d.aiKeyDates.length?`<div class="tea-ai-meta">📅 ${d.aiKeyDates.map(esc).join(', ')}</div>`:'';
@@ -806,7 +807,7 @@ function renderTeaParty(){
             :'';
         return `<tr>
             <td><strong>${esc(d.title)||'Untitled'}</strong></td>
-            <td style="max-width:340px;">${desc}${tags}${people}${dates}</td>
+            <td style="max-width:340px;">${desc}${errDetail}${tags}${people}${dates}</td>
             <td style="white-space:nowrap;">${icon} <a href="${esc(d.fileUrl)}" target="_blank" rel="noopener" style="color:var(--accent);">${esc(d.fileName)||'file'}</a></td>
             <td style="white-space:nowrap;">${teaPartyFormatSize(d.fileSize)}</td>
             <td style="white-space:nowrap;">${dt}</td>
@@ -949,9 +950,14 @@ async function scanTeaPartyDoc(docId){
     if(!isPdf&&!isImage){toast('AI scan supports PDFs and images only.','error');return;}
     try{await db.collection('estate_tea_party').doc(docId).update({aiStatus:'scanning',aiError:firebase.firestore.FieldValue.delete()});}catch(e){}
     try{
-        const res=await fetch(d.fileUrl);
-        if(!res.ok)throw new Error('Could not download file');
-        const blob=await res.blob();
+        let blob;
+        try{
+            const res=await fetch(d.fileUrl);
+            if(!res.ok)throw new Error(`Download failed (HTTP ${res.status})`);
+            blob=await res.blob();
+        }catch(netErr){
+            throw new Error('Fetch failed — likely Firebase Storage CORS. '+(netErr.message||netErr));
+        }
         const base64=await blobToBase64(blob);
         const mime=isPdf?'application/pdf':(d.fileMimeType||'image/jpeg');
         const prompt=`You are analyzing a document uploaded to a private file library. Read it and return ONLY a valid JSON object with these keys:

@@ -1156,15 +1156,17 @@ function renderTeaTaxFedMn(){
     if(hasMn){fedMnSeries.push({label:'Minnesota Tax',color:TEA_MN_COLOR,values:mnTax});fedMnLegend.push({label:'Minnesota',color:TEA_MN_COLOR});}
     const chart=teaBarChart(fedMnSeries,labels);
     const legend=teaChartLegend(fedMnLegend);
-    let fedSum=0,mnSum=0,cSum=0;
+    let fedSum=0,mnSum=0,cSum=0,wagesSum=0;
     const rows=years.map((y,i)=>{
         const f=y.federal?.fields||{},m=y.minnesota?.fields||{};
         const c=combined[i];
         if(fedTax[i]!=null)fedSum+=fedTax[i];
         if(mnTax[i]!=null)mnSum+=mnTax[i];
         if(c!=null)cSum+=c;
+        if(f.wages!=null)wagesSum+=f.wages;
         return `<tr>
             <td><strong>${y.year}</strong></td>
+            <td class="num">${fmtMoney(f.wages)}</td>
             <td class="num">${fmtMoney(f.agi)}</td>
             <td class="num tea-fed-color">${fmtMoney(f.totalTax)}</td>
             <td class="num tea-fed-color">${fmtMoney(f.withholding)}</td>
@@ -1176,9 +1178,9 @@ function renderTeaTaxFedMn(){
     content.innerHTML=`${legend}${chart}
         <div class="tea-chart-title">Tax by Jurisdiction</div>
         <div class="table-wrapper"><table class="tea-mini-table">
-            <thead><tr><th>Year</th><th>Federal AGI</th><th>Fed Tax</th><th>Fed W/H</th><th>MN Tax</th><th>MN W/H</th><th>Total Tax</th></tr></thead>
+            <thead><tr><th>Year</th><th>Wages (W-2)</th><th>Federal AGI</th><th>Fed Tax</th><th>Fed W/H</th><th>MN Tax</th><th>MN W/H</th><th>Total Tax</th></tr></thead>
             <tbody>${rows}</tbody>
-            <tfoot><tr><td>Totals</td><td class="num">—</td><td class="num">${fmtMoney(fedSum)}</td><td class="num">—</td><td class="num">${fmtMoney(mnSum)}</td><td class="num">—</td><td class="num">${fmtMoney(cSum)}</td></tr></tfoot>
+            <tfoot><tr><td>Totals</td><td class="num">${fmtMoney(wagesSum)}</td><td class="num">—</td><td class="num">${fmtMoney(fedSum)}</td><td class="num">—</td><td class="num">${fmtMoney(mnSum)}</td><td class="num">—</td><td class="num">${fmtMoney(cSum)}</td></tr></tfoot>
         </table></div>`;
 }
 

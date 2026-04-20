@@ -175,6 +175,14 @@
         .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;opacity:0;pointer-events:none;transition:opacity 0.2s;}
         .modal-overlay.show{opacity:1;pointer-events:all;}
         .modal{background:#fff;border-radius:14px;padding:28px 24px;width:100%;max-width:520px;margin:16px;max-height:90vh;overflow-y:auto;transform:scale(0.95);transition:transform 0.2s;}
+        .modal-wide{max-width:960px;}
+        .rx-inline-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;}
+        .rx-inline-grid .rx-inline-field{display:flex;flex-direction:column;gap:3px;}
+        .rx-inline-grid .rx-inline-field.full{grid-column:1/-1;}
+        .rx-inline-grid label{font-size:0.7rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.4px;}
+        .rx-inline-grid input,.rx-inline-grid select,.rx-inline-grid textarea{width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:5px;font-size:0.82rem;font-family:inherit;color:var(--text-primary);background:#fff;}
+        .rx-inline-grid input:focus,.rx-inline-grid select:focus,.rx-inline-grid textarea:focus{outline:none;border-color:var(--accent);}
+        .rx-card-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;}
         .modal-overlay.show .modal{transform:scale(1);}
         .modal-title{font-size:1.1rem;font-weight:700;color:var(--text-primary);margin-bottom:4px;}
         .modal-sub{font-size:0.85rem;color:var(--text-secondary);margin-bottom:16px;}
@@ -589,7 +597,10 @@
     <div class="card">
         <div class="card-title">
             <div class="card-title-left">💊 Prescriptions</div>
-            <button class="btn btn-primary btn-sm" onclick="openRxModal()">+ Add Prescription</button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="btn btn-secondary btn-sm" onclick="openRxUploadModal()">📷 Upload Labels</button>
+                <button class="btn btn-primary btn-sm" onclick="openRxModal()">+ Add Prescription</button>
+            </div>
         </div>
         <div class="toolbar">
             <input type="text" id="rx-search" placeholder="Search prescriptions..." oninput="renderPrescriptions()">
@@ -765,6 +776,31 @@
         <div class="modal-actions">
             <button class="btn btn-primary" onclick="saveRx()">Save Prescription</button>
             <button class="btn btn-ghost" onclick="closeRxModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- ══ RX LABEL UPLOAD MODAL ══ -->
+<div class="modal-overlay" id="rx-upload-modal">
+    <div class="modal modal-wide">
+        <div class="modal-title">📷 Upload Prescription Labels</div>
+        <div class="modal-sub">Drop label photos or PDFs. AI reads each one and creates a prescription list entry you can review before saving.</div>
+        <div class="bulk-drop-zone" id="rx-upload-drop" onclick="document.getElementById('rx-upload-input').click()">
+            <div class="bulk-drop-icon">💊</div>
+            <div class="bulk-drop-title">Drop label images or PDFs here</div>
+            <div class="bulk-drop-sub">or click to browse — pill bottles, pharmacy printouts, PDF summaries</div>
+            <input type="file" id="rx-upload-input" accept="image/*,application/pdf" multiple style="display:none;" onchange="handleRxLabelFiles(this.files);this.value='';">
+        </div>
+        <div class="bulk-actions">
+            <button class="btn btn-primary btn-sm" id="rx-queue-analyze-all" onclick="analyzeAllRxLabels()" disabled>🤖 Analyze All</button>
+            <button class="btn btn-info btn-sm" id="rx-queue-save-all" onclick="saveAllRxFromQueue()" disabled>💾 Save All</button>
+            <button class="btn btn-ghost btn-sm" onclick="clearRxQueue()">Clear Queue</button>
+            <span id="rx-queue-status" style="font-size:0.82rem;color:var(--text-secondary);margin-left:auto;"></span>
+        </div>
+        <div class="bulk-queue" id="rx-upload-queue"></div>
+        <div id="rx-upload-empty" style="text-align:center;color:var(--text-secondary);font-size:0.85rem;padding:10px 0;">No labels uploaded yet.</div>
+        <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="closeRxUploadModal()">Close</button>
         </div>
     </div>
 </div>
@@ -1591,6 +1627,184 @@ async function deleteRx(docId){
     const rx=rxItems.find(x=>x._docId===docId);
     if(!confirm(`Delete "${rx?.name||'prescription'}"?`))return;
     try{await db.collection('addison_prescriptions').doc(docId).delete();toast('Prescription removed.','success');}catch(e){toast('Delete failed.','error');}
+}
+
+// ═══════════════════════════════════════
+//  RX LABEL UPLOAD
+// ═══════════════════════════════════════
+let rxQueue=[];
+const RX_FIELDS=['name','dosage','frequency','physician','datePrescribed','condition','pharmacy','refills','notes'];
+
+function openRxUploadModal(){document.getElementById('rx-upload-modal').classList.add('show');renderRxQueue();}
+function closeRxUploadModal(){document.getElementById('rx-upload-modal').classList.remove('show');}
+document.getElementById('rx-upload-modal').addEventListener('click',e=>{if(e.target===document.getElementById('rx-upload-modal'))closeRxUploadModal();});
+
+(function initRxDropZone(){
+    const zone=document.getElementById('rx-upload-drop');
+    if(!zone)return;
+    ['dragenter','dragover'].forEach(ev=>zone.addEventListener(ev,e=>{e.preventDefault();e.stopPropagation();zone.classList.add('dragover');}));
+    ['dragleave','drop'].forEach(ev=>zone.addEventListener(ev,e=>{e.preventDefault();e.stopPropagation();zone.classList.remove('dragover');}));
+    zone.addEventListener('drop',e=>{if(e.dataTransfer?.files?.length)handleRxLabelFiles(e.dataTransfer.files);});
+})();
+
+async function handleRxLabelFiles(files){
+    const valid=Array.from(files).filter(f=>f.type.startsWith('image/')||f.type==='application/pdf');
+    if(!valid.length){toast('Select images or PDFs.','error');return;}
+    for(const file of valid){
+        const id=Date.now()+Math.random();
+        const item={id,file,base64:null,mimeType:file.type==='application/pdf'?'application/pdf':'image/jpeg',thumb:null,status:'pending',error:null,extracted:{}};
+        if(file.type==='application/pdf'){
+            item.base64=await new Promise(r=>{const fr=new FileReader();fr.onload=e=>r(e.target.result.split(',')[1]);fr.readAsDataURL(file);});
+        }else{
+            const dataUrl=await compressImage(file)||await new Promise(r=>{const fr=new FileReader();fr.onload=e=>r(e.target.result);fr.readAsDataURL(file);});
+            item.base64=dataUrl.split(',')[1];
+            item.thumb=dataUrl;
+        }
+        rxQueue.push(item);
+    }
+    renderRxQueue();
+}
+
+function renderRxQueue(){
+    const el=document.getElementById('rx-upload-queue'),empty=document.getElementById('rx-upload-empty');
+    const hasItems=rxQueue.length>0;
+    if(empty)empty.style.display=hasItems?'none':'block';
+    document.getElementById('rx-queue-analyze-all').disabled=!rxQueue.some(q=>q.status==='pending'||q.status==='error');
+    document.getElementById('rx-queue-save-all').disabled=!rxQueue.some(q=>q.status==='ready');
+    const counts=rxQueue.reduce((a,q)=>{a[q.status]=(a[q.status]||0)+1;return a;},{});
+    document.getElementById('rx-queue-status').textContent=hasItems?`${rxQueue.length} total · ${counts.ready||0} ready · ${counts.saved||0} saved`:'';
+    el.innerHTML=rxQueue.map(q=>{
+        const isPdf=q.mimeType==='application/pdf';
+        const imgHtml=q.thumb?`<img class="bulk-card-img" src="${q.thumb}">`:`<div class="bulk-card-img-placeholder">${isPdf?'📄':'💊'}</div>`;
+        const labelMap={pending:'Pending',scanning:'Analyzing…',ready:'Ready',saved:'Saved',error:'Error'};
+        const statusClass='status-'+q.status;
+        let body='';
+        if(q.status==='ready'||q.status==='error'){
+            const ex=q.extracted||{};
+            body=`<div class="rx-inline-grid">
+                <div class="rx-inline-field full"><label>Medication *</label><input type="text" value="${esc(ex.name)||''}" oninput="updateRxQueueField(${q.id},'name',this.value)"></div>
+                <div class="rx-inline-field"><label>Dosage</label><input type="text" value="${esc(ex.dosage)||''}" oninput="updateRxQueueField(${q.id},'dosage',this.value)"></div>
+                <div class="rx-inline-field"><label>Frequency</label><input type="text" value="${esc(ex.frequency)||''}" oninput="updateRxQueueField(${q.id},'frequency',this.value)"></div>
+                <div class="rx-inline-field"><label>Physician</label><input type="text" list="physician-list" value="${esc(ex.physician)||''}" oninput="updateRxQueueField(${q.id},'physician',this.value)"></div>
+                <div class="rx-inline-field"><label>Date Prescribed</label><input type="date" value="${esc(ex.datePrescribed)||''}" oninput="updateRxQueueField(${q.id},'datePrescribed',this.value)"></div>
+                <div class="rx-inline-field"><label>Pharmacy</label><input type="text" value="${esc(ex.pharmacy)||''}" oninput="updateRxQueueField(${q.id},'pharmacy',this.value)"></div>
+                <div class="rx-inline-field"><label>Refills</label><input type="number" min="0" value="${esc(ex.refills)||''}" oninput="updateRxQueueField(${q.id},'refills',this.value)"></div>
+                <div class="rx-inline-field full"><label>Condition / Reason</label><input type="text" value="${esc(ex.condition)||''}" oninput="updateRxQueueField(${q.id},'condition',this.value)"></div>
+                <div class="rx-inline-field full"><label>Notes</label><textarea rows="2" oninput="updateRxQueueField(${q.id},'notes',this.value)">${esc(ex.notes)||''}</textarea></div>
+            </div>`;
+        }else if(q.status==='saved'){
+            body=`<div class="bulk-card-field"><strong>${esc(q.extracted?.name)||'Prescription'}</strong> saved to list.</div>`;
+        }else if(q.status==='scanning'){
+            body=`<div class="bulk-card-field">Reading label with AI…</div>`;
+        }else{
+            body=`<div class="bulk-card-field">Ready to analyze.</div>`;
+        }
+        let actions='';
+        if(q.status==='pending'||q.status==='error'){
+            actions=`<button class="btn btn-primary btn-sm" onclick="analyzeRxLabel(${q.id})">🤖 Analyze</button>`;
+        }
+        if(q.status==='ready'){
+            actions=`<button class="btn btn-primary btn-sm" onclick="saveRxFromQueue(${q.id})">💾 Save to List</button>
+                     <button class="btn btn-ghost btn-sm" onclick="analyzeRxLabel(${q.id})">↻ Re-analyze</button>`;
+        }
+        const errMsg=q.status==='error'?`<div class="bulk-card-field" style="color:var(--danger);margin-top:6px;">${esc(q.error||'Analysis failed')}</div>`:'';
+        return `<div class="bulk-card ${q.status==='saved'?'done':''} ${q.status==='error'?'error':''}" id="rx-card-${q.id}">
+            <button class="bulk-card-remove" onclick="removeRxQueueItem(${q.id})" title="Remove">✕</button>
+            ${imgHtml}
+            <div class="bulk-card-body">
+                <span class="bulk-card-status ${statusClass}">${labelMap[q.status]||q.status}</span>
+                ${body}
+                ${errMsg}
+                <div class="rx-card-actions">${actions}</div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function updateRxQueueField(id,field,value){
+    const q=rxQueue.find(x=>x.id===id);if(!q)return;
+    q.extracted=q.extracted||{};q.extracted[field]=value;
+}
+
+function removeRxQueueItem(id){
+    rxQueue=rxQueue.filter(x=>x.id!==id);renderRxQueue();
+}
+
+function clearRxQueue(){
+    if(!rxQueue.length)return;
+    if(!confirm('Clear all uploaded labels from the queue?'))return;
+    rxQueue=[];renderRxQueue();
+}
+
+async function analyzeRxLabel(id){
+    const q=rxQueue.find(x=>x.id===id);if(!q||!q.base64)return;
+    if(!apiKey){toast('Set your Anthropic API key in Settings first.','error');return;}
+    q.status='scanning';q.error=null;renderRxQueue();
+    const prompt=`You are a pharmacy label analyst. Read this prescription label or pharmacy printout and extract the fields below. Return ONLY a valid JSON object with these exact keys:
+name (medication/drug name, brand or generic — the primary drug),
+dosage (strength per unit, e.g. "500mg", "10mg/5mL"),
+frequency (sig/directions, e.g. "Twice daily", "1 tablet every 8 hours as needed"),
+physician (prescriber name, e.g. "Dr. Jane Smith"),
+datePrescribed (YYYY-MM-DD, use fill/written date if available),
+condition (indication/reason if stated, else empty),
+pharmacy (pharmacy name, e.g. "CVS", "Walgreens"),
+refills (number of refills remaining, as a string digit or empty),
+notes (any warnings, side-effect cautions, or extra directions in one short line).
+Use empty string for any field you cannot confidently extract. Do not invent values.`;
+    try{
+        const raw=await callClaude(q.base64,q.mimeType,prompt);
+        if(!raw)throw new Error('No response from AI');
+        const jsonMatch=raw.match(/\{[\s\S]*\}/);
+        if(!jsonMatch)throw new Error('Could not parse AI response');
+        const r=JSON.parse(jsonMatch[0]);
+        q.extracted={};
+        RX_FIELDS.forEach(f=>{q.extracted[f]=(r[f]||'').toString();});
+        if(!q.extracted.name){q.status='error';q.error='No medication name detected. Try a clearer photo.';}
+        else{q.status='ready';}
+    }catch(err){
+        q.status='error';q.error=err.message;
+    }
+    renderRxQueue();
+}
+
+async function analyzeAllRxLabels(){
+    const pending=rxQueue.filter(q=>q.status==='pending'||q.status==='error');
+    for(const q of pending){await analyzeRxLabel(q.id);}
+}
+
+async function saveRxFromQueue(id){
+    const q=rxQueue.find(x=>x.id===id);if(!q||q.status!=='ready')return;
+    const ex=q.extracted||{};
+    const name=(ex.name||'').trim();
+    if(!name){toast('Medication name is required.','error');return;}
+    const data={
+        name,
+        dosage:(ex.dosage||'').trim(),
+        frequency:(ex.frequency||'').trim(),
+        physician:(ex.physician||'').trim(),
+        datePrescribed:(ex.datePrescribed||'').trim(),
+        dateDiscontinued:'',
+        condition:(ex.condition||'').trim(),
+        pharmacy:(ex.pharmacy||'').trim(),
+        refills:(ex.refills||'').toString().trim(),
+        status:'active',
+        notes:(ex.notes||'').trim(),
+        source:'label-upload',
+        addedAt:new Date().toISOString(),
+    };
+    try{
+        await db.collection('addison_prescriptions').add(data);
+        q.status='saved';
+        toast(`Added ${name}.`,'success');
+        renderRxQueue();
+    }catch(err){
+        toast('Save failed: '+err.message,'error');
+    }
+}
+
+async function saveAllRxFromQueue(){
+    const ready=rxQueue.filter(q=>q.status==='ready');
+    for(const q of ready){await saveRxFromQueue(q.id);}
 }
 
 // ═══════════════════════════════════════

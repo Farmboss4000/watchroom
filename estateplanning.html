@@ -1324,22 +1324,28 @@ function ensurePdfJs(){
 async function openPdfWithPasswords(blob){
     ensurePdfJs();
     const arrayBuffer=await blob.arrayBuffer();
-    const openPdf=async(password)=>{
-        const task=window.pdfjsLib.getDocument(password?{data:arrayBuffer.slice(0),password}:{data:arrayBuffer.slice(0)});
-        return await task.promise;
-    };
-    let pdf;
-    try{pdf=await openPdf();return pdf;}
-    catch(err){
-        const name=err?.name||'';
-        if(name==='PasswordException'||/password/i.test(err?.message||'')){
-            for(const pwd of TEA_PDF_PASSWORDS){
-                try{pdf=await openPdf(pwd);return pdf;}catch(e){}
-            }
-            throw new Error('PDF is password-protected and no saved password matched');
+    const task=window.pdfjsLib.getDocument({data:new Uint8Array(arrayBuffer)});
+    const passwords=[...TEA_PDF_PASSWORDS];
+    let idx=0,promptedOnce=false;
+    task.onPassword=(updateCallback,reason)=>{
+        // reason: 1 = NEED_PASSWORD (first try), 2 = INCORRECT_PASSWORD (last attempt failed)
+        if(idx<passwords.length){
+            updateCallback(passwords[idx]);
+            idx++;
+            return;
         }
-        throw err;
-    }
+        if(!promptedOnce){
+            promptedOnce=true;
+            const pwd=prompt('This PDF is password-protected. Enter the password (will be cached for this session):');
+            if(pwd&&pwd.length){
+                if(!TEA_PDF_PASSWORDS.includes(pwd))TEA_PDF_PASSWORDS.push(pwd);
+                updateCallback(pwd);
+                return;
+            }
+        }
+        updateCallback(new Error('No matching password'));
+    };
+    return await task.promise;
 }
 async function extractPdfText(blob,maxPages=250){
     const pdf=await openPdfWithPasswords(blob);

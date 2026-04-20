@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Farmboss Tea Party</title>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0;}
+        :root{
+            --bg-primary:#f5f3ef;--bg-secondary:#ffffff;--bg-card:#ece8df;
+            --accent:#7f1d1d;--accent-hover:#991b1b;--accent-dim:rgba(127,29,29,0.12);
+            --text-primary:#1a1f2e;--text-secondary:#5a6070;--border:#cdc8bd;
+            --success:#16a34a;--danger:#dc2626;--info:#2563eb;--warn:#f59e0b;--hdr-bg:#1a1409;
+        }
+        body{font-family:'Georgia',serif;background:var(--bg-primary);color:var(--text-primary);min-height:100vh;overflow-x:hidden;}
+        .site-switcher{background:#111827;display:flex;align-items:center;padding:5px 18px;gap:4px;font-size:0.77rem;border-bottom:1px solid rgba(255,255,255,0.07);overflow-x:auto;scrollbar-width:none;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
+        .site-switcher::-webkit-scrollbar{display:none;}
+        .site-link{text-decoration:none;color:#9ca3af;padding:4px 12px;border-radius:4px;display:flex;align-items:center;gap:6px;font-weight:500;transition:all 0.15s;white-space:nowrap;}
+        .site-link:hover{background:rgba(255,255,255,0.1);color:#e5e7eb;}
+        .site-link.active{background:rgba(255,255,255,0.13);color:#fff;font-weight:600;}
+        #login-screen{position:fixed;inset:0;background:linear-gradient(135deg,#1a0a0a 0%,#3d1818 100%);display:flex;align-items:center;justify-content:center;z-index:9000;flex-direction:column;gap:12px;}
+        .login-site-links{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
+        .login-site-links a{color:rgba(255,255,255,0.5);font-size:0.78rem;text-decoration:none;padding:4px 12px;border:1px solid rgba(255,255,255,0.2);border-radius:4px;transition:all 0.15s;}
+        .login-site-links a:hover{color:#fff;border-color:rgba(255,255,255,0.5);}
+        .login-site-links a.active{color:#d4a574;border-color:#d4a574;}
+        .login-box{background:#fff;border-radius:10px;padding:44px 40px;width:100%;max-width:400px;box-shadow:0 24px 64px rgba(0,0,0,0.4);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
+        .login-logo{width:56px;height:56px;background:var(--accent);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 16px;color:#fff;}
+        .login-box h2{text-align:center;font-size:1.5rem;color:#1a1f2e;margin-bottom:4px;font-family:'Georgia',serif;}
+        .login-sub{text-align:center;font-size:0.85rem;color:#6b7280;margin-bottom:28px;font-style:italic;}
+        .login-error{color:var(--danger);font-size:0.82rem;margin-bottom:12px;min-height:18px;text-align:center;}
+        .login-full{width:100%;justify-content:center;}
+        .form-group{margin-bottom:14px;}
+        .form-group label{display:block;font-size:0.8rem;font-weight:600;color:#374151;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.4px;}
+        .form-group input,.form-group select,.form-group textarea{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:5px;font-size:0.9rem;font-family:inherit;color:var(--text-primary);background:var(--bg-secondary);transition:border-color 0.15s;}
+        .form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--accent);}
+        #loading-screen{display:none;position:fixed;inset:0;background:var(--bg-primary);flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:8000;}
+        .spinner{width:44px;height:44px;border:4px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
+        @keyframes spin{to{transform:rotate(360deg);}}
+        #app{display:none;min-height:100vh;flex-direction:column;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
+        header{background:var(--hdr-bg);padding:0 20px;display:flex;align-items:center;gap:16px;min-height:56px;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,0.25);flex-wrap:wrap;}
+        .logo-area{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+        .logo-icon{width:32px;height:32px;background:var(--accent);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:17px;color:#fff;flex-shrink:0;}
+        header h1{font-size:1.15rem;font-weight:700;color:#fff;white-space:nowrap;font-family:'Georgia',serif;}
+        header h1 span{color:#d4a574;}
+        nav{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;flex-shrink:0;}
+        nav::-webkit-scrollbar{display:none;}
+        nav button{background:transparent;border:none;color:#9ca3af;padding:8px 13px;border-radius:5px;cursor:pointer;font-size:0.83rem;transition:all 0.15s;white-space:nowrap;font-family:inherit;}
+        nav button:hover{background:rgba(127,29,29,0.3);color:#fff;}
+        nav button.active{background:var(--accent);color:#fff;font-weight:600;}
+        .header-right{display:flex;align-items:center;gap:10px;margin-left:auto;}
+        .user-badge{font-size:0.78rem;color:#9ca3af;background:rgba(255,255,255,0.08);padding:4px 10px;border-radius:5px;}
+        .btn-signout{background:transparent;border:1px solid rgba(255,255,255,0.2);color:#9ca3af;padding:5px 12px;border-radius:5px;cursor:pointer;font-size:0.78rem;transition:all 0.15s;font-family:inherit;}
+        .btn-signout:hover{border-color:var(--danger);color:var(--danger);}
+        main{padding:20px;max-width:1400px;margin:0 auto;flex:1;width:100%;}
+        .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:20px;}
+        .stat-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:18px 16px;text-align:center;}
+        .stat-value{font-size:2rem;font-weight:800;color:var(--accent);line-height:1;margin-bottom:4px;font-family:'Georgia',serif;}
+        .stat-label{font-size:0.77rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;}
+        .card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:22px;margin-bottom:20px;}
+        .card-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;gap:10px;flex-wrap:wrap;}
+        .card-title-left{font-size:1.05rem;font-weight:700;color:var(--text-primary);font-family:'Georgia',serif;}
+        .view{display:none;}.view.active{display:block;}
+        .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:5px;font-size:0.85rem;font-weight:600;cursor:pointer;border:none;transition:all 0.15s;font-family:inherit;text-decoration:none;}
+        .btn-primary{background:var(--accent);color:#fff;}.btn-primary:hover{background:var(--accent-hover);}
+        .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text-primary);}.btn-ghost:hover{background:var(--bg-card);}
+        .btn-danger{background:var(--danger);color:#fff;}.btn-danger:hover{opacity:0.85;}
+        .btn-info{background:var(--info);color:#fff;}.btn-info:hover{opacity:0.85;}
+        .btn-sm{padding:5px 10px;font-size:0.78rem;}
+        .btn-icon{background:transparent;border:1px solid var(--border);color:var(--text-secondary);padding:3px 9px;border-radius:4px;font-size:0.76rem;cursor:pointer;font-family:inherit;}
+        .btn-icon:hover{border-color:var(--accent);color:var(--accent);}
+        .btn-icon.danger:hover{border-color:var(--danger);color:var(--danger);}
+        .form-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+        .form-group.full-width{grid-column:1/-1;}
+        .form-group.span2{grid-column:span 2;}
+        .form-actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+        .table-wrapper{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+        table{width:100%;border-collapse:collapse;font-size:0.88rem;}
+        thead th{background:var(--bg-card);padding:10px 12px;text-align:left;font-size:0.74rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary);border-bottom:2px solid var(--border);white-space:nowrap;}
+        tbody tr{border-bottom:1px solid var(--border);transition:background 0.1s;}
+        tbody tr:hover{background:var(--accent-dim);}
+        tbody td{padding:10px 12px;vertical-align:top;}
+        .empty{text-align:center;padding:40px 20px;color:var(--text-secondary);}
+        .empty-icon{font-size:3rem;margin-bottom:12px;}
+        .badge{display:inline-block;padding:3px 9px;border-radius:4px;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;white-space:nowrap;}
+        .badge-tax{background:#e0e7ff;color:#4338ca;}
+        .hero{background:linear-gradient(135deg,#2a0f0f 0%,#3d1818 60%,#531f1f 100%);border-radius:10px;padding:28px 32px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:16px;overflow:hidden;position:relative;}
+        .hero-title{font-size:1.7rem;font-weight:800;color:#fff;margin-bottom:4px;font-family:'Georgia',serif;letter-spacing:0.5px;}
+        .hero-title span{color:#d4a574;}
+        .hero-sub{font-size:0.9rem;color:rgba(255,255,255,0.7);font-style:italic;}
+        .hero-emoji{font-size:4rem;opacity:0.85;flex-shrink:0;}
+        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;opacity:0;pointer-events:none;transition:opacity 0.2s;}
+        .modal-overlay.show{opacity:1;pointer-events:all;}
+        .modal{background:#fff;border-radius:10px;padding:28px 24px;width:100%;max-width:640px;margin:16px;max-height:90vh;overflow-y:auto;transform:scale(0.95);transition:transform 0.2s;}
+        .modal-overlay.show .modal{transform:scale(1);}
+        .modal-title{font-size:1.15rem;font-weight:700;color:var(--text-primary);margin-bottom:4px;font-family:'Georgia',serif;}
+        .modal-sub{font-size:0.85rem;color:var(--text-secondary);margin-bottom:16px;font-style:italic;}
+        .modal-actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+        .api-key-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;}
+        .api-key-row .form-group{flex:1;min-width:260px;}
+        .api-status{font-size:0.82rem;margin-top:8px;padding:8px 12px;border-radius:5px;}
+        .api-status.ok{background:#dcfce7;color:#15803d;}
+        .api-status.err{background:#fee2e2;color:#b91c1c;}
+        .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--text-primary);color:#fff;padding:12px 24px;border-radius:6px;font-size:0.88rem;z-index:9999;transition:transform 0.3s;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
+        .toast.show{transform:translateX(-50%) translateY(0);}
+        .toast.success{background:var(--success);}
+        .toast.error{background:var(--danger);}
+        .toast.warn{background:var(--warn);color:#000;}
+        .analysis-panel{background:#fdf9f3;border:1.5px solid #e8dcc4;border-radius:10px;padding:24px;margin-top:20px;line-height:1.7;font-size:0.92rem;color:var(--text-primary);}
+        .analysis-panel h2{font-size:1.15rem;font-weight:700;color:var(--accent);margin:18px 0 8px;font-family:'Georgia',serif;border-bottom:1px solid var(--border);padding-bottom:4px;}
+        .analysis-panel h2:first-child{margin-top:0;}
+        .analysis-panel h3{font-size:1rem;font-weight:700;color:var(--text-primary);margin:14px 0 6px;font-family:'Georgia',serif;}
+        .analysis-panel ul,.analysis-panel ol{margin:8px 0;padding-left:24px;}
+        .analysis-panel li{margin-bottom:4px;}
+        .analysis-panel strong{color:var(--text-primary);}
+        .analysis-panel em{color:var(--accent);font-style:italic;}
+        .analysis-summary{background:#fff;border:1.5px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;}
+        .analysis-summary-info{flex:1;min-width:200px;}
+        .analysis-summary-label{font-size:0.74rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:3px;}
+        .analysis-summary-date{font-size:1.02rem;font-weight:700;color:var(--text-primary);}
+        .analysis-summary-meta{font-size:0.82rem;color:var(--text-secondary);margin-top:2px;}
+        .history-item{background:#fff;border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:10px;transition:all 0.15s;}
+        .history-item:hover{border-color:var(--accent);background:#fdf9f3;}
+        .history-item-info{flex:1;min-width:0;}
+        .history-item-date{font-size:0.9rem;font-weight:600;color:var(--text-primary);}
+        .history-item-meta{font-size:0.78rem;color:var(--text-secondary);margin-top:2px;}
+        .history-item.current{border-left:3px solid var(--accent);}
+        .history-item-actions{display:flex;gap:6px;flex-shrink:0;}
+        @media(max-width:700px){
+            header{padding:6px 12px;gap:10px;}
+            .logo-area{flex:1;}
+            header h1{font-size:0.95rem;}
+            nav{order:3;width:100%;overflow-x:auto;scrollbar-width:none;padding-bottom:2px;border-top:1px solid rgba(255,255,255,0.1);padding-top:6px;}
+            main{padding:12px;}
+            .form-grid{grid-template-columns:1fr 1fr;}
+            .form-group.span2{grid-column:span 1;}
+            .stats-grid{grid-template-columns:1fr 1fr;}
+            input,select,textarea{font-size:16px;}
+        }
+        @media(max-width:480px){
+            .form-grid{grid-template-columns:1fr;}
+            .form-group.full-width,.form-group.span2{grid-column:1;}
+        }
+    </style>
+</head>
+<body>
+
+<div id="login-screen">
+    <div class="login-site-links">
+        <a href="index.html">🏠 HQ</a>
+        <a href="dontpush.html">🚫 Don't Push</a>
+        <a href="teaparty.html" class="active">🫖 Tea Party</a>
+    </div>
+    <div class="login-box">
+        <div class="login-logo">🫖</div>
+        <h2>Farmboss Tea Party</h2>
+        <p class="login-sub">Household tax-history archive</p>
+        <form id="login-form">
+            <div class="form-group"><label>Email</label><input type="email" id="login-email" placeholder="your@email.com" required autocomplete="username"></div>
+            <div class="form-group" style="margin-bottom:20px;"><label>Password</label><input type="password" id="login-password" placeholder="••••••••" required autocomplete="current-password"></div>
+            <div class="login-error" id="login-error"></div>
+            <button type="submit" class="btn btn-primary login-full" id="login-btn">Sign In</button>
+        </form>
+    </div>
+</div>
+
+<div id="loading-screen"><div class="spinner"></div><p>Loading tax archive...</p></div>
+
+<div id="app">
+<div class="site-switcher">
+    <a href="index.html" class="site-link">🏠 HQ</a>
+    <a href="armory.html" class="site-link">🔫 Armory</a>
+    <a href="machinery.html" class="site-link">🚜 Machinery</a>
+    <a href="automotive.html" class="site-link">🚗 Automotive</a>
+    <a href="livestock.html" class="site-link">🐄 Livestock</a>
+    <a href="timepieces.html" class="site-link">⌚ Timepieces</a>
+    <a href="knives.html" class="site-link">🔪 Knives</a>
+    <a href="realestate.html" class="site-link">🏡 Real Estate</a>
+    <a href="globetrotting.html" class="site-link">✈️ Globetrotting</a>
+    <a href="vendors.html" class="site-link">💼 Vendors</a>
+    <a href="contacts.html" class="site-link">👥 Enterprise Contacts</a>
+    <a href="estateplanning.html" class="site-link">📜 Estate Planning</a>
+    <a href="teaparty.html" class="site-link active">🫖 Tea Party</a>
+    <a href="dontpush.html" class="site-link">🚫 Don't Push</a>
+</div>
+<header>
+    <div class="logo-area">
+        <div class="logo-icon">🫖</div>
+        <h1>Farmboss <span>Tea Party</span></h1>
+    </div>
+    <nav>
+        <button class="active" onclick="showView('years')">📊 Tax Years</button>
+        <button onclick="showView('settings')">⚙ Settings</button>
+    </nav>
+    <div class="header-right">
+        <span class="user-badge" id="user-email"></span>
+        <button class="btn-signout" onclick="doSignOut()">Sign Out</button>
+    </div>
+</header>
+<main>
+
+<!-- TAX YEARS VIEW -->
+<div id="view-years" class="view active">
+    <div class="hero">
+        <div>
+            <div class="hero-title">Farmboss <span>Tea Party</span></div>
+            <div class="hero-sub">A long look at what the taxman took — 2002 to present</div>
+        </div>
+        <div class="hero-emoji">🫖</div>
+    </div>
+
+    <!-- SUMMARY AT TOP -->
+    <div class="card">
+        <div class="card-title">
+            <div class="card-title-left">✨ Tax History Summary — 2002 to Present</div>
+            <button class="btn btn-primary" id="btn-generate-tax-summary" onclick="generateTaxSummary()">✨ Generate Summary</button>
+        </div>
+        <p style="font-size:0.9rem;color:var(--text-secondary);margin-bottom:16px;font-style:italic;">AI reviews every tax year on file and writes a plain-English narrative of how income, tax burden, and refunds have shifted over time — flagging years where something meaningfully changed.</p>
+        <div class="stats-grid" id="tax-summary-stats" style="margin-bottom:16px;"></div>
+        <div class="analysis-summary" id="tax-summary-meta-row" style="display:none;">
+            <div class="analysis-summary-info">
+                <div class="analysis-summary-label">Last Generated</div>
+                <div class="analysis-summary-date" id="tax-summary-date">—</div>
+                <div class="analysis-summary-meta" id="tax-summary-meta">—</div>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="generateTaxSummary()">🔄 Refresh Summary</button>
+        </div>
+        <div id="tax-summary-status" style="font-size:0.82rem;color:var(--text-secondary);min-height:18px;margin-bottom:8px;"></div>
+        <div id="tax-summary-result" class="analysis-panel" style="display:none;"></div>
+        <div id="tax-summary-history-wrap" style="display:none;margin-top:20px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-top:14px;border-top:1px solid var(--border);">
+                <div style="font-weight:600;font-size:0.92rem;color:var(--text-primary);">📚 Previous Summaries <span id="tax-summary-history-count" style="color:var(--text-secondary);font-weight:400;font-size:0.82rem;margin-left:6px;"></span></div>
+            </div>
+            <div id="tax-summary-history-list"></div>
+        </div>
+    </div>
+
+    <!-- TAX YEAR REPORTS TABLE -->
+    <div class="card">
+        <div class="card-title">
+            <div class="card-title-left">📊 Tax Year Reports</div>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                <span style="font-size:0.85rem;color:var(--text-secondary);" id="tax-years-meta">0 years</span>
+                <button class="btn btn-ghost btn-sm" onclick="exportTaxCSV()">📥 Export CSV</button>
+                <button class="btn btn-primary btn-sm" onclick="openTaxYearForm()">+ Add Year</button>
+            </div>
+        </div>
+        <div class="table-wrapper">
+            <table id="tax-years-table"><thead><tr>
+                <th>Year</th>
+                <th style="text-align:right;">Federal AGI</th>
+                <th style="text-align:right;">Taxable Income</th>
+                <th style="text-align:right;">Federal Tax</th>
+                <th style="text-align:right;">Withholding</th>
+                <th style="text-align:right;">Net (Fed)</th>
+                <th>State Returns</th>
+                <th>Docs</th>
+            </tr></thead><tbody id="tax-years-tbody"></tbody></table>
+        </div>
+        <div id="tax-years-empty" class="empty" style="display:none;"><div class="empty-icon">🫖</div><p>No tax years yet. Click <strong>+ Add Year</strong> to begin.</p></div>
+    </div>
+</div>
+
+<!-- SETTINGS -->
+<div id="view-settings" class="view">
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">🔑 Anthropic API Key</div></div>
+        <p style="font-size:0.88rem;color:var(--text-secondary);margin-bottom:16px;font-style:italic;">Required for the AI-generated tax history summary. Shared with the other Farmboss sites.</p>
+        <div class="api-key-row">
+            <div class="form-group" style="margin-bottom:0;"><label>API Key</label><input type="password" id="api-key-input" placeholder="sk-ant-api03-…"></div>
+            <button class="btn btn-primary" onclick="saveApiKey()">Save Key</button>
+            <button class="btn btn-ghost" onclick="testApiKey()">Test</button>
+        </div>
+        <div class="api-status" id="api-status" style="display:none;"></div>
+    </div>
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">🌐 CORS Proxy URL (optional)</div></div>
+        <div class="api-key-row">
+            <div class="form-group" style="margin-bottom:0;"><label>Proxy URL</label><input type="text" id="api-proxy-input" placeholder="https://your-proxy.workers.dev/"></div>
+            <button class="btn btn-primary" onclick="saveProxyUrl()">Save Proxy</button>
+        </div>
+    </div>
+</div>
+
+<!-- TAX YEAR EDIT MODAL -->
+<div class="modal-overlay" id="tax-modal" onclick="if(event.target===this)closeTaxModal()">
+    <div class="modal">
+        <div class="modal-title" id="tax-modal-title">Add Tax Year</div>
+        <div class="modal-sub">Federal 1040 totals and state filings for a single tax year.</div>
+        <input type="hidden" id="tf-doc-id">
+        <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;">
+            <div class="form-group"><label>Tax Year *</label><input type="number" id="tf-year" min="1900" max="2100" required></div>
+            <div class="form-group"><label>Filing Status</label><select id="tf-filing"><option>MFJ</option><option>MFS</option><option>Single</option><option>HoH</option><option>QW</option></select></div>
+            <div class="form-group"><label>Taxpayers</label><input type="text" id="tf-taxpayers" placeholder="e.g. Jeffrey M. &amp; Renee C. Stoebner"></div>
+            <div class="form-group"><label>Federal AGI</label><input type="number" step="1" id="tf-agi"></div>
+            <div class="form-group"><label>Taxable Income</label><input type="number" step="1" id="tf-taxable"></div>
+            <div class="form-group"><label>Federal Tax</label><input type="number" step="1" id="tf-fedtax"></div>
+            <div class="form-group"><label>Federal Withholding</label><input type="number" step="1" id="tf-withholding"></div>
+            <div class="form-group span2"><label>State Returns (one per line: STATE | refund/owed)</label><textarea id="tf-states" rows="2" placeholder="MN | 1234&#10;IA | -250"></textarea></div>
+            <div class="form-group full-width"><label>Docs On File (comma-separated: e.g. 1040, 1040-X, Schedule C)</label><input type="text" id="tf-docs" placeholder="1040"></div>
+            <div class="form-group full-width"><label>Notes</label><textarea id="tf-notes" rows="2"></textarea></div>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-primary" onclick="saveTaxYear()">Save</button>
+            <button class="btn btn-ghost" onclick="closeTaxModal()">Cancel</button>
+            <button class="btn btn-danger" id="tf-delete-btn" onclick="deleteTaxYear()" style="display:none;">🗑 Delete</button>
+        </div>
+    </div>
+</div>
+
+</main>
+</div><!-- end #app -->
+
+<div id="toast" class="toast"></div>
+
+<script>
+firebase.initializeApp({
+    apiKey:"AIzaSyB7c4urD9tJO80S7nADItxjwhSYVqlrkEU",
+    authDomain:"watchroom-714a0.firebaseapp.com",
+    projectId:"watchroom-714a0",
+    storageBucket:"watchroom-714a0.firebasestorage.app",
+    messagingSenderId:"911514107783",
+    appId:"1:911514107783:web:20e8a729fd66577c28dd22"
+});
+const auth=firebase.auth(),db=firebase.firestore();
+
+// STATE
+let taxYears=[];
+let apiKey='',proxyUrl='',aiModel='claude-sonnet-4-5';
+let unsubTaxYears=null;
+const VIEWS=['years','settings'];
+
+// UTILS
+function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):'';}
+function toast(msg,type){const el=document.getElementById('toast');el.textContent=msg;el.className='toast '+(type||'')+' show';clearTimeout(el._tid);el._tid=setTimeout(()=>el.classList.remove('show'),3500);}
+function fmtMoney(n){
+    if(n===null||n===undefined||n==='')return '—';
+    const v=Number(n);
+    if(!isFinite(v))return '—';
+    return '$'+Math.round(v).toLocaleString();
+}
+function fmtSigned(n){
+    if(n===null||n===undefined||n==='')return '—';
+    const v=Number(n);
+    if(!isFinite(v))return '—';
+    const r=Math.round(v);
+    if(r===0)return '+$0';
+    return (r>0?'+$':'-$')+Math.abs(r).toLocaleString();
+}
+function formatOverviewDate(ts){
+    if(!ts)return '—';
+    let d;
+    if(typeof ts==='object'&&ts.seconds)d=new Date(ts.seconds*1000);
+    else if(typeof ts==='string')d=new Date(ts);
+    else if(ts instanceof Date)d=ts;
+    else return '—';
+    return d.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
+}
+
+// AUTH
+auth.onAuthStateChanged(user=>{
+    if(user){
+        document.getElementById('login-screen').style.display='none';
+        document.getElementById('loading-screen').style.display='flex';
+        document.getElementById('app').style.display='none';
+        document.getElementById('user-email').textContent=user.email;
+        initApp();
+    } else {
+        document.getElementById('login-screen').style.display='flex';
+        document.getElementById('loading-screen').style.display='none';
+        document.getElementById('app').style.display='none';
+        if(unsubTaxYears){unsubTaxYears();unsubTaxYears=null;}
+        taxYears=[];
+    }
+});
+document.getElementById('login-form').addEventListener('submit',async e=>{
+    e.preventDefault();
+    const email=document.getElementById('login-email').value.trim();
+    const pass=document.getElementById('login-password').value;
+    const errEl=document.getElementById('login-error'),btn=document.getElementById('login-btn');
+    errEl.textContent='';btn.textContent='Signing in...';btn.disabled=true;
+    try{await auth.signInWithEmailAndPassword(email,pass);}
+    catch(err){errEl.textContent='Invalid email or password.';btn.textContent='Sign In';btn.disabled=false;}
+});
+async function doSignOut(){if(!confirm('Sign out?'))return;await auth.signOut();}
+
+// INIT
+async function initApp(){
+    try{
+        const keyDoc=await db.collection('settings').doc('apikey').get();
+        if(keyDoc.exists&&keyDoc.data().key){apiKey=keyDoc.data().key;document.getElementById('api-key-input').value=apiKey;}
+        const proxyDoc=await db.collection('settings').doc('proxy').get();
+        if(proxyDoc.exists&&proxyDoc.data().url){proxyUrl=proxyDoc.data().url;document.getElementById('api-proxy-input').value=proxyUrl;}
+        const modelDoc=await db.collection('settings').doc('model').get();
+        if(modelDoc.exists&&modelDoc.data().model) aiModel=modelDoc.data().model;
+
+        unsubTaxYears=db.collection('estate_tax_years').onSnapshot(snap=>{
+            taxYears=snap.docs.map(doc=>({_docId:doc.id,...doc.data()}));
+            renderTaxYears();
+        },err=>console.warn('tax years snap err',err));
+
+        loadTaxSummaryHistory();
+
+        document.getElementById('loading-screen').style.display='none';
+        document.getElementById('app').style.display='block';
+        showView('years');
+    }catch(err){
+        document.getElementById('loading-screen').innerHTML=`<p style="color:var(--danger);padding:20px;text-align:center;">Error: ${err.message}<br><br><button class="btn btn-ghost" onclick="doSignOut()">Sign Out</button></p>`;
+    }
+}
+
+function showView(v){
+    VIEWS.forEach(id=>document.getElementById('view-'+id).classList.remove('active'));
+    document.getElementById('view-'+v).classList.add('active');
+    document.querySelectorAll('nav button').forEach((btn,i)=>btn.classList.toggle('active',VIEWS[i]===v));
+    window.scrollTo(0,0);
+}
+
+// ── CLAUDE API ──
+async function callClaudeText(prompt,maxTokens=4096,timeoutMs=120000){
+    if(!apiKey){toast('Set API key in Settings first.','error');return null;}
+    const msgPayload={model:aiModel,max_tokens:maxTokens,messages:[{role:'user',content:prompt}]};
+    const ctrl=new AbortController();
+    const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
+    let res;
+    try{
+        if(proxyUrl){res=await fetch(proxyUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...msgPayload,apiKey}),signal:ctrl.signal});}
+        else{res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',mode:'cors',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true'},body:JSON.stringify(msgPayload),signal:ctrl.signal});}
+    }catch(networkErr){clearTimeout(timer);if(networkErr.name==='AbortError')throw new Error('Timeout');throw new Error('Network error — set up a Proxy URL.');}
+    clearTimeout(timer);
+    if(!res.ok){
+        let e=`API error ${res.status}`;
+        try{const d=await res.json();e=d.error?.message||e;}catch(x){}
+        throw new Error(e);
+    }
+    const data=await res.json();return data.content[0].text;
+}
+
+// ── SETTINGS ──
+async function saveApiKey(){const key=document.getElementById('api-key-input').value.trim();if(!key){toast('Enter a key first.','error');return;}await db.collection('settings').doc('apikey').set({key});apiKey=key;toast('API key saved!','success');}
+async function testApiKey(){
+    const key=document.getElementById('api-key-input').value.trim(),proxy=document.getElementById('api-proxy-input').value.trim();
+    if(!key){toast('Enter a key first.','error');return;}
+    const el=document.getElementById('api-status');el.style.display='block';el.className='api-status';el.textContent='Testing…';
+    try{
+        const testPayload={model:aiModel,max_tokens:10,messages:[{role:'user',content:'Hi'}]};
+        let res;
+        if(proxy){res=await fetch(proxy,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...testPayload,apiKey:key})});}
+        else{res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',mode:'cors',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true'},body:JSON.stringify(testPayload)});}
+        if(res.ok){el.className='api-status ok';el.textContent=`✅ Connected!`;}
+        else{const d=await res.json().catch(()=>({}));el.className='api-status err';el.textContent=`❌ ${d.error?.message||res.status}`;}
+    }catch(err){el.className='api-status err';el.textContent=`❌ ${err.message}`;}
+}
+async function saveProxyUrl(){const url=document.getElementById('api-proxy-input').value.trim();await db.collection('settings').doc('proxy').set({url});proxyUrl=url;toast(url?'Proxy saved!':'Proxy cleared.','success');}
+
+// ── TAX YEARS ──
+function taxSorted(){return [...taxYears].sort((a,b)=>(b.year||0)-(a.year||0));}
+function taxNetFed(t){
+    const wh=Number(t.federalWithholding||0), tax=Number(t.federalTax||0);
+    if(!isFinite(wh)||!isFinite(tax))return null;
+    return wh-tax;
+}
+function renderTaxYears(){
+    const tbody=document.getElementById('tax-years-tbody');
+    const meta=document.getElementById('tax-years-meta');
+    const empty=document.getElementById('tax-years-empty');
+    if(!tbody)return;
+    const sorted=taxSorted();
+    if(meta)meta.textContent=sorted.length?`${sorted.length} year${sorted.length!==1?'s':''} · ${sorted.reduce((s,t)=>s+(t.docs?t.docs.length:0),0)} docs`:'0 years';
+    if(!sorted.length){tbody.innerHTML='';if(empty)empty.style.display='block';renderTaxSummaryStats();return;}
+    if(empty)empty.style.display='none';
+    tbody.innerHTML=sorted.map(t=>{
+        const net=taxNetFed(t);
+        const netColor=net>0?'var(--success)':(net<0?'var(--danger)':'var(--text-secondary)');
+        const stateList=(t.stateReturns||[]).map(s=>`${esc(s.state)} ${fmtSigned(s.amount)}`).join(', ')||'—';
+        const docBadges=(t.docs||[]).map(d=>`<span class="badge badge-tax" style="margin-right:4px;">${esc(d)}</span>`).join('')||'—';
+        const taxpayers=t.taxpayers?`<div style="font-size:0.78rem;color:var(--text-secondary);margin-top:2px;">Filing: ${esc(t.filingStatus||'—')} · ${esc(t.taxpayers)}</div>`:'';
+        return `<tr style="cursor:pointer;" onclick="openTaxYearForm('${t._docId}')">
+            <td><strong style="font-size:1rem;">${esc(String(t.year||'—'))}</strong>${taxpayers}</td>
+            <td style="text-align:right;">${fmtMoney(t.federalAGI)}</td>
+            <td style="text-align:right;">${fmtMoney(t.taxableIncome)}</td>
+            <td style="text-align:right;">${fmtMoney(t.federalTax)}</td>
+            <td style="text-align:right;">${fmtMoney(t.federalWithholding)}</td>
+            <td style="text-align:right;font-weight:700;color:${netColor};">${net===null?'—':fmtSigned(net)}</td>
+            <td style="font-size:0.82rem;">${stateList}</td>
+            <td>${docBadges}</td>
+        </tr>`;
+    }).join('');
+    renderTaxSummaryStats();
+}
+function renderTaxSummaryStats(){
+    const el=document.getElementById('tax-summary-stats');
+    if(!el)return;
+    const sorted=taxSorted();
+    if(!sorted.length){el.innerHTML='';return;}
+    const years=sorted.map(t=>t.year).filter(Boolean);
+    const minY=Math.min(...years), maxY=Math.max(...years);
+    const totalAGI=sorted.reduce((s,t)=>s+(Number(t.federalAGI)||0),0);
+    const totalFedTax=sorted.reduce((s,t)=>s+(Number(t.federalTax)||0),0);
+    const totalNet=sorted.reduce((s,t)=>{const n=taxNetFed(t);return s+(n||0);},0);
+    const avgAGI=years.length?Math.round(totalAGI/years.length):0;
+    el.innerHTML=`
+        <div class="stat-card"><div class="stat-value">${sorted.length}</div><div class="stat-label">Years on File</div></div>
+        <div class="stat-card"><div class="stat-value" style="font-size:1.3rem;">${minY}–${maxY}</div><div class="stat-label">Range</div></div>
+        <div class="stat-card"><div class="stat-value" style="font-size:1.3rem;">${fmtMoney(avgAGI)}</div><div class="stat-label">Avg AGI</div></div>
+        <div class="stat-card"><div class="stat-value" style="font-size:1.3rem;">${fmtMoney(totalFedTax)}</div><div class="stat-label">Total Fed Tax</div></div>
+        <div class="stat-card" style="border-color:${totalNet>=0?'var(--success)':'var(--danger)'};"><div class="stat-value" style="font-size:1.3rem;color:${totalNet>=0?'var(--success)':'var(--danger)'};">${fmtSigned(totalNet)}</div><div class="stat-label">Net Refunds</div></div>`;
+}
+
+function openTaxYearForm(id){
+    const modal=document.getElementById('tax-modal');
+    const title=document.getElementById('tax-modal-title');
+    const delBtn=document.getElementById('tf-delete-btn');
+    document.getElementById('tf-doc-id').value=id||'';
+    if(id){
+        const t=taxYears.find(x=>x._docId===id);
+        if(!t){toast('Tax year not found.','error');return;}
+        title.textContent=`Edit Tax Year ${t.year||''}`;
+        document.getElementById('tf-year').value=t.year||'';
+        document.getElementById('tf-filing').value=t.filingStatus||'MFJ';
+        document.getElementById('tf-taxpayers').value=t.taxpayers||'';
+        document.getElementById('tf-agi').value=t.federalAGI??'';
+        document.getElementById('tf-taxable').value=t.taxableIncome??'';
+        document.getElementById('tf-fedtax').value=t.federalTax??'';
+        document.getElementById('tf-withholding').value=t.federalWithholding??'';
+        document.getElementById('tf-states').value=(t.stateReturns||[]).map(s=>`${s.state} | ${s.amount}`).join('\n');
+        document.getElementById('tf-docs').value=(t.docs||[]).join(', ');
+        document.getElementById('tf-notes').value=t.notes||'';
+        delBtn.style.display='inline-flex';
+    }else{
+        title.textContent='Add Tax Year';
+        ['tf-year','tf-taxpayers','tf-agi','tf-taxable','tf-fedtax','tf-withholding','tf-states','tf-docs','tf-notes'].forEach(k=>document.getElementById(k).value='');
+        document.getElementById('tf-filing').value='MFJ';
+        delBtn.style.display='none';
+    }
+    modal.classList.add('show');
+}
+function closeTaxModal(){document.getElementById('tax-modal').classList.remove('show');}
+function parseStateLines(raw){
+    return (raw||'').split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{
+        const parts=l.split('|').map(p=>p.trim());
+        const state=(parts[0]||'').toUpperCase().slice(0,2);
+        const amount=Number((parts[1]||'').replace(/[,$]/g,''));
+        return state?{state,amount:isFinite(amount)?amount:0}:null;
+    }).filter(Boolean);
+}
+async function saveTaxYear(){
+    const id=document.getElementById('tf-doc-id').value;
+    const year=parseInt(document.getElementById('tf-year').value);
+    if(!year||year<1900||year>2100){toast('Enter a valid tax year.','error');return;}
+    const data={
+        year,
+        filingStatus:document.getElementById('tf-filing').value,
+        taxpayers:document.getElementById('tf-taxpayers').value.trim(),
+        federalAGI:Number(document.getElementById('tf-agi').value)||null,
+        taxableIncome:Number(document.getElementById('tf-taxable').value)||null,
+        federalTax:Number(document.getElementById('tf-fedtax').value)||null,
+        federalWithholding:Number(document.getElementById('tf-withholding').value)||null,
+        stateReturns:parseStateLines(document.getElementById('tf-states').value),
+        docs:document.getElementById('tf-docs').value.split(',').map(s=>s.trim()).filter(Boolean),
+        notes:document.getElementById('tf-notes').value.trim(),
+        updatedAt:new Date().toISOString()
+    };
+    try{
+        if(id){await db.collection('estate_tax_years').doc(id).update(data);toast('Tax year updated.','success');}
+        else{data.addedAt=new Date().toISOString();await db.collection('estate_tax_years').add(data);toast('Tax year added.','success');}
+        closeTaxModal();
+    }catch(err){toast('Save failed: '+err.message,'error');}
+}
+async function deleteTaxYear(){
+    const id=document.getElementById('tf-doc-id').value;
+    if(!id)return;
+    const t=taxYears.find(x=>x._docId===id);
+    if(!confirm(`Delete tax year ${t?t.year:''}? This cannot be undone.`))return;
+    try{await db.collection('estate_tax_years').doc(id).delete();closeTaxModal();toast('Tax year deleted.','success');}
+    catch(err){toast('Delete failed: '+err.message,'error');}
+}
+function exportTaxCSV(){
+    const sorted=[...taxYears].sort((a,b)=>(a.year||0)-(b.year||0));
+    if(!sorted.length){toast('No tax years to export.','error');return;}
+    const headers=['Year','Filing','Taxpayers','Federal AGI','Taxable Income','Federal Tax','Federal Withholding','Net (Fed)','State Returns','Docs','Notes'];
+    const rows=sorted.map(t=>[
+        t.year||'',
+        t.filingStatus||'',
+        t.taxpayers||'',
+        t.federalAGI??'',
+        t.taxableIncome??'',
+        t.federalTax??'',
+        t.federalWithholding??'',
+        taxNetFed(t)??'',
+        (t.stateReturns||[]).map(s=>`${s.state} ${s.amount}`).join('; '),
+        (t.docs||[]).join('; '),
+        (t.notes||'').replace(/"/g,'""')
+    ]);
+    const csv=[headers,...rows].map(r=>r.map(v=>{
+        const s=String(v);
+        return /[",\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;
+    }).join(',')).join('\n');
+    const blob=new Blob([csv],{type:'text/csv'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download=`tax_years_${new Date().toISOString().slice(0,10)}.csv`;a.click();
+    URL.revokeObjectURL(url);
+}
+
+// ── TAX SUMMARY (AI) ──
+let taxSummaryHistory=[], currentTaxSummaryId=null;
+
+function renderTaxMarkdown(raw){
+    let html=esc(raw||'');
+    html=html.replace(/^# (.+)$/gm,'<h1 style="font-size:1.4rem;font-weight:800;color:var(--accent);margin:8px 0 14px;font-family:Georgia,serif;">$1</h1>');
+    html=html.replace(/^## (.+)$/gm,'<h2>$1</h2>');
+    html=html.replace(/^### (.+)$/gm,'<h3>$1</h3>');
+    html=html.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+    html=html.replace(/\*(.+?)\*/g,'<em>$1</em>');
+    html=html.replace(/^- (.+)$/gm,'<li>$1</li>');
+    html=html.replace(/^\d+\. (.+)$/gm,'<li>$1</li>');
+    html=html.replace(/(<li>.*?<\/li>(?:\s*<li>.*?<\/li>)*)/gs,m=>'<ul>'+m+'</ul>');
+    html=html.replace(/<\/ul>\s*<ul>/g,'');
+    return html;
+}
+
+async function generateTaxSummary(){
+    if(!apiKey){toast('Set API key in Settings first.','error');return;}
+    if(!taxYears.length){toast('Add at least one tax year first.','error');return;}
+    const btn=document.getElementById('btn-generate-tax-summary');
+    const statusEl=document.getElementById('tax-summary-status');
+    const resultEl=document.getElementById('tax-summary-result');
+    btn.disabled=true;btn.textContent='⏳ Analyzing…';
+    statusEl.textContent='Reading every tax year on file and writing a narrative of how things have shifted…';
+    statusEl.style.color='var(--text-secondary)';
+    resultEl.style.display='none';
+
+    const sorted=[...taxYears].sort((a,b)=>(a.year||0)-(b.year||0));
+    const tableRows=sorted.map(t=>{
+        const net=taxNetFed(t);
+        const states=(t.stateReturns||[]).map(s=>`${s.state}:${s.amount}`).join(';')||'—';
+        return `${t.year} | ${t.filingStatus||'—'} | AGI ${t.federalAGI??'—'} | Taxable ${t.taxableIncome??'—'} | Fed Tax ${t.federalTax??'—'} | Withheld ${t.federalWithholding??'—'} | Net ${net??'—'} | States ${states} | Docs ${(t.docs||[]).join(',')||'—'}${t.notes?' | '+t.notes:''}`;
+    }).join('\n');
+    const years=sorted.map(t=>t.year).filter(Boolean);
+    const minY=years.length?Math.min(...years):'—', maxY=years.length?Math.max(...years):'—';
+
+    try{
+        const prompt=`You are writing a financial-history narrative for a family member reviewing the long arc of their household's tax returns. Audience is a non-accountant — use plain English, no jargon.
+
+Focus on what has **CHANGED** over the years. Identify:
+- Income trajectory (AGI and taxable income trends — rising, flat, dropping; any big jumps or dips)
+- Tax burden shifts (effective tax rate, unusually high/low years)
+- Refund vs owed patterns (years where withholding was well-matched vs misaligned)
+- Filing-status or taxpayer changes (e.g. marriage, name changes, adding dependents)
+- Gaps in the record (missing years)
+- Any obvious inflection points (career change, windfall, business event, retirement)
+- State-filing changes (new states, refunds shifting)
+
+Format in markdown with these sections:
+
+# Tax History Summary — ${minY} to ${maxY}
+
+## 📈 The Long Arc
+One paragraph on the overall trajectory — what do the ${years.length} years on file collectively say?
+
+## 🔀 Major Shifts & Inflection Points
+Bulleted list of the 3-6 most meaningful changes over the span, each anchored to a specific year or range. Be concrete with numbers.
+
+## 💵 Income Trends
+Short analysis of AGI and taxable income over time — direction, magnitude, notable outliers.
+
+## 🧾 Tax Burden & Refunds
+How has federal tax owed shifted? Which years had the biggest refunds or balances due? Any mismatches between withholding and actual tax?
+
+## 🗺 State & Filing Context
+Notable changes in filing status, taxpayers listed, or state returns.
+
+## ⚠️ Gaps & Things to Watch
+Missing years, incomplete records, or anything that looks worth a closer look.
+
+End with one sentence summarizing the overall financial story these returns tell.
+
+DATA (one line per year, oldest first):
+${tableRows}
+
+Total years on file: ${years.length}
+Range: ${minY}–${maxY}`;
+
+        const raw=await callClaudeText(prompt,4096);
+        if(!raw)return;
+        resultEl.innerHTML=renderTaxMarkdown(raw);
+        resultEl.style.display='block';
+        try{
+            const entry={rawText:raw,yearCount:years.length,minYear:minY,maxYear:maxY,createdAt:firebase.firestore.FieldValue.serverTimestamp()};
+            const docRef=await db.collection('estate_tax_summaries').add(entry);
+            currentTaxSummaryId=docRef.id;
+        }catch(saveErr){console.warn('Failed to save tax summary:',saveErr);}
+        await loadTaxSummaryHistory();
+        statusEl.textContent=`✅ Summary ready — ${years.length} years reviewed (${minY}–${maxY}).`;
+        statusEl.style.color='var(--success)';
+    }catch(err){statusEl.textContent='❌ Error: '+err.message;statusEl.style.color='var(--danger)';}
+    finally{btn.disabled=false;btn.textContent='✨ Regenerate Summary';}
+}
+
+async function loadTaxSummaryHistory(){
+    try{
+        const snap=await db.collection('estate_tax_summaries').orderBy('createdAt','desc').get();
+        taxSummaryHistory=[];
+        snap.forEach(doc=>taxSummaryHistory.push({_id:doc.id,...doc.data()}));
+    }catch(err){console.warn('Failed to load tax summary history:',err);taxSummaryHistory=[];}
+    renderTaxSummaryMeta();
+    renderTaxSummaryHistoryList();
+}
+
+function renderTaxSummaryMeta(){
+    const metaRow=document.getElementById('tax-summary-meta-row');
+    const dateEl=document.getElementById('tax-summary-date');
+    const metaEl=document.getElementById('tax-summary-meta');
+    const resultEl=document.getElementById('tax-summary-result');
+    const btn=document.getElementById('btn-generate-tax-summary');
+    if(!metaRow)return;
+    if(!taxSummaryHistory.length){metaRow.style.display='none';if(btn)btn.textContent='✨ Generate Summary';return;}
+    const latest=taxSummaryHistory[0];
+    metaRow.style.display='flex';
+    dateEl.textContent=formatOverviewDate(latest.createdAt);
+    const yc=latest.yearCount||0;
+    metaEl.textContent=`${yc} year${yc!==1?'s':''} reviewed${latest.minYear&&latest.maxYear?` (${latest.minYear}–${latest.maxYear})`:''}`;
+    if(btn)btn.textContent='🔄 Regenerate';
+    if(resultEl&&(resultEl.style.display==='none'||!resultEl.innerHTML.trim())){
+        resultEl.innerHTML=renderTaxMarkdown(latest.rawText||'');
+        resultEl.style.display='block';
+        currentTaxSummaryId=latest._id;
+    }
+}
+
+function renderTaxSummaryHistoryList(){
+    const wrap=document.getElementById('tax-summary-history-wrap');
+    const listEl=document.getElementById('tax-summary-history-list');
+    const countEl=document.getElementById('tax-summary-history-count');
+    if(!wrap||!listEl)return;
+    if(taxSummaryHistory.length<=1){wrap.style.display='none';return;}
+    wrap.style.display='block';
+    countEl.textContent=`(${taxSummaryHistory.length})`;
+    listEl.innerHTML=taxSummaryHistory.map(a=>{
+        const yc=a.yearCount||0;
+        const isCurrent=a._id===currentTaxSummaryId;
+        return `<div class="history-item${isCurrent?' current':''}">
+            <div class="history-item-info">
+                <div class="history-item-date">${esc(formatOverviewDate(a.createdAt))}${isCurrent?' <span style="color:var(--accent);font-size:0.72rem;font-weight:600;">· CURRENT</span>':''}</div>
+                <div class="history-item-meta">${yc} year${yc!==1?'s':''} reviewed${a.minYear&&a.maxYear?` (${a.minYear}–${a.maxYear})`:''}</div>
+            </div>
+            <div class="history-item-actions">
+                <button class="btn-icon" onclick="viewTaxSummaryEntry('${a._id}')">👁 View</button>
+                <button class="btn-icon danger" onclick="deleteTaxSummaryEntry('${a._id}')">🗑 Delete</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function viewTaxSummaryEntry(id){
+    const entry=taxSummaryHistory.find(a=>a._id===id);
+    if(!entry)return;
+    const resultEl=document.getElementById('tax-summary-result');
+    const statusEl=document.getElementById('tax-summary-status');
+    resultEl.innerHTML=renderTaxMarkdown(entry.rawText||'');
+    resultEl.style.display='block';
+    currentTaxSummaryId=id;
+    const yc=entry.yearCount||0;
+    statusEl.textContent=`📖 Viewing summary from ${formatOverviewDate(entry.createdAt)} — ${yc} year${yc!==1?'s':''} reviewed.`;
+    statusEl.style.color='var(--text-secondary)';
+    renderTaxSummaryHistoryList();
+    resultEl.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+async function deleteTaxSummaryEntry(id){
+    if(!confirm('Delete this saved tax summary? This cannot be undone.'))return;
+    try{
+        await db.collection('estate_tax_summaries').doc(id).delete();
+        if(currentTaxSummaryId===id){
+            currentTaxSummaryId=null;
+            const resultEl=document.getElementById('tax-summary-result');
+            if(resultEl){resultEl.style.display='none';resultEl.innerHTML='';}
+        }
+        await loadTaxSummaryHistory();
+        toast('Summary deleted.','success');
+    }catch(err){toast('Delete failed: '+err.message,'error');}
+}
+</script>
+</body>
+</html>

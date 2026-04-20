@@ -193,6 +193,17 @@
         .rx-scan-controls input[type=file]{font-size:0.8rem;color:var(--text-secondary);}
         .rx-scan-actions{display:flex;gap:8px;margin-top:auto;}
         .rx-scan-status{font-size:0.78rem;color:var(--text-secondary);min-height:16px;}
+        .rx-overview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;}
+        .rx-pill{background:var(--bg-card);border:1px solid var(--border);border-left:4px solid var(--accent);border-radius:10px;padding:14px 16px;cursor:pointer;transition:all 0.15s;display:flex;flex-direction:column;gap:6px;}
+        .rx-pill:hover{border-left-color:var(--accent-hover);transform:translateY(-1px);box-shadow:0 4px 12px rgba(124,58,237,0.12);}
+        .rx-pill-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+        .rx-pill-name{font-size:0.98rem;font-weight:700;color:var(--text-primary);line-height:1.25;}
+        .rx-pill-dose{font-size:0.8rem;color:var(--accent);font-weight:600;flex-shrink:0;white-space:nowrap;}
+        .rx-pill-sig{font-size:0.82rem;color:var(--text-secondary);line-height:1.35;}
+        .rx-pill-meta{display:flex;flex-wrap:wrap;gap:10px;font-size:0.75rem;color:var(--text-secondary);margin-top:4px;padding-top:8px;border-top:1px dashed var(--border);}
+        .rx-pill-meta span{display:inline-flex;align-items:center;gap:4px;}
+        .rx-pill-meta strong{color:var(--text-primary);font-weight:600;}
+        .rx-pill-refills-low{color:#b91c1c;font-weight:700;}
         .modal-overlay.show .modal{transform:scale(1);}
         .modal-title{font-size:1.1rem;font-weight:700;color:var(--text-primary);margin-bottom:4px;}
         .modal-sub{font-size:0.85rem;color:var(--text-secondary);margin-bottom:16px;}
@@ -383,6 +394,16 @@
         </svg>
     </div>
     <div class="stats-grid" id="stats-grid"></div>
+    <div class="card">
+        <div class="card-title">
+            <div class="card-title-left">💊 Active Prescriptions</div>
+            <button class="btn btn-ghost btn-sm" onclick="showView('prescriptions')">View All →</button>
+        </div>
+        <div class="rx-overview-grid" id="rx-overview-grid"></div>
+        <div id="rx-overview-empty" style="display:none;text-align:center;color:var(--text-secondary);padding:24px 0;font-size:0.9rem;">
+            No active prescriptions. <a href="#" onclick="showView('prescriptions');return false;" style="color:var(--accent);">Add one →</a>
+        </div>
+    </div>
     <div class="card">
         <div class="card-title"><div class="card-title-left">📊 Visits by Type</div></div>
         <div class="cat-breakdown" id="cat-breakdown"></div>
@@ -967,6 +988,7 @@ async function initApp(){
         unsubRx=db.collection('addison_prescriptions').onSnapshot(snap=>{
             rxItems=snap.docs.map(doc=>({_docId:doc.id,...doc.data()}));
             renderPrescriptions();
+            if(document.getElementById('view-dashboard')?.classList.contains('active'))renderDashboard();
         },()=>{});
         document.getElementById('loading-screen').style.display='none';
         document.getElementById('app').style.display='block';
@@ -1037,12 +1059,14 @@ function renderDashboard(){
     const physCount=physicians.length;
     const upcoming=items.filter(i=>{if(!i.followUpDate)return false;return new Date(i.followUpDate+'T00:00:00')>=new Date(new Date().toDateString());}).length;
     const types=new Set(items.map(i=>i.visitType).filter(Boolean)).size;
+    const activeRx=rxItems.filter(rx=>rx.status!=='discontinued').length;
     document.getElementById('stats-grid').innerHTML=`
         <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Total Visits</div></div>
         <div class="stat-card"><div class="stat-value">${physCount}</div><div class="stat-label">Physicians</div></div>
         <div class="stat-card"><div class="stat-value">${thisYear}</div><div class="stat-label">This Year</div></div>
         <div class="stat-card"><div class="stat-value">${upcoming}</div><div class="stat-label">Upcoming Follow-ups</div></div>
-        <div class="stat-card"><div class="stat-value">${types}</div><div class="stat-label">Visit Types</div></div>`;
+        <div class="stat-card" style="cursor:pointer" onclick="showView('prescriptions')"><div class="stat-value">${activeRx}</div><div class="stat-label">Active Rx</div></div>`;
+    renderRxOverview();
     const counts={};
     items.forEach(it=>{if(it.visitType)counts[it.visitType]=(counts[it.visitType]||0)+1;});
     const maxC=Math.max(...Object.values(counts),1);
@@ -1071,6 +1095,36 @@ function renderDashboard(){
             <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(it.diagnosis)||'—'}</td>
           </tr>`).join('')
         :'<tr><td colspan="6" style="text-align:center;color:var(--text-secondary);padding:30px;">No visits yet.</td></tr>';
+}
+
+function renderRxOverview(){
+    const grid=document.getElementById('rx-overview-grid');
+    const empty=document.getElementById('rx-overview-empty');
+    if(!grid||!empty)return;
+    const active=rxItems.filter(rx=>rx.status!=='discontinued')
+        .sort((a,b)=>(b.datePrescribed||'').localeCompare(a.datePrescribed||''));
+    if(!active.length){grid.innerHTML='';empty.style.display='block';return;}
+    empty.style.display='none';
+    grid.innerHTML=active.map(rx=>{
+        const refillsNum=parseInt(rx.refills,10);
+        const refillsDisplay=rx.refills!==''&&!isNaN(refillsNum)
+            ?`<span class="${refillsNum===0?'rx-pill-refills-low':''}">🔄 <strong>${refillsNum}</strong> refill${refillsNum===1?'':'s'}</span>`
+            :'';
+        const physician=rx.physician?`<span>👨‍⚕️ <strong>${esc(rx.physician)}</strong></span>`:'';
+        const pharmacy=rx.pharmacy?`<span>🏥 ${esc(rx.pharmacy)}</span>`:'';
+        const condition=rx.condition?`<span>🎯 ${esc(rx.condition)}</span>`:'';
+        const sig=rx.frequency?`<div class="rx-pill-sig">${esc(rx.frequency)}</div>`:'';
+        const metaParts=[physician,pharmacy,refillsDisplay,condition].filter(Boolean).join('');
+        const meta=metaParts?`<div class="rx-pill-meta">${metaParts}</div>`:'';
+        return `<div class="rx-pill" onclick="editRx('${rx._docId}')" title="Edit ${esc(rx.name)}">
+            <div class="rx-pill-head">
+                <div class="rx-pill-name">${esc(rx.name)||'Unnamed'}</div>
+                ${rx.dosage?`<div class="rx-pill-dose">${esc(rx.dosage)}</div>`:''}
+            </div>
+            ${sig}
+            ${meta}
+        </div>`;
+    }).join('');
 }
 
 function toggleCatDetail(cat){

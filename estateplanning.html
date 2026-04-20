@@ -111,6 +111,19 @@
         .tea-tag{font-size:0.7rem;background:var(--bg-card,#f3f0e8);color:var(--text-secondary);padding:2px 8px;border-radius:10px;border:1px solid var(--border);}
         .tea-ai-desc{font-size:0.85rem;color:var(--text-primary);line-height:1.4;}
         .tea-ai-meta{font-size:0.75rem;color:var(--text-secondary);margin-top:4px;}
+        .tax-badge{display:inline-block;font-size:0.68rem;font-weight:700;padding:2px 8px;border-radius:4px;background:rgba(16,185,129,0.15);color:#047857;margin-right:6px;letter-spacing:0.3px;}
+        .tax-report-table{width:100%;border-collapse:collapse;font-size:0.85rem;}
+        .tax-report-table th{text-align:left;padding:8px 10px;background:var(--bg-card,#f3f0e8);font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-secondary);border-bottom:2px solid var(--border);white-space:nowrap;}
+        .tax-report-table td{padding:10px;border-bottom:1px solid var(--border);vertical-align:top;}
+        .tax-report-table td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+        .tax-report-table tr:hover td{background:rgba(0,0,0,0.02);}
+        .tax-report-year{font-size:1.1rem;font-weight:800;color:var(--text-primary);}
+        .tax-refund{color:#15803d;font-weight:600;}
+        .tax-owed{color:#b91c1c;font-weight:600;}
+        .tax-state-line{font-size:0.78rem;color:var(--text-secondary);margin-top:3px;}
+        .tax-docs-chips{display:flex;flex-wrap:wrap;gap:4px;}
+        .tax-doc-chip{font-size:0.7rem;background:rgba(16,185,129,0.08);color:#047857;padding:2px 7px;border-radius:10px;border:1px solid rgba(16,185,129,0.2);cursor:pointer;text-decoration:none;}
+        .tax-doc-chip:hover{background:rgba(16,185,129,0.18);}
         .badge{display:inline-block;padding:3px 9px;border-radius:4px;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;white-space:nowrap;}
         .badge-will{background:#fee2e2;color:#991b1b;}
         .badge-trust{background:#fef3c7;color:#92400e;}
@@ -414,6 +427,16 @@
 
 <!-- TEA PARTY -->
 <div id="view-tea-party" class="view">
+    <div class="card" id="tea-tax-report-card" style="display:none;">
+        <div class="card-title">
+            <div class="card-title-left">📊 Tax Year Reports</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <span style="font-size:0.82rem;color:var(--text-secondary);" id="tea-tax-count"></span>
+                <button class="btn btn-ghost btn-sm" onclick="exportTeaTaxReportCSV()">📥 Export CSV</button>
+            </div>
+        </div>
+        <div id="tea-tax-report-content"></div>
+    </div>
     <div class="card">
         <div class="card-title">
             <div class="card-title-left">🫖 Tea Party</div>
@@ -766,6 +789,12 @@ function renderTeaParty(){
         if(d.aiStatus==='scanning')aiBadge=`<span class="tea-ai-badge tea-ai-scanning">⏳ Scanning</span>`;
         else if(d.aiStatus==='scanned')aiBadge=`<span class="tea-ai-badge tea-ai-scanned">✨ AI</span>`;
         else if(d.aiStatus==='error')aiBadge=`<span class="tea-ai-badge tea-ai-error" title="${esc(d.aiError)||'Scan failed'}">⚠ AI failed</span>`;
+        if(d.taxData?.isTaxDocument){
+            const yr=d.taxData.taxYear?` ${d.taxData.taxYear}`:'';
+            const juris=d.taxData.jurisdiction==='state'&&d.taxData.stateCode?` ${d.taxData.stateCode}`:(d.taxData.jurisdiction==='federal'?' FED':'');
+            const form=d.taxData.formType?` · ${d.taxData.formType}`:'';
+            aiBadge+=`<span class="tax-badge">🧾${yr}${juris}${form}</span>`;
+        }
         const desc=d.aiDescription
             ?`<div class="tea-ai-desc">${aiBadge}${esc(d.aiDescription)}</div>`+(d.description&&d.description!==d.aiDescription?`<div class="tea-ai-meta">Note: ${esc(d.description)}</div>`:'')
             :`<div>${aiBadge}${esc(d.description)||'<span style="color:var(--text-secondary);">—</span>'}</div>`;
@@ -795,6 +824,116 @@ function renderTeaParty(){
     }).length;
     const scanAllBtn=document.getElementById('tea-scan-all-btn');
     if(scanAllBtn){scanAllBtn.disabled=unscanned===0;scanAllBtn.textContent=unscanned?`🤖 Analyze ${unscanned} Unscanned`:`🤖 Analyze All Unscanned`;}
+    renderTeaTaxReport();
+}
+
+// ── TAX YEAR REPORTS ────────────────────────────────────────
+function teaTaxReturnsByYear(){
+    const byYear={};
+    teaPartyDocs.forEach(d=>{
+        const td=d.taxData;
+        if(!td?.isTaxDocument||!td.taxYear)return;
+        const y=td.taxYear;
+        if(!byYear[y])byYear[y]={year:y,federalReturns:[],stateReturns:[],supporting:[]};
+        const payload={doc:d,taxData:td};
+        if(td.isReturn&&td.jurisdiction==='federal')byYear[y].federalReturns.push(payload);
+        else if(td.isReturn&&td.jurisdiction==='state')byYear[y].stateReturns.push(payload);
+        else byYear[y].supporting.push(payload);
+    });
+    return Object.values(byYear).sort((a,b)=>b.year-a.year);
+}
+
+function fmtMoney(v){
+    if(v===null||v===undefined||v==='')return '—';
+    const n=Number(v);if(isNaN(n))return '—';
+    return n.toLocaleString('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0});
+}
+
+function renderTeaTaxReport(){
+    const card=document.getElementById('tea-tax-report-card');
+    const content=document.getElementById('tea-tax-report-content');
+    const countEl=document.getElementById('tea-tax-count');
+    if(!card||!content)return;
+    const years=teaTaxReturnsByYear();
+    if(!years.length){card.style.display='none';return;}
+    card.style.display='block';
+    const docCount=years.reduce((a,y)=>a+y.federalReturns.length+y.stateReturns.length+y.supporting.length,0);
+    if(countEl)countEl.textContent=`${years.length} year${years.length===1?'':'s'} · ${docCount} doc${docCount===1?'':'s'}`;
+    const rows=years.map(y=>{
+        const fed=y.federalReturns[0]?.taxData;
+        const fedF=fed?.fields||{};
+        const stateRows=y.stateReturns.map(s=>{
+            const f=s.taxData.fields||{};
+            const net=f.refund!=null?`<span class="tax-refund">+${fmtMoney(f.refund).replace('$','$')}</span>`:(f.owed!=null?`<span class="tax-owed">−${fmtMoney(f.owed).replace('$','$')}</span>`:'—');
+            return `<div class="tax-state-line">${esc(s.taxData.stateCode||'State')} (${esc(s.taxData.formType||'')}): AGI ${fmtMoney(f.agi)} · Tax ${fmtMoney(f.totalTax)} · W/H ${fmtMoney(f.withholding)} · Net ${net}</div>`;
+        }).join('');
+        const fedNet=fedF.refund!=null?`<span class="tax-refund">+${fmtMoney(fedF.refund).replace('$','$')}</span>`:(fedF.owed!=null?`<span class="tax-owed">−${fmtMoney(fedF.owed).replace('$','$')}</span>`:'—');
+        const docs=[...y.federalReturns,...y.stateReturns,...y.supporting];
+        const chips=docs.map(p=>{
+            const label=p.taxData.formType||p.taxData.jurisdiction||'doc';
+            const tip=(p.doc.title||p.doc.fileName||'').replace(/"/g,'&quot;');
+            return `<a class="tax-doc-chip" href="${esc(p.doc.fileUrl)}" target="_blank" rel="noopener" title="${tip}">${esc(label)}</a>`;
+        }).join('');
+        const filingStatus=fed?.filingStatus?`<div class="tax-state-line">Filing: ${esc(fed.filingStatus)}${fed.taxpayerName?` · ${esc(fed.taxpayerName)}`:''}</div>`:'';
+        return `<tr>
+            <td><div class="tax-report-year">${y.year}</div>${filingStatus}</td>
+            <td class="num">${fmtMoney(fedF.agi)}</td>
+            <td class="num">${fmtMoney(fedF.taxableIncome)}</td>
+            <td class="num">${fmtMoney(fedF.totalTax)}</td>
+            <td class="num">${fmtMoney(fedF.withholding)}</td>
+            <td class="num">${fedNet}</td>
+            <td>${stateRows||'<span style="color:var(--text-secondary);font-size:0.8rem;">—</span>'}</td>
+            <td><div class="tax-docs-chips">${chips}</div></td>
+        </tr>`;
+    }).join('');
+    content.innerHTML=`
+        <div class="table-wrapper">
+            <table class="tax-report-table">
+                <thead><tr>
+                    <th>Year</th>
+                    <th style="text-align:right;">Federal AGI</th>
+                    <th style="text-align:right;">Taxable Income</th>
+                    <th style="text-align:right;">Federal Tax</th>
+                    <th style="text-align:right;">Withholding</th>
+                    <th style="text-align:right;">Net (Fed)</th>
+                    <th>State Returns</th>
+                    <th>Docs</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>`;
+}
+
+function exportTeaTaxReportCSV(){
+    const years=teaTaxReturnsByYear();
+    if(!years.length){toast('No tax returns to export.','error');return;}
+    const headers=['Tax Year','Jurisdiction','State','Form','Filing Status','Taxpayer','Wages','Interest','Dividends','Capital Gains','Social Security','Total Income','AGI','Deduction','Deduction Type','Taxable Income','Total Tax','Withholding','Estimated Payments','Credits','Total Payments','Refund','Owed','Dependents','Source File'];
+    const rows=[headers.join(',')];
+    const csvCell=v=>{
+        if(v===null||v===undefined)return '';
+        const s=String(v);
+        return /[",\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;
+    };
+    years.forEach(y=>{
+        const all=[...y.federalReturns,...y.stateReturns,...y.supporting];
+        all.forEach(p=>{
+            const t=p.taxData;const f=t.fields||{};
+            rows.push([
+                t.taxYear||'',t.jurisdiction||'',t.stateCode||'',t.formType||'',t.filingStatus||'',t.taxpayerName||'',
+                f.wages??'',f.interestIncome??'',f.dividendIncome??'',f.capitalGains??'',f.socialSecurity??'',
+                f.totalIncome??'',f.agi??'',f.deduction??'',f.deductionType||'',f.taxableIncome??'',
+                f.totalTax??'',f.withholding??'',f.estimatedPayments??'',f.credits??'',f.totalPayments??'',
+                f.refund??'',f.owed??'',f.dependents??'',
+                p.doc.fileName||'',
+            ].map(csvCell).join(','));
+        });
+    });
+    const blob=new Blob([rows.join('\n')],{type:'text/csv'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download=`tea-party-tax-report-${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+    toast('Exported tax report CSV.','success');
 }
 
 async function blobToBase64(blob){
@@ -815,14 +954,50 @@ async function scanTeaPartyDoc(docId){
         const blob=await res.blob();
         const base64=await blobToBase64(blob);
         const mime=isPdf?'application/pdf':(d.fileMimeType||'image/jpeg');
-        const prompt=`You are analyzing a document uploaded to a private file library. Read it and return ONLY a valid JSON object with keys:
-title (a short concise title for this file, max 8 words),
+        const prompt=`You are analyzing a document uploaded to a private file library. Read it and return ONLY a valid JSON object with these keys:
+title (short concise title, max 8 words),
 description (1-2 sentence plain-English summary of what the document is and its purpose),
-docType (one short lowercase category like "receipt", "letter", "photo", "contract", "statement", "note", "form", "tax_document", "report"),
-tags (array of 2-5 single-word lowercase keywords capturing the topic),
+docType (one short lowercase category like "receipt", "letter", "photo", "contract", "statement", "note", "form", "tax_return", "w2", "1099", "k1", "tax_document", "report"),
+tags (array of 2-5 single-word lowercase keywords),
 keyPeople (array of people named in the document, if any),
-keyDates (array of date strings in YYYY-MM-DD format where possible, or the raw date text if ambiguous).
-Use empty strings and empty arrays for fields you cannot confidently extract. Do not invent values.`;
+keyDates (array of date strings in YYYY-MM-DD format where possible, or raw date text),
+taxData (object — ONLY populate when the document is clearly a tax return or tax form such as 1040, 1040-SR, 1040-X, a state income tax return, W-2, 1099, K-1 or similar; otherwise set to null).
+
+taxData must have this exact shape when present:
+{
+  "isTaxDocument": true,
+  "isReturn": boolean (true for actual filed returns like 1040 or state 540; false for supporting docs like W-2, 1099),
+  "taxYear": integer (the tax year, e.g. 2023),
+  "jurisdiction": "federal" | "state" | "local",
+  "stateCode": 2-letter USPS code like "CA" when jurisdiction is state, else empty,
+  "formType": short string like "1040", "1040-SR", "540", "W-2", "1099-INT", "1099-DIV", "1099-B", "K-1",
+  "filingStatus": "Single" | "MFJ" | "MFS" | "HOH" | "QSS" | empty,
+  "taxpayerName": string,
+  "fields": {
+    "wages": number or null (W-2 box 1 or 1040 line 1),
+    "interestIncome": number or null,
+    "dividendIncome": number or null,
+    "capitalGains": number or null,
+    "iraDistributions": number or null,
+    "socialSecurity": number or null,
+    "otherIncome": number or null,
+    "totalIncome": number or null,
+    "agi": number or null (Adjusted Gross Income),
+    "deduction": number or null,
+    "deductionType": "standard" | "itemized" | empty,
+    "taxableIncome": number or null,
+    "totalTax": number or null,
+    "withholding": number or null (federal or state as applicable),
+    "estimatedPayments": number or null,
+    "credits": number or null,
+    "totalPayments": number or null,
+    "refund": number or null (amount refunded, positive),
+    "owed": number or null (amount owed, positive),
+    "dependents": integer or null
+  }
+}
+
+Use empty strings, empty arrays, and null for fields you cannot confidently extract. Do not invent values. Numbers must be raw numbers (not strings), with no commas or dollar signs.`;
         const raw=await callClaude(base64,mime,prompt,2048);
         if(!raw)throw new Error('No AI response');
         const jsonMatch=raw.match(/\{[\s\S]*\}/);
@@ -839,6 +1014,45 @@ Use empty strings and empty arrays for fields you cannot confidently extract. Do
             aiKeyDates:Array.isArray(r.keyDates)?r.keyDates.filter(Boolean).map(t=>t.toString().trim()).slice(0,10):[],
             aiError:firebase.firestore.FieldValue.delete(),
         };
+        if(r.taxData&&typeof r.taxData==='object'&&r.taxData.isTaxDocument){
+            const td=r.taxData;
+            const cleanNum=v=>{if(v===null||v===undefined||v==='')return null;const n=Number(v);return isNaN(n)?null:n;};
+            const fields=td.fields||{};
+            update.taxData={
+                isTaxDocument:true,
+                isReturn:!!td.isReturn,
+                taxYear:cleanNum(td.taxYear),
+                jurisdiction:(td.jurisdiction||'').toString().toLowerCase(),
+                stateCode:(td.stateCode||'').toString().toUpperCase(),
+                formType:(td.formType||'').toString(),
+                filingStatus:(td.filingStatus||'').toString(),
+                taxpayerName:(td.taxpayerName||'').toString(),
+                fields:{
+                    wages:cleanNum(fields.wages),
+                    interestIncome:cleanNum(fields.interestIncome),
+                    dividendIncome:cleanNum(fields.dividendIncome),
+                    capitalGains:cleanNum(fields.capitalGains),
+                    iraDistributions:cleanNum(fields.iraDistributions),
+                    socialSecurity:cleanNum(fields.socialSecurity),
+                    otherIncome:cleanNum(fields.otherIncome),
+                    totalIncome:cleanNum(fields.totalIncome),
+                    agi:cleanNum(fields.agi),
+                    deduction:cleanNum(fields.deduction),
+                    deductionType:(fields.deductionType||'').toString(),
+                    taxableIncome:cleanNum(fields.taxableIncome),
+                    totalTax:cleanNum(fields.totalTax),
+                    withholding:cleanNum(fields.withholding),
+                    estimatedPayments:cleanNum(fields.estimatedPayments),
+                    credits:cleanNum(fields.credits),
+                    totalPayments:cleanNum(fields.totalPayments),
+                    refund:cleanNum(fields.refund),
+                    owed:cleanNum(fields.owed),
+                    dependents:cleanNum(fields.dependents),
+                },
+            };
+        }else{
+            update.taxData=firebase.firestore.FieldValue.delete();
+        }
         const defaultTitle=(d.fileName||'').replace(/\.[^.]+$/,'');
         if(update.aiTitle&&(!d.title||d.title===defaultTitle))update.title=update.aiTitle;
         if(update.aiDescription&&!d.description)update.description=update.aiDescription;

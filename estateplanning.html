@@ -15,6 +15,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
         *{box-sizing:border-box;margin:0;padding:0;}
         :root{
@@ -974,6 +975,26 @@ async function blobToBase64(blob){
     return new Promise((res,rej)=>{const fr=new FileReader();fr.onload=e=>res(e.target.result.split(',')[1]);fr.onerror=rej;fr.readAsDataURL(blob);});
 }
 
+let _pdfjsConfigured=false;
+async function extractPdfText(blob,maxPages=250){
+    if(!window.pdfjsLib)throw new Error('PDF reader library not loaded');
+    if(!_pdfjsConfigured){
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        _pdfjsConfigured=true;
+    }
+    const arrayBuffer=await blob.arrayBuffer();
+    const pdf=await window.pdfjsLib.getDocument({data:arrayBuffer}).promise;
+    const pages=Math.min(pdf.numPages,maxPages);
+    const out=[];
+    for(let i=1;i<=pages;i++){
+        const page=await pdf.getPage(i);
+        const content=await page.getTextContent();
+        const txt=content.items.map(it=>it.str).join(' ').replace(/\s+/g,' ').trim();
+        out.push(`--- Page ${i} ---\n${txt}`);
+    }
+    return{text:out.join('\n\n'),numPages:pdf.numPages};
+}
+
 function pickFilesFromDisk(multiple,accept,hintMsg){
     return new Promise(resolve=>{
         if(hintMsg)toast(hintMsg,'info');
@@ -1002,9 +1023,7 @@ async function fetchBlobForTeaDoc(d){
 
 async function scanTeaDocFromBlob(docId,d,blob){
     const isPdf=(d.fileMimeType==='application/pdf')||(d.fileName||'').toLowerCase().endsWith('.pdf')||blob.type==='application/pdf';
-    const base64=await blobToBase64(blob);
-    const mime=isPdf?'application/pdf':(d.fileMimeType||blob.type||'image/jpeg');
-    const prompt=`You are analyzing a document uploaded to a private file library. Read it and return ONLY a valid JSON object with these keys:
+    const baseInstructions=`You are analyzing a document uploaded to a private file library. Return ONLY a valid JSON object with these keys:
 title (short concise title, max 8 words),
 description (1-2 sentence plain-English summary of what the document is and its purpose),
 docType (one short lowercase category like "receipt", "letter", "photo", "contract", "statement", "note", "form", "tax_return", "w2", "1099", "k1", "tax_document", "report"),
@@ -1048,7 +1067,28 @@ taxData must have this exact shape when present:
 }
 
 Use empty strings, empty arrays, and null for fields you cannot confidently extract. Do not invent values. Numbers must be raw numbers (not strings), with no commas or dollar signs.`;
-    const raw=await callClaude(base64,mime,prompt,2048);
+    let raw;
+    if(isPdf){
+        // Text extraction path — works regardless of page count and is far more token-efficient
+        let extracted;
+        try{extracted=await extractPdfText(blob);}catch(e){extracted=null;}
+        const text=extracted?.text||'';
+        if(text.length>=200){
+            // Truncate if extremely long to stay under model context
+            const MAX_CHARS=450000;
+            const body=text.length>MAX_CHARS?text.slice(0,MAX_CHARS)+`\n\n[...truncated — full document has ${extracted.numPages} pages]`:text;
+            const prompt=`${baseInstructions}\n\nThe following is text extracted from a PDF named "${d.fileName||'document'}" (${extracted.numPages} page${extracted.numPages===1?'':'s'}). Analyze the CONTENT of the text to fill the fields. Return only the JSON object, no prose.\n\nBEGIN DOCUMENT TEXT:\n${body}\nEND DOCUMENT TEXT`;
+            raw=await callClaudeText(prompt,2048);
+        }else{
+            // Fallback: no text layer (scanned image PDF) — try document API, may fail for big PDFs
+            const base64=await blobToBase64(blob);
+            raw=await callClaude(base64,'application/pdf',baseInstructions,2048);
+        }
+    }else{
+        const base64=await blobToBase64(blob);
+        const mime=d.fileMimeType||blob.type||'image/jpeg';
+        raw=await callClaude(base64,mime,baseInstructions,2048);
+    }
     if(!raw)throw new Error('No AI response');
     const jsonMatch=raw.match(/\{[\s\S]*\}/);
     if(!jsonMatch)throw new Error('Could not parse AI response');

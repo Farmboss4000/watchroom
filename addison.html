@@ -175,6 +175,38 @@
         .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;opacity:0;pointer-events:none;transition:opacity 0.2s;}
         .modal-overlay.show{opacity:1;pointer-events:all;}
         .modal{background:#fff;border-radius:14px;padding:28px 24px;width:100%;max-width:520px;margin:16px;max-height:90vh;overflow-y:auto;transform:scale(0.95);transition:transform 0.2s;}
+        .modal-wide{max-width:960px;}
+        .rx-inline-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;}
+        .rx-inline-grid .rx-inline-field{display:flex;flex-direction:column;gap:3px;}
+        .rx-inline-grid .rx-inline-field.full{grid-column:1/-1;}
+        .rx-inline-grid label{font-size:0.7rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.4px;}
+        .rx-inline-grid input,.rx-inline-grid select,.rx-inline-grid textarea{width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:5px;font-size:0.82rem;font-family:inherit;color:var(--text-primary);background:#fff;}
+        .rx-inline-grid input:focus,.rx-inline-grid select:focus,.rx-inline-grid textarea:focus{outline:none;border-color:var(--accent);}
+        .rx-card-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;}
+        .rx-scan-row{display:flex;gap:14px;padding:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;margin-bottom:16px;align-items:stretch;}
+        .rx-scan-preview{width:100px;height:100px;flex-shrink:0;border:2px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;background:#fff;overflow:hidden;position:relative;}
+        .rx-scan-preview img{width:100%;height:100%;object-fit:cover;}
+        .rx-scan-preview .rx-scan-pdf{font-size:2rem;}
+        .rx-scan-placeholder{font-size:2rem;color:var(--border);}
+        .rx-scan-controls{flex:1;display:flex;flex-direction:column;gap:6px;min-width:0;}
+        .rx-scan-label{font-size:0.72rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.4px;}
+        .rx-scan-controls input[type=file]{font-size:0.8rem;color:var(--text-secondary);}
+        .rx-scan-actions{display:flex;gap:8px;margin-top:auto;}
+        .rx-scan-status{font-size:0.78rem;color:var(--text-secondary);min-height:16px;}
+        .rx-overview-summary{background:linear-gradient(135deg,rgba(124,58,237,0.06),rgba(124,58,237,0.02));border:1px solid var(--accent-dim);border-left:4px solid var(--accent);border-radius:10px;padding:14px 18px;margin-bottom:16px;font-size:0.88rem;line-height:1.6;color:var(--text-primary);}
+        .rx-overview-summary strong{color:var(--accent-hover);}
+        .rx-overview-summary .rx-summary-warn{color:#b91c1c;font-weight:600;}
+        .rx-overview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;}
+        .rx-pill{background:var(--bg-card);border:1px solid var(--border);border-left:4px solid var(--accent);border-radius:10px;padding:14px 16px;cursor:pointer;transition:all 0.15s;display:flex;flex-direction:column;gap:6px;}
+        .rx-pill:hover{border-left-color:var(--accent-hover);transform:translateY(-1px);box-shadow:0 4px 12px rgba(124,58,237,0.12);}
+        .rx-pill-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+        .rx-pill-name{font-size:0.98rem;font-weight:700;color:var(--text-primary);line-height:1.25;}
+        .rx-pill-dose{font-size:0.8rem;color:var(--accent);font-weight:600;flex-shrink:0;white-space:nowrap;}
+        .rx-pill-sig{font-size:0.82rem;color:var(--text-secondary);line-height:1.35;}
+        .rx-pill-meta{display:flex;flex-wrap:wrap;gap:10px;font-size:0.75rem;color:var(--text-secondary);margin-top:4px;padding-top:8px;border-top:1px dashed var(--border);}
+        .rx-pill-meta span{display:inline-flex;align-items:center;gap:4px;}
+        .rx-pill-meta strong{color:var(--text-primary);font-weight:600;}
+        .rx-pill-refills-low{color:#b91c1c;font-weight:700;}
         .modal-overlay.show .modal{transform:scale(1);}
         .modal-title{font-size:1.1rem;font-weight:700;color:var(--text-primary);margin-bottom:4px;}
         .modal-sub{font-size:0.85rem;color:var(--text-secondary);margin-bottom:16px;}
@@ -367,6 +399,17 @@
         </svg>
     </div>
     <div class="stats-grid" id="stats-grid"></div>
+    <div class="card">
+        <div class="card-title">
+            <div class="card-title-left">💊 Active Prescriptions</div>
+            <button class="btn btn-ghost btn-sm" onclick="showView('prescriptions')">View All →</button>
+        </div>
+        <div id="rx-overview-summary" class="rx-overview-summary" style="display:none;"></div>
+        <div class="rx-overview-grid" id="rx-overview-grid"></div>
+        <div id="rx-overview-empty" style="display:none;text-align:center;color:var(--text-secondary);padding:24px 0;font-size:0.9rem;">
+            No active prescriptions. <a href="#" onclick="showView('prescriptions');return false;" style="color:var(--accent);">Add one →</a>
+        </div>
+    </div>
     <div class="card">
         <div class="card-title"><div class="card-title-left">📊 Visits by Type</div></div>
         <div class="cat-breakdown" id="cat-breakdown"></div>
@@ -591,7 +634,10 @@
     <div class="card">
         <div class="card-title">
             <div class="card-title-left">💊 Prescriptions</div>
-            <button class="btn btn-primary btn-sm" onclick="openRxModal()">+ Add Prescription</button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="btn btn-secondary btn-sm" onclick="openRxUploadModal()">📷 Upload Labels</button>
+                <button class="btn btn-primary btn-sm" onclick="openRxModal()">+ Add Prescription</button>
+            </div>
         </div>
         <div class="toolbar">
             <input type="text" id="rx-search" placeholder="Search prescriptions..." oninput="renderPrescriptions()">
@@ -749,8 +795,22 @@
 <div class="modal-overlay" id="rx-modal">
     <div class="modal">
         <div class="modal-title" id="rx-modal-title">Add Prescription</div>
-        <div class="modal-sub">Enter prescription details.</div>
+        <div class="modal-sub">Enter prescription details, or upload a label photo to auto-fill.</div>
         <input type="hidden" id="rx-edit-doc-id">
+        <div class="rx-scan-row">
+            <div class="rx-scan-preview" id="rx-scan-preview">
+                <span class="rx-scan-placeholder">📷</span>
+                <button type="button" class="remove-photo" id="rx-scan-remove" onclick="removeRxModalPhoto()" style="display:none;">✕</button>
+            </div>
+            <div class="rx-scan-controls">
+                <label class="rx-scan-label">Label photo or PDF</label>
+                <input type="file" id="rx-scan-input" accept="image/*,application/pdf" onchange="handleRxModalFile(this.files[0]);this.value='';">
+                <div class="rx-scan-actions">
+                    <button type="button" class="btn btn-ai" id="rx-scan-btn" onclick="scanRxModalPhoto()" disabled style="margin-top:0;">🤖 Scan with AI</button>
+                </div>
+                <div class="rx-scan-status" id="rx-scan-status"></div>
+            </div>
+        </div>
         <div class="form-grid" style="grid-template-columns:1fr 1fr;">
             <div class="form-group"><label>Medication Name *</label><input type="text" id="rx-name" placeholder="e.g. Amoxicillin" required></div>
             <div class="form-group"><label>Dosage</label><input type="text" id="rx-dosage" placeholder="e.g. 500mg"></div>
@@ -767,6 +827,31 @@
         <div class="modal-actions">
             <button class="btn btn-primary" onclick="saveRx()">Save Prescription</button>
             <button class="btn btn-ghost" onclick="closeRxModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- ══ RX LABEL UPLOAD MODAL ══ -->
+<div class="modal-overlay" id="rx-upload-modal">
+    <div class="modal modal-wide">
+        <div class="modal-title">📷 Upload Prescription Labels</div>
+        <div class="modal-sub">Drop label photos or PDFs. AI reads each one and creates a prescription list entry you can review before saving.</div>
+        <div class="bulk-drop-zone" id="rx-upload-drop" onclick="document.getElementById('rx-upload-input').click()">
+            <div class="bulk-drop-icon">💊</div>
+            <div class="bulk-drop-title">Drop label images or PDFs here</div>
+            <div class="bulk-drop-sub">or click to browse — pill bottles, pharmacy printouts, PDF summaries</div>
+            <input type="file" id="rx-upload-input" accept="image/*,application/pdf" multiple style="display:none;" onchange="handleRxLabelFiles(this.files);this.value='';">
+        </div>
+        <div class="bulk-actions">
+            <button class="btn btn-primary btn-sm" id="rx-queue-analyze-all" onclick="analyzeAllRxLabels()" disabled>🤖 Analyze All</button>
+            <button class="btn btn-info btn-sm" id="rx-queue-save-all" onclick="saveAllRxFromQueue()" disabled>💾 Save All</button>
+            <button class="btn btn-ghost btn-sm" onclick="clearRxQueue()">Clear Queue</button>
+            <span id="rx-queue-status" style="font-size:0.82rem;color:var(--text-secondary);margin-left:auto;"></span>
+        </div>
+        <div class="bulk-queue" id="rx-upload-queue"></div>
+        <div id="rx-upload-empty" style="text-align:center;color:var(--text-secondary);font-size:0.85rem;padding:10px 0;">No labels uploaded yet.</div>
+        <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="closeRxUploadModal()">Close</button>
         </div>
     </div>
 </div>
@@ -909,6 +994,7 @@ async function initApp(){
         unsubRx=db.collection('addison_prescriptions').onSnapshot(snap=>{
             rxItems=snap.docs.map(doc=>({_docId:doc.id,...doc.data()}));
             renderPrescriptions();
+            if(document.getElementById('view-dashboard')?.classList.contains('active'))renderDashboard();
         },()=>{});
         document.getElementById('loading-screen').style.display='none';
         document.getElementById('app').style.display='block';
@@ -979,12 +1065,14 @@ function renderDashboard(){
     const physCount=physicians.length;
     const upcoming=items.filter(i=>{if(!i.followUpDate)return false;return new Date(i.followUpDate+'T00:00:00')>=new Date(new Date().toDateString());}).length;
     const types=new Set(items.map(i=>i.visitType).filter(Boolean)).size;
+    const activeRx=rxItems.filter(rx=>rx.status!=='discontinued').length;
     document.getElementById('stats-grid').innerHTML=`
         <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Total Visits</div></div>
         <div class="stat-card"><div class="stat-value">${physCount}</div><div class="stat-label">Physicians</div></div>
         <div class="stat-card"><div class="stat-value">${thisYear}</div><div class="stat-label">This Year</div></div>
         <div class="stat-card"><div class="stat-value">${upcoming}</div><div class="stat-label">Upcoming Follow-ups</div></div>
-        <div class="stat-card"><div class="stat-value">${types}</div><div class="stat-label">Visit Types</div></div>`;
+        <div class="stat-card" style="cursor:pointer" onclick="showView('prescriptions')"><div class="stat-value">${activeRx}</div><div class="stat-label">Active Rx</div></div>`;
+    renderRxOverview();
     const counts={};
     items.forEach(it=>{if(it.visitType)counts[it.visitType]=(counts[it.visitType]||0)+1;});
     const maxC=Math.max(...Object.values(counts),1);
@@ -1013,6 +1101,72 @@ function renderDashboard(){
             <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(it.diagnosis)||'—'}</td>
           </tr>`).join('')
         :'<tr><td colspan="6" style="text-align:center;color:var(--text-secondary);padding:30px;">No visits yet.</td></tr>';
+}
+
+function buildRxSummary(active){
+    if(!active.length)return '';
+    const n=active.length;
+    const med=n===1?'medication':'medications';
+    const meds=active.map(rx=>{
+        const name=rx.name||'unnamed';
+        const dose=rx.dosage?` ${rx.dosage}`:'';
+        const freq=rx.frequency?` — ${rx.frequency.toLowerCase()}`:'';
+        const reason=rx.condition?` for ${rx.condition.toLowerCase()}`:'';
+        return `<strong>${esc(name)}</strong>${esc(dose)}${esc(reason)}${esc(freq)}`;
+    });
+    let list;
+    if(meds.length===1)list=meds[0];
+    else if(meds.length===2)list=meds.join(' and ');
+    else list=meds.slice(0,-1).join(', ')+', and '+meds[meds.length-1];
+    const physicians=[...new Set(active.map(rx=>rx.physician).filter(Boolean))];
+    const pharmacies=[...new Set(active.map(rx=>rx.pharmacy).filter(Boolean))];
+    const noRefill=active.filter(rx=>{const n=parseInt(rx.refills,10);return rx.refills!==''&&!isNaN(n)&&n===0;});
+    const parts=[`Currently managing <strong>${n}</strong> active ${med}: ${list}.`];
+    if(physicians.length){
+        const physList=physicians.length===1?esc(physicians[0]):physicians.length===2?physicians.map(esc).join(' and '):physicians.slice(0,-1).map(esc).join(', ')+', and '+esc(physicians[physicians.length-1]);
+        parts.push(`Prescribed by ${physList}.`);
+    }
+    if(pharmacies.length){
+        const phList=pharmacies.length===1?esc(pharmacies[0]):pharmacies.length===2?pharmacies.map(esc).join(' and '):pharmacies.slice(0,-1).map(esc).join(', ')+', and '+esc(pharmacies[pharmacies.length-1]);
+        parts.push(`Filled at ${phList}.`);
+    }
+    if(noRefill.length){
+        const names=noRefill.map(rx=>esc(rx.name||'a prescription')).join(', ');
+        parts.push(`<span class="rx-summary-warn">⚠️ ${noRefill.length} ${noRefill.length===1?'prescription has':'prescriptions have'} no refills remaining (${names}) — contact the prescriber to renew.</span>`);
+    }
+    return parts.join(' ');
+}
+
+function renderRxOverview(){
+    const grid=document.getElementById('rx-overview-grid');
+    const empty=document.getElementById('rx-overview-empty');
+    const summary=document.getElementById('rx-overview-summary');
+    if(!grid||!empty)return;
+    const active=rxItems.filter(rx=>rx.status!=='discontinued')
+        .sort((a,b)=>(b.datePrescribed||'').localeCompare(a.datePrescribed||''));
+    if(!active.length){grid.innerHTML='';empty.style.display='block';if(summary)summary.style.display='none';return;}
+    empty.style.display='none';
+    if(summary){summary.innerHTML=buildRxSummary(active);summary.style.display='block';}
+    grid.innerHTML=active.map(rx=>{
+        const refillsNum=parseInt(rx.refills,10);
+        const refillsDisplay=rx.refills!==''&&!isNaN(refillsNum)
+            ?`<span class="${refillsNum===0?'rx-pill-refills-low':''}">🔄 <strong>${refillsNum}</strong> refill${refillsNum===1?'':'s'}</span>`
+            :'';
+        const physician=rx.physician?`<span>👨‍⚕️ <strong>${esc(rx.physician)}</strong></span>`:'';
+        const pharmacy=rx.pharmacy?`<span>🏥 ${esc(rx.pharmacy)}</span>`:'';
+        const condition=rx.condition?`<span>🎯 ${esc(rx.condition)}</span>`:'';
+        const sig=rx.frequency?`<div class="rx-pill-sig">${esc(rx.frequency)}</div>`:'';
+        const metaParts=[physician,pharmacy,refillsDisplay,condition].filter(Boolean).join('');
+        const meta=metaParts?`<div class="rx-pill-meta">${metaParts}</div>`:'';
+        return `<div class="rx-pill" onclick="editRx('${rx._docId}')" title="Edit ${esc(rx.name)}">
+            <div class="rx-pill-head">
+                <div class="rx-pill-name">${esc(rx.name)||'Unnamed'}</div>
+                ${rx.dosage?`<div class="rx-pill-dose">${esc(rx.dosage)}</div>`:''}
+            </div>
+            ${sig}
+            ${meta}
+        </div>`;
+    }).join('');
 }
 
 function toggleCatDetail(cat){
@@ -1537,7 +1691,82 @@ function renderPrescriptions(){
     }).join('');
 }
 
+let rxModalPhoto={base64:null,mimeType:null,thumb:null};
+
+function resetRxModalPhoto(){
+    rxModalPhoto={base64:null,mimeType:null,thumb:null};
+    const prev=document.getElementById('rx-scan-preview');
+    if(prev)prev.innerHTML='<span class="rx-scan-placeholder">📷</span><button type="button" class="remove-photo" id="rx-scan-remove" onclick="removeRxModalPhoto()" style="display:none;">✕</button>';
+    const btn=document.getElementById('rx-scan-btn');if(btn)btn.disabled=true;
+    const st=document.getElementById('rx-scan-status');if(st){st.textContent='';st.style.color='';}
+    const input=document.getElementById('rx-scan-input');if(input)input.value='';
+}
+
+async function handleRxModalFile(file){
+    if(!file)return;
+    const status=document.getElementById('rx-scan-status');
+    const prev=document.getElementById('rx-scan-preview');
+    const btn=document.getElementById('rx-scan-btn');
+    if(file.type==='application/pdf'){
+        rxModalPhoto.mimeType='application/pdf';
+        rxModalPhoto.base64=await new Promise(r=>{const fr=new FileReader();fr.onload=e=>r(e.target.result.split(',')[1]);fr.readAsDataURL(file);});
+        rxModalPhoto.thumb=null;
+        prev.innerHTML=`<span class="rx-scan-pdf">📄</span><button type="button" class="remove-photo" onclick="removeRxModalPhoto()">✕</button>`;
+    }else if(file.type.startsWith('image/')){
+        const dataUrl=await compressImage(file)||await new Promise(r=>{const fr=new FileReader();fr.onload=e=>r(e.target.result);fr.readAsDataURL(file);});
+        rxModalPhoto.mimeType='image/jpeg';
+        rxModalPhoto.base64=dataUrl.split(',')[1];
+        rxModalPhoto.thumb=dataUrl;
+        prev.innerHTML=`<img src="${dataUrl}"><button type="button" class="remove-photo" onclick="removeRxModalPhoto()">✕</button>`;
+    }else{
+        toast('Select an image or PDF.','error');return;
+    }
+    btn.disabled=false;
+    status.textContent='Ready to scan.';status.style.color='';
+}
+
+function removeRxModalPhoto(){resetRxModalPhoto();}
+
+async function scanRxModalPhoto(){
+    if(!rxModalPhoto.base64)return;
+    if(!apiKey){toast('Set your Anthropic API key in Settings first.','error');return;}
+    const btn=document.getElementById('rx-scan-btn'),status=document.getElementById('rx-scan-status');
+    btn.disabled=true;btn.classList.add('scanning');btn.textContent='⏳ Scanning…';
+    status.textContent='Reading label with AI…';status.style.color='';
+    const prompt=`You are a pharmacy label analyst. Read this prescription label or pharmacy printout and extract the fields below. Return ONLY a valid JSON object with these exact keys:
+name (medication/drug name, brand or generic — the primary drug),
+dosage (strength per unit, e.g. "500mg", "10mg/5mL"),
+frequency (sig/directions, e.g. "Twice daily", "1 tablet every 8 hours as needed"),
+physician (prescriber name, e.g. "Dr. Jane Smith"),
+datePrescribed (YYYY-MM-DD, use fill/written date if available),
+condition (indication/reason if stated, else empty),
+pharmacy (pharmacy name, e.g. "CVS", "Walgreens"),
+refills (number of refills remaining, as a string digit or empty),
+notes (any warnings, side-effect cautions, or extra directions in one short line).
+Use empty string for any field you cannot confidently extract. Do not invent values.`;
+    try{
+        const raw=await callClaude(rxModalPhoto.base64,rxModalPhoto.mimeType,prompt);
+        if(!raw)throw new Error('No response from AI');
+        const jsonMatch=raw.match(/\{[\s\S]*\}/);
+        if(!jsonMatch)throw new Error('Could not parse AI response');
+        const r=JSON.parse(jsonMatch[0]);
+        const map={name:'rx-name',dosage:'rx-dosage',frequency:'rx-frequency',physician:'rx-physician',datePrescribed:'rx-date-prescribed',condition:'rx-condition',pharmacy:'rx-pharmacy',refills:'rx-refills',notes:'rx-notes'};
+        const filled=[];
+        Object.entries(map).forEach(([k,id])=>{
+            const v=(r[k]||'').toString().trim();
+            if(v){document.getElementById(id).value=v;filled.push(k);}
+        });
+        status.textContent=filled.length?`✅ Filled: ${filled.join(', ')}.`:'⚠️ Could not extract details.';
+        status.style.color=filled.length?'var(--success)':'var(--text-secondary)';
+    }catch(err){
+        status.textContent='❌ '+err.message;status.style.color='var(--danger)';
+    }finally{
+        btn.disabled=false;btn.classList.remove('scanning');btn.innerHTML='🤖 Scan with AI';
+    }
+}
+
 function openRxModal(docId){
+    resetRxModalPhoto();
     document.getElementById('rx-edit-doc-id').value=docId||'';
     document.getElementById('rx-modal-title').textContent=docId?'Edit Prescription':'Add Prescription';
     if(docId){
@@ -1593,6 +1822,184 @@ async function deleteRx(docId){
     const rx=rxItems.find(x=>x._docId===docId);
     if(!confirm(`Delete "${rx?.name||'prescription'}"?`))return;
     try{await db.collection('addison_prescriptions').doc(docId).delete();toast('Prescription removed.','success');}catch(e){toast('Delete failed.','error');}
+}
+
+// ═══════════════════════════════════════
+//  RX LABEL UPLOAD
+// ═══════════════════════════════════════
+let rxQueue=[];
+const RX_FIELDS=['name','dosage','frequency','physician','datePrescribed','condition','pharmacy','refills','notes'];
+
+function openRxUploadModal(){document.getElementById('rx-upload-modal').classList.add('show');renderRxQueue();}
+function closeRxUploadModal(){document.getElementById('rx-upload-modal').classList.remove('show');}
+document.getElementById('rx-upload-modal').addEventListener('click',e=>{if(e.target===document.getElementById('rx-upload-modal'))closeRxUploadModal();});
+
+(function initRxDropZone(){
+    const zone=document.getElementById('rx-upload-drop');
+    if(!zone)return;
+    ['dragenter','dragover'].forEach(ev=>zone.addEventListener(ev,e=>{e.preventDefault();e.stopPropagation();zone.classList.add('dragover');}));
+    ['dragleave','drop'].forEach(ev=>zone.addEventListener(ev,e=>{e.preventDefault();e.stopPropagation();zone.classList.remove('dragover');}));
+    zone.addEventListener('drop',e=>{if(e.dataTransfer?.files?.length)handleRxLabelFiles(e.dataTransfer.files);});
+})();
+
+async function handleRxLabelFiles(files){
+    const valid=Array.from(files).filter(f=>f.type.startsWith('image/')||f.type==='application/pdf');
+    if(!valid.length){toast('Select images or PDFs.','error');return;}
+    for(const file of valid){
+        const id=Date.now()+Math.random();
+        const item={id,file,base64:null,mimeType:file.type==='application/pdf'?'application/pdf':'image/jpeg',thumb:null,status:'pending',error:null,extracted:{}};
+        if(file.type==='application/pdf'){
+            item.base64=await new Promise(r=>{const fr=new FileReader();fr.onload=e=>r(e.target.result.split(',')[1]);fr.readAsDataURL(file);});
+        }else{
+            const dataUrl=await compressImage(file)||await new Promise(r=>{const fr=new FileReader();fr.onload=e=>r(e.target.result);fr.readAsDataURL(file);});
+            item.base64=dataUrl.split(',')[1];
+            item.thumb=dataUrl;
+        }
+        rxQueue.push(item);
+    }
+    renderRxQueue();
+}
+
+function renderRxQueue(){
+    const el=document.getElementById('rx-upload-queue'),empty=document.getElementById('rx-upload-empty');
+    const hasItems=rxQueue.length>0;
+    if(empty)empty.style.display=hasItems?'none':'block';
+    document.getElementById('rx-queue-analyze-all').disabled=!rxQueue.some(q=>q.status==='pending'||q.status==='error');
+    document.getElementById('rx-queue-save-all').disabled=!rxQueue.some(q=>q.status==='ready');
+    const counts=rxQueue.reduce((a,q)=>{a[q.status]=(a[q.status]||0)+1;return a;},{});
+    document.getElementById('rx-queue-status').textContent=hasItems?`${rxQueue.length} total · ${counts.ready||0} ready · ${counts.saved||0} saved`:'';
+    el.innerHTML=rxQueue.map(q=>{
+        const isPdf=q.mimeType==='application/pdf';
+        const imgHtml=q.thumb?`<img class="bulk-card-img" src="${q.thumb}">`:`<div class="bulk-card-img-placeholder">${isPdf?'📄':'💊'}</div>`;
+        const labelMap={pending:'Pending',scanning:'Analyzing…',ready:'Ready',saved:'Saved',error:'Error'};
+        const statusClass='status-'+q.status;
+        let body='';
+        if(q.status==='ready'||q.status==='error'){
+            const ex=q.extracted||{};
+            body=`<div class="rx-inline-grid">
+                <div class="rx-inline-field full"><label>Medication *</label><input type="text" value="${esc(ex.name)||''}" oninput="updateRxQueueField(${q.id},'name',this.value)"></div>
+                <div class="rx-inline-field"><label>Dosage</label><input type="text" value="${esc(ex.dosage)||''}" oninput="updateRxQueueField(${q.id},'dosage',this.value)"></div>
+                <div class="rx-inline-field"><label>Frequency</label><input type="text" value="${esc(ex.frequency)||''}" oninput="updateRxQueueField(${q.id},'frequency',this.value)"></div>
+                <div class="rx-inline-field"><label>Physician</label><input type="text" list="physician-list" value="${esc(ex.physician)||''}" oninput="updateRxQueueField(${q.id},'physician',this.value)"></div>
+                <div class="rx-inline-field"><label>Date Prescribed</label><input type="date" value="${esc(ex.datePrescribed)||''}" oninput="updateRxQueueField(${q.id},'datePrescribed',this.value)"></div>
+                <div class="rx-inline-field"><label>Pharmacy</label><input type="text" value="${esc(ex.pharmacy)||''}" oninput="updateRxQueueField(${q.id},'pharmacy',this.value)"></div>
+                <div class="rx-inline-field"><label>Refills</label><input type="number" min="0" value="${esc(ex.refills)||''}" oninput="updateRxQueueField(${q.id},'refills',this.value)"></div>
+                <div class="rx-inline-field full"><label>Condition / Reason</label><input type="text" value="${esc(ex.condition)||''}" oninput="updateRxQueueField(${q.id},'condition',this.value)"></div>
+                <div class="rx-inline-field full"><label>Notes</label><textarea rows="2" oninput="updateRxQueueField(${q.id},'notes',this.value)">${esc(ex.notes)||''}</textarea></div>
+            </div>`;
+        }else if(q.status==='saved'){
+            body=`<div class="bulk-card-field"><strong>${esc(q.extracted?.name)||'Prescription'}</strong> saved to list.</div>`;
+        }else if(q.status==='scanning'){
+            body=`<div class="bulk-card-field">Reading label with AI…</div>`;
+        }else{
+            body=`<div class="bulk-card-field">Ready to analyze.</div>`;
+        }
+        let actions='';
+        if(q.status==='pending'||q.status==='error'){
+            actions=`<button class="btn btn-primary btn-sm" onclick="analyzeRxLabel(${q.id})">🤖 Analyze</button>`;
+        }
+        if(q.status==='ready'){
+            actions=`<button class="btn btn-primary btn-sm" onclick="saveRxFromQueue(${q.id})">💾 Save to List</button>
+                     <button class="btn btn-ghost btn-sm" onclick="analyzeRxLabel(${q.id})">↻ Re-analyze</button>`;
+        }
+        const errMsg=q.status==='error'?`<div class="bulk-card-field" style="color:var(--danger);margin-top:6px;">${esc(q.error||'Analysis failed')}</div>`:'';
+        return `<div class="bulk-card ${q.status==='saved'?'done':''} ${q.status==='error'?'error':''}" id="rx-card-${q.id}">
+            <button class="bulk-card-remove" onclick="removeRxQueueItem(${q.id})" title="Remove">✕</button>
+            ${imgHtml}
+            <div class="bulk-card-body">
+                <span class="bulk-card-status ${statusClass}">${labelMap[q.status]||q.status}</span>
+                ${body}
+                ${errMsg}
+                <div class="rx-card-actions">${actions}</div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function updateRxQueueField(id,field,value){
+    const q=rxQueue.find(x=>x.id===id);if(!q)return;
+    q.extracted=q.extracted||{};q.extracted[field]=value;
+}
+
+function removeRxQueueItem(id){
+    rxQueue=rxQueue.filter(x=>x.id!==id);renderRxQueue();
+}
+
+function clearRxQueue(){
+    if(!rxQueue.length)return;
+    if(!confirm('Clear all uploaded labels from the queue?'))return;
+    rxQueue=[];renderRxQueue();
+}
+
+async function analyzeRxLabel(id){
+    const q=rxQueue.find(x=>x.id===id);if(!q||!q.base64)return;
+    if(!apiKey){toast('Set your Anthropic API key in Settings first.','error');return;}
+    q.status='scanning';q.error=null;renderRxQueue();
+    const prompt=`You are a pharmacy label analyst. Read this prescription label or pharmacy printout and extract the fields below. Return ONLY a valid JSON object with these exact keys:
+name (medication/drug name, brand or generic — the primary drug),
+dosage (strength per unit, e.g. "500mg", "10mg/5mL"),
+frequency (sig/directions, e.g. "Twice daily", "1 tablet every 8 hours as needed"),
+physician (prescriber name, e.g. "Dr. Jane Smith"),
+datePrescribed (YYYY-MM-DD, use fill/written date if available),
+condition (indication/reason if stated, else empty),
+pharmacy (pharmacy name, e.g. "CVS", "Walgreens"),
+refills (number of refills remaining, as a string digit or empty),
+notes (any warnings, side-effect cautions, or extra directions in one short line).
+Use empty string for any field you cannot confidently extract. Do not invent values.`;
+    try{
+        const raw=await callClaude(q.base64,q.mimeType,prompt);
+        if(!raw)throw new Error('No response from AI');
+        const jsonMatch=raw.match(/\{[\s\S]*\}/);
+        if(!jsonMatch)throw new Error('Could not parse AI response');
+        const r=JSON.parse(jsonMatch[0]);
+        q.extracted={};
+        RX_FIELDS.forEach(f=>{q.extracted[f]=(r[f]||'').toString();});
+        if(!q.extracted.name){q.status='error';q.error='No medication name detected. Try a clearer photo.';}
+        else{q.status='ready';}
+    }catch(err){
+        q.status='error';q.error=err.message;
+    }
+    renderRxQueue();
+}
+
+async function analyzeAllRxLabels(){
+    const pending=rxQueue.filter(q=>q.status==='pending'||q.status==='error');
+    for(const q of pending){await analyzeRxLabel(q.id);}
+}
+
+async function saveRxFromQueue(id){
+    const q=rxQueue.find(x=>x.id===id);if(!q||q.status!=='ready')return;
+    const ex=q.extracted||{};
+    const name=(ex.name||'').trim();
+    if(!name){toast('Medication name is required.','error');return;}
+    const data={
+        name,
+        dosage:(ex.dosage||'').trim(),
+        frequency:(ex.frequency||'').trim(),
+        physician:(ex.physician||'').trim(),
+        datePrescribed:(ex.datePrescribed||'').trim(),
+        dateDiscontinued:'',
+        condition:(ex.condition||'').trim(),
+        pharmacy:(ex.pharmacy||'').trim(),
+        refills:(ex.refills||'').toString().trim(),
+        status:'active',
+        notes:(ex.notes||'').trim(),
+        source:'label-upload',
+        addedAt:new Date().toISOString(),
+    };
+    try{
+        await db.collection('addison_prescriptions').add(data);
+        q.status='saved';
+        toast(`Added ${name}.`,'success');
+        renderRxQueue();
+    }catch(err){
+        toast('Save failed: '+err.message,'error');
+    }
+}
+
+async function saveAllRxFromQueue(){
+    const ready=rxQueue.filter(q=>q.status==='ready');
+    for(const q of ready){await saveRxFromQueue(q.id);}
 }
 
 // ═══════════════════════════════════════

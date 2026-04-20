@@ -125,6 +125,18 @@
         .tax-docs-chips{display:flex;flex-wrap:wrap;gap:4px;}
         .tax-doc-chip{font-size:0.7rem;background:rgba(16,185,129,0.08);color:#047857;padding:2px 7px;border-radius:10px;border:1px solid rgba(16,185,129,0.2);cursor:pointer;text-decoration:none;}
         .tax-doc-chip:hover{background:rgba(16,185,129,0.18);}
+        .tea-chart-wrap{margin-top:8px;margin-bottom:12px;}
+        .tea-chart-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.78rem;color:var(--text-secondary);margin-bottom:10px;}
+        .tea-chart-legend .dot{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:6px;vertical-align:middle;}
+        .tea-chart-title{font-size:0.82rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.4px;margin:14px 0 6px;}
+        .tea-mini-table{width:100%;border-collapse:collapse;font-size:0.82rem;margin-top:6px;}
+        .tea-mini-table th{text-align:left;padding:6px 10px;background:var(--bg-card,#f3f0e8);font-size:0.72rem;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-secondary);border-bottom:1.5px solid var(--border);white-space:nowrap;font-weight:700;}
+        .tea-mini-table td{padding:7px 10px;border-bottom:1px solid var(--border);font-variant-numeric:tabular-nums;}
+        .tea-mini-table td.num{text-align:right;white-space:nowrap;}
+        .tea-mini-table tr:hover td{background:rgba(0,0,0,0.025);}
+        .tea-mini-table tfoot td{font-weight:700;background:var(--bg-card,#f3f0e8);border-top:2px solid var(--border);}
+        .tea-fed-color{color:#1e40af;}
+        .tea-mn-color{color:#c2410c;}
         .badge{display:inline-block;padding:3px 9px;border-radius:4px;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;white-space:nowrap;}
         .badge-will{background:#fee2e2;color:#991b1b;}
         .badge-trust{background:#fef3c7;color:#92400e;}
@@ -437,6 +449,22 @@
             </div>
         </div>
         <div id="tea-tax-report-content"></div>
+    </div>
+    <div class="card" id="tea-tax-trends-card" style="display:none;">
+        <div class="card-title"><div class="card-title-left">📈 Income & AGI Trends</div></div>
+        <div id="tea-tax-trends-content"></div>
+    </div>
+    <div class="card" id="tea-tax-fedmn-card" style="display:none;">
+        <div class="card-title"><div class="card-title-left">🏛️ Federal vs Minnesota — Tax Burden</div></div>
+        <div id="tea-tax-fedmn-content"></div>
+    </div>
+    <div class="card" id="tea-tax-refunds-card" style="display:none;">
+        <div class="card-title"><div class="card-title-left">💰 Refunds & Amounts Owed</div></div>
+        <div id="tea-tax-refunds-content"></div>
+    </div>
+    <div class="card" id="tea-tax-rates-card" style="display:none;">
+        <div class="card-title"><div class="card-title-left">🎯 Effective Tax Rates</div></div>
+        <div id="tea-tax-rates-content"></div>
     </div>
     <div class="card">
         <div class="card-title">
@@ -937,6 +965,262 @@ function renderTeaTaxReport(){
                 <tbody>${rows}</tbody>
             </table>
         </div>`;
+    renderTeaTaxTrends();
+    renderTeaTaxFedMn();
+    renderTeaTaxRefunds();
+    renderTeaTaxRates();
+}
+
+// ── Per-year federal vs Minnesota breakdown (ignores other states) ──
+function teaTaxByYearBreakdown(){
+    const byYear={};
+    teaPartyDocs.forEach(d=>{
+        const td=d.taxData;
+        if(!td?.isTaxDocument||!td.taxYear)return;
+        const y=td.taxYear;
+        if(!byYear[y])byYear[y]={year:y,federal:null,minnesota:null,otherStates:[],docsFed:[],docsMn:[]};
+        if(td.jurisdiction==='federal'&&td.isReturn){byYear[y].federal=td;byYear[y].docsFed.push(d);}
+        else if(td.jurisdiction==='federal'){byYear[y].docsFed.push(d);}
+        else if(td.jurisdiction==='state'&&td.stateCode==='MN'){
+            if(td.isReturn)byYear[y].minnesota=td;
+            byYear[y].docsMn.push(d);
+        }else if(td.jurisdiction==='state'){
+            byYear[y].otherStates.push(td);
+        }
+    });
+    return Object.values(byYear).sort((a,b)=>a.year-b.year);
+}
+
+const TEA_FED_COLOR='#1e40af';
+const TEA_MN_COLOR='#c2410c';
+const TEA_REFUND_COLOR='#15803d';
+const TEA_OWED_COLOR='#b91c1c';
+
+// Render a grouped bar chart. series = [{label:'Federal', color:'#...', values:[...]}, ...], xLabels = ['2020', '2021', ...]
+function teaBarChart(series,xLabels,opts={}){
+    if(!series.length||!xLabels.length)return '<div style="padding:10px 0;color:var(--text-secondary);font-size:0.85rem;">No data.</div>';
+    const W=opts.width||880,H=opts.height||220,pad={top:16,right:12,bottom:28,left:64};
+    const groups=xLabels.length,barsPerGroup=series.length;
+    const allVals=series.flatMap(s=>s.values.filter(v=>v!=null&&!isNaN(v)));
+    if(!allVals.length)return '<div style="padding:10px 0;color:var(--text-secondary);font-size:0.85rem;">No data.</div>';
+    const signed=opts.signed||allVals.some(v=>v<0);
+    const maxV=Math.max(...allVals,0);
+    const minV=signed?Math.min(...allVals,0):0;
+    const range=Math.max(Math.abs(maxV),Math.abs(minV))||1;
+    const yMax=signed?range:maxV||1;
+    const yMin=signed?-range:0;
+    const plotH=H-pad.top-pad.bottom,plotW=W-pad.left-pad.right;
+    const yToPx=v=>pad.top+(1-(v-yMin)/(yMax-yMin))*plotH;
+    const zeroY=yToPx(0);
+    const groupW=plotW/groups;
+    const barW=Math.max((groupW*0.75)/barsPerGroup,2);
+    const fmt=opts.fmt||(v=>fmtMoney(v).replace('$',''));
+    let bars='';
+    for(let g=0;g<groups;g++){
+        const gx=pad.left+g*groupW+(groupW-barW*barsPerGroup)/2;
+        series.forEach((s,si)=>{
+            const v=s.values[g];
+            if(v==null||isNaN(v))return;
+            const x=gx+si*barW;
+            const y=v>=0?yToPx(v):zeroY;
+            const h=Math.abs(yToPx(v)-zeroY);
+            bars+=`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${(barW*0.88).toFixed(1)}" height="${h.toFixed(1)}" fill="${s.color}" rx="2"><title>${esc(s.label)} ${xLabels[g]}: ${fmt(v)}</title></rect>`;
+            if(opts.showValues!==false){
+                const valY=v>=0?y-4:y+h+11;
+                bars+=`<text x="${(x+barW*0.44).toFixed(1)}" y="${valY.toFixed(1)}" font-size="10" text-anchor="middle" fill="#444">${fmt(v)}</text>`;
+            }
+        });
+        bars+=`<text x="${(pad.left+g*groupW+groupW/2).toFixed(1)}" y="${(H-10).toFixed(1)}" font-size="11" text-anchor="middle" fill="#555">${esc(xLabels[g])}</text>`;
+    }
+    // y-axis grid (3 ticks)
+    let grid='';
+    const ticks=signed?[-range,-range/2,0,range/2,range]:[0,yMax/4,yMax/2,3*yMax/4,yMax];
+    ticks.forEach(tv=>{
+        const py=yToPx(tv);
+        grid+=`<line x1="${pad.left}" y1="${py.toFixed(1)}" x2="${(W-pad.right).toFixed(1)}" y2="${py.toFixed(1)}" stroke="${tv===0?'#999':'#eee'}" stroke-width="${tv===0?1:0.7}"/>`;
+        grid+=`<text x="${(pad.left-6).toFixed(1)}" y="${(py+3).toFixed(1)}" font-size="10" text-anchor="end" fill="#888">${fmt(tv)}</text>`;
+    });
+    return `<div class="tea-chart-wrap"><svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px;display:block;">${grid}${bars}</svg></div>`;
+}
+
+function teaChartLegend(entries){
+    return `<div class="tea-chart-legend">${entries.map(e=>`<span><span class="dot" style="background:${e.color};"></span>${esc(e.label)}</span>`).join('')}</div>`;
+}
+
+function renderTeaTaxTrends(){
+    const card=document.getElementById('tea-tax-trends-card');
+    const content=document.getElementById('tea-tax-trends-content');
+    if(!card||!content)return;
+    const years=teaTaxByYearBreakdown().filter(y=>y.federal);
+    if(!years.length){card.style.display='none';return;}
+    card.style.display='block';
+    const labels=years.map(y=>String(y.year));
+    const getF=key=>years.map(y=>y.federal?.fields?.[key]??null);
+    const chart=teaBarChart([
+        {label:'Total Income',color:'#0ea5e9',values:getF('totalIncome')},
+        {label:'AGI',color:TEA_FED_COLOR,values:getF('agi')},
+        {label:'Taxable Income',color:'#6366f1',values:getF('taxableIncome')},
+    ],labels);
+    const legend=teaChartLegend([
+        {label:'Total Income',color:'#0ea5e9'},
+        {label:'AGI',color:TEA_FED_COLOR},
+        {label:'Taxable Income',color:'#6366f1'},
+    ]);
+    const rows=years.map(y=>{
+        const f=y.federal.fields||{};
+        return `<tr>
+            <td><strong>${y.year}</strong></td>
+            <td class="num">${fmtMoney(f.wages)}</td>
+            <td class="num">${fmtMoney(f.interestIncome)}</td>
+            <td class="num">${fmtMoney(f.dividendIncome)}</td>
+            <td class="num">${fmtMoney(f.capitalGains)}</td>
+            <td class="num">${fmtMoney(f.socialSecurity)}</td>
+            <td class="num">${fmtMoney(f.otherIncome)}</td>
+            <td class="num"><strong>${fmtMoney(f.totalIncome)}</strong></td>
+            <td class="num"><strong>${fmtMoney(f.agi)}</strong></td>
+        </tr>`;
+    }).join('');
+    content.innerHTML=`${legend}${chart}
+        <div class="tea-chart-title">Income Components (Federal)</div>
+        <div class="table-wrapper"><table class="tea-mini-table">
+            <thead><tr><th>Year</th><th>Wages</th><th>Interest</th><th>Dividends</th><th>Cap Gains</th><th>Soc Sec</th><th>Other</th><th>Total Income</th><th>AGI</th></tr></thead>
+            <tbody>${rows}</tbody>
+        </table></div>`;
+}
+
+function renderTeaTaxFedMn(){
+    const card=document.getElementById('tea-tax-fedmn-card');
+    const content=document.getElementById('tea-tax-fedmn-content');
+    if(!card||!content)return;
+    const years=teaTaxByYearBreakdown().filter(y=>y.federal||y.minnesota);
+    if(!years.length){card.style.display='none';return;}
+    card.style.display='block';
+    const labels=years.map(y=>String(y.year));
+    const fedTax=years.map(y=>y.federal?.fields?.totalTax??null);
+    const mnTax=years.map(y=>y.minnesota?.fields?.totalTax??null);
+    const combined=years.map((_,i)=>{const a=fedTax[i],b=mnTax[i];if(a==null&&b==null)return null;return (a||0)+(b||0);});
+    const chart=teaBarChart([
+        {label:'Federal Tax',color:TEA_FED_COLOR,values:fedTax},
+        {label:'Minnesota Tax',color:TEA_MN_COLOR,values:mnTax},
+    ],labels);
+    const legend=teaChartLegend([{label:'Federal',color:TEA_FED_COLOR},{label:'Minnesota',color:TEA_MN_COLOR}]);
+    let fedSum=0,mnSum=0,cSum=0;
+    const rows=years.map((y,i)=>{
+        const f=y.federal?.fields||{},m=y.minnesota?.fields||{};
+        const c=combined[i];
+        if(fedTax[i]!=null)fedSum+=fedTax[i];
+        if(mnTax[i]!=null)mnSum+=mnTax[i];
+        if(c!=null)cSum+=c;
+        return `<tr>
+            <td><strong>${y.year}</strong></td>
+            <td class="num">${fmtMoney(f.agi)}</td>
+            <td class="num tea-fed-color">${fmtMoney(f.totalTax)}</td>
+            <td class="num tea-fed-color">${fmtMoney(f.withholding)}</td>
+            <td class="num tea-mn-color">${fmtMoney(m.totalTax)}</td>
+            <td class="num tea-mn-color">${fmtMoney(m.withholding)}</td>
+            <td class="num"><strong>${fmtMoney(c)}</strong></td>
+        </tr>`;
+    }).join('');
+    content.innerHTML=`${legend}${chart}
+        <div class="tea-chart-title">Tax by Jurisdiction</div>
+        <div class="table-wrapper"><table class="tea-mini-table">
+            <thead><tr><th>Year</th><th>Federal AGI</th><th>Fed Tax</th><th>Fed W/H</th><th>MN Tax</th><th>MN W/H</th><th>Total Tax</th></tr></thead>
+            <tbody>${rows}</tbody>
+            <tfoot><tr><td>Totals</td><td class="num">—</td><td class="num">${fmtMoney(fedSum)}</td><td class="num">—</td><td class="num">${fmtMoney(mnSum)}</td><td class="num">—</td><td class="num">${fmtMoney(cSum)}</td></tr></tfoot>
+        </table></div>`;
+}
+
+function renderTeaTaxRefunds(){
+    const card=document.getElementById('tea-tax-refunds-card');
+    const content=document.getElementById('tea-tax-refunds-content');
+    if(!card||!content)return;
+    const years=teaTaxByYearBreakdown().filter(y=>y.federal||y.minnesota);
+    if(!years.length){card.style.display='none';return;}
+    card.style.display='block';
+    const net=td=>{if(!td)return null;const f=td.fields||{};if(f.refund!=null&&f.refund!==0)return f.refund;if(f.owed!=null&&f.owed!==0)return -f.owed;return 0;};
+    const labels=years.map(y=>String(y.year));
+    const fedNet=years.map(y=>net(y.federal));
+    const mnNet=years.map(y=>net(y.minnesota));
+    const chart=teaBarChart([
+        {label:'Federal',color:TEA_FED_COLOR,values:fedNet},
+        {label:'Minnesota',color:TEA_MN_COLOR,values:mnNet},
+    ],labels,{signed:true});
+    const legend=teaChartLegend([
+        {label:'Refund (above line)',color:TEA_REFUND_COLOR},
+        {label:'Owed (below line)',color:TEA_OWED_COLOR},
+        {label:'Federal bar',color:TEA_FED_COLOR},
+        {label:'Minnesota bar',color:TEA_MN_COLOR},
+    ]);
+    const line=(v)=>{
+        if(v==null)return '—';
+        if(v===0)return '<span style="color:var(--text-secondary);">$0</span>';
+        return v>0?`<span class="tax-refund">+${fmtMoney(v)}</span>`:`<span class="tax-owed">−${fmtMoney(Math.abs(v))}</span>`;
+    };
+    let fedSum=0,mnSum=0;
+    const rows=years.map((y,i)=>{
+        const f=y.federal?.fields||{},m=y.minnesota?.fields||{};
+        const fn=fedNet[i],mn=mnNet[i];
+        if(fn!=null)fedSum+=fn;
+        if(mn!=null)mnSum+=mn;
+        const total=(fn||0)+(mn||0);
+        return `<tr>
+            <td><strong>${y.year}</strong></td>
+            <td class="num">${fmtMoney(f.refund)}</td>
+            <td class="num">${fmtMoney(f.owed)}</td>
+            <td class="num">${line(fn)}</td>
+            <td class="num">${fmtMoney(m.refund)}</td>
+            <td class="num">${fmtMoney(m.owed)}</td>
+            <td class="num">${line(mn)}</td>
+            <td class="num"><strong>${line(total)}</strong></td>
+        </tr>`;
+    }).join('');
+    content.innerHTML=`${legend}${chart}
+        <div class="tea-chart-title">Net Refund (+) or Owed (−) by Year</div>
+        <div class="table-wrapper"><table class="tea-mini-table">
+            <thead><tr><th rowspan="2">Year</th><th colspan="3" style="text-align:center;">Federal</th><th colspan="3" style="text-align:center;">Minnesota</th><th rowspan="2">Combined Net</th></tr>
+                <tr><th>Refund</th><th>Owed</th><th>Net</th><th>Refund</th><th>Owed</th><th>Net</th></tr></thead>
+            <tbody>${rows}</tbody>
+            <tfoot><tr><td>Totals</td><td class="num" colspan="2">—</td><td class="num">${line(fedSum)}</td><td class="num" colspan="2">—</td><td class="num">${line(mnSum)}</td><td class="num">${line(fedSum+mnSum)}</td></tr></tfoot>
+        </table></div>`;
+}
+
+function renderTeaTaxRates(){
+    const card=document.getElementById('tea-tax-rates-card');
+    const content=document.getElementById('tea-tax-rates-content');
+    if(!card||!content)return;
+    const years=teaTaxByYearBreakdown().filter(y=>y.federal);
+    if(!years.length){card.style.display='none';return;}
+    card.style.display='block';
+    const labels=years.map(y=>String(y.year));
+    const safeRate=(tax,agi)=>{if(tax==null||agi==null||agi<=0)return null;return (tax/agi)*100;};
+    const fedRate=years.map(y=>safeRate(y.federal?.fields?.totalTax,y.federal?.fields?.agi));
+    const mnRate=years.map(y=>safeRate(y.minnesota?.fields?.totalTax,y.federal?.fields?.agi));
+    const combinedRate=years.map((_,i)=>{const a=fedRate[i]||0,b=mnRate[i]||0;if(fedRate[i]==null&&mnRate[i]==null)return null;return a+b;});
+    const fmtPct=v=>{if(v==null||isNaN(v))return '—';return v.toFixed(1)+'%';};
+    const chart=teaBarChart([
+        {label:'Federal Rate',color:TEA_FED_COLOR,values:fedRate},
+        {label:'Minnesota Rate',color:TEA_MN_COLOR,values:mnRate},
+        {label:'Combined',color:'#475569',values:combinedRate},
+    ],labels,{fmt:fmtPct});
+    const legend=teaChartLegend([{label:'Federal',color:TEA_FED_COLOR},{label:'Minnesota',color:TEA_MN_COLOR},{label:'Combined',color:'#475569'}]);
+    const rows=years.map((y,i)=>{
+        const f=y.federal.fields||{};
+        return `<tr>
+            <td><strong>${y.year}</strong></td>
+            <td class="num">${fmtMoney(f.agi)}</td>
+            <td class="num tea-fed-color">${fmtMoney(f.totalTax)}</td>
+            <td class="num tea-fed-color">${fmtPct(fedRate[i])}</td>
+            <td class="num tea-mn-color">${fmtMoney(y.minnesota?.fields?.totalTax)}</td>
+            <td class="num tea-mn-color">${fmtPct(mnRate[i])}</td>
+            <td class="num"><strong>${fmtPct(combinedRate[i])}</strong></td>
+        </tr>`;
+    }).join('');
+    content.innerHTML=`${legend}${chart}
+        <div class="tea-chart-title">Effective Rate = Total Tax ÷ Federal AGI</div>
+        <div class="table-wrapper"><table class="tea-mini-table">
+            <thead><tr><th>Year</th><th>Federal AGI</th><th>Fed Tax</th><th>Fed Rate</th><th>MN Tax</th><th>MN Rate</th><th>Combined Rate</th></tr></thead>
+            <tbody>${rows}</tbody>
+        </table></div>`;
 }
 
 function exportTeaTaxReportCSV(){
@@ -976,6 +1260,7 @@ async function blobToBase64(blob){
 }
 
 let _pdfjsConfigured=false;
+const TEA_PDF_PASSWORDS=['249626'];
 async function extractPdfText(blob,maxPages=250){
     if(!window.pdfjsLib)throw new Error('PDF reader library not loaded');
     if(!_pdfjsConfigured){
@@ -983,7 +1268,22 @@ async function extractPdfText(blob,maxPages=250){
         _pdfjsConfigured=true;
     }
     const arrayBuffer=await blob.arrayBuffer();
-    const pdf=await window.pdfjsLib.getDocument({data:arrayBuffer}).promise;
+    const openPdf=async(password)=>{
+        const task=window.pdfjsLib.getDocument(password?{data:arrayBuffer,password}:{data:arrayBuffer});
+        return await task.promise;
+    };
+    let pdf;
+    try{pdf=await openPdf();}
+    catch(err){
+        const name=err?.name||'';
+        if(name==='PasswordException'||/password/i.test(err?.message||'')){
+            let opened=false;
+            for(const pwd of TEA_PDF_PASSWORDS){
+                try{pdf=await openPdf(pwd);opened=true;break;}catch(e){}
+            }
+            if(!opened)throw new Error('PDF is password-protected and no saved password matched');
+        }else{throw err;}
+    }
     const pages=Math.min(pdf.numPages,maxPages);
     const out=[];
     for(let i=1;i<=pages;i++){

@@ -283,27 +283,6 @@
         <div class="hero-emoji">🫖</div>
     </div>
 
-    <!-- INLINE BULK UPLOAD (drops files straight into the upload queue) -->
-    <div class="card">
-        <div class="card-title">
-            <div class="card-title-left">📥 Bulk Upload Tax Returns</div>
-            <span style="font-size:0.82rem;color:var(--text-secondary);">Drop multiple PDFs — AI extracts every field and populates the reports below.</span>
-        </div>
-        <div class="bulk-drop-zone" id="years-drop-zone" onclick="document.getElementById('years-file-input').click()"
-            ondragover="event.preventDefault();this.classList.add('dragover')"
-            ondragleave="this.classList.remove('dragover')"
-            ondrop="event.preventDefault();this.classList.remove('dragover');bulkUploadFromYears(event.dataTransfer.files)">
-            <div class="bulk-drop-icon">🧾</div>
-            <div class="bulk-drop-title">Drop 1040s, state returns, W-2s, 1099s, K-1s…</div>
-            <div class="bulk-drop-sub">or click to select multiple files at once (PDF, JPG, PNG)</div>
-            <input type="file" id="years-file-input" accept="image/*,application/pdf" multiple style="display:none" onchange="bulkUploadFromYears(this.files);this.value='';">
-        </div>
-        <div style="display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap;">
-            <button class="btn btn-ghost btn-sm" onclick="showView('upload')">→ Go to Upload queue</button>
-            <span id="years-queue-hint" style="font-size:0.82rem;color:var(--text-secondary);"></span>
-        </div>
-    </div>
-
     <!-- SUMMARY AT TOP -->
     <div class="card">
         <div class="card-title">
@@ -1266,23 +1245,6 @@ function handleBulkFiles(files){
     document.getElementById('bulk-actions').style.display='flex';
     document.getElementById('btn-bulk-save-all').style.display='none';
     updateBulkCountLabel();
-    const hint=document.getElementById('years-queue-hint');
-    if(hint)hint.textContent=bulkQueue.length?`${bulkQueue.length} file${bulkQueue.length>1?'s':''} queued.`:'';
-}
-
-// Bulk upload initiated from the Tax Years view: enqueue the files, jump to the
-// Upload queue, and (when an API key is configured) kick off scanning automatically.
-function bulkUploadFromYears(files){
-    const before=bulkQueue.length;
-    handleBulkFiles(files);
-    if(bulkQueue.length===before)return;
-    showView('upload');
-    if(apiKey){
-        // Auto-start scanning the newly added files so bulk drop → bulk scan feels like one action.
-        setTimeout(()=>{runBulkScan();},150);
-    }else{
-        toast('Files queued. Set your API key in Settings to enable AI scanning.','warn');
-    }
 }
 function clearBulkQueue(){bulkQueue=[];document.getElementById('bulk-queue').innerHTML='';document.getElementById('bulk-actions').style.display='none';document.getElementById('bulk-count-label').textContent='';}
 function removeBulkItem(id){bulkQueue=bulkQueue.filter(q=>q.id!==id);renderBulkQueue();updateBulkCountLabel();if(!bulkQueue.length)document.getElementById('bulk-actions').style.display='none';}

@@ -1973,11 +1973,30 @@ function renderTeaTaxTrends(){
     if(!hasData){card.style.display='none';return;}
     card.style.display='block';
     const xLabels=rows.map(r=>String(r.year));
+    // An explicit $0 in any of these four fields is almost always an AI
+    // extraction miss when the other fields for the same year are non-zero
+    // (a real return with $500k AGI doesn't have $0 wages). Render suspect
+    // zeros as null so the line breaks across that year instead of diving
+    // to the baseline.
+    const clean=(row,v)=>{
+        if(v==null)return null;
+        if(v!==0)return v;
+        const peers=[row.fedTotalIncome,row.fedWages,row.fedAgi,row.fedTaxable];
+        return peers.some(p=>p!=null&&p!==0)?null:0;
+    };
+    // Reuse the wage figure already reconciled by teaW2WagesByYear (which
+    // prefers the scanned W-2 sum when the 1040 line 1 extracted as $0).
+    const w2ByYear={};
+    (typeof teaW2WagesByYear==='function'?teaW2WagesByYear():[]).forEach(w=>{w2ByYear[w.year]=w.wages;});
     const series=[
-        {label:'Total Income',color:'#2563eb',values:rows.map(r=>r.fedTotalIncome)},
-        {label:'Wages (W-2)',color:'#059669',values:rows.map(r=>r.fedWages)},
-        {label:'AGI',color:'#7c3aed',values:rows.map(r=>r.fedAgi)},
-        {label:'Taxable Income',color:'#6366f1',values:rows.map(r=>r.fedTaxable)},
+        {label:'Total Income',color:'#2563eb',values:rows.map(r=>clean(r,r.fedTotalIncome))},
+        {label:'Wages (W-2)',color:'#059669',values:rows.map(r=>{
+            const w=w2ByYear[r.year];
+            if(w!=null&&w!==0)return w;
+            return clean(r,r.fedWages);
+        })},
+        {label:'AGI',color:'#7c3aed',values:rows.map(r=>clean(r,r.fedAgi))},
+        {label:'Taxable Income',color:'#6366f1',values:rows.map(r=>clean(r,r.fedTaxable))},
     ];
     content.innerHTML=teaChartLegend(series)+teaLineChart(series,xLabels);
 }

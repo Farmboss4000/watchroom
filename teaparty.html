@@ -822,31 +822,140 @@ function renderTaxMarkdown(raw){
     return html;
 }
 
+// Build a per-year dataset for the Tax History Summary that prefers scanned
+// tax documents (rich field-level data) and falls back to manual Tax Year
+// entries for any year that isn't covered by a scanned return.
+function buildSummaryDataset(){
+    const byYear={};
+    // Scanned returns — take every filing (federal + any additionalFilings)
+    const breakdown=(typeof teaTaxByYearBreakdown==='function')?teaTaxByYearBreakdown():[];
+    breakdown.forEach(r=>{
+        byYear[r.year]={
+            year:r.year,
+            source:'scanned',
+            filingStatus:null,
+            taxpayers:null,
+            federalAGI:r.fedAgi,
+            taxableIncome:r.fedTaxable,
+            federalTax:r.fedTotalTax,
+            federalWithholding:r.fedWithholding,
+            wages:r.fedWages,
+            totalIncome:r.fedTotalIncome,
+            deduction:r.fedDeduction,
+            deductionType:r.fedDeductionType,
+            refund:r.fedRefund,
+            owed:r.fedOwed,
+            stateTotalTax:r.stateTotalTax,
+            stateWithholding:r.stateWithholding,
+            stateCodes:r.stateCodes||[],
+        };
+    });
+    // Backfill filingStatus / taxpayerName from the source taxData where known
+    const returnsByYear=(typeof teaTaxReturnsByYear==='function')?teaTaxReturnsByYear():[];
+    returnsByYear.forEach(y=>{
+        if(!byYear[y.year])return;
+        const fed=y.federalReturns[0]?.taxData;
+        if(fed){
+            if(fed.filingStatus&&!byYear[y.year].filingStatus)byYear[y.year].filingStatus=fed.filingStatus;
+            if(fed.taxpayerName&&!byYear[y.year].taxpayers)byYear[y.year].taxpayers=fed.taxpayerName;
+        }
+    });
+    // Manual Tax Year entries — add any year not already covered, or fill gaps
+    (taxYears||[]).forEach(t=>{
+        if(!t.year)return;
+        const existing=byYear[t.year];
+        const states=(t.stateReturns||[]).reduce((s,x)=>{
+            s.total+=x.amount||0;
+            if(x.state)s.codes.push(x.state);
+            return s;
+        },{total:0,codes:[]});
+        if(!existing){
+            byYear[t.year]={
+                year:t.year,
+                source:'manual',
+                filingStatus:t.filingStatus||null,
+                taxpayers:t.taxpayers||null,
+                federalAGI:t.federalAGI??null,
+                taxableIncome:t.taxableIncome??null,
+                federalTax:t.federalTax??null,
+                federalWithholding:t.federalWithholding??null,
+                wages:null,
+                totalIncome:null,
+                deduction:null,
+                deductionType:null,
+                refund:null,
+                owed:null,
+                stateTotalTax:null,
+                stateWithholding:null,
+                stateCodes:states.codes,
+                manualStateNet:states.total||null,
+                manualNotes:t.notes||'',
+            };
+        }else{
+            if(!existing.filingStatus&&t.filingStatus)existing.filingStatus=t.filingStatus;
+            if(!existing.taxpayers&&t.taxpayers)existing.taxpayers=t.taxpayers;
+            if(existing.federalAGI==null&&t.federalAGI!=null)existing.federalAGI=t.federalAGI;
+            if(existing.taxableIncome==null&&t.taxableIncome!=null)existing.taxableIncome=t.taxableIncome;
+            if(existing.federalTax==null&&t.federalTax!=null)existing.federalTax=t.federalTax;
+            if(existing.federalWithholding==null&&t.federalWithholding!=null)existing.federalWithholding=t.federalWithholding;
+            if(states.codes.length){
+                existing.stateCodes=[...new Set([...(existing.stateCodes||[]),...states.codes])];
+            }
+            if(t.notes)existing.manualNotes=t.notes;
+        }
+    });
+    return Object.values(byYear).sort((a,b)=>a.year-b.year);
+}
+
 async function generateTaxSummary(){
     if(!apiKey){toast('Set API key in Settings first.','error');return;}
-    if(!taxYears.length){toast('Add at least one tax year first.','error');return;}
+    const dataset=buildSummaryDataset();
+    if(!dataset.length){
+        toast('Upload a tax return or add a manual tax year first.','error');
+        return;
+    }
     const btn=document.getElementById('btn-generate-tax-summary');
     const statusEl=document.getElementById('tax-summary-status');
     const resultEl=document.getElementById('tax-summary-result');
     btn.disabled=true;btn.textContent='⏳ Analyzing…';
     statusEl.textContent='Reading every tax year on file and writing a narrative of how things have shifted…';
     statusEl.style.color='var(--text-secondary)';
-    resultEl.style.display='none';
+    // Keep the last generated summary visible while the new one is being written,
+    // so users aren't staring at an empty panel during refresh.
 
-    const sorted=[...taxYears].sort((a,b)=>(a.year||0)-(b.year||0));
-    const tableRows=sorted.map(t=>{
-        const net=taxNetFed(t);
-        const states=(t.stateReturns||[]).map(s=>`${s.state}:${s.amount}`).join(';')||'—';
-        return `${t.year} | ${t.filingStatus||'—'} | AGI ${t.federalAGI??'—'} | Taxable ${t.taxableIncome??'—'} | Fed Tax ${t.federalTax??'—'} | Withheld ${t.federalWithholding??'—'} | Net ${net??'—'} | States ${states} | Docs ${(t.docs||[]).join(',')||'—'}${t.notes?' | '+t.notes:''}`;
+    const tableRows=dataset.map(r=>{
+        const net=r.refund!=null?r.refund:(r.owed!=null?-r.owed:(r.federalWithholding!=null&&r.federalTax!=null?r.federalWithholding-r.federalTax:null));
+        const parts=[
+            `${r.year}`,
+            `source=${r.source}`,
+            `filing=${r.filingStatus||'?'}`,
+            `taxpayers=${r.taxpayers||'?'}`,
+            `AGI=${r.federalAGI??'?'}`,
+            `wages=${r.wages??'?'}`,
+            `totalIncome=${r.totalIncome??'?'}`,
+            `taxable=${r.taxableIncome??'?'}`,
+            `fedTax=${r.federalTax??'?'}`,
+            `fedWH=${r.federalWithholding??'?'}`,
+            `fedNet=${net??'?'}`,
+            `deduction=${r.deduction??'?'}${r.deductionType?`(${r.deductionType})`:''}`,
+            `stateTax=${r.stateTotalTax??'?'}`,
+            `stateWH=${r.stateWithholding??'?'}`,
+            `states=${(r.stateCodes||[]).join(',')||'—'}`,
+        ];
+        if(r.manualNotes)parts.push(`notes=${r.manualNotes}`);
+        return parts.join(' | ');
     }).join('\n');
-    const years=sorted.map(t=>t.year).filter(Boolean);
-    const minY=years.length?Math.min(...years):'—', maxY=years.length?Math.max(...years):'—';
+    const years=dataset.map(r=>r.year);
+    const minY=Math.min(...years), maxY=Math.max(...years);
+    const scannedCount=dataset.filter(r=>r.source==='scanned').length;
+    const manualCount=dataset.filter(r=>r.source==='manual').length;
 
     try{
+        const sourceBlurb=scannedCount&&manualCount?`${scannedCount} year${scannedCount!==1?'s':''} extracted from uploaded returns plus ${manualCount} manual entry/entries`:(scannedCount?`${scannedCount} year${scannedCount!==1?'s':''} extracted from uploaded returns`:`${manualCount} manual tax-year entry/entries`);
         const prompt=`You are writing a financial-history narrative for a family member reviewing the long arc of their household's tax returns. Audience is a non-accountant — use plain English, no jargon.
 
 Focus on what has **CHANGED** over the years. Identify:
-- Income trajectory (AGI and taxable income trends — rising, flat, dropping; any big jumps or dips)
+- Income trajectory (AGI, wages, total income trends — rising, flat, dropping; any big jumps or dips)
 - Tax burden shifts (effective tax rate, unusually high/low years)
 - Refund vs owed patterns (years where withholding was well-matched vs misaligned)
 - Filing-status or taxpayer changes (e.g. marriage, name changes, adding dependents)
@@ -865,7 +974,7 @@ One paragraph on the overall trajectory — what do the ${years.length} years on
 Bulleted list of the 3-6 most meaningful changes over the span, each anchored to a specific year or range. Be concrete with numbers.
 
 ## 💵 Income Trends
-Short analysis of AGI and taxable income over time — direction, magnitude, notable outliers.
+Short analysis of AGI, wages, and taxable income over time — direction, magnitude, notable outliers.
 
 ## 🧾 Tax Burden & Refunds
 How has federal tax owed shifted? Which years had the biggest refunds or balances due? Any mismatches between withholding and actual tax?
@@ -878,6 +987,8 @@ Missing years, incomplete records, or anything that looks worth a closer look.
 
 End with one sentence summarizing the overall financial story these returns tell.
 
+Data drawn from ${sourceBlurb}. Each line below is one year. "source=scanned" means values came from AI-extracted tax returns in the document library; "source=manual" means they came from a manually entered Tax Year record.
+
 DATA (one line per year, oldest first):
 ${tableRows}
 
@@ -889,15 +1000,16 @@ Range: ${minY}–${maxY}`;
         resultEl.innerHTML=renderTaxMarkdown(raw);
         resultEl.style.display='block';
         try{
-            const entry={rawText:raw,yearCount:years.length,minYear:minY,maxYear:maxY,createdAt:firebase.firestore.FieldValue.serverTimestamp()};
+            const entry={rawText:raw,yearCount:years.length,minYear:minY,maxYear:maxY,scannedCount,manualCount,createdAt:firebase.firestore.FieldValue.serverTimestamp()};
             const docRef=await db.collection('estate_tax_summaries').add(entry);
             currentTaxSummaryId=docRef.id;
         }catch(saveErr){console.warn('Failed to save tax summary:',saveErr);}
         await loadTaxSummaryHistory();
-        statusEl.textContent=`✅ Summary ready — ${years.length} years reviewed (${minY}–${maxY}).`;
+        const srcNote=scannedCount&&manualCount?` (${scannedCount} scanned · ${manualCount} manual)`:(scannedCount?` (all scanned)`:` (all manual)`);
+        statusEl.textContent=`✅ Summary ready — ${years.length} year${years.length!==1?'s':''} reviewed (${minY}–${maxY})${srcNote}.`;
         statusEl.style.color='var(--success)';
     }catch(err){statusEl.textContent='❌ Error: '+err.message;statusEl.style.color='var(--danger)';}
-    finally{btn.disabled=false;btn.textContent='✨ Regenerate Summary';}
+    finally{btn.disabled=false;btn.textContent='🔄 Regenerate Summary';}
 }
 
 async function loadTaxSummaryHistory(){

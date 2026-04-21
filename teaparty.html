@@ -332,6 +332,10 @@
     </div>
 
     <!-- CHARTS -->
+    <div class="card" id="tea-tax-wages-card" style="display:none;">
+        <div class="card-title"><div class="card-title-left">💼 W-2 Wages by Year</div></div>
+        <div id="tea-tax-wages-content"></div>
+    </div>
     <div class="card" id="tea-tax-trends-card" style="display:none;">
         <div class="card-title"><div class="card-title-left">📈 Income &amp; AGI Trends</div></div>
         <div id="tea-tax-trends-content"></div>
@@ -1549,6 +1553,7 @@ function renderTeaTaxReport(){
             <td><div class="tax-docs-chips">${chips}</div></td>
         </tr>`;
     }).join('')}</tbody></table></div>`;
+    renderTeaTaxWages();
     renderTeaTaxTrends();
     renderTeaTaxFedState();
     renderTeaTaxRefunds();
@@ -1677,6 +1682,65 @@ function teaLineChart(series,xLabels,opts={}){
         ${paths}
         ${xText}
     </svg></div>`;
+}
+
+// ─────────────────────────────────────────
+// W-2 WAGES BY YEAR
+// ─────────────────────────────────────────
+// Prefer the sum of scanned W-2 documents for a year; fall back to the
+// federal 1040 "wages" line when no individual W-2s are on file.
+function teaW2WagesByYear(){
+    const byYear={};
+    const getE=y=>{if(!byYear[y])byYear[y]={year:y,w2Sum:0,w2Count:0,fedWages:null};return byYear[y];};
+    documents.forEach(d=>{
+        const td=d.taxData;
+        if(!td||!td.isTaxDocument)return;
+        const filings=[td,...(Array.isArray(td.additionalFilings)?td.additionalFilings:[])];
+        filings.forEach(f=>{
+            const y=f.taxYear;
+            if(!y)return;
+            const form=(f.formType||'').toUpperCase().replace(/\s+/g,'');
+            const isW2=form==='W-2'||form==='W2';
+            if(isW2&&f.fields?.wages!=null){
+                const e=getE(y);
+                e.w2Sum+=Number(f.fields.wages)||0;
+                e.w2Count++;
+            }
+        });
+    });
+    (typeof teaTaxByYearBreakdown==='function'?teaTaxByYearBreakdown():[]).forEach(r=>{
+        if(r.fedWages!=null)getE(r.year).fedWages=r.fedWages;
+    });
+    return Object.values(byYear).map(e=>{
+        const wages=e.w2Count?e.w2Sum:e.fedWages;
+        return{
+            year:e.year,
+            wages,
+            source:e.w2Count?`${e.w2Count} W-2${e.w2Count>1?'s':''}`:(e.fedWages!=null?'1040 line 1':'—'),
+            w2Count:e.w2Count,
+            w2Sum:e.w2Sum,
+            fedWages:e.fedWages,
+        };
+    }).filter(r=>r.wages!=null).sort((a,b)=>a.year-b.year);
+}
+
+function renderTeaTaxWages(){
+    const card=document.getElementById('tea-tax-wages-card');
+    const content=document.getElementById('tea-tax-wages-content');
+    if(!card||!content)return;
+    const rows=teaW2WagesByYear();
+    if(!rows.length){card.style.display='none';return;}
+    card.style.display='block';
+    const xLabels=rows.map(r=>String(r.year));
+    const series=[{label:'W-2 Wages',color:'#059669',values:rows.map(r=>r.wages)}];
+    const tableRows=rows.map(r=>`<tr>
+        <td>${r.year}</td>
+        <td class="num">${fmtMoney(r.wages)}</td>
+        <td style="font-size:0.78rem;color:var(--text-secondary);">${esc(r.source)}</td>
+    </tr>`).join('');
+    content.innerHTML=teaChartLegend(series)+teaLineChart(series,xLabels)+
+        `<div class="tea-chart-title">By Year</div>
+        <div class="table-wrapper"><table class="tea-mini-table"><thead><tr><th>Year</th><th class="num">W-2 Wages</th><th>Source</th></tr></thead><tbody>${tableRows}</tbody></table></div>`;
 }
 
 // ─────────────────────────────────────────

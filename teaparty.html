@@ -1889,11 +1889,24 @@ function teaW2WagesByYear(){
         if(r.fedWages!=null)getE(r.year).fedWages=r.fedWages;
     });
     return Object.values(byYear).map(e=>{
-        const wages=e.w2Count?e.w2Sum:e.fedWages;
+        // Prefer 1040 line 1 (the authoritative total of all W-2 box 1s) and
+        // fall back to the summed scanned W-2s only when no federal return is
+        // on file. Protects against a single miskeyed W-2 zeroing out a year.
+        const useFed=e.fedWages!=null;
+        const wages=useFed?e.fedWages:(e.w2Count?e.w2Sum:null);
+        let source;
+        if(useFed){
+            source='1040 line 1';
+            if(e.w2Count&&Math.abs(e.w2Sum-e.fedWages)>1){
+                source+=` (scanned W-2s sum to ${fmtMoney(e.w2Sum)})`;
+            }
+        }else{
+            source=e.w2Count?`${e.w2Count} W-2${e.w2Count>1?'s':''}`:'—';
+        }
         return{
             year:e.year,
             wages,
-            source:e.w2Count?`${e.w2Count} W-2${e.w2Count>1?'s':''}`:(e.fedWages!=null?'1040 line 1':'—'),
+            source,
             w2Count:e.w2Count,
             w2Sum:e.w2Sum,
             fedWages:e.fedWages,

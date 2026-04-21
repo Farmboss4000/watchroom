@@ -275,6 +275,37 @@
         .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
         .toast.error{background:var(--danger);}
 
+        /* ── TRIP PLANNER ── */
+        .tp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;}
+        .tp-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:18px;transition:box-shadow 0.2s,border-color 0.15s;cursor:pointer;}
+        .tp-card:hover{box-shadow:0 4px 18px rgba(13,148,136,0.12);border-color:var(--accent);}
+        .tp-card-title{font-size:1rem;font-weight:700;color:var(--text-primary);margin-bottom:4px;}
+        .tp-card-sub{font-size:0.8rem;color:var(--text-secondary);margin-bottom:10px;}
+        .tp-counts{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
+        .tp-count-pill{display:inline-flex;gap:4px;background:var(--accent-dim);border:1px solid var(--border);border-radius:20px;padding:2px 8px;font-size:0.74rem;font-weight:600;color:var(--text-primary);}
+        .tp-card-footer{display:flex;align-items:center;justify-content:space-between;font-size:0.75rem;color:var(--text-secondary);padding-top:8px;border-top:1px solid var(--border);}
+        .tp-section{background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:12px;}
+        .tp-section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+        .tp-section-title{font-size:0.92rem;font-weight:700;color:var(--text-primary);}
+        .tp-section-count{font-size:0.74rem;color:var(--text-secondary);font-weight:600;}
+        .tp-item{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:6px;font-size:0.85rem;}
+        .tp-item-top{display:flex;justify-content:space-between;align-items:flex-start;gap:6px;margin-bottom:4px;}
+        .tp-item-title{font-weight:700;color:var(--text-primary);}
+        .tp-item-badge{font-size:0.7rem;padding:2px 7px;border-radius:4px;background:var(--accent-dim);color:var(--accent);font-weight:700;white-space:nowrap;}
+        .tp-item-meta{font-size:0.82rem;color:var(--text-secondary);line-height:1.5;}
+        .tp-item-row{display:flex;flex-wrap:wrap;gap:10px;font-size:0.78rem;color:var(--text-secondary);margin-top:4px;}
+        .tp-item-row strong{color:var(--text-primary);font-weight:600;}
+        .tp-leg{border-left:2px solid var(--border);padding:3px 0 3px 8px;margin:4px 0 4px 4px;font-size:0.78rem;color:var(--text-secondary);}
+        .tp-leg strong{color:var(--text-primary);}
+        .tp-leg.layover{border-left-color:var(--warning);color:var(--warning);font-style:italic;}
+        .tp-empty-sm{font-size:0.82rem;color:var(--text-secondary);font-style:italic;padding:6px 0;}
+        .tp-refresh-log{max-height:320px;overflow-y:auto;}
+        .tp-refresh-item{padding:9px 0;border-bottom:1px solid var(--border);}
+        .tp-refresh-item:last-child{border-bottom:none;}
+        .tp-refresh-ts{font-weight:600;color:var(--text-primary);font-size:0.85rem;}
+        .tp-refresh-meta{color:var(--text-secondary);font-size:0.76rem;margin-top:2px;}
+        .tp-refresh-summary{color:var(--text-primary);font-size:0.8rem;margin-top:5px;font-style:italic;background:var(--bg-card);padding:6px 10px;border-radius:6px;border-left:3px solid var(--accent);}
+
         /* ── RESPONSIVE ── */
         @media(max-width:900px){
             .us-map-layout{grid-template-columns:1fr;}
@@ -378,6 +409,7 @@
             <button onclick="showView('trips')">My Trips</button>
             <button onclick="showView('add-trip')">＋ Add Trip</button>
             <button onclick="showView('scan')">🔍 Scan Itinerary</button>
+            <button onclick="showView('trip-planner')">🧳 Trip Planner</button>
             <button onclick="showView('world-map')">🌍 World Map</button>
             <button onclick="showView('us-map')">🇺🇸 US Map</button>
             <button onclick="showView('reports')">📊 Reports</button>
@@ -577,6 +609,26 @@
             </div>
         </div>
 
+        <!-- ── TRIP PLANNER ── -->
+        <div class="view" id="view-trip-planner">
+            <div id="tp-list-mode">
+                <div class="card">
+                    <div class="card-title">
+                        <span class="card-title-left">🧳 Trip Planner</span>
+                        <button class="btn btn-primary btn-sm" onclick="tpNewPlan()">＋ New Travel Plan</button>
+                    </div>
+                    <p style="font-size:0.87rem;color:var(--text-secondary);margin-bottom:14px;">
+                        Build complete travel plans from flights, hotels, itineraries, tours, and emails. Drop any mix of
+                        <strong>PDFs, JPGs, PNGs, and .eml files</strong> — AI will extract structured details including
+                        flight numbers, seat assignments, departure/arrival times, layovers, hotel check-in dates,
+                        confirmation codes, and more. Re-run the analysis any time and keep a full refresh history.
+                    </p>
+                    <div class="tp-grid" id="tp-grid"></div>
+                </div>
+            </div>
+            <div id="tp-detail-mode" style="display:none;"></div>
+        </div>
+
         <!-- ── WORLD MAP ── -->
         <div class="view" id="view-world-map">
             <div class="map-stats" id="world-map-stats">Loading destinations…</div>
@@ -712,7 +764,7 @@ let usGeoLayer = null;
 let activeView = 'dashboard';
 let modalTripId = null;
 
-const VIEWS = ['dashboard','trips','add-trip','scan','world-map','us-map','reports','recycle-bin'];
+const VIEWS = ['dashboard','trips','add-trip','scan','trip-planner','world-map','us-map','reports','recycle-bin'];
 
 // ═══════════════════════════════════════════════
 //  AUTH
@@ -725,6 +777,7 @@ auth.onAuthStateChanged(async user => {
         document.getElementById('user-badge').textContent = user.email;
         await loadSettings();
         await loadTrips();
+        await loadTravelPlans();
         renderAll();
         showView('dashboard');
     } else {
@@ -1223,12 +1276,13 @@ function showView(v) {
         if (el) el.classList.toggle('active', name === v);
     });
     const navBtns = document.querySelectorAll('#main-nav button');
-    const navIdx = {'dashboard':0,'trips':1,'add-trip':2,'scan':3,'world-map':4,'us-map':5,'reports':6,'recycle-bin':7};
+    const navIdx = {'dashboard':0,'trips':1,'add-trip':2,'scan':3,'trip-planner':4,'world-map':5,'us-map':6,'reports':7,'recycle-bin':8};
     navBtns.forEach((b,i) => b.classList.toggle('active', i === navIdx[v]));
 
     if (v === 'dashboard') renderDashboard();
     if (v === 'trips') renderTrips();
     if (v === 'reports') renderReports();
+    if (v === 'trip-planner') renderTripPlanner();
     if (v === 'world-map') renderWorldMap();
     if (v === 'us-map') renderUSMap();
     if (v === 'recycle-bin') renderBin();
@@ -2977,6 +3031,641 @@ function showToast(msg, isErr) {
     t.className = 'toast' + (isErr ? ' error' : '') + ' show';
     clearTimeout(t._timer);
     t._timer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ═══════════════════════════════════════════════
+//  TRIP PLANNER
+// ═══════════════════════════════════════════════
+let travelPlans = [];
+let currentPlan = null;
+let planFiles = [];
+
+async function loadTravelPlans() {
+    const snap = await db.collection('globetrotting_plans').orderBy('createdAt','desc').get().catch(() => null);
+    if (!snap) { travelPlans = []; return; }
+    travelPlans = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+}
+
+function fmtRelative(iso) {
+    if (!iso) return '—';
+    try {
+        const d = new Date(iso);
+        const diff = (Date.now() - d.getTime()) / 1000;
+        if (diff < 60) return 'just now';
+        if (diff < 3600) return Math.round(diff/60) + 'm ago';
+        if (diff < 86400) return Math.round(diff/3600) + 'h ago';
+        if (diff < 86400*30) return Math.round(diff/86400) + 'd ago';
+        return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    } catch { return iso; }
+}
+
+function renderTripPlanner() {
+    document.getElementById('tp-list-mode').style.display = 'block';
+    document.getElementById('tp-detail-mode').style.display = 'none';
+    const active = travelPlans.filter(p => !p.deleted);
+    const grid = document.getElementById('tp-grid');
+    if (!active.length) {
+        grid.innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="empty-icon">🧳</div>No travel plans yet. Click <strong>＋ New Travel Plan</strong> to start organizing flights, hotels, and tours.</div>`;
+        return;
+    }
+    grid.innerHTML = active.map(p => {
+        const linkedTrip = p.tripId ? trips.find(t => t._id === p.tripId) : null;
+        const lastRef = (p.refreshLog && p.refreshLog.length) ? p.refreshLog[p.refreshLog.length-1] : null;
+        const counts = [
+            ['✈️', (p.flights||[]).length, 'flight'],
+            ['🏨', (p.hotels||[]).length, 'hotel'],
+            ['🎟️', (p.tours||[]).length + (p.activities||[]).length, 'tour'],
+            ['🚗', (p.transportation||[]).length, 'transit'],
+            ['📄', (p.documents||[]).length, 'doc']
+        ];
+        return `<div class="tp-card" onclick="tpOpenPlan('${p._id}')">
+            <div class="tp-card-title">${esc(p.name || 'Untitled plan')}</div>
+            <div class="tp-card-sub">${linkedTrip ? '🔗 ' + esc(linkedTrip.name) : 'Standalone plan'}${p.description ? ' · ' + esc(p.description.slice(0,80)) + (p.description.length>80?'…':'') : ''}</div>
+            <div class="tp-counts">
+                ${counts.map(([icon,n,lbl]) => `<span class="tp-count-pill">${icon} ${n} ${esc(lbl)}${n!==1?'s':''}</span>`).join('')}
+            </div>
+            <div class="tp-card-footer">
+                <span>${lastRef ? 'Refreshed ' + fmtRelative(lastRef.timestamp) : 'Not yet analyzed'}</span>
+                <span>${(p.refreshLog||[]).length} refresh${(p.refreshLog||[]).length!==1?'es':''}</span>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+async function tpNewPlan() {
+    const name = prompt('Name your travel plan (e.g. "Iceland Ring Road 2026"):');
+    if (!name || !name.trim()) return;
+    try {
+        const ref = await db.collection('globetrotting_plans').add({
+            name: name.trim(),
+            description: '',
+            tripId: null,
+            documents: [],
+            flights: [],
+            hotels: [],
+            tours: [],
+            transportation: [],
+            activities: [],
+            refreshLog: [],
+            deleted: false,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        await loadTravelPlans();
+        tpOpenPlan(ref.id);
+        showToast('Travel plan created');
+    } catch(e) {
+        showToast('Failed to create plan: ' + e.message, true);
+    }
+}
+
+function tpOpenPlan(id) {
+    const p = travelPlans.find(x => x._id === id);
+    if (!p) return;
+    currentPlan = JSON.parse(JSON.stringify(p));
+    planFiles = [];
+    renderPlanDetail();
+}
+
+function tpBackToList() {
+    currentPlan = null;
+    planFiles = [];
+    renderTripPlanner();
+}
+
+function renderPlanDetail() {
+    if (!currentPlan) return;
+    document.getElementById('tp-list-mode').style.display = 'none';
+    document.getElementById('tp-detail-mode').style.display = 'block';
+    const p = currentPlan;
+    const tripOpts = trips.filter(t => !t.deleted).map(t =>
+        `<option value="${esc(t._id)}"${p.tripId===t._id?' selected':''}>${esc(t.name)}</option>`
+    ).join('');
+
+    const hasDocs = (p.documents||[]).length > 0;
+    const refreshCount = (p.refreshLog||[]).length;
+
+    document.getElementById('tp-detail-mode').innerHTML = `
+        <div class="card">
+            <div class="card-title">
+                <span class="card-title-left">🧳 ${esc(p.name || 'Travel Plan')}</span>
+                <button class="btn btn-ghost btn-sm" onclick="tpBackToList()">← Back to plans</button>
+            </div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Plan Name</label>
+                    <input type="text" id="tp-f-name" value="${esc(p.name||'')}">
+                </div>
+                <div class="form-group">
+                    <label>Link to Trip (optional)</label>
+                    <select id="tp-f-trip">
+                        <option value="">— none —</option>
+                        ${tripOpts}
+                    </select>
+                </div>
+                <div class="form-group full-width">
+                    <label>Description / Notes</label>
+                    <textarea id="tp-f-desc" rows="2" placeholder="Anything worth remembering about this plan…">${esc(p.description||'')}</textarea>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-primary btn-sm" onclick="tpSavePlan()">💾 Save Details</button>
+                <button class="btn btn-danger btn-sm" onclick="tpDeletePlan()" style="margin-left:auto;">🗑 Delete Plan</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title"><span class="card-title-left">📥 Bulk Upload &amp; AI Scan</span></div>
+            <p style="font-size:0.86rem;color:var(--text-secondary);margin-bottom:12px;">
+                Drop any mix of <strong>flight tickets, hotel confirmations, tour vouchers, itineraries, or travel emails</strong>
+                — PDFs, JPGs, PNGs, and .eml files all work. AI extracts flight numbers, seat assignments, times,
+                layovers, check-in/out dates, confirmation codes, and more.
+            </p>
+            <div class="form-drop" id="tp-drop" onclick="document.getElementById('tp-file-input').click()"
+                 ondragover="tpDragOver(event)" ondragleave="tpDragLeave(event)" ondrop="tpDropFiles(event)">
+                <div style="font-size:1.6rem;margin-bottom:4px;">📄</div>
+                <div class="form-drop-text">Drop documents here or <strong>click to browse</strong></div>
+                <div style="font-size:0.75rem;color:var(--text-secondary);margin-top:4px;">JPG, PNG, PDF, EML — multiple files at once</div>
+            </div>
+            <input type="file" id="tp-file-input" accept=".jpg,.jpeg,.png,.pdf,.eml" multiple style="display:none;" onchange="tpHandleFiles(this.files)">
+            <div id="tp-file-list"></div>
+            <div id="tp-file-actions" style="display:none;margin-top:10px;">
+                <button class="btn btn-primary btn-sm" onclick="tpUploadDocs()">📤 Attach to Plan</button>
+                <button class="btn btn-ghost btn-sm" onclick="tpClearFiles()" style="margin-left:8px;">✕ Clear</button>
+            </div>
+            <div id="tp-scan-status" style="display:none;margin-top:10px;"></div>
+
+            <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+                <button class="btn btn-primary" onclick="tpRefreshPlan()" ${!hasDocs ? 'disabled' : ''}>
+                    🔄 ${refreshCount ? 'Refresh Analysis' : 'Analyze Plan with AI'}
+                </button>
+                <span style="font-size:0.78rem;color:var(--text-secondary);">
+                    ${hasDocs
+                        ? `Runs AI extraction across all ${(p.documents||[]).length} document${(p.documents||[]).length!==1?'s':''}.`
+                        : 'Attach at least one document to enable analysis.'}
+                </span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">
+                <span class="card-title-left">📑 Attached Documents</span>
+                <span style="font-size:0.78rem;color:var(--text-secondary);">${(p.documents||[]).length} file${(p.documents||[]).length!==1?'s':''}</span>
+            </div>
+            <div id="tp-docs-list"></div>
+        </div>
+
+        ${p.lastSummary ? `<div class="card" style="background:var(--bg-card);">
+            <div class="card-title"><span class="card-title-left">📝 AI Summary</span></div>
+            <div style="font-size:0.9rem;line-height:1.6;color:var(--text-primary);">${esc(p.lastSummary)}</div>
+        </div>` : ''}
+
+        <div class="tp-section">
+            <div class="tp-section-hdr">
+                <span class="tp-section-title">✈️ Flights</span>
+                <span class="tp-section-count">${(p.flights||[]).length} segment${(p.flights||[]).length!==1?'s':''}</span>
+            </div>
+            <div id="tp-flights">${renderFlights(p.flights||[])}</div>
+        </div>
+
+        <div class="tp-section">
+            <div class="tp-section-hdr">
+                <span class="tp-section-title">🏨 Hotels &amp; Lodging</span>
+                <span class="tp-section-count">${(p.hotels||[]).length} stay${(p.hotels||[]).length!==1?'s':''}</span>
+            </div>
+            <div id="tp-hotels">${renderHotels(p.hotels||[])}</div>
+        </div>
+
+        <div class="tp-section">
+            <div class="tp-section-hdr">
+                <span class="tp-section-title">🎟️ Tours &amp; Activities</span>
+                <span class="tp-section-count">${(p.tours||[]).length + (p.activities||[]).length} item${((p.tours||[]).length + (p.activities||[]).length)!==1?'s':''}</span>
+            </div>
+            <div id="tp-tours">${renderTours([...(p.tours||[]),...(p.activities||[])])}</div>
+        </div>
+
+        <div class="tp-section">
+            <div class="tp-section-hdr">
+                <span class="tp-section-title">🚗 Transportation &amp; Transfers</span>
+                <span class="tp-section-count">${(p.transportation||[]).length} item${(p.transportation||[]).length!==1?'s':''}</span>
+            </div>
+            <div id="tp-transit">${renderTransit(p.transportation||[])}</div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">
+                <span class="card-title-left">🕘 Refresh History</span>
+                <span style="font-size:0.78rem;color:var(--text-secondary);">${refreshCount} refresh${refreshCount!==1?'es':''}</span>
+            </div>
+            <div class="tp-refresh-log" id="tp-refresh-log">${renderRefreshLog(p.refreshLog||[])}</div>
+        </div>
+    `;
+    renderPlanDocsList();
+}
+
+function renderFlights(flights) {
+    if (!flights.length) return '<div class="tp-empty-sm">No flights extracted yet. Upload tickets and click <strong>Analyze Plan with AI</strong>.</div>';
+    return flights.map(f => {
+        let legsHtml = '';
+        if (Array.isArray(f.segments) && f.segments.length) {
+            const segs = [];
+            f.segments.forEach((seg, i) => {
+                segs.push(`<div class="tp-leg"><strong>${esc(seg.from||'?')}</strong> → <strong>${esc(seg.to||'?')}</strong>${seg.flightNumber?' · '+esc(seg.flightNumber):''}${seg.departureTime?' · '+esc(seg.departureTime):''}${seg.arrivalTime?' → '+esc(seg.arrivalTime):''}${seg.seat?' · Seat '+esc(seg.seat):''}</div>`);
+                if (seg.layover && (seg.layover.airport || seg.layover.duration)) {
+                    segs.push(`<div class="tp-leg layover">↳ Layover${seg.layover.airport?' at '+esc(seg.layover.airport):''}${seg.layover.duration?' · '+esc(seg.layover.duration):''}</div>`);
+                }
+            });
+            legsHtml = segs.join('');
+        }
+        return `<div class="tp-item">
+            <div class="tp-item-top">
+                <div class="tp-item-title">${esc(f.airline||'Flight')}${f.flightNumber?' '+esc(f.flightNumber):''}</div>
+                ${f.cabin?`<span class="tp-item-badge">${esc(f.cabin)}</span>`:''}
+            </div>
+            ${(f.departureAirport || f.arrivalAirport) ? `<div class="tp-item-meta">
+                ${f.departureAirport?`<strong>${esc(f.departureAirport)}</strong>`:''}${f.departureTime?' '+esc(f.departureTime):''}
+                ${f.arrivalAirport?' → <strong>'+esc(f.arrivalAirport)+'</strong>':''}${f.arrivalTime?' '+esc(f.arrivalTime):''}
+            </div>` : ''}
+            <div class="tp-item-row">
+                ${f.seat?`<span>Seat <strong>${esc(f.seat)}</strong></span>`:''}
+                ${f.confirmation?`<span>Conf <strong>${esc(f.confirmation)}</strong></span>`:''}
+                ${f.passenger?`<span>Passenger: ${esc(f.passenger)}</span>`:''}
+                ${f.date?`<span>Date: ${esc(f.date)}</span>`:''}
+            </div>
+            ${legsHtml}
+            ${f.notes?`<div class="tp-item-row" style="font-style:italic;">${esc(f.notes)}</div>`:''}
+        </div>`;
+    }).join('');
+}
+
+function renderHotels(hotels) {
+    if (!hotels.length) return '<div class="tp-empty-sm">No hotels extracted yet.</div>';
+    return hotels.map(h => `<div class="tp-item">
+        <div class="tp-item-top">
+            <div class="tp-item-title">${esc(h.name||'Hotel')}</div>
+            ${h.nights?`<span class="tp-item-badge">${esc(h.nights)} night${h.nights!=1?'s':''}</span>`:''}
+        </div>
+        ${h.address?`<div class="tp-item-meta">${esc(h.address)}</div>`:''}
+        <div class="tp-item-row">
+            ${h.checkIn?`<span>Check-in <strong>${esc(h.checkIn)}</strong></span>`:''}
+            ${h.checkOut?`<span>Check-out <strong>${esc(h.checkOut)}</strong></span>`:''}
+            ${h.roomType?`<span>Room: ${esc(h.roomType)}</span>`:''}
+            ${h.confirmation?`<span>Conf <strong>${esc(h.confirmation)}</strong></span>`:''}
+            ${h.guest?`<span>Guest: ${esc(h.guest)}</span>`:''}
+        </div>
+        ${h.notes?`<div class="tp-item-row" style="font-style:italic;">${esc(h.notes)}</div>`:''}
+    </div>`).join('');
+}
+
+function renderTours(tours) {
+    if (!tours.length) return '<div class="tp-empty-sm">No tours or activities extracted yet.</div>';
+    return tours.map(t => `<div class="tp-item">
+        <div class="tp-item-top">
+            <div class="tp-item-title">${esc(t.name||'Activity')}</div>
+            ${t.duration?`<span class="tp-item-badge">${esc(t.duration)}</span>`:''}
+        </div>
+        ${t.location?`<div class="tp-item-meta">${esc(t.location)}</div>`:''}
+        <div class="tp-item-row">
+            ${t.date?`<span>Date <strong>${esc(t.date)}</strong></span>`:''}
+            ${t.time?`<span>Time <strong>${esc(t.time)}</strong></span>`:''}
+            ${t.provider?`<span>Provider: ${esc(t.provider)}</span>`:''}
+            ${t.confirmation?`<span>Conf <strong>${esc(t.confirmation)}</strong></span>`:''}
+            ${t.meetingPoint?`<span>Meet: ${esc(t.meetingPoint)}</span>`:''}
+        </div>
+        ${t.notes?`<div class="tp-item-row" style="font-style:italic;">${esc(t.notes)}</div>`:''}
+    </div>`).join('');
+}
+
+function renderTransit(items) {
+    if (!items.length) return '<div class="tp-empty-sm">No ground transportation or transfers extracted yet.</div>';
+    return items.map(r => `<div class="tp-item">
+        <div class="tp-item-top">
+            <div class="tp-item-title">${esc(r.type||'Transit')}${r.provider?' — '+esc(r.provider):''}</div>
+        </div>
+        ${(r.from || r.to) ? `<div class="tp-item-meta">
+            ${r.from?`<strong>${esc(r.from)}</strong>`:''}${r.from&&r.to?' → ':''}${r.to?`<strong>${esc(r.to)}</strong>`:''}
+        </div>` : ''}
+        <div class="tp-item-row">
+            ${r.pickupDate?`<span>Pickup <strong>${esc(r.pickupDate)}${r.pickupTime?' '+esc(r.pickupTime):''}</strong></span>`:''}
+            ${r.returnDate?`<span>Return <strong>${esc(r.returnDate)}${r.returnTime?' '+esc(r.returnTime):''}</strong></span>`:''}
+            ${r.confirmation?`<span>Conf <strong>${esc(r.confirmation)}</strong></span>`:''}
+        </div>
+        ${r.notes?`<div class="tp-item-row" style="font-style:italic;">${esc(r.notes)}</div>`:''}
+    </div>`).join('');
+}
+
+function renderRefreshLog(log) {
+    if (!log.length) return '<div class="tp-empty-sm">No refreshes yet. After attaching documents, click <strong>Analyze Plan with AI</strong> to run the first extraction.</div>';
+    return [...log].reverse().map(entry => {
+        const ts = entry.timestamp ? new Date(entry.timestamp) : null;
+        const when = ts && !isNaN(ts) ? ts.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}) : '—';
+        return `<div class="tp-refresh-item">
+            <div class="tp-refresh-ts">${esc(when)}</div>
+            <div class="tp-refresh-meta">${entry.docsProcessed||0} document${entry.docsProcessed!==1?'s':''} · ${entry.itemsFound||0} item${entry.itemsFound!==1?'s':''} extracted${entry.by?' · by '+esc(entry.by):''}</div>
+            ${entry.summary?`<div class="tp-refresh-summary">${esc(entry.summary)}</div>`:''}
+        </div>`;
+    }).join('');
+}
+
+function renderPlanDocsList() {
+    if (!currentPlan) return;
+    const el = document.getElementById('tp-docs-list');
+    if (!el) return;
+    const docs = currentPlan.documents || [];
+    if (!docs.length) {
+        el.innerHTML = '<div class="trip-doc-empty">No documents attached yet.</div>';
+        return;
+    }
+    el.innerHTML = docs.map((d, i) => {
+        const icon = d.type && d.type.startsWith('image/') ? '🖼️'
+            : d.type === 'application/pdf' ? '📄'
+            : d.name?.toLowerCase().endsWith('.eml') ? '📧' : '📎';
+        const date = d.uploadedAt ? new Date(d.uploadedAt).toLocaleDateString() : '';
+        const size = d.size ? `${(d.size/1024).toFixed(1)} KB` : '';
+        return `<div class="trip-doc-item">
+            <div class="trip-doc-icon">${icon}</div>
+            <div class="trip-doc-info">
+                <div class="trip-doc-name">${esc(d.name)}</div>
+                <div class="trip-doc-meta">${size}${size && date ? ' · ' : ''}${date}</div>
+            </div>
+            <button class="scan-file-remove" onclick="tpDeletePlanDoc(${i})" title="Remove">✕</button>
+        </div>`;
+    }).join('');
+}
+
+function tpDragOver(e) { e.preventDefault(); document.getElementById('tp-drop').classList.add('dragover'); }
+function tpDragLeave(e) { document.getElementById('tp-drop').classList.remove('dragover'); }
+function tpDropFiles(e) {
+    e.preventDefault();
+    document.getElementById('tp-drop').classList.remove('dragover');
+    if (e.dataTransfer.files.length) tpHandleFiles(e.dataTransfer.files);
+}
+
+function tpHandleFiles(fileList) {
+    if (!fileList || !fileList.length) return;
+    const validTypes = ['image/jpeg','image/png','image/jpg','application/pdf','message/rfc822'];
+    for (const f of fileList) {
+        if (validTypes.includes(f.type) || f.name.toLowerCase().endsWith('.eml')) planFiles.push(f);
+    }
+    renderPlanFileList();
+    document.getElementById('tp-file-actions').style.display = planFiles.length ? 'block' : 'none';
+}
+
+function renderPlanFileList() {
+    const listEl = document.getElementById('tp-file-list');
+    if (!listEl) return;
+    if (!planFiles.length) { listEl.innerHTML = ''; return; }
+    let html = '<div class="scan-file-list" style="margin-top:10px;">';
+    planFiles.forEach((file, i) => {
+        const isEml = file.name.toLowerCase().endsWith('.eml');
+        const thumb = file.type.startsWith('image/')
+            ? `<img src="${URL.createObjectURL(file)}">`
+            : isEml ? `<div style="font-size:1.8rem;">📧</div>`
+            : `<div style="font-size:1.8rem;">📄</div>`;
+        const fileMeta = isEml ? `Email · ${(file.size/1024).toFixed(1)} KB` : `${file.type||'file'} · ${(file.size/1024).toFixed(1)} KB`;
+        html += `<div class="scan-file-item">
+            ${thumb}
+            <div class="scan-file-info">
+                <div class="scan-file-name">${esc(file.name)}</div>
+                <div class="scan-file-meta">${fileMeta}</div>
+            </div>
+            <button class="scan-file-remove" onclick="tpRemoveFile(${i})" title="Remove">✕</button>
+        </div>`;
+    });
+    html += '</div>';
+    if (planFiles.length > 1) html += `<div class="scan-file-count">${planFiles.length} documents queued</div>`;
+    listEl.innerHTML = html;
+}
+
+function tpRemoveFile(i) {
+    planFiles.splice(i, 1);
+    renderPlanFileList();
+    document.getElementById('tp-file-actions').style.display = planFiles.length ? 'block' : 'none';
+}
+
+function tpClearFiles() {
+    planFiles = [];
+    renderPlanFileList();
+    const actEl = document.getElementById('tp-file-actions');
+    if (actEl) actEl.style.display = 'none';
+    const inp = document.getElementById('tp-file-input');
+    if (inp) inp.value = '';
+}
+
+async function tpUploadDocs() {
+    if (!currentPlan || !planFiles.length) return;
+    const statusEl = document.getElementById('tp-scan-status');
+    statusEl.style.display = 'block';
+    statusEl.innerHTML = `<div class="scan-result"><div class="scan-result-title">Uploading ${planFiles.length} document${planFiles.length!==1?'s':''}…</div><div style="display:flex;justify-content:center;padding:16px;"><div class="spinner"></div></div></div>`;
+    try {
+        const newDocs = [];
+        for (const f of planFiles) {
+            const base64 = await fileToBase64(f);
+            const emlType = f.name.toLowerCase().endsWith('.eml') ? 'message/rfc822' : '';
+            newDocs.push({
+                name: f.name,
+                type: f.type || emlType || 'application/octet-stream',
+                size: f.size,
+                base64,
+                uploadedAt: new Date().toISOString()
+            });
+        }
+        const existing = currentPlan.documents || [];
+        const all = [...existing, ...newDocs];
+        await db.collection('globetrotting_plans').doc(currentPlan._id).update({ documents: all });
+        currentPlan.documents = all;
+        const idx = travelPlans.findIndex(p => p._id === currentPlan._id);
+        if (idx >= 0) travelPlans[idx].documents = all;
+        const count = planFiles.length;
+        tpClearFiles();
+        renderPlanDetail();
+        const s = document.getElementById('tp-scan-status');
+        if (s) {
+            s.style.display = 'block';
+            s.innerHTML = `<div class="scan-result"><div class="scan-result-title" style="color:var(--success);">Uploaded</div><p style="font-size:0.85rem;color:var(--text-secondary);">${count} document${count!==1?'s':''} attached. Click <strong>Analyze Plan with AI</strong> to extract flights, hotels, tours, and more.</p></div>`;
+        }
+    } catch(e) {
+        statusEl.innerHTML = `<div class="scan-result"><div class="scan-result-title" style="color:var(--danger);">Upload error</div><pre style="color:var(--danger);">${esc(e.message)}</pre></div>`;
+    }
+}
+
+async function tpDeletePlanDoc(idx) {
+    if (!currentPlan) return;
+    const docs = currentPlan.documents || [];
+    if (idx < 0 || idx >= docs.length) return;
+    if (!confirm('Remove this document from the plan?')) return;
+    const newDocs = docs.slice();
+    newDocs.splice(idx, 1);
+    try {
+        await db.collection('globetrotting_plans').doc(currentPlan._id).update({ documents: newDocs });
+        currentPlan.documents = newDocs;
+        const i = travelPlans.findIndex(p => p._id === currentPlan._id);
+        if (i >= 0) travelPlans[i].documents = newDocs;
+        renderPlanDetail();
+        showToast('Document removed');
+    } catch(e) {
+        showToast('Remove failed: ' + e.message, true);
+    }
+}
+
+async function tpSavePlan() {
+    if (!currentPlan) return;
+    const name = (document.getElementById('tp-f-name').value || '').trim();
+    const desc = (document.getElementById('tp-f-desc').value || '').trim();
+    const tripId = document.getElementById('tp-f-trip').value || null;
+    if (!name) { showToast('Name required', true); return; }
+    try {
+        await db.collection('globetrotting_plans').doc(currentPlan._id).update({ name, description: desc, tripId });
+        currentPlan.name = name; currentPlan.description = desc; currentPlan.tripId = tripId;
+        const idx = travelPlans.findIndex(p => p._id === currentPlan._id);
+        if (idx >= 0) { travelPlans[idx].name = name; travelPlans[idx].description = desc; travelPlans[idx].tripId = tripId; }
+        showToast('Plan saved');
+    } catch(e) {
+        showToast('Save failed: ' + e.message, true);
+    }
+}
+
+async function tpDeletePlan() {
+    if (!currentPlan) return;
+    if (!confirm(`Delete the travel plan "${currentPlan.name}"? This cannot be undone.`)) return;
+    try {
+        await db.collection('globetrotting_plans').doc(currentPlan._id).delete();
+        showToast('Plan deleted');
+        await loadTravelPlans();
+        tpBackToList();
+    } catch(e) {
+        showToast('Delete failed: ' + e.message, true);
+    }
+}
+
+async function tpRefreshPlan() {
+    if (!currentPlan) return;
+    if (!apiKey || !proxyUrl) { showToast('Set API key & proxy in Agents → Settings first', true); return; }
+    const docs = currentPlan.documents || [];
+    if (!docs.length) { showToast('Attach documents first', true); return; }
+
+    const statusEl = document.getElementById('tp-scan-status');
+    statusEl.style.display = 'block';
+    statusEl.innerHTML = `<div class="scan-result"><div class="scan-result-title">Analyzing ${docs.length} document${docs.length!==1?'s':''} with AI…</div><div style="display:flex;justify-content:center;padding:20px;"><div class="spinner"></div></div></div>`;
+
+    try {
+        const contentBlocks = [];
+        for (const doc of docs) {
+            if (!doc.base64) continue;
+            if (doc.type && doc.type.startsWith('image/')) {
+                contentBlocks.push({ type: 'image', source: { type: 'base64', media_type: doc.type, data: doc.base64 } });
+            } else if (doc.type === 'application/pdf') {
+                contentBlocks.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: doc.base64 } });
+            } else if (doc.type === 'message/rfc822' || doc.name?.toLowerCase().endsWith('.eml')) {
+                try {
+                    const decoded = atob(doc.base64);
+                    contentBlocks.push({ type: 'text', text: `[EMAIL: ${doc.name}]\n${decoded.substring(0, 10000)}` });
+                } catch {}
+            }
+        }
+        if (!contentBlocks.length) throw new Error('No supported document content to analyze');
+
+        const systemPrompt = `You are an expert travel document parser. Given a set of tickets, confirmations, itineraries, emails, and other travel paperwork, extract ALL relevant details into a structured JSON object. Be exhaustive — capture every flight segment (including layovers), every hotel night, every tour, every rental car or transfer.
+
+Return ONLY a JSON object with this exact shape:
+{
+  "summary": "1-2 sentence overview of the trip (what, when, where)",
+  "flights": [
+    {
+      "airline":"...","flightNumber":"e.g. AA123","confirmation":"booking reference / PNR",
+      "passenger":"name on ticket if shown","cabin":"Economy / Premium Economy / Business / First",
+      "seat":"e.g. 14A","date":"YYYY-MM-DD",
+      "departureAirport":"IATA or city + airport name","departureTime":"YYYY-MM-DD HH:MM local",
+      "arrivalAirport":"...","arrivalTime":"YYYY-MM-DD HH:MM local",
+      "segments":[
+        { "from":"...","to":"...","flightNumber":"...","departureTime":"...","arrivalTime":"...","seat":"...",
+          "layover":{"airport":"...","duration":"Xh Ym"} }
+      ],
+      "notes":"baggage, boarding group, anything else worth noting"
+    }
+  ],
+  "hotels":[
+    {"name":"...","address":"...","checkIn":"YYYY-MM-DD","checkOut":"YYYY-MM-DD","nights":N,
+     "roomType":"...","guest":"...","confirmation":"...","notes":"breakfast, loyalty #, etc."}
+  ],
+  "tours":[
+    {"name":"...","provider":"...","location":"...","date":"YYYY-MM-DD","time":"HH:MM",
+     "duration":"e.g. 3h","meetingPoint":"...","confirmation":"...","notes":"..."}
+  ],
+  "transportation":[
+    {"type":"Rental car / Train / Private transfer / Ferry / Bus / etc.",
+     "provider":"...","from":"...","to":"...",
+     "pickupDate":"YYYY-MM-DD","pickupTime":"HH:MM","returnDate":"YYYY-MM-DD","returnTime":"HH:MM",
+     "confirmation":"...","notes":"..."}
+  ],
+  "activities":[
+    {"name":"...","date":"YYYY-MM-DD","time":"HH:MM","location":"...","notes":"..."}
+  ]
+}
+
+Rules:
+- If a field is not present in the documents, omit it (do not invent).
+- Preserve every flight segment. Multi-leg tickets on a single PNR should use segments[].
+- For layovers, include them inside segments[] as a "layover" object on the preceding segment.
+- Use local times where shown.
+- Return ONLY the JSON object — no explanation, no markdown, no commentary.`;
+
+        contentBlocks.push({ type: 'text', text: `I have ${docs.length} travel document${docs.length!==1?'s':''} for a single trip. Extract every flight, hotel, tour, transfer, and activity into the JSON schema. Be precise with seat numbers, flight numbers, confirmation codes, and times.` });
+
+        const reqBody = {
+            apiKey,
+            model: 'claude-opus-4-6',
+            max_tokens: 8192,
+            stream: false,
+            system: systemPrompt,
+            messages: [{ role: 'user', content: contentBlocks }]
+        };
+
+        const res = await fetch(proxyUrl, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(reqBody) });
+        const txt = await res.text();
+        const j = JSON.parse(txt);
+        if (!res.ok) throw new Error(j?.error?.message || 'API error ' + res.status);
+        const rawText = (j?.content || []).filter(b => b.type==='text').map(b => b.text).join('');
+        const match = rawText.match(/\{[\s\S]*\}/);
+        if (!match) throw new Error('Could not parse AI response');
+        const extracted = JSON.parse(match[0]);
+
+        const flights = Array.isArray(extracted.flights) ? extracted.flights : [];
+        const hotels = Array.isArray(extracted.hotels) ? extracted.hotels : [];
+        const tours = Array.isArray(extracted.tours) ? extracted.tours : [];
+        const transportation = Array.isArray(extracted.transportation) ? extracted.transportation : [];
+        const activities = Array.isArray(extracted.activities) ? extracted.activities : [];
+        const itemsFound = flights.length + hotels.length + tours.length + transportation.length + activities.length;
+        const summary = extracted.summary || '';
+
+        const logEntry = {
+            timestamp: new Date().toISOString(),
+            by: (auth.currentUser && auth.currentUser.email) || 'unknown',
+            docsProcessed: docs.length,
+            itemsFound,
+            summary
+        };
+        const newLog = [...(currentPlan.refreshLog || []), logEntry];
+
+        await db.collection('globetrotting_plans').doc(currentPlan._id).update({
+            flights, hotels, tours, transportation, activities,
+            lastSummary: summary,
+            refreshLog: newLog
+        });
+
+        currentPlan = { ...currentPlan, flights, hotels, tours, transportation, activities, lastSummary: summary, refreshLog: newLog };
+        const idx = travelPlans.findIndex(p => p._id === currentPlan._id);
+        if (idx >= 0) travelPlans[idx] = { ...travelPlans[idx], flights, hotels, tours, transportation, activities, lastSummary: summary, refreshLog: newLog };
+
+        renderPlanDetail();
+        const s = document.getElementById('tp-scan-status');
+        if (s) {
+            s.style.display = 'block';
+            s.innerHTML = `<div class="scan-result"><div class="scan-result-title" style="color:var(--success);">✅ Analysis complete</div><p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:4px;">${itemsFound} item${itemsFound!==1?'s':''} extracted from ${docs.length} document${docs.length!==1?'s':''}.</p>${summary?`<p style="font-size:0.83rem;color:var(--text-primary);font-style:italic;">${esc(summary)}</p>`:''}</div>`;
+        }
+        showToast(`Extracted ${itemsFound} item${itemsFound!==1?'s':''}`);
+    } catch(e) {
+        statusEl.innerHTML = `<div class="scan-result"><div class="scan-result-title" style="color:var(--danger);">Analysis error</div><pre style="color:var(--danger);">${esc(e.message)}</pre></div>`;
+    }
 }
 
 // ═══════════════════════════════════════════════

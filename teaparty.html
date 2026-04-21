@@ -198,6 +198,36 @@
         .exception-body{flex:1;min-width:0;}
         .exception-title{font-weight:700;font-size:0.9rem;color:var(--text-primary);margin-bottom:2px;}
         .exception-detail{font-size:0.82rem;color:var(--text-secondary);line-height:1.4;}
+        /* Only shown when printing */
+        .print-header{display:none;}
+        @media print{
+            @page{size:landscape;margin:0.4in;}
+            *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;}
+            body{background:#fff !important;}
+            /* Hide chrome */
+            .site-switcher,header,.toast,.modal-overlay,.tea-page-actions,
+            #tax-summary-history-wrap,
+            .view:not(.active){display:none !important;}
+            /* Kill interactive bits */
+            button,.btn,.btn-icon{display:none !important;}
+            /* Restore layout */
+            main{padding:0 !important;max-width:none !important;}
+            #app{display:block !important;}
+            /* Tone down the hero so it reads in print */
+            .hero{background:#2a0f0f !important;color:#fff !important;padding:18px 22px !important;margin-bottom:12px !important;break-after:avoid;page-break-after:avoid;}
+            .hero-emoji{display:none !important;}
+            /* Card styling */
+            .card{break-inside:avoid;page-break-inside:avoid;box-shadow:none !important;border-color:#d4d4d4 !important;margin-bottom:12px !important;padding:14px !important;}
+            /* Long content may span pages */
+            #tax-summary-result,#tea-tax-report-content,#tea-exceptions-content,.analysis-panel{break-inside:auto;page-break-inside:auto;}
+            /* Keep charts intact on one page */
+            svg,.tea-chart-wrap{break-inside:avoid;page-break-inside:avoid;}
+            .tea-chart-legend{break-after:avoid;page-break-after:avoid;}
+            /* Print header stamp */
+            .print-header{display:block !important;text-align:right;font-size:0.72rem;color:#666;margin:0 0 8px;font-style:italic;}
+            /* Hide the meta-row's Refresh button implicitly via .btn rule; keep the row for context */
+            .analysis-summary{background:#fff !important;}
+        }
         @media(max-width:700px){
             header{padding:6px 12px;gap:10px;}
             .logo-area{flex:1;}
@@ -282,6 +312,12 @@
         </div>
         <div class="hero-emoji">🫖</div>
     </div>
+
+    <!-- Page actions (hidden when printing) -->
+    <div class="tea-page-actions" style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:14px;">
+        <button class="btn btn-ghost btn-sm" onclick="printTeaParty()" title="Opens your browser print dialog — choose 'Save as PDF' as the destination for a single landscape PDF with every report.">📄 Print / Save as PDF</button>
+    </div>
+    <div class="print-header" aria-hidden="true">Farmboss Tea Party — Tax History · printed <span id="print-date-stamp"></span></div>
 
     <!-- SUMMARY AT TOP -->
     <div class="card">
@@ -625,6 +661,21 @@ function showView(v){
     if(v==='documents'){populateDocFilters();renderDocuments();}
     if(v==='upload'){document.getElementById('bulk-actions').style.display=bulkQueue.length?'flex':'none';renderBulkQueue();}
     window.scrollTo(0,0);
+}
+
+// Trigger the browser print dialog on the Tax Years view. Print CSS hides
+// the nav chrome, collapses the drop zone / history, lays the page out in
+// landscape with 0.4in margins, and keeps each card together where it
+// fits on a single page. Users choose "Save as PDF" as the destination
+// for a single landscape PDF covering every report top to bottom.
+function printTeaParty(){
+    if(!document.getElementById('view-years').classList.contains('active'))showView('years');
+    const stamp=document.getElementById('print-date-stamp');
+    if(stamp){
+        try{stamp.textContent=new Date().toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});}
+        catch(e){stamp.textContent=new Date().toISOString().slice(0,10);}
+    }
+    setTimeout(()=>window.print(),50);
 }
 
 // ── CLAUDE API ──

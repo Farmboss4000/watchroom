@@ -1973,16 +1973,22 @@ function renderTeaTaxTrends(){
     if(!hasData){card.style.display='none';return;}
     card.style.display='block';
     const xLabels=rows.map(r=>String(r.year));
-    // An explicit $0 in any of these four fields is almost always an AI
-    // extraction miss when the other fields for the same year are non-zero
-    // (a real return with $500k AGI doesn't have $0 wages). Render suspect
-    // zeros as null so the line breaks across that year instead of diving
-    // to the baseline.
+    // A $0 (or implausibly-small) value in any of these four fields is
+    // almost always an AI extraction miss when the other fields for the
+    // same year are substantial (a real return with $500k AGI doesn't have
+    // $50 taxable income). Render suspect values as null so the line
+    // breaks across that year instead of diving to the baseline.
     const clean=(row,v)=>{
-        if(v==null)return null;
-        if(v!==0)return v;
-        const peers=[row.fedTotalIncome,row.fedWages,row.fedAgi,row.fedTaxable];
-        return peers.some(p=>p!=null&&p!==0)?null:0;
+        if(v==null||!isFinite(v))return null;
+        if(v<0)return v; // real negative values (e.g. capital loss) stay
+        const peers=[row.fedTotalIncome,row.fedWages,row.fedAgi,row.fedTaxable]
+            .filter(p=>p!=null&&isFinite(p)&&p>0);
+        const maxPeer=peers.length?Math.max(...peers):0;
+        // Flag as suspect: value is under 2% of the largest sibling when
+        // that sibling is > $10k. Catches both exact $0 and small-junk
+        // values the OCR sometimes returns.
+        if(maxPeer>10000 && v<maxPeer*0.02)return null;
+        return v;
     };
     // Reuse the wage figure already reconciled by teaW2WagesByYear (which
     // prefers the scanned W-2 sum when the 1040 line 1 extracted as $0).

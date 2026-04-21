@@ -356,6 +356,10 @@
         <div class="card-title"><div class="card-title-left">📉 Deductions by Year</div></div>
         <div id="tea-tax-deductions-content"></div>
     </div>
+    <div class="card" id="tea-tax-activities-card" style="display:none;">
+        <div class="card-title"><div class="card-title-left">🚜 Activity Income &amp; Losses — Farm, B&amp;B, Rental Houses</div></div>
+        <div id="tea-tax-activities-content"></div>
+    </div>
 
     <!-- TAX YEAR REPORTS TABLE (manual entry) -->
     <div class="card">
@@ -1269,7 +1273,10 @@ taxData must have this exact shape when present:
     "totalPayments": number or null,
     "refund": number or null (positive amount refunded),
     "owed": number or null (positive amount owed),
-    "dependents": integer or null
+    "dependents": integer or null,
+    "farmIncome": number or null (Schedule F net profit/loss — positive for profit, NEGATIVE for loss),
+    "rentalIncome": number or null (Schedule E total net rental real estate income — positive for profit, NEGATIVE for loss; combine all rental properties on the return),
+    "scheduleCBusinesses": [ optional array of Schedule C businesses filed with this return; one entry per business. Each entry: {"name": short business name exactly as shown on Schedule C line A or the business name line, "netIncome": number or null (positive profit, NEGATIVE loss)}. Omit the array when there are no Schedule C businesses. ]
   },
   "additionalFilings": [ optional array of other filings in the SAME PDF, each with the same shape (isReturn, taxYear, jurisdiction, stateCode, formType, filingStatus, taxpayerName, fields) — omit when single filing ]
 }
@@ -1453,6 +1460,15 @@ function cleanFiling(td){
             refund:cleanNum(fields.refund),
             owed:cleanNum(fields.owed),
             dependents:cleanNum(fields.dependents),
+            farmIncome:cleanNum(fields.farmIncome),
+            rentalIncome:cleanNum(fields.rentalIncome),
+            scheduleCBusinesses:Array.isArray(fields.scheduleCBusinesses)
+                ? fields.scheduleCBusinesses
+                    .filter(b=>b&&typeof b==='object')
+                    .map(b=>({name:(b.name||'').toString().trim(),netIncome:cleanNum(b.netIncome)}))
+                    .filter(b=>b.name||b.netIncome!=null)
+                    .slice(0,10)
+                : [],
         },
     };
 }
@@ -1559,6 +1575,7 @@ function renderTeaTaxReport(){
     renderTeaTaxRefunds();
     renderTeaTaxRates();
     renderTeaTaxDeductions();
+    renderTeaTaxActivities();
     renderTeaExceptions();
 }
 
@@ -1926,6 +1943,90 @@ function exportTeaTaxReportCSV(){
 
 // ─────────────────────────────────────────
 // EXCEPTION REPORTING
+// ─────────────────────────────────────────
+// ACTIVITY LOSSES — FARM, B&B, RENTAL HOUSES
+// ─────────────────────────────────────────
+function isBnBName(name){
+    if(!name)return false;
+    const n=name.toLowerCase();
+    return n.includes('b&b')||n.includes('bnb')||n.includes('bed & breakfast')||n.includes('bed and breakfast')||n.includes('bed &amp; breakfast')||/\bbed[\s-]?breakfast\b/.test(n)||/\binn\b/.test(n)||/\bguest ?house\b/.test(n);
+}
+
+// Build per-year totals for Farm (Schedule F), B&B (matching Schedule C), and
+// Rental Houses (Schedule E). Federal-return filings only; never double-count
+// a state copy of the same schedule. Null means no data on file for that
+// activity in that year (distinct from $0).
+function teaActivityByYear(){
+    const byYear={};
+    const getE=y=>{
+        if(!byYear[y])byYear[y]={year:y,farm:null,bnb:null,rental:null,bnbNames:[]};
+        return byYear[y];
+    };
+    documents.forEach(d=>{
+        const td=d.taxData;
+        if(!td||!td.isTaxDocument)return;
+        const filings=[td,...(Array.isArray(td.additionalFilings)?td.additionalFilings:[])];
+        filings.forEach(f=>{
+            if(!f.taxYear)return;
+            // Schedules only flow through the federal return; skip state copies.
+            if(f.jurisdiction&&f.jurisdiction!=='federal')return;
+            const fields=f.fields||{};
+            const e=getE(f.taxYear);
+            if(fields.farmIncome!=null)e.farm=(e.farm||0)+Number(fields.farmIncome);
+            if(fields.rentalIncome!=null)e.rental=(e.rental||0)+Number(fields.rentalIncome);
+            if(Array.isArray(fields.scheduleCBusinesses)){
+                fields.scheduleCBusinesses.forEach(b=>{
+                    if(!isBnBName(b.name))return;
+                    if(b.netIncome==null)return;
+                    e.bnb=(e.bnb||0)+Number(b.netIncome);
+                    if(b.name)e.bnbNames.push(b.name);
+                });
+            }
+        });
+    });
+    return Object.values(byYear).sort((a,b)=>a.year-b.year);
+}
+
+function renderTeaTaxActivities(){
+    const card=document.getElementById('tea-tax-activities-card');
+    const content=document.getElementById('tea-tax-activities-content');
+    if(!card||!content)return;
+    const rows=teaActivityByYear();
+    const hasAny=rows.some(r=>r.farm!=null||r.bnb!=null||r.rental!=null);
+    if(!hasAny){card.style.display='none';return;}
+    card.style.display='block';
+    const xLabels=rows.map(r=>String(r.year));
+    const series=[
+        {label:'🚜 Farm (Sch F)',color:'#b45309',values:rows.map(r=>r.farm)},
+        {label:'🏡 B&B (Sch C)',color:'#7c3aed',values:rows.map(r=>r.bnb)},
+        {label:'🏘 Rental Houses (Sch E)',color:'#0d9488',values:rows.map(r=>r.rental)},
+    ];
+    const cell=v=>v==null?'<span style="opacity:0.5;">—</span>':(v<0?`<span class="tax-owed">−${fmtMoney(Math.abs(v)).replace('-','')}</span>`:fmtMoney(v));
+    const bnbLabel=r=>{
+        const names=[...new Set((r.bnbNames||[]).filter(Boolean))];
+        return names.length?`<div style="font-size:0.72rem;color:var(--text-secondary);margin-top:2px;">${esc(names.slice(0,3).join(', '))}${names.length>3?', …':''}</div>`:'';
+    };
+    const tableRows=rows.map(r=>`<tr>
+        <td>${r.year}</td>
+        <td class="num">${cell(r.farm)}</td>
+        <td class="num">${cell(r.bnb)}${bnbLabel(r)}</td>
+        <td class="num">${cell(r.rental)}</td>
+    </tr>`).join('');
+    const footTotals=(key)=>{
+        const vals=rows.map(r=>r[key]).filter(v=>v!=null);
+        if(!vals.length)return '<span style="opacity:0.5;">—</span>';
+        const sum=vals.reduce((s,v)=>s+v,0);
+        return sum<0?`<span class="tax-owed">−${fmtMoney(Math.abs(sum)).replace('-','')}</span>`:fmtMoney(sum);
+    };
+    content.innerHTML=`<p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:10px;">Negative values are losses. Farm comes from Schedule F, B&amp;B from Schedule C businesses whose name looks like a bed &amp; breakfast / inn / guesthouse, and Rental Houses from Schedule E.</p>`+
+        teaChartLegend(series)+teaLineChart(series,xLabels)+
+        `<div class="tea-chart-title">By Year</div>
+        <div class="table-wrapper"><table class="tea-mini-table"><thead><tr><th>Year</th><th class="num">🚜 Farm</th><th class="num">🏡 B&amp;B</th><th class="num">🏘 Rental Houses</th></tr></thead>
+            <tbody>${tableRows}</tbody>
+            <tfoot><tr><td>Lifetime</td><td class="num">${footTotals('farm')}</td><td class="num">${footTotals('bnb')}</td><td class="num">${footTotals('rental')}</td></tr></tfoot>
+        </table></div>`;
+}
+
 // ─────────────────────────────────────────
 function median(arr){
     const s=arr.slice().sort((a,b)=>a-b);

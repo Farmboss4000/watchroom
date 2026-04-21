@@ -1902,19 +1902,33 @@ function teaW2WagesByYear(){
         if(r.fedWages!=null)getE(r.year).fedWages=r.fedWages;
     });
     return Object.values(byYear).map(e=>{
-        // Prefer 1040 line 1 (the authoritative total of all W-2 box 1s) and
-        // fall back to the summed scanned W-2s only when no federal return is
-        // on file. Protects against a single miskeyed W-2 zeroing out a year.
-        const useFed=e.fedWages!=null;
-        const wages=useFed?e.fedWages:(e.w2Count?e.w2Sum:null);
-        let source;
-        if(useFed){
+        // Authoritative source is 1040 line 1 (total of every W-2 box 1 as
+        // filed). But treat an explicit $0 from either source as "suspect"
+        // when the other source has a real number, since AI extraction on
+        // legacy returns sometimes returns 0 instead of the true value. Only
+        // fall through to a real 0 when both sources agree (or only one has
+        // data at all).
+        const fed=e.fedWages;
+        const w2=e.w2Count?e.w2Sum:null;
+        const fedTrusted=fed!=null&&fed!==0;
+        const w2Trusted=w2!=null&&w2!==0;
+        let wages=null, source='—';
+        if(fedTrusted){
+            wages=fed;
             source='1040 line 1';
-            if(e.w2Count&&Math.abs(e.w2Sum-e.fedWages)>1){
-                source+=` (scanned W-2s sum to ${fmtMoney(e.w2Sum)})`;
+            if(w2Trusted&&Math.abs(w2-fed)>1){
+                source+=` (scanned W-2s sum to ${fmtMoney(w2)})`;
             }
-        }else{
-            source=e.w2Count?`${e.w2Count} W-2${e.w2Count>1?'s':''}`:'—';
+        }else if(w2Trusted){
+            wages=w2;
+            source=`${e.w2Count} W-2${e.w2Count>1?'s':''}`;
+            if(fed===0)source+=' (1040 line 1 read as $0)';
+        }else if(fed!=null){
+            wages=fed; // genuine zero from 1040
+            source=e.w2Count?`1040 line 1 + ${e.w2Count} W-2${e.w2Count>1?'s':''} (both $0)`:'1040 line 1 ($0)';
+        }else if(w2!=null){
+            wages=w2; // genuine zero from W-2 fallback
+            source=`${e.w2Count} W-2${e.w2Count>1?'s':''} ($0)`;
         }
         return{
             year:e.year,

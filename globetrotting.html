@@ -289,7 +289,19 @@
         .tp-section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
         .tp-section-title{font-size:0.92rem;font-weight:700;color:var(--text-primary);}
         .tp-section-count{font-size:0.74rem;color:var(--text-secondary);font-weight:600;}
-        .tp-item{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:6px;font-size:0.85rem;}
+        .tp-item{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:6px;font-size:0.85rem;position:relative;}
+        .tp-item-del{position:absolute;top:6px;right:6px;background:transparent;border:none;color:var(--text-secondary);font-size:0.95rem;line-height:1;cursor:pointer;padding:3px 7px;border-radius:4px;}
+        .tp-item-del:hover{background:var(--danger);color:#fff;}
+        .tp-timeline-hdr{display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;padding-right:28px;}
+        .tp-type-chip{font-size:0.7rem;font-weight:700;padding:2px 8px;border-radius:999px;text-transform:uppercase;letter-spacing:0.03em;}
+        .tp-type-flights{background:#dbeafe;color:#1e40af;}
+        .tp-type-hotels{background:#fef3c7;color:#92400e;}
+        .tp-type-tours,.tp-type-activities{background:#ede9fe;color:#5b21b6;}
+        .tp-type-transportation{background:#d1fae5;color:#065f46;}
+        .tp-timeline-date{font-size:0.8rem;font-weight:600;color:var(--text-primary);}
+        .tp-timeline-date.none{color:var(--text-secondary);font-style:italic;font-weight:400;}
+        .tp-summary-clear{background:transparent;border:none;color:var(--text-secondary);font-size:0.9rem;line-height:1;cursor:pointer;padding:3px 8px;border-radius:4px;}
+        .tp-summary-clear:hover{background:var(--danger);color:#fff;}
         .tp-item-top{display:flex;justify-content:space-between;align-items:flex-start;gap:6px;margin-bottom:4px;}
         .tp-item-title{font-weight:700;color:var(--text-primary);}
         .tp-item-badge{font-size:0.7rem;padding:2px 7px;border-radius:4px;background:var(--accent-dim);color:var(--accent);font-weight:700;white-space:nowrap;}
@@ -3217,41 +3229,20 @@ function renderPlanDetail() {
         </div>
 
         ${p.lastSummary ? `<div class="card" style="background:var(--bg-card);">
-            <div class="card-title"><span class="card-title-left">📝 AI Summary</span></div>
+            <div class="card-title">
+                <span class="card-title-left">📝 AI Summary</span>
+                <button class="tp-summary-clear" onclick="tpClearSummary()" title="Clear AI summary">✕</button>
+            </div>
             <div style="font-size:0.9rem;line-height:1.6;color:var(--text-primary);">${esc(p.lastSummary)}</div>
         </div>` : ''}
 
-        <div class="tp-section">
+        ${(()=>{const tl=tpBuildTimeline(p);return `<div class="tp-section">
             <div class="tp-section-hdr">
-                <span class="tp-section-title">✈️ Flights</span>
-                <span class="tp-section-count">${(p.flights||[]).length} segment${(p.flights||[]).length!==1?'s':''}</span>
+                <span class="tp-section-title">📅 Itinerary</span>
+                <span class="tp-section-count">${tl.length} item${tl.length!==1?'s':''}</span>
             </div>
-            <div id="tp-flights">${renderFlights(p.flights||[])}</div>
-        </div>
-
-        <div class="tp-section">
-            <div class="tp-section-hdr">
-                <span class="tp-section-title">🏨 Hotels &amp; Lodging</span>
-                <span class="tp-section-count">${(p.hotels||[]).length} stay${(p.hotels||[]).length!==1?'s':''}</span>
-            </div>
-            <div id="tp-hotels">${renderHotels(p.hotels||[])}</div>
-        </div>
-
-        <div class="tp-section">
-            <div class="tp-section-hdr">
-                <span class="tp-section-title">🎟️ Tours &amp; Activities</span>
-                <span class="tp-section-count">${(p.tours||[]).length + (p.activities||[]).length} item${((p.tours||[]).length + (p.activities||[]).length)!==1?'s':''}</span>
-            </div>
-            <div id="tp-tours">${renderTours([...(p.tours||[]),...(p.activities||[])])}</div>
-        </div>
-
-        <div class="tp-section">
-            <div class="tp-section-hdr">
-                <span class="tp-section-title">🚗 Transportation &amp; Transfers</span>
-                <span class="tp-section-count">${(p.transportation||[]).length} item${(p.transportation||[]).length!==1?'s':''}</span>
-            </div>
-            <div id="tp-transit">${renderTransit(p.transportation||[])}</div>
-        </div>
+            <div id="tp-timeline">${renderTimeline(tl)}</div>
+        </div>`;})()}
 
         <div class="card">
             <div class="card-title">
@@ -3264,95 +3255,209 @@ function renderPlanDetail() {
     renderPlanDocsList();
 }
 
-function renderFlights(flights) {
-    if (!flights.length) return '<div class="tp-empty-sm">No flights extracted yet. Upload tickets and click <strong>Analyze Plan with AI</strong>.</div>';
-    return flights.map(f => {
-        let legsHtml = '';
-        if (Array.isArray(f.segments) && f.segments.length) {
-            const segs = [];
-            f.segments.forEach((seg, i) => {
-                segs.push(`<div class="tp-leg"><strong>${esc(seg.from||'?')}</strong> → <strong>${esc(seg.to||'?')}</strong>${seg.flightNumber?' · '+esc(seg.flightNumber):''}${seg.departureTime?' · '+esc(seg.departureTime):''}${seg.arrivalTime?' → '+esc(seg.arrivalTime):''}${seg.seat?' · Seat '+esc(seg.seat):''}</div>`);
-                if (seg.layover && (seg.layover.airport || seg.layover.duration)) {
-                    segs.push(`<div class="tp-leg layover">↳ Layover${seg.layover.airport?' at '+esc(seg.layover.airport):''}${seg.layover.duration?' · '+esc(seg.layover.duration):''}</div>`);
-                }
-            });
-            legsHtml = segs.join('');
-        }
-        return `<div class="tp-item">
-            <div class="tp-item-top">
-                <div class="tp-item-title">${esc(f.airline||'Flight')}${f.flightNumber?' '+esc(f.flightNumber):''}</div>
-                ${f.cabin?`<span class="tp-item-badge">${esc(f.cabin)}</span>`:''}
-            </div>
-            ${(f.departureAirport || f.arrivalAirport) ? `<div class="tp-item-meta">
-                ${f.departureAirport?`<strong>${esc(f.departureAirport)}</strong>`:''}${f.departureTime?' '+esc(f.departureTime):''}
-                ${f.arrivalAirport?' → <strong>'+esc(f.arrivalAirport)+'</strong>':''}${f.arrivalTime?' '+esc(f.arrivalTime):''}
-            </div>` : ''}
-            <div class="tp-item-row">
-                ${f.seat?`<span>Seat <strong>${esc(f.seat)}</strong></span>`:''}
-                ${f.confirmation?`<span>Conf <strong>${esc(f.confirmation)}</strong></span>`:''}
-                ${f.passenger?`<span>Passenger: ${esc(f.passenger)}</span>`:''}
-                ${f.date?`<span>Date: ${esc(f.date)}</span>`:''}
-            </div>
-            ${legsHtml}
-            ${f.notes?`<div class="tp-item-row" style="font-style:italic;">${esc(f.notes)}</div>`:''}
-        </div>`;
-    }).join('');
+function renderSingleFlight(f) {
+    let legsHtml = '';
+    if (Array.isArray(f.segments) && f.segments.length) {
+        const segs = [];
+        f.segments.forEach(seg => {
+            segs.push(`<div class="tp-leg"><strong>${esc(seg.from||'?')}</strong> → <strong>${esc(seg.to||'?')}</strong>${seg.flightNumber?' · '+esc(seg.flightNumber):''}${seg.departureTime?' · '+esc(seg.departureTime):''}${seg.arrivalTime?' → '+esc(seg.arrivalTime):''}${seg.seat?' · Seat '+esc(seg.seat):''}</div>`);
+            if (seg.layover && (seg.layover.airport || seg.layover.duration)) {
+                segs.push(`<div class="tp-leg layover">↳ Layover${seg.layover.airport?' at '+esc(seg.layover.airport):''}${seg.layover.duration?' · '+esc(seg.layover.duration):''}</div>`);
+            }
+        });
+        legsHtml = segs.join('');
+    }
+    return `<div class="tp-item-top">
+            <div class="tp-item-title">${esc(f.airline||'Flight')}${f.flightNumber?' '+esc(f.flightNumber):''}</div>
+            ${f.cabin?`<span class="tp-item-badge">${esc(f.cabin)}</span>`:''}
+        </div>
+        ${(f.departureAirport || f.arrivalAirport) ? `<div class="tp-item-meta">
+            ${f.departureAirport?`<strong>${esc(f.departureAirport)}</strong>`:''}${f.departureTime?' '+esc(f.departureTime):''}
+            ${f.arrivalAirport?' → <strong>'+esc(f.arrivalAirport)+'</strong>':''}${f.arrivalTime?' '+esc(f.arrivalTime):''}
+        </div>` : ''}
+        <div class="tp-item-row">
+            ${f.seat?`<span>Seat <strong>${esc(f.seat)}</strong></span>`:''}
+            ${f.confirmation?`<span>Conf <strong>${esc(f.confirmation)}</strong></span>`:''}
+            ${f.passenger?`<span>Passenger: ${esc(f.passenger)}</span>`:''}
+        </div>
+        ${legsHtml}
+        ${f.notes?`<div class="tp-item-row" style="font-style:italic;">${esc(f.notes)}</div>`:''}`;
 }
 
-function renderHotels(hotels) {
-    if (!hotels.length) return '<div class="tp-empty-sm">No hotels extracted yet.</div>';
-    return hotels.map(h => `<div class="tp-item">
-        <div class="tp-item-top">
+function renderSingleHotel(h) {
+    return `<div class="tp-item-top">
             <div class="tp-item-title">${esc(h.name||'Hotel')}</div>
             ${h.nights?`<span class="tp-item-badge">${esc(h.nights)} night${h.nights!=1?'s':''}</span>`:''}
         </div>
         ${h.address?`<div class="tp-item-meta">${esc(h.address)}</div>`:''}
         <div class="tp-item-row">
-            ${h.checkIn?`<span>Check-in <strong>${esc(h.checkIn)}</strong></span>`:''}
-            ${h.checkOut?`<span>Check-out <strong>${esc(h.checkOut)}</strong></span>`:''}
             ${h.roomType?`<span>Room: ${esc(h.roomType)}</span>`:''}
             ${h.confirmation?`<span>Conf <strong>${esc(h.confirmation)}</strong></span>`:''}
             ${h.guest?`<span>Guest: ${esc(h.guest)}</span>`:''}
         </div>
-        ${h.notes?`<div class="tp-item-row" style="font-style:italic;">${esc(h.notes)}</div>`:''}
-    </div>`).join('');
+        ${h.notes?`<div class="tp-item-row" style="font-style:italic;">${esc(h.notes)}</div>`:''}`;
 }
 
-function renderTours(tours) {
-    if (!tours.length) return '<div class="tp-empty-sm">No tours or activities extracted yet.</div>';
-    return tours.map(t => `<div class="tp-item">
-        <div class="tp-item-top">
+function renderSingleTour(t) {
+    return `<div class="tp-item-top">
             <div class="tp-item-title">${esc(t.name||'Activity')}</div>
             ${t.duration?`<span class="tp-item-badge">${esc(t.duration)}</span>`:''}
         </div>
         ${t.location?`<div class="tp-item-meta">${esc(t.location)}</div>`:''}
         <div class="tp-item-row">
-            ${t.date?`<span>Date <strong>${esc(t.date)}</strong></span>`:''}
             ${t.time?`<span>Time <strong>${esc(t.time)}</strong></span>`:''}
             ${t.provider?`<span>Provider: ${esc(t.provider)}</span>`:''}
             ${t.confirmation?`<span>Conf <strong>${esc(t.confirmation)}</strong></span>`:''}
             ${t.meetingPoint?`<span>Meet: ${esc(t.meetingPoint)}</span>`:''}
         </div>
-        ${t.notes?`<div class="tp-item-row" style="font-style:italic;">${esc(t.notes)}</div>`:''}
-    </div>`).join('');
+        ${t.notes?`<div class="tp-item-row" style="font-style:italic;">${esc(t.notes)}</div>`:''}`;
 }
 
-function renderTransit(items) {
-    if (!items.length) return '<div class="tp-empty-sm">No ground transportation or transfers extracted yet.</div>';
-    return items.map(r => `<div class="tp-item">
-        <div class="tp-item-top">
+function renderSingleTransit(r) {
+    return `<div class="tp-item-top">
             <div class="tp-item-title">${esc(r.type||'Transit')}${r.provider?' — '+esc(r.provider):''}</div>
         </div>
         ${(r.from || r.to) ? `<div class="tp-item-meta">
             ${r.from?`<strong>${esc(r.from)}</strong>`:''}${r.from&&r.to?' → ':''}${r.to?`<strong>${esc(r.to)}</strong>`:''}
         </div>` : ''}
         <div class="tp-item-row">
-            ${r.pickupDate?`<span>Pickup <strong>${esc(r.pickupDate)}${r.pickupTime?' '+esc(r.pickupTime):''}</strong></span>`:''}
+            ${r.pickupTime?`<span>Pickup <strong>${esc(r.pickupTime)}</strong></span>`:''}
             ${r.returnDate?`<span>Return <strong>${esc(r.returnDate)}${r.returnTime?' '+esc(r.returnTime):''}</strong></span>`:''}
             ${r.confirmation?`<span>Conf <strong>${esc(r.confirmation)}</strong></span>`:''}
         </div>
-        ${r.notes?`<div class="tp-item-row" style="font-style:italic;">${esc(r.notes)}</div>`:''}
-    </div>`).join('');
+        ${r.notes?`<div class="tp-item-row" style="font-style:italic;">${esc(r.notes)}</div>`:''}`;
+}
+
+// Merge every itinerary item into a single list keyed by its source array +
+// index, then sort by normalized date so the page reads top-down as the
+// trip unfolds.
+function tpBuildTimeline(p) {
+    const items = [];
+    const push = (type, arr) => (arr||[]).forEach((item,idx)=>items.push({type,idx,item,sortKey:tpNormalizeDate(tpRawDate(type,item))}));
+    push('flights', p.flights);
+    push('hotels', p.hotels);
+    push('tours', p.tours);
+    push('activities', p.activities);
+    push('transportation', p.transportation);
+    items.sort((a,b)=>{
+        if (a.sortKey && b.sortKey) return a.sortKey.localeCompare(b.sortKey);
+        if (a.sortKey) return -1;
+        if (b.sortKey) return 1;
+        return 0;
+    });
+    return items;
+}
+
+function tpRawDate(type, item) {
+    switch(type) {
+        case 'flights': return item.date || item.departureTime || (item.segments && item.segments[0] && item.segments[0].departureTime) || '';
+        case 'hotels': return item.checkIn || '';
+        case 'tours':
+        case 'activities': return item.date || '';
+        case 'transportation': return item.pickupDate || '';
+    }
+    return '';
+}
+
+function tpNormalizeDate(s) {
+    if (!s) return '';
+    const iso = String(s).match(/\d{4}-\d{2}-\d{2}/);
+    if (iso) return iso[0];
+    const d = new Date(s);
+    if (!isNaN(d)) return d.toISOString().slice(0,10);
+    return String(s);
+}
+
+function tpDisplayDate(type, item) {
+    switch(type) {
+        case 'flights': {
+            const d = item.date || (item.segments && item.segments[0] && item.segments[0].departureTime) || '';
+            const t = item.departureTime || '';
+            return t && !d.includes(t) ? `${d}${d?' · ':''}${t}` : d;
+        }
+        case 'hotels':
+            if (item.checkIn && item.checkOut) return `${item.checkIn} → ${item.checkOut}`;
+            return item.checkIn || item.checkOut || '';
+        case 'tours':
+        case 'activities': {
+            const d = item.date || ''; const t = item.time || '';
+            return d && t ? `${d} · ${t}` : (d || t);
+        }
+        case 'transportation': {
+            const d = item.pickupDate || ''; const t = item.pickupTime || '';
+            return d && t ? `${d} · ${t}` : (d || t);
+        }
+    }
+    return '';
+}
+
+const TP_TYPE_LABELS = {
+    flights: '✈️ Flight',
+    hotels: '🏨 Hotel',
+    tours: '🎟️ Tour',
+    activities: '🎟️ Activity',
+    transportation: '🚗 Transit',
+};
+
+function renderTimeline(items) {
+    if (!items.length) return '<div class="tp-empty-sm">Nothing scheduled yet. Attach documents and click <strong>Analyze Plan with AI</strong>.</div>';
+    return items.map(x => {
+        let inner = '';
+        switch (x.type) {
+            case 'flights': inner = renderSingleFlight(x.item); break;
+            case 'hotels': inner = renderSingleHotel(x.item); break;
+            case 'tours':
+            case 'activities': inner = renderSingleTour(x.item); break;
+            case 'transportation': inner = renderSingleTransit(x.item); break;
+        }
+        const label = TP_TYPE_LABELS[x.type] || x.type;
+        const date = tpDisplayDate(x.type, x.item);
+        const dateHtml = date
+            ? `<span class="tp-timeline-date">${esc(date)}</span>`
+            : `<span class="tp-timeline-date none">No date</span>`;
+        return `<div class="tp-item">
+            <button class="tp-item-del" onclick="tpDeleteItem('${x.type}',${x.idx})" title="Remove this item">✕</button>
+            <div class="tp-timeline-hdr">
+                <span class="tp-type-chip tp-type-${x.type}">${label}</span>
+                ${dateHtml}
+            </div>
+            ${inner}
+        </div>`;
+    }).join('');
+}
+
+async function tpDeleteItem(listKey, idx) {
+    if (!currentPlan) return;
+    const arr = currentPlan[listKey] || [];
+    if (idx < 0 || idx >= arr.length) return;
+    if (!confirm('Remove this item from the plan?')) return;
+    const newArr = arr.slice();
+    newArr.splice(idx, 1);
+    try {
+        await db.collection('globetrotting_plans').doc(currentPlan._id).update({ [listKey]: newArr });
+        currentPlan[listKey] = newArr;
+        const i = travelPlans.findIndex(p => p._id === currentPlan._id);
+        if (i >= 0) travelPlans[i][listKey] = newArr;
+        renderPlanDetail();
+        showToast('Item removed');
+    } catch(e) {
+        showToast('Remove failed: ' + e.message, true);
+    }
+}
+
+async function tpClearSummary() {
+    if (!currentPlan) return;
+    if (!confirm('Clear the AI summary?')) return;
+    try {
+        await db.collection('globetrotting_plans').doc(currentPlan._id).update({ lastSummary: '' });
+        currentPlan.lastSummary = '';
+        const i = travelPlans.findIndex(p => p._id === currentPlan._id);
+        if (i >= 0) travelPlans[i].lastSummary = '';
+        renderPlanDetail();
+        showToast('Summary cleared');
+    } catch(e) {
+        showToast('Clear failed: ' + e.message, true);
+    }
 }
 
 function renderRefreshLog(log) {

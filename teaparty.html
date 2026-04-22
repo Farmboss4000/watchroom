@@ -1902,23 +1902,36 @@ function teaW2WagesByYear(){
         if(r.fedWages!=null)getE(r.year).fedWages=r.fedWages;
     });
     return Object.values(byYear).map(e=>{
-        // Authoritative source is 1040 line 1 (total of every W-2 box 1 as
-        // filed). But treat an explicit $0 from either source as "suspect"
-        // when the other source has a real number, since AI extraction on
-        // legacy returns sometimes returns 0 instead of the true value. Only
-        // fall through to a real 0 when both sources agree (or only one has
-        // data at all).
+        // 1040 line 1 is meant to be the total of every W-2 box 1 as filed,
+        // but AI extraction on legacy returns sometimes reads a small-but-
+        // nonzero fragment (e.g. just one spouse's wages on a joint return,
+        // or a subtotal). Reconciliation rules:
+        //   - both sources non-zero, within 10%  → trust 1040 line 1
+        //   - both sources non-zero, disagree    → take the LARGER; under-
+        //       reporting is the common failure mode (missed W-2 on the
+        //       1040, or a sub-total picked up instead of the full line)
+        //   - only one source non-zero           → use it
+        //   - both zero / missing                → fall through to $0
         const fed=e.fedWages;
         const w2=e.w2Count?e.w2Sum:null;
         const fedTrusted=fed!=null&&fed!==0;
         const w2Trusted=w2!=null&&w2!==0;
         let wages=null, source='—';
-        if(fedTrusted){
+        if(fedTrusted&&w2Trusted){
+            const diff=Math.abs(w2-fed);
+            const larger=Math.max(w2,fed);
+            if(diff/larger>0.1){
+                wages=larger;
+                source=(larger===fed)
+                    ? `1040 line 1 (scanned W-2s sum to ${fmtMoney(w2)})`
+                    : `${e.w2Count} W-2${e.w2Count>1?'s':''} — 1040 line 1 reads ${fmtMoney(fed)}`;
+            }else{
+                wages=fed;
+                source='1040 line 1';
+            }
+        }else if(fedTrusted){
             wages=fed;
             source='1040 line 1';
-            if(w2Trusted&&Math.abs(w2-fed)>1){
-                source+=` (scanned W-2s sum to ${fmtMoney(w2)})`;
-            }
         }else if(w2Trusted){
             wages=w2;
             source=`${e.w2Count} W-2${e.w2Count>1?'s':''}`;

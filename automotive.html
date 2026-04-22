@@ -2791,7 +2791,7 @@ function catClass(cat) {
     if (c.includes('pickup'))                             return 'cat-truck';
     return 'cat-default';
 }
-function esc(s) { return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'):''; }
+function esc(s) { return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'):''; }
 let _toastUndoFn = null;
 function toast(msg, type='', undoFn=null) {
     _toastUndoFn = undoFn;

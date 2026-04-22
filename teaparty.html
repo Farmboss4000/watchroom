@@ -570,7 +570,7 @@ const VIEWS=['years','upload','documents','settings'];
 const TAX_CATEGORY='Tax Document';
 
 // UTILS
-function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):'';}
+function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'):'';}
 function toast(msg,type){const el=document.getElementById('toast');el.textContent=msg;el.className='toast '+(type||'')+' show';clearTimeout(el._tid);el._tid=setTimeout(()=>el.classList.remove('show'),3500);}
 function fmtMoney(n){
     if(n===null||n===undefined||n==='')return '—';

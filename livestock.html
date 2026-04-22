@@ -1986,7 +1986,7 @@ function catClass(cat) {
     if (c.includes('chicken') || c.includes('turkey') || c.includes('duck') || c.includes('geese') || c.includes('poultry')) return 'cat-hay';
     return 'cat-default';
 }
-function esc(s) { return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'):''; }
+function esc(s) { return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'):''; }
 let _toastUndoFn = null;
 function toast(msg, type='', undoFn=null) {
     _toastUndoFn = undoFn;

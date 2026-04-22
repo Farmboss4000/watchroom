@@ -4924,7 +4924,7 @@ function catClass(cat) {
     return 'cat-default';
 }
 
-function esc(s) { return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'):''; }
+function esc(s) { return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'):''; }
 function escHtml(s) { return esc(s); }
 
 let _toastUndoFn = null;

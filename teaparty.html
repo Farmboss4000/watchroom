@@ -1973,33 +1973,45 @@ function renderTeaTaxTrends(){
     if(!hasData){card.style.display='none';return;}
     card.style.display='block';
     const xLabels=rows.map(r=>String(r.year));
-    // A $0 (or implausibly-small) value in any of these four fields is
-    // almost always an AI extraction miss when the other fields for the
-    // same year are substantial (a real return with $500k AGI doesn't have
-    // $50 taxable income). Render suspect values as null so the line
-    // breaks across that year instead of diving to the baseline.
+    // A value that is drastically smaller than its sibling income fields
+    // for the same year is almost always an AI extraction miss — a real
+    // 1040 with $900k AGI doesn't have $20k taxable income, and wages on
+    // a W-2-earner's return are never 1% of total income. Null suspect
+    // values so the line breaks across that year instead of plunging to
+    // (or near) the baseline.
+    //
+    // Use the MEDIAN of the four income fields as the anchor instead of
+    // the MAX. The max is fragile — one garbage high value could inflate
+    // the threshold; the median of four values survives two bad extracts
+    // and tracks the true income magnitude for that year.
     const clean=(row,v)=>{
         if(v==null||!isFinite(v))return null;
-        if(v<0)return v; // real negative values (e.g. capital loss) stay
-        const peers=[row.fedTotalIncome,row.fedWages,row.fedAgi,row.fedTaxable]
-            .filter(p=>p!=null&&isFinite(p)&&p>0);
-        const maxPeer=peers.length?Math.max(...peers):0;
-        // Flag as suspect: value is under 2% of the largest sibling when
-        // that sibling is > $10k. Catches both exact $0 and small-junk
-        // values the OCR sometimes returns.
-        if(maxPeer>10000 && v<maxPeer*0.02)return null;
+        if(v<0)return v; // genuine negatives (capital loss) stay
+        const all=[row.fedTotalIncome,row.fedWages,row.fedAgi,row.fedTaxable]
+            .filter(p=>p!=null&&isFinite(p)&&p>0)
+            .sort((a,b)=>a-b);
+        if(!all.length)return v;
+        const median=all.length%2
+            ? all[(all.length-1)/2]
+            : (all[all.length/2-1]+all[all.length/2])/2;
+        // Flag as suspect: value is under 15% of the median sibling when
+        // that median is > $25k. Catches exact $0, near-$0, and the
+        // $1k–$20k junk values the OCR sometimes returns.
+        if(median>25000 && v<median*0.15)return null;
         return v;
     };
     // Reuse the wage figure already reconciled by teaW2WagesByYear (which
-    // prefers the scanned W-2 sum when the 1040 line 1 extracted as $0).
+    // prefers the scanned W-2 sum when the 1040 line 1 extracted as $0),
+    // but still put the result through clean() so a small junk value
+    // doesn't sneak through on its own.
     const w2ByYear={};
     (typeof teaW2WagesByYear==='function'?teaW2WagesByYear():[]).forEach(w=>{w2ByYear[w.year]=w.wages;});
     const series=[
         {label:'Total Income',color:'#2563eb',values:rows.map(r=>clean(r,r.fedTotalIncome))},
         {label:'Wages (W-2)',color:'#059669',values:rows.map(r=>{
             const w=w2ByYear[r.year];
-            if(w!=null&&w!==0)return w;
-            return clean(r,r.fedWages);
+            const raw=(w!=null&&w!==0)?w:r.fedWages;
+            return clean(r,raw);
         })},
         {label:'AGI',color:'#7c3aed',values:rows.map(r=>clean(r,r.fedAgi))},
         {label:'Taxable Income',color:'#6366f1',values:rows.map(r=>clean(r,r.fedTaxable))},

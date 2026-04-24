@@ -1071,8 +1071,8 @@ service firebase.storage {
         <div class="modal-sub" id="maint-modal-sub"></div>
         <div style="background:var(--bg-card);border-radius:8px;padding:16px;margin-bottom:16px;">
             <div style="font-size:0.85rem;font-weight:700;margin-bottom:12px;">Add New Record</div>
-            <input type="file" id="maint-receipt-input" accept="image/*" style="display:none" onchange="scanMaintenanceReceipt(this)">
-            <button type="button" class="btn-ai" id="btn-scan-receipt" onclick="document.getElementById('maint-receipt-input').click()" style="margin-top:0;margin-bottom:10px;">📷 Scan Receipt with AI</button>
+            <input type="file" id="maint-receipt-input" accept="image/*,application/pdf,message/rfc822,.eml,text/plain,.txt,.html,.htm" style="display:none" onchange="scanMaintenanceReceipt(this)">
+            <button type="button" class="btn-ai" id="btn-scan-receipt" onclick="document.getElementById('maint-receipt-input').click()" style="margin-top:0;margin-bottom:10px;">📷 Scan Receipt with AI <span style="font-weight:400;opacity:0.8;">— photo, PDF, or email</span></button>
             <div id="maint-scan-status" style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:12px;min-height:1em;"></div>
             <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:12px;">
                 <div class="form-group"><label>Date</label><input type="date" id="maint-date"></div>
@@ -2751,6 +2751,51 @@ function renderMaintenanceHistory(records) {
         </div>`).join('');
 }
 
+async function callClaudeRaw(content, maxTokens) {
+    if (!apiKey) { toast('Set your Anthropic API key in Settings first.','error'); return null; }
+    const msgPayload = {
+        model: aiModel, max_tokens: maxTokens || 768,
+        messages:[{ role:'user', content }]
+    };
+    let res;
+    try {
+        if (proxyUrl) {
+            res = await fetch(proxyUrl, {
+                method:'POST',
+                headers:{ 'Content-Type':'application/json' },
+                body: JSON.stringify({ ...msgPayload, apiKey })
+            });
+        } else {
+            res = await fetch('https://api.anthropic.com/v1/messages', {
+                method:'POST', mode:'cors',
+                headers:{ 'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true' },
+                body: JSON.stringify(msgPayload)
+            });
+        }
+    } catch(networkErr) { throw new Error('Network error — set up a Proxy URL in Settings to fix CORS issues.'); }
+    if (!res.ok) {
+        let errMsg = `API error ${res.status}`;
+        try {
+            const d = await res.json();
+            errMsg = d.error?.message || errMsg;
+            if (res.status===401) errMsg = 'Invalid API key — re-enter your key in Settings.';
+            if (res.status===429) errMsg = 'Rate limit reached — please wait a moment.';
+        } catch(e) {}
+        throw new Error(errMsg);
+    }
+    const data = await res.json();
+    return data.content[0].text;
+}
+
+function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload  = e => resolve(e.target.result.split(',')[1]);
+        fr.onerror = reject;
+        fr.readAsDataURL(file);
+    });
+}
+
 async function scanMaintenanceReceipt(input) {
     const file = input.files && input.files[0];
     input.value = '';
@@ -2758,17 +2803,19 @@ async function scanMaintenanceReceipt(input) {
     if (!apiKey) { toast('Set your Anthropic API key in Settings first.','error'); return; }
     const btn    = document.getElementById('btn-scan-receipt');
     const status = document.getElementById('maint-scan-status');
+    const origBtnHtml = '📷 Scan Receipt with AI <span style="font-weight:400;opacity:0.8;">— photo, PDF, or email</span>';
     btn.disabled = true; btn.classList.add('scanning'); btn.textContent = '⏳ Reading receipt...';
     status.textContent = 'Analyzing receipt with AI...'; status.style.color = 'var(--text-secondary)';
     try {
-        const base64 = await new Promise((resolve, reject) => {
-            const fr = new FileReader();
-            fr.onload  = e => resolve(e.target.result.split(',')[1]);
-            fr.onerror = reject;
-            fr.readAsDataURL(file);
-        });
-        const mimeType = file.type || 'image/jpeg';
-        const prompt = `This is a photo of a vehicle service / maintenance receipt or invoice. Extract the following fields and return ONLY valid JSON — no explanation, no markdown, no code fences:
+        const name = (file.name || '').toLowerCase();
+        const type = (file.type || '').toLowerCase();
+        const isImage = type.startsWith('image/');
+        const isPdf   = type === 'application/pdf' || name.endsWith('.pdf');
+        const isEmail = type === 'message/rfc822' || name.endsWith('.eml') || name.endsWith('.msg')
+                     || type.startsWith('text/') || name.endsWith('.txt')
+                     || type === 'text/html' || name.endsWith('.html') || name.endsWith('.htm');
+
+        const extractRules = `Extract the following fields and return ONLY valid JSON — no explanation, no markdown, no code fences:
 {"date":"YYYY-MM-DD","type":"short service category","description":"concise summary of work performed","cost":"total charged in dollars as a number, no $ or commas","nextDate":"YYYY-MM-DD of next recommended service if shown","miles":"odometer reading at service as an integer"}
 
 Rules:
@@ -2779,7 +2826,35 @@ Rules:
 - "nextDate" only if a specific next-service date is printed; otherwise omit.
 - "miles" is the odometer reading — integer only, omit if not shown.
 - Omit any field you cannot determine with reasonable confidence. Return only the JSON object.`;
-        const raw = await callClaude(base64, mimeType, prompt);
+
+        let content;
+        if (isImage) {
+            status.textContent = 'Reading photo with AI...';
+            const base64 = await readFileAsBase64(file);
+            content = [
+                { type:'image', source:{ type:'base64', media_type: type || 'image/jpeg', data: base64 }},
+                { type:'text',  text: `This is a photo of a vehicle service / maintenance receipt or invoice. ${extractRules}` }
+            ];
+        } else if (isPdf) {
+            status.textContent = 'Reading PDF with AI...';
+            const base64 = await readFileAsBase64(file);
+            content = [
+                { type:'document', source:{ type:'base64', media_type:'application/pdf', data: base64 }},
+                { type:'text',     text: `This PDF is a vehicle service / maintenance receipt or invoice. ${extractRules}` }
+            ];
+        } else if (isEmail) {
+            status.textContent = 'Reading email with AI...';
+            const text = await file.text();
+            if (!text || !text.trim()) throw new Error('Email file was empty or unreadable.');
+            const truncated = text.length > 60000 ? text.slice(0, 60000) + '\n\n[...truncated]' : text;
+            content = [
+                { type:'text', text: `The following is the raw content of an email about a vehicle service / maintenance visit. It may include headers, HTML, quoted text, or line-item details. ${extractRules}\n\n--- EMAIL CONTENT ---\n${truncated}` }
+            ];
+        } else {
+            throw new Error('Unsupported file type. Use an image, PDF, or email (.eml/.txt/.html).');
+        }
+
+        const raw = await callClaudeRaw(content, 768);
         if (!raw) return;
         const jsonMatch = raw.match(/\{[\s\S]*\}/);
         if (!jsonMatch) throw new Error('Could not parse AI response');
@@ -2803,7 +2878,7 @@ Rules:
         status.style.color = 'var(--danger)';
     } finally {
         btn.disabled = false; btn.classList.remove('scanning');
-        btn.innerHTML = '📷 Scan Receipt with AI';
+        btn.innerHTML = '📷 Scan Receipt with AI <span style="font-weight:400;opacity:0.8;">— photo, PDF, or email</span>';
     }
 }
 

@@ -1071,6 +1071,9 @@ service firebase.storage {
         <div class="modal-sub" id="maint-modal-sub"></div>
         <div style="background:var(--bg-card);border-radius:8px;padding:16px;margin-bottom:16px;">
             <div style="font-size:0.85rem;font-weight:700;margin-bottom:12px;">Add New Record</div>
+            <input type="file" id="maint-receipt-input" accept="image/*" style="display:none" onchange="scanMaintenanceReceipt(this)">
+            <button type="button" class="btn-ai" id="btn-scan-receipt" onclick="document.getElementById('maint-receipt-input').click()" style="margin-top:0;margin-bottom:10px;">📷 Scan Receipt with AI</button>
+            <div id="maint-scan-status" style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:12px;min-height:1em;"></div>
             <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:12px;">
                 <div class="form-group"><label>Date</label><input type="date" id="maint-date"></div>
                 <div class="form-group"><label>Type</label><input type="text" id="maint-type" list="maint-types" placeholder="Oil Change, Tire Rotation..."><datalist id="maint-types"><option>Oil Change</option><option>Tire Rotation</option><option>Brake Service</option><option>Transmission Service</option><option>Inspection</option><option>Repair</option><option>Detail</option><option>Registration</option><option>Insurance</option><option>Other</option></datalist></div>
@@ -2725,6 +2728,7 @@ function showMaintenance(docId) {
     document.getElementById('maint-modal-title').textContent = `🔧 ${it.make||''} ${it.model||''} — Maintenance Log`;
     document.getElementById('maint-modal-sub').textContent = `${it.year||''} ${it.category||''} | VIN: ${it.serialNumber||'N/A'}`;
     document.getElementById('maint-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('maint-scan-status').textContent = '';
     renderMaintenanceHistory(it.maintenance||[]);
     document.getElementById('maint-modal').classList.add('show');
 }
@@ -2747,6 +2751,62 @@ function renderMaintenanceHistory(records) {
         </div>`).join('');
 }
 
+async function scanMaintenanceReceipt(input) {
+    const file = input.files && input.files[0];
+    input.value = '';
+    if (!file) return;
+    if (!apiKey) { toast('Set your Anthropic API key in Settings first.','error'); return; }
+    const btn    = document.getElementById('btn-scan-receipt');
+    const status = document.getElementById('maint-scan-status');
+    btn.disabled = true; btn.classList.add('scanning'); btn.textContent = '⏳ Reading receipt...';
+    status.textContent = 'Analyzing receipt with AI...'; status.style.color = 'var(--text-secondary)';
+    try {
+        const base64 = await new Promise((resolve, reject) => {
+            const fr = new FileReader();
+            fr.onload  = e => resolve(e.target.result.split(',')[1]);
+            fr.onerror = reject;
+            fr.readAsDataURL(file);
+        });
+        const mimeType = file.type || 'image/jpeg';
+        const prompt = `This is a photo of a vehicle service / maintenance receipt or invoice. Extract the following fields and return ONLY valid JSON — no explanation, no markdown, no code fences:
+{"date":"YYYY-MM-DD","type":"short service category","description":"concise summary of work performed","cost":"total charged in dollars as a number, no $ or commas","nextDate":"YYYY-MM-DD of next recommended service if shown","miles":"odometer reading at service as an integer"}
+
+Rules:
+- "date" is the date of service (invoice/service date), in YYYY-MM-DD format.
+- "type" should be one of: Oil Change, Tire Rotation, Brake Service, Transmission Service, Inspection, Repair, Detail, Registration, Insurance, Other — pick the best fit. If multiple, pick the most prominent.
+- "description" should be 1-2 short sentences summarizing the line items / work performed.
+- "cost" is the grand total (after tax), as a plain number like 127.45 — omit if not clearly shown.
+- "nextDate" only if a specific next-service date is printed; otherwise omit.
+- "miles" is the odometer reading — integer only, omit if not shown.
+- Omit any field you cannot determine with reasonable confidence. Return only the JSON object.`;
+        const raw = await callClaude(base64, mimeType, prompt);
+        if (!raw) return;
+        const jsonMatch = raw.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error('Could not parse AI response');
+        const data = JSON.parse(jsonMatch[0]);
+        const filled = [];
+        if (data.date)        { document.getElementById('maint-date').value        = data.date;                filled.push('Date'); }
+        if (data.type)        { document.getElementById('maint-type').value        = data.type;                filled.push('Type'); }
+        if (data.description) { document.getElementById('maint-desc').value        = data.description;         filled.push('Description'); }
+        if (data.cost != null && data.cost !== '') { document.getElementById('maint-cost').value = data.cost;  filled.push('Cost'); }
+        if (data.nextDate)    { document.getElementById('maint-next-date').value   = data.nextDate;            filled.push('Next Service Date'); }
+        if (data.miles != null && data.miles !== '') { document.getElementById('maint-miles').value = data.miles; filled.push('Mileage'); }
+        if (filled.length) {
+            status.textContent = `✅ AI filled in: ${filled.join(', ')}. Review and adjust before saving.`;
+            status.style.color = 'var(--success)';
+        } else {
+            status.textContent = '⚠️ Could not read receipt details clearly — fill in manually.';
+            status.style.color = 'var(--text-secondary)';
+        }
+    } catch(err) {
+        status.textContent = '❌ Error: ' + err.message;
+        status.style.color = 'var(--danger)';
+    } finally {
+        btn.disabled = false; btn.classList.remove('scanning');
+        btn.innerHTML = '📷 Scan Receipt with AI';
+    }
+}
+
 async function saveMaintenance() {
     const record = {
         date: document.getElementById('maint-date').value,
@@ -2767,6 +2827,7 @@ async function saveMaintenance() {
         document.getElementById('maint-cost').value='';
         document.getElementById('maint-next-date').value='';
         document.getElementById('maint-miles').value='';
+        document.getElementById('maint-scan-status').textContent='';
         toast('Record added!','success');
     } catch(err) { toast('Error: '+err.message,'error'); }
 }

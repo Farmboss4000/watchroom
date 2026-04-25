@@ -3052,22 +3052,28 @@ async function pdfToPageImages(file) {
 }
 
 async function extractInsuranceCardData(base64, mimeType) {
-    const prompt = `This is a proof-of-insurance card. Extract these fields and return ONLY valid JSON — no markdown, no code fences:
-{"vin":"17-character VIN","plate":"license plate","expirationDate":"YYYY-MM-DD"}
+    const prompt = `This is a proof-of-insurance card. It may list ONE OR MORE vehicles on the same card. Extract these fields and return ONLY valid JSON — no markdown, no code fences:
+{"expirationDate":"YYYY-MM-DD","vehicles":[{"vin":"17 chars","plate":"plate if shown","year":"YYYY","make":"...","model":"..."}]}
 
 Rules:
-- "vin" must be exactly 17 alphanumeric characters (no I, O, or Q). Omit if not clearly readable.
-- "plate" should be uppercase, no spaces. Omit if not clearly readable.
-- "expirationDate" is the policy or card expiration date in YYYY-MM-DD format. Omit if not shown.
-- Omit any field you cannot determine with reasonable confidence. Return only the JSON object.`;
+- "vehicles" is ALWAYS an array, even if there is only one vehicle. List every vehicle visible on the card.
+- "expirationDate" is the policy/card expiration date in YYYY-MM-DD format. Omit if not shown.
+- For each vehicle, include whichever of vin, plate, year, make, model are clearly readable. Omit fields you can't determine with confidence.
+- vin must be exactly 17 alphanumeric characters (no I, O, or Q).
+- plate is uppercase, no spaces.
+- Return ONLY the JSON object.`;
     const content = [
         { type:'image', source:{ type:'base64', media_type: mimeType, data: base64 }},
         { type:'text',  text: prompt }
     ];
-    const raw = await callClaudeRaw(content, 256);
-    if (!raw) return {};
-    const m = raw.match(/\{[\s\S]*\}/); if (!m) return {};
-    try { return JSON.parse(m[0]); } catch(e) { return {}; }
+    const raw = await callClaudeRaw(content, 1024);
+    if (!raw) return { vehicles: [] };
+    const m = raw.match(/\{[\s\S]*\}/); if (!m) return { vehicles: [] };
+    try {
+        const parsed = JSON.parse(m[0]);
+        if (!Array.isArray(parsed.vehicles)) parsed.vehicles = [];
+        return parsed;
+    } catch(e) { return { vehicles: [] }; }
 }
 
 function findMatchingVehicle(vin, plate) {
@@ -3119,21 +3125,40 @@ async function onInsCardsFilesSelected(input) {
     for (const pg of pages) {
         processed++;
         status.textContent = `Reading card ${processed} of ${pages.length} with AI…`;
-        let data = {};
+        let data = { vehicles: [] };
         try { data = await extractInsuranceCardData(pg.base64, pg.mimeType); }
         catch(err) { console.warn('AI extract failed:', err); }
         const tempId = 'ic_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
-        const suggestedDocId = findMatchingVehicle(data.vin, data.plate);
+        // Build a row per detected vehicle. If AI found none, still create one empty row so user can manually assign.
+        const detectedVehicles = (data.vehicles || []).map(v => {
+            const matchedDocId = findMatchingVehicle(v.vin, v.plate);
+            return {
+                rowId: 'r_' + Math.random().toString(36).slice(2,8),
+                vin: v.vin || '', plate: v.plate || '',
+                year: v.year || '', make: v.make || '', model: v.model || '',
+                suggestedDocId: matchedDocId,
+                selectedDocId: matchedDocId,
+                manuallyAdded: false
+            };
+        });
+        if (!detectedVehicles.length) {
+            detectedVehicles.push({
+                rowId: 'r_' + Math.random().toString(36).slice(2,8),
+                vin: '', plate: '', year: '', make: '', model: '',
+                suggestedDocId: '', selectedDocId: '', manuallyAdded: true
+            });
+        }
         pendingInsCards.push({
             tempId, base64: pg.base64, mimeType: pg.mimeType,
             fileName: pg.fileName, pageNum: pg.pageNum, totalPages: pg.totalPages,
-            vin: data.vin || '', plate: data.plate || '', expirationDate: data.expirationDate || '',
-            suggestedDocId, selectedDocId: suggestedDocId, status: 'pending'
+            expirationDate: data.expirationDate || '',
+            assignments: detectedVehicles
         });
         renderInsCardsList();
     }
-    const matched = pendingInsCards.filter(c => c.suggestedDocId).length;
-    status.textContent = `${pendingInsCards.length} card${pendingInsCards.length!==1?'s':''} read · ${matched} auto-matched. Review the assignments below.`;
+    const totalAssignments = pendingInsCards.reduce((s,c) => s + c.assignments.length, 0);
+    const matchedAssignments = pendingInsCards.reduce((s,c) => s + c.assignments.filter(a => a.suggestedDocId).length, 0);
+    status.textContent = `${pendingInsCards.length} card${pendingInsCards.length!==1?'s':''} read · ${totalAssignments} vehicle assignment${totalAssignments!==1?'s':''} detected · ${matchedAssignments} auto-matched. Review and confirm below.`;
     document.getElementById('btn-save-ins-cards').disabled = false;
 }
 
@@ -3144,37 +3169,86 @@ function renderInsCardsList() {
         `<option value="${i._docId}">${esc(vehicleLabel(i))}</option>`
     ).join('');
     list.innerHTML = pendingInsCards.map(c => {
-        const matched = !!c.suggestedDocId;
-        const matchBadge = matched
-            ? `<span style="color:var(--success);font-size:0.72rem;font-weight:700;">✅ AUTO-MATCHED</span>`
-            : `<span style="color:#b45309;font-size:0.72rem;font-weight:700;">⚠ NO MATCH — pick manually</span>`;
         const fileLabel = c.totalPages > 1 ? `${esc(c.fileName)} · page ${c.pageNum}/${c.totalPages}` : esc(c.fileName);
-        return `<div style="display:flex;gap:14px;border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;background:var(--bg-secondary);" data-temp-id="${c.tempId}">
-            <img src="data:${c.mimeType};base64,${c.base64}" style="width:120px;height:90px;object-fit:contain;background:#fff;border-radius:6px;border:1px solid var(--border);cursor:pointer;" onclick="openInsCardPreview('${c.tempId}')" title="Click to open full-size">
-            <div style="flex:1;min-width:0;">
-                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;">
-                    <span style="font-size:0.8rem;font-weight:600;color:var(--text-secondary);">${fileLabel}</span>
-                    ${matchBadge}
-                </div>
-                <div style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:8px;">
-                    ${c.vin ? `<strong>VIN:</strong> <span class="mono">${esc(c.vin)}</span> · ` : ''}
-                    ${c.plate ? `<strong>Plate:</strong> ${esc(c.plate)} · ` : ''}
-                    ${c.expirationDate ? `<strong>Exp:</strong> ${esc(c.expirationDate)}` : ''}
-                    ${(!c.vin && !c.plate && !c.expirationDate) ? 'AI could not read details.' : ''}
-                </div>
-                <select onchange="setInsCardVehicle('${c.tempId}', this.value)" style="width:100%;">
-                    <option value="">— Skip this card —</option>
-                    ${vehicleOpts.replace(`value="${c.selectedDocId}"`, `value="${c.selectedDocId}" selected`)}
+        const cardSummaryParts = [];
+        if (c.expirationDate) cardSummaryParts.push(`<strong>Exp:</strong> ${esc(c.expirationDate)}`);
+        const detectedCount = c.assignments.filter(a => !a.manuallyAdded).length;
+        const matchedCount  = c.assignments.filter(a => a.suggestedDocId).length;
+        if (detectedCount) cardSummaryParts.push(`${detectedCount} vehicle${detectedCount!==1?'s':''} detected · ${matchedCount} auto-matched`);
+        const cardSummary = cardSummaryParts.length ? cardSummaryParts.join(' · ') : 'AI could not read details.';
+
+        const rowsHtml = c.assignments.map(a => {
+            const optsWithSelected = a.selectedDocId
+                ? vehicleOpts.replace(`value="${a.selectedDocId}"`, `value="${a.selectedDocId}" selected`)
+                : vehicleOpts;
+            const detectedLabel = a.manuallyAdded
+                ? `<em style="color:var(--text-secondary);">Manually added — pick a vehicle below</em>`
+                : [
+                    a.year || a.make || a.model ? `<strong>${esc([a.year,a.make,a.model].filter(Boolean).join(' '))}</strong>` : '',
+                    a.vin ? `VIN <span class="mono">${esc(a.vin)}</span>` : '',
+                    a.plate ? `Plate ${esc(a.plate)}` : ''
+                ].filter(Boolean).join(' · ') || '<em style="color:var(--text-secondary);">No details read</em>';
+            const statusBadge = a.suggestedDocId
+                ? `<span style="color:var(--success);font-size:0.7rem;font-weight:700;white-space:nowrap;">✅ MATCHED</span>`
+                : (a.manuallyAdded
+                    ? `<span style="color:var(--accent);font-size:0.7rem;font-weight:700;white-space:nowrap;">＋ MANUAL</span>`
+                    : `<span style="color:#b45309;font-size:0.7rem;font-weight:700;white-space:nowrap;">⚠ NO MATCH</span>`);
+            return `<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-top:1px dashed var(--border);">
+                <div style="flex:1;min-width:0;font-size:0.78rem;color:var(--text-secondary);">${detectedLabel}</div>
+                ${statusBadge}
+                <select onchange="setInsRowVehicle('${c.tempId}','${a.rowId}', this.value)" style="min-width:240px;">
+                    <option value="">— Skip —</option>
+                    ${optsWithSelected}
                 </select>
+                <button type="button" class="btn btn-danger btn-sm" onclick="removeInsRow('${c.tempId}','${a.rowId}')" title="Remove this assignment">✗</button>
+            </div>`;
+        }).join('');
+
+        return `<div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px;background:var(--bg-secondary);" data-temp-id="${c.tempId}">
+            <div style="display:flex;gap:14px;align-items:flex-start;">
+                <img src="data:${c.mimeType};base64,${c.base64}" style="width:140px;height:100px;object-fit:contain;background:#fff;border-radius:6px;border:1px solid var(--border);cursor:pointer;flex-shrink:0;" onclick="openInsCardPreview('${c.tempId}')" title="Click to open full-size">
+                <div style="flex:1;min-width:0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px;">
+                        <span style="font-size:0.82rem;font-weight:700;">${fileLabel}</span>
+                        <button type="button" class="btn btn-danger btn-sm" onclick="removeInsCard('${c.tempId}')" title="Remove this card entirely">✗ Card</button>
+                    </div>
+                    <div style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:6px;">${cardSummary}</div>
+                </div>
             </div>
-            <button type="button" class="btn btn-danger btn-sm" onclick="removeInsCard('${c.tempId}')" title="Remove">✗</button>
+            <div style="margin-top:8px;">
+                <div style="font-size:0.72rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px;">Assign this card to:</div>
+                ${rowsHtml}
+                <button type="button" class="btn btn-ghost btn-sm" onclick="addInsRow('${c.tempId}')" style="margin-top:6px;">+ Add another vehicle</button>
+            </div>
         </div>`;
     }).join('');
 }
 
-function setInsCardVehicle(tempId, docId) {
-    const c = pendingInsCards.find(x => x.tempId === tempId);
-    if (c) c.selectedDocId = docId;
+function setInsRowVehicle(tempId, rowId, docId) {
+    const c = pendingInsCards.find(x => x.tempId === tempId); if (!c) return;
+    const r = c.assignments.find(a => a.rowId === rowId); if (!r) return;
+    r.selectedDocId = docId;
+}
+
+function addInsRow(tempId) {
+    const c = pendingInsCards.find(x => x.tempId === tempId); if (!c) return;
+    c.assignments.push({
+        rowId: 'r_' + Math.random().toString(36).slice(2,8),
+        vin:'', plate:'', year:'', make:'', model:'',
+        suggestedDocId:'', selectedDocId:'', manuallyAdded:true
+    });
+    renderInsCardsList();
+}
+
+function removeInsRow(tempId, rowId) {
+    const c = pendingInsCards.find(x => x.tempId === tempId); if (!c) return;
+    c.assignments = c.assignments.filter(a => a.rowId !== rowId);
+    if (!c.assignments.length) {
+        // Card has no assignments left — remove the card entirely
+        pendingInsCards = pendingInsCards.filter(x => x.tempId !== tempId);
+    }
+    renderInsCardsList();
+    document.getElementById('btn-save-ins-cards').disabled = pendingInsCards.length === 0;
 }
 
 function removeInsCard(tempId) {
@@ -3189,33 +3263,55 @@ function openInsCardPreview(tempId) {
 }
 
 async function saveInsuranceCards() {
-    const toSave = pendingInsCards.filter(c => c.selectedDocId);
-    if (!toSave.length) { toast('Pick at least one vehicle to assign to (or close and re-upload).','error'); return; }
+    // Gather all (card, vehicleDocId) assignments
+    const work = [];
+    for (const c of pendingInsCards) {
+        const picked = c.assignments.filter(a => a.selectedDocId);
+        for (const a of picked) work.push({ card: c, assign: a });
+    }
+    if (!work.length) { toast('Pick at least one vehicle to assign to.','error'); return; }
     const btn = document.getElementById('btn-save-ins-cards');
     btn.disabled = true; btn.textContent = '⏳ Saving…';
     const status = document.getElementById('ins-cards-status');
+
+    // Upload each unique card image only once, then write a document entry per assignment
+    const cardUrls = {}; // tempId → url
     let saved = 0, failed = 0;
-    for (const c of toSave) {
+    for (let i = 0; i < work.length; i++) {
+        const { card, assign } = work[i];
         try {
-            status.textContent = `Saving ${saved+1} of ${toSave.length}…`;
-            const blob = await fetch(`data:${c.mimeType};base64,${c.base64}`).then(r => r.blob());
-            const file = new File([blob], `insurance-${Date.now()}.jpg`, { type: c.mimeType });
-            const path = `automotive_docs/insurance/${Date.now()}_${c.tempId}.jpg`;
-            const ref = storage.ref().child(path);
-            await ref.put(file);
-            const url = await ref.getDownloadURL();
-            const veh = items.find(i => i._docId === c.selectedDocId);
+            status.textContent = `Saving ${i+1} of ${work.length}…`;
+            if (!cardUrls[card.tempId]) {
+                const blob = await fetch(`data:${card.mimeType};base64,${card.base64}`).then(r => r.blob());
+                const ext = card.mimeType === 'application/pdf' ? 'pdf' : 'jpg';
+                const file = new File([blob], `insurance-${Date.now()}.${ext}`, { type: card.mimeType });
+                const path = `automotive_docs/insurance/${Date.now()}_${card.tempId}.${ext}`;
+                const ref = storage.ref().child(path);
+                await ref.put(file);
+                cardUrls[card.tempId] = await ref.getDownloadURL();
+            }
+            const url = cardUrls[card.tempId];
+            const veh = items.find(it => it._docId === assign.selectedDocId);
             const existingDocs = veh?.documents || [];
+            const summaryBits = [
+                'Insurance card',
+                assign.vin ? `VIN ${assign.vin}` : '',
+                assign.plate ? `Plate ${assign.plate}` : '',
+                (assign.year || assign.make || assign.model) ? [assign.year, assign.make, assign.model].filter(Boolean).join(' ') : ''
+            ].filter(Boolean);
             const newDoc = {
-                name: 'Proof of Insurance' + (c.expirationDate ? ` (exp ${c.expirationDate})` : ''),
-                url, mimeType: c.mimeType, summary: `Insurance card${c.vin?` · VIN ${c.vin}`:''}${c.plate?` · Plate ${c.plate}`:''}`,
+                name: 'Proof of Insurance' + (card.expirationDate ? ` (exp ${card.expirationDate})` : ''),
+                url, mimeType: card.mimeType,
+                summary: summaryBits.join(' · '),
                 addedAt: new Date().toISOString(),
                 type: 'insurance_card',
-                expirationDate: c.expirationDate || ''
+                expirationDate: card.expirationDate || ''
             };
-            await db.collection('automotive_items').doc(c.selectedDocId).update({
+            await db.collection('automotive_items').doc(assign.selectedDocId).update({
                 documents: [...existingDocs, newDoc]
             });
+            // Reflect locally so subsequent saves see the new doc array
+            if (veh) veh.documents = [...existingDocs, newDoc];
             saved++;
         } catch(err) {
             console.error('Save card failed:', err);
@@ -3223,8 +3319,8 @@ async function saveInsuranceCards() {
         }
     }
     btn.disabled = false; btn.textContent = 'Save Assignments';
-    if (saved) toast(`Saved ${saved} insurance card${saved!==1?'s':''}${failed?` (${failed} failed)`:''}.`, failed?'error':'success');
-    else toast('Could not save any cards.','error');
+    if (saved) toast(`Saved ${saved} card assignment${saved!==1?'s':''}${failed?` (${failed} failed)`:''}.`, failed?'error':'success');
+    else toast('Could not save any assignments.','error');
     if (saved && !failed) closeInsCardsModal();
     else status.textContent = `Saved ${saved}, failed ${failed}.`;
 }

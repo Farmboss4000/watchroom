@@ -378,6 +378,7 @@ function renderPages() {
                     ${attCount ? ` · ${attCount} card${attCount!==1?'s':''}/doc${attCount!==1?'s':''}` : ''}
                 </div>
             </div>
+            <button class="btn btn-ghost btn-sm" onclick="copyFamilyLink('${p._docId}')" title="Copy shareable link">🔗 Copy Link</button>
             <button class="btn btn-ghost btn-sm" onclick="openPageEditor('${p._docId}')">Edit</button>
         </div>`;
     }).join('');
@@ -677,6 +678,24 @@ async function savePage() {
         closePageEditor();
         await loadPages();
     } catch(e) { toast('Save failed: ' + e.message, 'error'); }
+}
+
+function familyLinkFor(p) {
+    if (!p || !p.slug) return '';
+    const here = window.location.origin + window.location.pathname.replace(/[^/]*$/, 'family.html');
+    return here + '?p=' + encodeURIComponent(p.slug);
+}
+
+function copyFamilyLink(docId) {
+    const p = pages.find(x => x._docId === docId);
+    if (!p) return;
+    if (!p.slug) { toast('This page has no slug yet — open Edit and set a slug first.', 'error'); return; }
+    const url = familyLinkFor(p);
+    if (!navigator.clipboard) { window.prompt('Copy this link:', url); return; }
+    navigator.clipboard.writeText(url).then(
+        () => toast('Link copied: ' + url, 'success'),
+        () => window.prompt('Copy this link:', url)
+    );
 }
 
 async function deleteCurrentPage() {

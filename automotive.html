@@ -7,6 +7,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js" defer></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
@@ -709,6 +711,10 @@
                     <input type="text" id="f-driver" list="driver-list" placeholder="e.g. Jeff, Farm Crew, Ranch Manager" autocomplete="off">
                     <datalist id="driver-list"></datalist>
                 </div>
+                <div class="form-group">
+                    <label>📧 Driver Email</label>
+                    <input type="email" id="f-driver-email" placeholder="driver@example.com" autocomplete="off">
+                </div>
                 <div class="form-group full-width">
                     <label>Notes</label>
                     <textarea id="f-notes" rows="2" placeholder="Service history, modifications, accessories..."></textarea>
@@ -821,6 +827,7 @@
             <button class="btn btn-primary btn-sm" onclick="showView('add-item');resetForm()">+ Add Vehicle</button>
             <button class="btn btn-ghost btn-sm" onclick="openScanner()" title="Scan barcode">📷 Scan</button>
             <button class="btn btn-ghost btn-sm" id="btn-refresh-all-mv" onclick="refreshAllMarketValues()" title="Re-estimate market value for every vehicle">💲 Refresh All Values</button>
+            <button class="btn btn-ghost btn-sm" onclick="openInsCardsModal()" title="Bulk-upload proof-of-insurance cards and assign to vehicles">🛡️ Insurance Cards</button>
             <div class="view-picker-wrap" style="position:relative;display:inline-block;">
                 <button class="btn btn-ghost btn-sm" onclick="toggleViewMenu(event)" title="Show / hide columns">👁 View</button>
                 <div id="view-menu" class="view-menu"><div class="view-menu-title">Show columns</div><div id="view-menu-items"></div></div>
@@ -1103,6 +1110,24 @@ service firebase.storage {
         <div style="font-size:0.85rem;font-weight:700;margin-bottom:10px;">History</div>
         <div id="maint-history" style="max-height:300px;overflow-y:auto;"></div>
         <div class="modal-actions"><button class="btn btn-ghost" onclick="closeMaintModal()">Close</button></div>
+    </div>
+</div>
+
+<!-- ══ INSURANCE CARDS BULK UPLOAD MODAL ══ -->
+<div class="modal-overlay" id="ins-cards-modal">
+    <div class="modal" style="max-width:920px;">
+        <div class="modal-title">🛡️ Upload Insurance Cards</div>
+        <div class="modal-sub">Upload one or more cards as photos or PDFs. Multi-page PDFs will be split into individual cards. AI reads VIN / plate / expiration and suggests the matching vehicle — confirm and save.</div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:14px 0;">
+            <input type="file" id="ins-cards-files" accept="image/*,application/pdf" multiple style="display:none" onchange="onInsCardsFilesSelected(this)">
+            <button type="button" class="btn btn-primary" onclick="document.getElementById('ins-cards-files').click()">📁 Choose Files</button>
+            <span id="ins-cards-status" style="font-size:0.85rem;color:var(--text-secondary);"></span>
+        </div>
+        <div id="ins-cards-list" style="max-height:60vh;overflow-y:auto;"></div>
+        <div class="modal-actions">
+            <button type="button" class="btn btn-primary" id="btn-save-ins-cards" onclick="saveInsuranceCards()" disabled>Save Assignments</button>
+            <button type="button" class="btn btn-ghost" onclick="closeInsCardsModal()">Close</button>
+        </div>
     </div>
 </div>
 
@@ -2197,6 +2222,7 @@ document.getElementById('item-form').addEventListener('submit', async e => {
         location:      document.getElementById('f-location').value.trim(),
         insuranceCompany: document.getElementById('f-insurance').value.trim(),
         defaultDriver: document.getElementById('f-driver').value.trim(),
+        driverEmail:   document.getElementById('f-driver-email').value.trim(),
         notes:         document.getElementById('f-notes').value.trim(),
     };
     btn.disabled = true; btn.textContent = 'Saving...';
@@ -2304,6 +2330,7 @@ function editItem(docId) {
     document.getElementById('f-location').value        = it.location||'';
     document.getElementById('f-insurance').value       = it.insuranceCompany||'';
     document.getElementById('f-driver').value          = it.defaultDriver||'';
+    document.getElementById('f-driver-email').value    = it.driverEmail||'';
     document.getElementById('f-notes').value           = it.notes||'';
     document.getElementById('form-title').textContent      = `✏️ Edit Vehicle #${it.id}`;
     document.getElementById('form-submit-btn').textContent = 'Update Vehicle';
@@ -2512,6 +2539,7 @@ function renderInventory() {
             <td data-col="actions" style="white-space:nowrap">
                 <button class="btn btn-ghost btn-sm" onclick="showMaintenance('${it._docId}')" title="Maintenance Log">🔧</button>
                 <button class="btn btn-info btn-sm" onclick="showBarcode('${it._docId}')" title="Barcode/Photos">▣</button>
+                <button class="btn btn-ghost btn-sm" onclick="emailInsuranceCard('${it._docId}')" title="Email proof of insurance to driver">✉️</button>
                 <button class="btn btn-ghost btn-sm" onclick="editItem('${it._docId}')" title="Edit">✎</button>
                 <button class="btn btn-danger btn-sm" onclick="deleteItem('${it._docId}')" title="Delete">✗</button>
             </td></tr>`;}).join('');
@@ -2986,6 +3014,337 @@ async function saveMaintenance() {
 
 function closeMaintModal() { document.getElementById('maint-modal').classList.remove('show'); currentMaintDocId=null; }
 document.getElementById('maint-modal').addEventListener('click', e => { if(e.target===document.getElementById('maint-modal'))closeMaintModal(); });
+
+// ═══════════════════════════════════════
+//  INSURANCE CARDS — bulk upload + AI match
+// ═══════════════════════════════════════
+let pendingInsCards = []; // [{tempId, base64, mimeType, fileName, pageNum, totalPages, vin, plate, expirationDate, suggestedDocId, selectedDocId, status}]
+
+function openInsCardsModal() {
+    pendingInsCards = [];
+    document.getElementById('ins-cards-status').textContent = '';
+    document.getElementById('ins-cards-list').innerHTML = '';
+    document.getElementById('btn-save-ins-cards').disabled = true;
+    document.getElementById('ins-cards-modal').classList.add('show');
+}
+function closeInsCardsModal() {
+    document.getElementById('ins-cards-modal').classList.remove('show');
+    pendingInsCards = [];
+}
+document.getElementById('ins-cards-modal').addEventListener('click', e => { if(e.target===document.getElementById('ins-cards-modal'))closeInsCardsModal(); });
+
+async function pdfToPageImages(file) {
+    if (typeof pdfjsLib === 'undefined') throw new Error('PDF library not loaded yet — wait a moment and try again.');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    const pages = [];
+    for (let p = 1; p <= pdf.numPages; p++) {
+        const page = await pdf.getPage(p);
+        const viewport = page.getViewport({ scale: 2 });
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width; canvas.height = viewport.height;
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        pages.push({ base64: dataUrl.split(',')[1], mimeType: 'image/jpeg', pageNum: p, totalPages: pdf.numPages });
+    }
+    return pages;
+}
+
+async function extractInsuranceCardData(base64, mimeType) {
+    const prompt = `This is a proof-of-insurance card. Extract these fields and return ONLY valid JSON — no markdown, no code fences:
+{"vin":"17-character VIN","plate":"license plate","expirationDate":"YYYY-MM-DD"}
+
+Rules:
+- "vin" must be exactly 17 alphanumeric characters (no I, O, or Q). Omit if not clearly readable.
+- "plate" should be uppercase, no spaces. Omit if not clearly readable.
+- "expirationDate" is the policy or card expiration date in YYYY-MM-DD format. Omit if not shown.
+- Omit any field you cannot determine with reasonable confidence. Return only the JSON object.`;
+    const content = [
+        { type:'image', source:{ type:'base64', media_type: mimeType, data: base64 }},
+        { type:'text',  text: prompt }
+    ];
+    const raw = await callClaudeRaw(content, 256);
+    if (!raw) return {};
+    const m = raw.match(/\{[\s\S]*\}/); if (!m) return {};
+    try { return JSON.parse(m[0]); } catch(e) { return {}; }
+}
+
+function findMatchingVehicle(vin, plate) {
+    const vinClean = (vin||'').replace(/[^A-Z0-9]/gi,'').toUpperCase();
+    if (vinClean.length === 17) {
+        const byVin = items.find(i => (i.serialNumber||'').replace(/[^A-Z0-9]/gi,'').toUpperCase() === vinClean);
+        if (byVin) return byVin._docId;
+    }
+    const plateClean = (plate||'').replace(/[^A-Z0-9]/gi,'').toUpperCase();
+    if (plateClean) {
+        const byPlate = items.find(i => (i.licensePlate||'').replace(/[^A-Z0-9]/gi,'').toUpperCase() === plateClean);
+        if (byPlate) return byPlate._docId;
+    }
+    return '';
+}
+
+function vehicleLabel(it) {
+    return `${it.year||''} ${it.make||''} ${it.model||''}`.trim() + (it.licensePlate?` (${it.licensePlate})`:'') + ` · #${it.id}`;
+}
+
+async function onInsCardsFilesSelected(input) {
+    const files = Array.from(input.files || []);
+    input.value = '';
+    if (!files.length) return;
+    if (!apiKey) { toast('Set your Anthropic API key in Settings first.','error'); return; }
+    const status = document.getElementById('ins-cards-status');
+
+    // Expand each file into one or more "pages"
+    const pages = [];
+    for (const f of files) {
+        const isPdf = f.type === 'application/pdf' || (f.name||'').toLowerCase().endsWith('.pdf');
+        if (isPdf) {
+            try {
+                status.textContent = `Splitting PDF "${f.name}"…`;
+                const pgs = await pdfToPageImages(f);
+                pgs.forEach(p => pages.push({ ...p, fileName: f.name }));
+            } catch(err) {
+                toast(`Failed to split "${f.name}": ${err.message}`, 'error');
+            }
+        } else {
+            const base64 = await readFileAsBase64(f);
+            pages.push({ base64, mimeType: f.type || 'image/jpeg', fileName: f.name, pageNum: 1, totalPages: 1 });
+        }
+    }
+    if (!pages.length) { status.textContent = ''; return; }
+
+    // Run AI extraction on each page (sequential to avoid rate limits)
+    let processed = 0;
+    for (const pg of pages) {
+        processed++;
+        status.textContent = `Reading card ${processed} of ${pages.length} with AI…`;
+        let data = {};
+        try { data = await extractInsuranceCardData(pg.base64, pg.mimeType); }
+        catch(err) { console.warn('AI extract failed:', err); }
+        const tempId = 'ic_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
+        const suggestedDocId = findMatchingVehicle(data.vin, data.plate);
+        pendingInsCards.push({
+            tempId, base64: pg.base64, mimeType: pg.mimeType,
+            fileName: pg.fileName, pageNum: pg.pageNum, totalPages: pg.totalPages,
+            vin: data.vin || '', plate: data.plate || '', expirationDate: data.expirationDate || '',
+            suggestedDocId, selectedDocId: suggestedDocId, status: 'pending'
+        });
+        renderInsCardsList();
+    }
+    const matched = pendingInsCards.filter(c => c.suggestedDocId).length;
+    status.textContent = `${pendingInsCards.length} card${pendingInsCards.length!==1?'s':''} read · ${matched} auto-matched. Review the assignments below.`;
+    document.getElementById('btn-save-ins-cards').disabled = false;
+}
+
+function renderInsCardsList() {
+    const list = document.getElementById('ins-cards-list');
+    if (!pendingInsCards.length) { list.innerHTML = '<p style="color:var(--text-secondary);padding:20px 0;text-align:center;">No cards uploaded yet.</p>'; return; }
+    const vehicleOpts = items.slice().sort((a,b) => (a.make||'').localeCompare(b.make||'')).map(i =>
+        `<option value="${i._docId}">${esc(vehicleLabel(i))}</option>`
+    ).join('');
+    list.innerHTML = pendingInsCards.map(c => {
+        const matched = !!c.suggestedDocId;
+        const matchBadge = matched
+            ? `<span style="color:var(--success);font-size:0.72rem;font-weight:700;">✅ AUTO-MATCHED</span>`
+            : `<span style="color:#b45309;font-size:0.72rem;font-weight:700;">⚠ NO MATCH — pick manually</span>`;
+        const fileLabel = c.totalPages > 1 ? `${esc(c.fileName)} · page ${c.pageNum}/${c.totalPages}` : esc(c.fileName);
+        return `<div style="display:flex;gap:14px;border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;background:var(--bg-secondary);" data-temp-id="${c.tempId}">
+            <img src="data:${c.mimeType};base64,${c.base64}" style="width:120px;height:90px;object-fit:contain;background:#fff;border-radius:6px;border:1px solid var(--border);cursor:pointer;" onclick="openInsCardPreview('${c.tempId}')" title="Click to open full-size">
+            <div style="flex:1;min-width:0;">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;">
+                    <span style="font-size:0.8rem;font-weight:600;color:var(--text-secondary);">${fileLabel}</span>
+                    ${matchBadge}
+                </div>
+                <div style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:8px;">
+                    ${c.vin ? `<strong>VIN:</strong> <span class="mono">${esc(c.vin)}</span> · ` : ''}
+                    ${c.plate ? `<strong>Plate:</strong> ${esc(c.plate)} · ` : ''}
+                    ${c.expirationDate ? `<strong>Exp:</strong> ${esc(c.expirationDate)}` : ''}
+                    ${(!c.vin && !c.plate && !c.expirationDate) ? 'AI could not read details.' : ''}
+                </div>
+                <select onchange="setInsCardVehicle('${c.tempId}', this.value)" style="width:100%;">
+                    <option value="">— Skip this card —</option>
+                    ${vehicleOpts.replace(`value="${c.selectedDocId}"`, `value="${c.selectedDocId}" selected`)}
+                </select>
+            </div>
+            <button type="button" class="btn btn-danger btn-sm" onclick="removeInsCard('${c.tempId}')" title="Remove">✗</button>
+        </div>`;
+    }).join('');
+}
+
+function setInsCardVehicle(tempId, docId) {
+    const c = pendingInsCards.find(x => x.tempId === tempId);
+    if (c) c.selectedDocId = docId;
+}
+
+function removeInsCard(tempId) {
+    pendingInsCards = pendingInsCards.filter(c => c.tempId !== tempId);
+    renderInsCardsList();
+    document.getElementById('btn-save-ins-cards').disabled = pendingInsCards.length === 0;
+}
+
+function openInsCardPreview(tempId) {
+    const c = pendingInsCards.find(x => x.tempId === tempId);
+    if (c) window.open('data:'+c.mimeType+';base64,'+c.base64, '_blank');
+}
+
+async function saveInsuranceCards() {
+    const toSave = pendingInsCards.filter(c => c.selectedDocId);
+    if (!toSave.length) { toast('Pick at least one vehicle to assign to (or close and re-upload).','error'); return; }
+    const btn = document.getElementById('btn-save-ins-cards');
+    btn.disabled = true; btn.textContent = '⏳ Saving…';
+    const status = document.getElementById('ins-cards-status');
+    let saved = 0, failed = 0;
+    for (const c of toSave) {
+        try {
+            status.textContent = `Saving ${saved+1} of ${toSave.length}…`;
+            const blob = await fetch(`data:${c.mimeType};base64,${c.base64}`).then(r => r.blob());
+            const file = new File([blob], `insurance-${Date.now()}.jpg`, { type: c.mimeType });
+            const path = `automotive_docs/insurance/${Date.now()}_${c.tempId}.jpg`;
+            const ref = storage.ref().child(path);
+            await ref.put(file);
+            const url = await ref.getDownloadURL();
+            const veh = items.find(i => i._docId === c.selectedDocId);
+            const existingDocs = veh?.documents || [];
+            const newDoc = {
+                name: 'Proof of Insurance' + (c.expirationDate ? ` (exp ${c.expirationDate})` : ''),
+                url, mimeType: c.mimeType, summary: `Insurance card${c.vin?` · VIN ${c.vin}`:''}${c.plate?` · Plate ${c.plate}`:''}`,
+                addedAt: new Date().toISOString(),
+                type: 'insurance_card',
+                expirationDate: c.expirationDate || ''
+            };
+            await db.collection('automotive_items').doc(c.selectedDocId).update({
+                documents: [...existingDocs, newDoc]
+            });
+            saved++;
+        } catch(err) {
+            console.error('Save card failed:', err);
+            failed++;
+        }
+    }
+    btn.disabled = false; btn.textContent = 'Save Assignments';
+    if (saved) toast(`Saved ${saved} insurance card${saved!==1?'s':''}${failed?` (${failed} failed)`:''}.`, failed?'error':'success');
+    else toast('Could not save any cards.','error');
+    if (saved && !failed) closeInsCardsModal();
+    else status.textContent = `Saved ${saved}, failed ${failed}.`;
+}
+
+// ═══════════════════════════════════════
+//  EMAIL — Microsoft Graph (proof-of-insurance distribution)
+// ═══════════════════════════════════════
+let m365MsalInstance = null, m365Account = null;
+let m365ConfigCache = null;
+
+async function loadM365Config() {
+    if (m365ConfigCache) return m365ConfigCache;
+    try {
+        const doc = await db.collection('settings').doc('m365').get();
+        if (doc.exists) m365ConfigCache = doc.data();
+    } catch(e) {}
+    return m365ConfigCache;
+}
+
+function ensureMsalInstance(cfg) {
+    if (m365MsalInstance) return m365MsalInstance;
+    if (typeof msal === 'undefined') throw new Error('Microsoft auth library not loaded yet — wait a moment and try again.');
+    m365MsalInstance = new msal.PublicClientApplication({
+        auth: {
+            clientId: cfg.clientId,
+            authority: `https://login.microsoftonline.com/${cfg.tenantId || 'common'}`,
+            redirectUri: window.location.origin + window.location.pathname
+        },
+        cache: { cacheLocation: 'localStorage' }
+    });
+    const accounts = m365MsalInstance.getAllAccounts();
+    if (accounts.length) m365Account = accounts[0];
+    return m365MsalInstance;
+}
+
+async function m365GetTokenForSend() {
+    const cfg = await loadM365Config();
+    if (!cfg || !cfg.clientId) throw new Error('Microsoft 365 is not configured. Open Farmboss Addison → Settings to set the M365 Client ID.');
+    ensureMsalInstance(cfg);
+    const scopes = ['Mail.Send'];
+    if (!m365Account) {
+        const resp = await m365MsalInstance.loginPopup({ scopes });
+        m365Account = resp.account;
+    }
+    try {
+        const resp = await m365MsalInstance.acquireTokenSilent({ scopes, account: m365Account });
+        return resp.accessToken;
+    } catch(e) {
+        const resp = await m365MsalInstance.acquireTokenPopup({ scopes, account: m365Account });
+        return resp.accessToken;
+    }
+}
+
+async function m365SendMail({ to, subject, htmlBody, attachments }) {
+    const token = await m365GetTokenForSend();
+    const payload = {
+        message: {
+            subject,
+            body: { contentType: 'HTML', content: htmlBody },
+            toRecipients: [{ emailAddress: { address: to } }],
+            attachments: (attachments || []).map(a => ({
+                '@odata.type': '#microsoft.graph.fileAttachment',
+                name: a.name,
+                contentType: a.mimeType,
+                contentBytes: a.base64
+            }))
+        },
+        saveToSentItems: true
+    };
+    const res = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+    if (!res.ok && res.status !== 202) {
+        let msg = `Graph error ${res.status}`;
+        try { const d = await res.json(); msg = d.error?.message || msg; } catch(e) {}
+        throw new Error(msg);
+    }
+}
+
+async function emailInsuranceCard(docId) {
+    const it = items.find(i => i._docId === docId);
+    if (!it) { toast('Vehicle not found.','error'); return; }
+    if (!it.driverEmail) { toast('Set a Driver Email on this vehicle first (Edit → 📧 Driver Email).','error'); return; }
+    const cards = (it.documents || []).filter(d => d.type === 'insurance_card');
+    const card = cards.length ? cards[cards.length - 1] : null;
+    if (!card || !card.url) { toast('No insurance card on file. Use 🛡️ Insurance Cards to upload one.','error'); return; }
+
+    const driverName = it.defaultDriver || 'driver';
+    const vehicle = `${it.year||''} ${it.make||''} ${it.model||''}`.trim() || 'vehicle';
+    const plate = it.licensePlate ? ` (${it.licensePlate})` : '';
+    const ok = confirm(`Email proof of insurance for ${vehicle}${plate} to ${it.driverEmail}?`);
+    if (!ok) return;
+
+    toast('Sending insurance card…','');
+    try {
+        const resp = await fetch(card.url);
+        const blob = await resp.blob();
+        const mimeType = blob.type || card.mimeType || 'image/jpeg';
+        const base64 = await new Promise((resolve, reject) => {
+            const fr = new FileReader();
+            fr.onload  = e => resolve(e.target.result.split(',')[1]);
+            fr.onerror = reject;
+            fr.readAsDataURL(blob);
+        });
+        const ext = mimeType === 'application/pdf' ? 'pdf' : 'jpg';
+        const expLine = card.expirationDate ? `<p>Card expiration: <strong>${esc(card.expirationDate)}</strong></p>` : '';
+        const htmlBody = `<p>Hi ${esc(driverName)},</p><p>Attached is the current proof of insurance for the <strong>${esc(vehicle)}${esc(plate)}</strong>. Please keep a copy in the vehicle.</p>${expLine}<p>— Farmboss Automotive</p>`;
+        await m365SendMail({
+            to: it.driverEmail,
+            subject: `Proof of Insurance — ${vehicle}${plate}`,
+            htmlBody,
+            attachments: [{ name: `insurance-${(it.licensePlate||it.id||'card')}.${ext}`, mimeType, base64 }]
+        });
+        toast(`Insurance card emailed to ${it.driverEmail}.`,'success');
+    } catch(err) {
+        toast('Email failed: '+err.message,'error');
+    }
+}
 
 // ═══════════════════════════════════════
 //  UTILS

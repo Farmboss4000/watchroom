@@ -826,6 +826,9 @@
             <select id="inv-filter-driver" onchange="renderInventory()" style="min-width:150px;">
                 <option value="">All Drivers</option>
             </select>
+            <select id="inv-filter-insurance" onchange="renderInventory()" style="min-width:170px;">
+                <option value="">All Insurance Cos.</option>
+            </select>
             <button class="btn btn-primary btn-sm" onclick="showView('add-item');resetForm()">+ Add Vehicle</button>
             <button class="btn btn-ghost btn-sm" onclick="openScanner()" title="Scan barcode">📷 Scan</button>
             <button class="btn btn-ghost btn-sm" id="btn-refresh-all-mv" onclick="refreshAllMarketValues()" title="Re-estimate market value for every vehicle">💲 Refresh All Values</button>
@@ -854,6 +857,7 @@
                     <th onclick="sortBy('defaultDriver')" data-col="defaultDriver">Driver</th>
                     <th onclick="sortBy('purchaseDate')" data-col="purchaseDate">Purchased</th>
                     <th onclick="sortBy('vendor')" data-col="vendor">Source</th>
+                    <th onclick="sortBy('insuranceCompany')" data-col="insuranceCompany">Insurance Co.</th>
                     <th onclick="sortBy('price')" data-col="price">Purchase Price</th>
                     <th onclick="sortBy('marketValue')" data-col="marketValue">Market Value</th>
                     <th class="no-sort" data-col="actions">Actions</th>
@@ -2198,6 +2202,13 @@ function populateInsuranceList() {
     const list = [...new Set(items.map(i=>i.insuranceCompany).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
     const dl = document.getElementById('insurance-list');
     if (dl) dl.innerHTML = list.map(v=>`<option value="${esc(v)}">`).join('');
+    // Filter dropdown
+    const sel = document.getElementById('inv-filter-insurance');
+    if (sel) {
+        const cur = sel.value;
+        sel.innerHTML = '<option value="">All Insurance Cos.</option>' +
+            list.map(v=>`<option value="${esc(v)}"${v===cur?' selected':''}>${esc(v)}</option>`).join('');
+    }
 }
 
 document.getElementById('item-form').addEventListener('submit', async e => {
@@ -2410,13 +2421,15 @@ function filteredItems(searchId, catId) {
     const cat  = document.getElementById(catId)?.value||'';
     const cond   = document.getElementById('inv-filter-cond')?.value||'';
     const driver = document.getElementById('inv-filter-driver')?.value||'';
+    const ins    = document.getElementById('inv-filter-insurance')?.value||'';
     return items.filter(it => {
         const mc  = !cat    || it.category===cat;
         const mco = !cond   || it.condition===cond;
         const mdr = !driver || it.defaultDriver===driver;
+        const min = !ins    || it.insuranceCompany===ins;
         const ms  = !q      || [it.id?.toString(),it.category,it.make,it.model,it.year,
-            it.serialNumber,it.licensePlate,it.tabsExpiration,it.color,it.condition,it.location,it.defaultDriver,it.notes].some(v=>v?.toString().toLowerCase().includes(q));
-        return mc && mco && mdr && ms;
+            it.serialNumber,it.licensePlate,it.tabsExpiration,it.color,it.condition,it.location,it.defaultDriver,it.insuranceCompany,it.notes].some(v=>v?.toString().toLowerCase().includes(q));
+        return mc && mco && mdr && min && ms;
     });
 }
 
@@ -2436,7 +2449,7 @@ const INV_VIEW_COLUMNS = [
     ['photo','Photo'], ['id','ID'], ['category','Type'], ['make','Make'], ['model','Model'],
     ['year','Year'], ['serialNumber','VIN'], ['licensePlate','Plate / Tabs'], ['mileage','Mileage'],
     ['condition','Condition'], ['location','Location'], ['defaultDriver','Driver'],
-    ['purchaseDate','Purchased'], ['vendor','Source'], ['price','Purchase Price'], ['marketValue','Market Value']
+    ['purchaseDate','Purchased'], ['vendor','Source'], ['insuranceCompany','Insurance Co.'], ['price','Purchase Price'], ['marketValue','Market Value']
 ];
 const INV_HIDDEN_COLS_KEY = 'auto-inv-hidden-cols';
 let invHiddenCols = (() => {
@@ -2488,7 +2501,7 @@ function renderInventory() {
     const data  = sorted(filteredItems('inv-search','inv-filter-cat'), invSortField, invSortDir);
     document.getElementById('inv-count').textContent = `${data.length} item${data.length!==1?'s':''}`;
     document.querySelectorAll('#inv-table thead th').forEach(th=>th.classList.remove('sort-asc','sort-desc'));
-    const thIdx = {id:1,category:2,make:3,model:4,year:5,serialNumber:6,licensePlate:7,mileage:8,condition:9,location:10,defaultDriver:11,purchaseDate:12,vendor:13,price:14,marketValue:15};
+    const thIdx = {id:1,category:2,make:3,model:4,year:5,serialNumber:6,licensePlate:7,mileage:8,condition:9,location:10,defaultDriver:11,purchaseDate:12,vendor:13,insuranceCompany:14,price:15,marketValue:16};
     const ti = thIdx[invSortField];
     if (ti!==undefined) document.querySelectorAll('#inv-table thead th')[ti]?.classList.add(invSortDir==='asc'?'sort-asc':'sort-desc');
     const tbody = document.getElementById('inv-tbody');
@@ -2534,6 +2547,7 @@ function renderInventory() {
             <td data-col="defaultDriver">${it.defaultDriver ? `<span style="display:inline-flex;align-items:center;gap:5px;background:var(--accent-dim);color:var(--accent);padding:2px 9px;border-radius:12px;font-size:0.78rem;font-weight:600;">👤 ${esc(it.defaultDriver)}</span>` : '<span style="color:var(--text-secondary);font-size:0.8rem;">—</span>'}</td>
             <td data-col="purchaseDate">${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():'—'}</td>
             <td data-col="vendor" style="font-size:0.82rem;">${esc(it.vendor)||'—'}</td>
+            <td data-col="insuranceCompany" style="font-size:0.82rem;">${esc(it.insuranceCompany)||'—'}</td>
             <td data-col="price" style="white-space:nowrap;">${it.price ? '$'+Number(it.price).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—'}</td>
             <td data-col="marketValue" style="white-space:nowrap;min-width:120px;" id="mv-cell-${it._docId}">
                 ${marketValueCell(it)}
@@ -2552,7 +2566,7 @@ function renderInventory() {
     const priceStr   = totalPrice > 0 ? '$'+totalPrice.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
     const mvStr      = totalMV   > 0 ? '$'+totalMV.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
     document.getElementById('inv-tfoot').innerHTML = `<tr style="font-weight:700;border-top:2px solid var(--border);background:var(--bg-secondary);">
-        <td colspan="13" style="text-align:right;padding:8px 12px;color:var(--text-secondary);font-size:0.82rem;">TOTALS (${data.length} vehicle${data.length!==1?'s':''})</td>
+        <td colspan="14" style="text-align:right;padding:8px 12px;color:var(--text-secondary);font-size:0.82rem;">TOTALS (${data.length} vehicle${data.length!==1?'s':''})</td>
         <td data-col="price" style="padding:8px 12px;white-space:nowrap;color:#60a5fa;">${priceStr}</td>
         <td data-col="marketValue" style="padding:8px 12px;white-space:nowrap;color:#22c55e;">${mvStr}</td>
         <td data-col="actions"></td>

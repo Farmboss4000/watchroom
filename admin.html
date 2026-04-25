@@ -243,7 +243,10 @@ main { max-width:1100px; margin:0 auto; padding:24px 18px 80px; }
                 <label>🛡️ Insurance Cards & Documents</label>
                 <div id="pe-cards"></div>
                 <input type="file" id="pe-card-file" accept="image/*,application/pdf" style="display:none" onchange="addCardFile(this)">
-                <button class="btn btn-ghost btn-sm" onclick="document.getElementById('pe-card-file').click()" style="margin-top:6px;">+ Upload Card or Document</button>
+                <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
+                    <button class="btn btn-ghost btn-sm" onclick="document.getElementById('pe-card-file').click()">+ Upload Card or Document</button>
+                    <button class="btn btn-ghost btn-sm" onclick="openInvPicker()">📦 Pick from Inventory</button>
+                </div>
             </div>
         </div>
 
@@ -251,6 +254,22 @@ main { max-width:1100px; margin:0 auto; padding:24px 18px 80px; }
             <button class="btn btn-danger" id="pe-delete-btn" onclick="deleteCurrentPage()" style="margin-right:auto;display:none;">Delete Page</button>
             <button class="btn btn-ghost" onclick="closePageEditor()">Cancel</button>
             <button class="btn btn-primary" onclick="savePage()">Save Page</button>
+        </div>
+    </div>
+</div>
+
+<!-- Inventory card picker (sub-modal, z above page editor) -->
+<div class="modal-overlay" id="inv-picker-modal" style="z-index:1500;">
+    <div class="modal" style="max-width:780px;">
+        <div class="modal-title">📦 Pick Insurance Cards from Inventory</div>
+        <div class="modal-sub">These are insurance cards already attached to vehicles in the Automotive inventory. Cards matching this page's assigned emails are listed first.</div>
+        <div style="margin:12px 0;">
+            <input type="text" id="inv-picker-search" placeholder="Filter by vehicle, plate, driver…" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border);font-size:0.9rem;" oninput="renderInvPickerList()">
+        </div>
+        <div id="inv-picker-list" style="max-height:55vh;overflow-y:auto;"></div>
+        <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="closeInvPicker()">Cancel</button>
+            <button class="btn btn-primary" id="inv-picker-attach-btn" onclick="attachSelectedFromInv()" disabled>Attach Selected</button>
         </div>
     </div>
 </div>
@@ -462,6 +481,123 @@ function setCardField(i, field, val) {
 function removeCard(i) {
     peCards.splice(i, 1);
     renderCardsEditor();
+}
+
+// ── INVENTORY CARD PICKER ─────────────────────────
+let invCards = [];        // [{vehicleDocId, vehicleLabel, plate, driver, driverEmail, name, url, mimeType, expirationDate, addedAt}]
+let invPickerSelected = new Set();
+
+async function openInvPicker() {
+    invCards = [];
+    invPickerSelected = new Set();
+    document.getElementById('inv-picker-search').value = '';
+    document.getElementById('inv-picker-attach-btn').disabled = true;
+    document.getElementById('inv-picker-list').innerHTML = '<div class="empty" style="padding:30px;text-align:center;color:var(--text-secondary);border:2px dashed var(--border);border-radius:10px;">Loading…</div>';
+    document.getElementById('inv-picker-modal').classList.add('show');
+    try {
+        const snap = await db.collection('automotive_items').get();
+        const pageEmails = new Set((peEmails || []).map(e => e.toLowerCase()));
+        snap.docs.forEach(d => {
+            const v = d.data();
+            for (const doc of (v.documents || [])) {
+                if (doc.type === 'insurance_card' && doc.url) {
+                    invCards.push({
+                        vehicleDocId: d.id,
+                        vehicleLabel: [v.year, v.make, v.model].filter(Boolean).join(' ') || ('Vehicle #' + (v.id || '')),
+                        plate: v.licensePlate || '',
+                        driver: v.defaultDriver || '',
+                        driverEmail: (v.driverEmail || '').toLowerCase(),
+                        name: doc.name || 'Proof of Insurance',
+                        url: doc.url,
+                        mimeType: doc.mimeType || '',
+                        expirationDate: doc.expirationDate || '',
+                        addedAt: doc.addedAt || ''
+                    });
+                }
+            }
+        });
+        // Sort: matches to this page's assigned emails first, then by addedAt desc
+        invCards.sort((a, b) => {
+            const aMatch = pageEmails.has(a.driverEmail) ? 1 : 0;
+            const bMatch = pageEmails.has(b.driverEmail) ? 1 : 0;
+            if (aMatch !== bMatch) return bMatch - aMatch;
+            return (b.addedAt || '').localeCompare(a.addedAt || '');
+        });
+        renderInvPickerList();
+    } catch(e) {
+        document.getElementById('inv-picker-list').innerHTML = `<div class="empty" style="padding:30px;text-align:center;color:var(--danger);">Error loading inventory: ${esc(e.message)}</div>`;
+    }
+}
+
+function closeInvPicker() {
+    document.getElementById('inv-picker-modal').classList.remove('show');
+}
+document.getElementById('inv-picker-modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('inv-picker-modal')) closeInvPicker();
+});
+
+function renderInvPickerList() {
+    const filter = (document.getElementById('inv-picker-search').value || '').toLowerCase().trim();
+    const pageEmails = new Set((peEmails || []).map(e => e.toLowerCase()));
+    const matches = invCards.filter(c => {
+        if (!filter) return true;
+        const hay = [c.vehicleLabel, c.plate, c.driver, c.driverEmail, c.name, c.expirationDate].join(' ').toLowerCase();
+        return hay.includes(filter);
+    });
+    const list = document.getElementById('inv-picker-list');
+    if (!matches.length) {
+        list.innerHTML = '<div class="empty" style="padding:30px;text-align:center;color:var(--text-secondary);border:2px dashed var(--border);border-radius:10px;">No matching insurance cards in inventory.</div>';
+        return;
+    }
+    // Already-attached check (skip cards whose URL is already in peCards)
+    const existingUrls = new Set(peCards.map(c => c.url).filter(Boolean));
+    list.innerHTML = matches.map((c, i) => {
+        const idx = invCards.indexOf(c);
+        const checked = invPickerSelected.has(idx) ? 'checked' : '';
+        const matched = pageEmails.has(c.driverEmail);
+        const already = existingUrls.has(c.url);
+        const disabled = already ? 'disabled' : '';
+        const matchBadge = matched ? `<span style="color:var(--success);font-size:0.7rem;font-weight:700;margin-left:6px;">✓ FOR THIS PAGE</span>` : '';
+        const alreadyBadge = already ? `<span style="color:var(--text-secondary);font-size:0.7rem;font-weight:700;margin-left:6px;">— ALREADY ATTACHED</span>` : '';
+        const driverLine = c.driver || c.driverEmail ? `${esc(c.driver || '')}${c.driver && c.driverEmail ? ' · ' : ''}${esc(c.driverEmail || '')}` : '<em>No driver assigned</em>';
+        return `<label style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:#fff;margin-bottom:6px;cursor:${already?'not-allowed':'pointer'};opacity:${already?'0.55':'1'};">
+            <input type="checkbox" ${checked} ${disabled} onchange="toggleInvPick(${idx}, this.checked)" style="margin-top:2px;cursor:${already?'not-allowed':'pointer'};">
+            <div style="flex:1;min-width:0;">
+                <div style="font-size:0.9rem;font-weight:700;">${esc(c.vehicleLabel)}${c.plate ? ` · ${esc(c.plate)}` : ''}${matchBadge}${alreadyBadge}</div>
+                <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:2px;">${driverLine}</div>
+                <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:2px;">${esc(c.name)}${c.expirationDate ? ` · exp ${esc(c.expirationDate)}` : ''}</div>
+            </div>
+        </label>`;
+    }).join('');
+    document.getElementById('inv-picker-attach-btn').disabled = invPickerSelected.size === 0;
+}
+
+function toggleInvPick(idx, checked) {
+    if (checked) invPickerSelected.add(idx); else invPickerSelected.delete(idx);
+    document.getElementById('inv-picker-attach-btn').disabled = invPickerSelected.size === 0;
+}
+
+function attachSelectedFromInv() {
+    let added = 0;
+    const existingUrls = new Set(peCards.map(c => c.url).filter(Boolean));
+    for (const idx of invPickerSelected) {
+        const c = invCards[idx];
+        if (!c || existingUrls.has(c.url)) continue;
+        peCards.push({
+            tempId: 'c_' + Math.random().toString(36).slice(2,8),
+            name: c.name + (c.vehicleLabel ? ` — ${c.vehicleLabel}` : ''),
+            expirationDate: c.expirationDate || '',
+            url: c.url,
+            mimeType: c.mimeType || '',
+            file: null, base64: null,
+            fileName: c.name,
+            addedAt: new Date().toISOString()
+        });
+        added++;
+    }
+    closeInvPicker();
+    renderCardsEditor();
+    if (added) toast(`Attached ${added} card${added!==1?'s':''} from inventory.`, 'success');
 }
 
 async function addCardFile(input) {

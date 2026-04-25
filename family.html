@@ -255,7 +255,7 @@ async function renderFamilyPage(user) {
     } catch(e) { console.error('Vehicle lookup failed:', e); }
 
     renderVehicles(vehicles);
-    renderInsuranceCards(vehicles);
+    renderInsuranceCards(vehicles, page.attachments || []);
 }
 
 function renderVehicles(vehicles) {
@@ -295,7 +295,7 @@ function renderVehicles(vehicles) {
     }).join('')}</div>`;
 }
 
-function renderInsuranceCards(vehicles) {
+function renderInsuranceCards(vehicles, pageAttachments) {
     // Aggregate insurance_card documents from all assigned vehicles
     const cards = [];
     for (const v of vehicles) {
@@ -304,6 +304,11 @@ function renderInsuranceCards(vehicles) {
                 cards.push({ ...d, vehicleLabel: [v.year, v.make, v.model].filter(Boolean).join(' ') || ('Vehicle #' + (v.id || '')), licensePlate: v.licensePlate || '' });
             }
         }
+    }
+    // Plus attachments uploaded directly to the family page
+    for (const a of (pageAttachments || [])) {
+        if (!a.url) continue;
+        cards.push({ name: a.name || 'Document', url: a.url, mimeType: a.mimeType || '', expirationDate: a.expirationDate || '', addedAt: a.addedAt || '', vehicleLabel: '', licensePlate: '' });
     }
     cards.sort((a,b) => (b.addedAt || '').localeCompare(a.addedAt || ''));
     document.getElementById('ins-count').textContent = cards.length ? `(${cards.length})` : '';

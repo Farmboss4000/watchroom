@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Farmboss Admin</title>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<style>
+* { box-sizing:border-box; margin:0; padding:0; }
+:root {
+    --bg-primary:#f0f3f8; --bg-secondary:#ffffff; --bg-card:#e8edf5;
+    --accent:#3b82f6; --accent-hover:#2563eb; --accent-dim:rgba(59,130,246,0.13);
+    --text-primary:#1a1f2e; --text-secondary:#5a6070;
+    --border:#d4dae6; --success:#10b981; --danger:#ef4444; --warn:#f59e0b;
+}
+html,body { background:var(--bg-primary); color:var(--text-primary); font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif; min-height:100vh; }
+
+/* Site switcher */
+.site-switcher { display:flex; gap:6px; padding:8px 14px; background:#0b0f1a; flex-wrap:wrap; }
+.site-link { text-decoration:none; color:#9ca3af; padding:4px 12px; border-radius:4px; font-size:0.82rem; transition:all 0.15s; }
+.site-link:hover { background:rgba(255,255,255,0.1); color:#e5e7eb; }
+.site-link.active { background:rgba(255,255,255,0.13); color:#fff; font-weight:600; }
+
+/* Header */
+header { display:flex; justify-content:space-between; align-items:center; padding:14px 22px; background:#1a1f2e; color:#fff; }
+.logo-area { display:flex; align-items:center; gap:12px; }
+.logo-icon { font-size:1.5rem; }
+header h1 { font-size:1.15rem; font-weight:700; }
+header h1 span { color:var(--accent); }
+.user-badge { background:rgba(255,255,255,0.1); padding:5px 11px; border-radius:6px; font-size:0.78rem; }
+.signout-btn { background:transparent; border:1px solid rgba(255,255,255,0.3); color:#fff; padding:5px 12px; border-radius:6px; font-size:0.78rem; cursor:pointer; margin-left:8px; }
+.signout-btn:hover { background:rgba(255,255,255,0.12); }
+
+/* Login */
+#login-screen { min-height:100vh; background:linear-gradient(135deg,#0f172a,#1e3a5f); display:none; align-items:center; justify-content:center; flex-direction:column; padding:20px; }
+.login-box { background:rgba(255,255,255,0.06); backdrop-filter:blur(12px); padding:34px 30px; border-radius:14px; border:1px solid rgba(255,255,255,0.1); width:100%; max-width:380px; color:#fff; }
+.login-title { font-size:1.4rem; font-weight:700; text-align:center; margin-bottom:18px; }
+.login-label { font-size:0.78rem; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:rgba(255,255,255,0.65); display:block; margin-top:14px; margin-bottom:6px; }
+.login-input { width:100%; padding:11px 14px; border-radius:8px; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.18); color:#fff; font-size:0.94rem; }
+.login-input:focus { outline:none; border-color:var(--accent); }
+.login-btn { width:100%; padding:12px; background:var(--accent); color:#fff; border:none; border-radius:8px; font-size:0.94rem; font-weight:600; margin-top:18px; cursor:pointer; transition:background 0.15s; }
+.login-btn:hover { background:var(--accent-hover); }
+.login-error { color:#fda4af; font-size:0.82rem; margin-top:10px; min-height:1em; }
+
+/* Loading */
+#loading-screen { min-height:100vh; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:14px; color:var(--text-secondary); }
+.spinner { width:42px; height:42px; border:4px solid rgba(59,130,246,0.18); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* Layout */
+main { max-width:1100px; margin:0 auto; padding:24px 18px 80px; }
+.card { background:var(--bg-secondary); border:1px solid var(--border); border-radius:12px; padding:20px 22px; margin-bottom:18px; }
+.card h2 { font-size:1.05rem; font-weight:700; margin-bottom:14px; display:flex; align-items:center; gap:10px; justify-content:space-between; }
+.card h2 .h2-actions { display:flex; gap:8px; }
+
+/* Buttons */
+.btn { padding:8px 14px; border-radius:8px; border:none; font-family:inherit; font-size:0.85rem; font-weight:600; cursor:pointer; transition:all 0.15s; display:inline-flex; align-items:center; gap:6px; }
+.btn-primary { background:var(--accent); color:#fff; }
+.btn-primary:hover { background:var(--accent-hover); }
+.btn-ghost { background:transparent; color:var(--text-primary); border:1px solid var(--border); }
+.btn-ghost:hover { background:var(--bg-card); }
+.btn-danger { background:var(--danger); color:#fff; }
+.btn-danger:hover { opacity:0.88; }
+.btn-sm { padding:5px 10px; font-size:0.78rem; }
+.btn:disabled { opacity:0.55; cursor:not-allowed; }
+
+/* Page list */
+.page-row { display:flex; align-items:center; gap:14px; padding:12px 14px; border:1px solid var(--border); border-radius:10px; background:var(--bg-card); margin-bottom:8px; }
+.page-row:hover { border-color:var(--accent); }
+.page-name { font-weight:700; font-size:0.95rem; }
+.page-meta { font-size:0.78rem; color:var(--text-secondary); margin-top:2px; }
+.page-row .btn { margin-left:auto; }
+.page-empty { padding:30px; text-align:center; color:var(--text-secondary); border:2px dashed var(--border); border-radius:10px; }
+
+/* Form */
+.form-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.form-group label { display:block; font-size:0.76rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.4px; margin-bottom:5px; }
+.form-group input, .form-group textarea, .form-group select {
+    width:100%; padding:9px 12px; border-radius:8px; border:1px solid var(--border);
+    background:#fff; color:var(--text-primary); font-family:inherit; font-size:0.9rem;
+}
+.form-group input:focus, .form-group textarea:focus { outline:none; border-color:var(--accent); }
+.full { grid-column:1 / -1; }
+
+/* Chips */
+.chip-list { display:flex; flex-wrap:wrap; gap:6px; padding:8px; min-height:42px; border:1px solid var(--border); border-radius:8px; background:#fff; }
+.chip { display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:14px; background:var(--accent-dim); color:var(--accent); font-size:0.82rem; font-weight:600; }
+.chip button { background:transparent; border:none; color:inherit; cursor:pointer; font-size:0.85rem; padding:0; line-height:1; opacity:0.7; }
+.chip button:hover { opacity:1; }
+.chip-input-row { display:flex; gap:6px; margin-top:6px; }
+.chip-input-row input { flex:1; }
+
+/* Announcement editor */
+.ann-row { border:1px solid var(--border); border-radius:8px; padding:10px 12px; background:#fff; margin-bottom:8px; display:flex; gap:10px; }
+.ann-fields { flex:1; display:flex; flex-direction:column; gap:6px; }
+.ann-fields input, .ann-fields textarea { padding:7px 10px; border:1px solid var(--border); border-radius:6px; font-family:inherit; font-size:0.86rem; }
+
+/* Modal */
+.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.55); display:none; align-items:center; justify-content:center; padding:18px; z-index:1000; }
+.modal-overlay.show { display:flex; }
+.modal { background:var(--bg-secondary); border-radius:14px; max-width:760px; width:100%; max-height:92vh; overflow-y:auto; padding:24px; }
+.modal-title { font-size:1.15rem; font-weight:700; margin-bottom:6px; }
+.modal-sub { font-size:0.85rem; color:var(--text-secondary); margin-bottom:18px; }
+.modal-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:18px; padding-top:14px; border-top:1px solid var(--border); }
+
+/* Toast */
+.toast { position:fixed; top:18px; right:18px; background:#1a1f2e; color:#fff; padding:12px 18px; border-radius:8px; font-size:0.88rem; box-shadow:0 6px 18px rgba(0,0,0,0.25); transform:translateY(-120%); transition:transform 0.25s; z-index:2000; }
+.toast.show { transform:translateY(0); }
+.toast.success { background:var(--success); }
+.toast.error { background:var(--danger); }
+
+/* Access denied */
+#access-denied { display:none; min-height:60vh; padding:40px 20px; text-align:center; color:var(--text-secondary); }
+#access-denied h2 { font-size:1.4rem; color:var(--text-primary); margin-bottom:10px; }
+</style>
+</head>
+<body>
+
+<div id="loading-screen"><div class="spinner"></div><p>Loading admin…</p></div>
+
+<div id="login-screen">
+    <div class="login-box">
+        <div class="login-title">🔧 Farmboss Admin</div>
+        <label class="login-label" for="login-email">Admin Email</label>
+        <input class="login-input" type="email" id="login-email" autocomplete="email">
+        <label class="login-label" for="login-password">Password</label>
+        <input class="login-input" type="password" id="login-password" autocomplete="current-password">
+        <button class="login-btn" onclick="doLogin()">Sign In</button>
+        <div class="login-error" id="login-error"></div>
+    </div>
+</div>
+
+<div id="admin-app" style="display:none;">
+    <div class="site-switcher">
+        <a href="index.html" class="site-link">🏠 HQ</a>
+        <a href="automotive.html" class="site-link">🚗 Automotive</a>
+        <a href="contacts.html" class="site-link">👥 Enterprise Contacts</a>
+        <a href="family.html" class="site-link">👨‍👩‍👧 Family</a>
+        <a href="admin.html" class="site-link active">🔧 Admin</a>
+    </div>
+    <header>
+        <div class="logo-area">
+            <div class="logo-icon">🔧</div>
+            <h1>Farmboss <span>Admin</span></h1>
+        </div>
+        <div>
+            <span class="user-badge" id="user-email-badge"></span>
+            <button class="signout-btn" onclick="doSignOut()">Sign Out</button>
+        </div>
+    </header>
+
+    <main>
+        <div id="access-denied">
+            <h2>🚫 Access Denied</h2>
+            <p>This page is only available to the site administrator.</p>
+            <p style="margin-top:14px;">Signed in as <strong id="denied-email"></strong>. <a href="#" onclick="doSignOut();return false;" style="color:var(--accent);">Sign out</a> and use the admin account.</p>
+        </div>
+
+        <div id="admin-content" style="display:none;">
+            <!-- Family Pages -->
+            <section class="card">
+                <h2>👨‍👩‍👧 Family Pages
+                    <div class="h2-actions">
+                        <button class="btn btn-primary btn-sm" onclick="openPageEditor()">+ New Family Page</button>
+                    </div>
+                </h2>
+                <div id="pages-list">
+                    <div class="page-empty">Loading…</div>
+                </div>
+            </section>
+
+            <!-- Create user -->
+            <section class="card">
+                <h2>👤 Create Family User Account</h2>
+                <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:12px;">
+                    Creates a Firebase Auth account so the family member can sign in to <code>family.html</code>.
+                    After creating the user, edit the relevant family page above and add their email to "Assigned Emails".
+                </p>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="new-user-email" placeholder="bennett@example.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Initial Password (min 6 chars)</label>
+                        <input type="text" id="new-user-password" placeholder="give them a temp password">
+                    </div>
+                    <div class="full">
+                        <button class="btn btn-primary" onclick="createFamilyUser()">Create Account</button>
+                        <span id="new-user-status" style="margin-left:12px;font-size:0.85rem;color:var(--text-secondary);"></span>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+</div>
+
+<!-- Page editor modal -->
+<div class="modal-overlay" id="page-editor-modal">
+    <div class="modal">
+        <div class="modal-title" id="page-editor-title">New Family Page</div>
+        <div class="modal-sub">Set the page name, who can access it (by email), and any announcements you want to show.</div>
+        <input type="hidden" id="pe-doc-id">
+
+        <div class="form-grid">
+            <div class="form-group">
+                <label>Page Name</label>
+                <input type="text" id="pe-name" placeholder="e.g. Bennett">
+            </div>
+            <div class="form-group">
+                <label>Slug (URL-friendly, optional)</label>
+                <input type="text" id="pe-slug" placeholder="auto from name">
+            </div>
+            <div class="form-group full">
+                <label>Assigned Emails</label>
+                <div class="chip-list" id="pe-emails-chips"></div>
+                <div class="chip-input-row">
+                    <input type="email" id="pe-email-input" placeholder="email to add" onkeydown="if(event.key==='Enter'){event.preventDefault();addAssignedEmail();}">
+                    <button class="btn btn-ghost btn-sm" onclick="addAssignedEmail()">+ Add</button>
+                </div>
+            </div>
+            <div class="form-group full">
+                <label>Announcements (text the family member will see)</label>
+                <div id="pe-announcements"></div>
+                <button class="btn btn-ghost btn-sm" onclick="addAnnouncement()" style="margin-top:6px;">+ Add Announcement</button>
+            </div>
+        </div>
+
+        <div class="modal-actions">
+            <button class="btn btn-danger" id="pe-delete-btn" onclick="deleteCurrentPage()" style="margin-right:auto;display:none;">Delete Page</button>
+            <button class="btn btn-ghost" onclick="closePageEditor()">Cancel</button>
+            <button class="btn btn-primary" onclick="savePage()">Save Page</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyB7c4urD9tJO80S7nADItxjwhSYVqlrkEU",
+    authDomain: "watchroom-714a0.firebaseapp.com",
+    projectId: "watchroom-714a0",
+    storageBucket: "watchroom-714a0.firebasestorage.app",
+    messagingSenderId: "911514107783",
+    appId: "1:911514107783:web:20e8a729fd66577c28dd22"
+};
+firebase.initializeApp(FIREBASE_CONFIG);
+const auth = firebase.auth();
+const db   = firebase.firestore();
+
+const FALLBACK_ADMINS = ['jeff@stoebner.com'];
+let adminEmails = FALLBACK_ADMINS.slice();
+let pages = [];
+let editingPage = null;
+
+function showScreen(name) {
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('admin-app').style.display    = 'none';
+    if (name === 'login')   document.getElementById('login-screen').style.display = 'flex';
+    if (name === 'app')     document.getElementById('admin-app').style.display    = 'block';
+    if (name === 'loading') document.getElementById('loading-screen').style.display = 'flex';
+}
+
+auth.onAuthStateChanged(async user => {
+    if (!user) { showScreen('login'); return; }
+    document.getElementById('user-email-badge').textContent = user.email || '';
+    showScreen('app');
+    await loadAdminEmails();
+    if (!isAdmin(user.email)) {
+        document.getElementById('access-denied').style.display = 'block';
+        document.getElementById('admin-content').style.display = 'none';
+        document.getElementById('denied-email').textContent = user.email || '';
+        return;
+    }
+    document.getElementById('access-denied').style.display = 'none';
+    document.getElementById('admin-content').style.display = 'block';
+    await loadPages();
+});
+
+async function doLogin() {
+    const email = document.getElementById('login-email').value.trim();
+    const pw    = document.getElementById('login-password').value;
+    const errEl = document.getElementById('login-error');
+    errEl.textContent = '';
+    try { await auth.signInWithEmailAndPassword(email, pw); }
+    catch(e) { errEl.textContent = e.message; }
+}
+document.getElementById('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+function doSignOut() { auth.signOut(); }
+
+async function loadAdminEmails() {
+    try {
+        const doc = await db.collection('settings').doc('admins').get();
+        if (doc.exists) {
+            const d = doc.data();
+            if (Array.isArray(d.emails) && d.emails.length) adminEmails = d.emails.map(e => (e||'').toLowerCase());
+        }
+    } catch(e) { /* fall back to FALLBACK_ADMINS */ }
+}
+
+function isAdmin(email) {
+    return adminEmails.map(e=>e.toLowerCase()).includes((email||'').toLowerCase());
+}
+
+// ── PAGES CRUD ─────────────────────────────────────
+async function loadPages() {
+    const list = document.getElementById('pages-list');
+    list.innerHTML = '<div class="page-empty">Loading…</div>';
+    try {
+        const snap = await db.collection('family_pages').orderBy('name').get();
+        pages = snap.docs.map(d => ({ _docId: d.id, ...d.data() }));
+        renderPages();
+    } catch(e) {
+        list.innerHTML = `<div class="page-empty" style="color:var(--danger);">Error loading pages: ${esc(e.message)}</div>`;
+    }
+}
+
+function renderPages() {
+    const list = document.getElementById('pages-list');
+    if (!pages.length) {
+        list.innerHTML = '<div class="page-empty">No family pages yet. Click <strong>+ New Family Page</strong> to create the first one.</div>';
+        return;
+    }
+    list.innerHTML = pages.map(p => {
+        const emails = (p.assignedEmails||[]).join(', ');
+        const annCount = (p.announcements||[]).length;
+        return `<div class="page-row">
+            <div style="flex:1;min-width:0;">
+                <div class="page-name">${esc(p.name)}</div>
+                <div class="page-meta">
+                    ${emails ? `<strong>${(p.assignedEmails||[]).length}</strong> assigned: ${esc(emails)}` : '<em>No assignments yet</em>'}
+                    ${annCount ? ` · ${annCount} announcement${annCount!==1?'s':''}` : ''}
+                </div>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="openPageEditor('${p._docId}')">Edit</button>
+        </div>`;
+    }).join('');
+}
+
+function openPageEditor(docId) {
+    editingPage = docId ? pages.find(p => p._docId === docId) : null;
+    document.getElementById('page-editor-title').textContent = docId ? `Edit: ${editingPage.name}` : 'New Family Page';
+    document.getElementById('pe-doc-id').value = docId || '';
+    document.getElementById('pe-name').value   = editingPage?.name || '';
+    document.getElementById('pe-slug').value   = editingPage?.slug || '';
+    peEmails = (editingPage?.assignedEmails || []).slice();
+    peAnnouncements = (editingPage?.announcements || []).map(a => ({ ...a }));
+    renderEmailChips();
+    renderAnnouncementsEditor();
+    document.getElementById('pe-delete-btn').style.display = docId ? '' : 'none';
+    document.getElementById('page-editor-modal').classList.add('show');
+}
+function closePageEditor() { document.getElementById('page-editor-modal').classList.remove('show'); editingPage = null; }
+document.getElementById('page-editor-modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('page-editor-modal')) closePageEditor();
+});
+
+let peEmails = [];
+let peAnnouncements = [];
+
+function renderEmailChips() {
+    const el = document.getElementById('pe-emails-chips');
+    if (!peEmails.length) { el.innerHTML = '<span style="color:var(--text-secondary);font-size:0.85rem;">No emails assigned yet.</span>'; return; }
+    el.innerHTML = peEmails.map((email, i) =>
+        `<span class="chip">${esc(email)}<button onclick="removeAssignedEmail(${i})" title="Remove">✕</button></span>`
+    ).join('');
+}
+function addAssignedEmail() {
+    const input = document.getElementById('pe-email-input');
+    const val = input.value.trim().toLowerCase();
+    if (!val) return;
+    if (!val.includes('@')) { toast('Enter a valid email.', 'error'); return; }
+    if (peEmails.map(e=>e.toLowerCase()).includes(val)) { toast('Already assigned.', 'error'); return; }
+    peEmails.push(val);
+    input.value = '';
+    renderEmailChips();
+}
+function removeAssignedEmail(i) { peEmails.splice(i, 1); renderEmailChips(); }
+
+function renderAnnouncementsEditor() {
+    const el = document.getElementById('pe-announcements');
+    if (!peAnnouncements.length) { el.innerHTML = '<div style="font-size:0.85rem;color:var(--text-secondary);padding:6px 0;">No announcements yet.</div>'; return; }
+    el.innerHTML = peAnnouncements.map((a, i) => `<div class="ann-row">
+        <div class="ann-fields">
+            <input type="text" placeholder="Title (optional)" value="${esc(a.title||'')}" oninput="peAnnouncements[${i}].title=this.value">
+            <textarea rows="3" placeholder="Body…" oninput="peAnnouncements[${i}].body=this.value">${esc(a.body||'')}</textarea>
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="removeAnnouncement(${i})" title="Remove">✕</button>
+    </div>`).join('');
+}
+function addAnnouncement() {
+    peAnnouncements.push({ title:'', body:'', createdAt:new Date().toISOString() });
+    renderAnnouncementsEditor();
+}
+function removeAnnouncement(i) { peAnnouncements.splice(i, 1); renderAnnouncementsEditor(); }
+
+function slugify(s) { return (s||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,''); }
+
+async function savePage() {
+    const docId = document.getElementById('pe-doc-id').value;
+    const name  = document.getElementById('pe-name').value.trim();
+    if (!name) { toast('Page name is required.', 'error'); return; }
+    const slug = (document.getElementById('pe-slug').value.trim() || slugify(name));
+    const data = {
+        name, slug,
+        assignedEmails: peEmails.map(e => e.toLowerCase()),
+        announcements: peAnnouncements.map(a => ({ title:a.title||'', body:a.body||'', createdAt:a.createdAt||new Date().toISOString() })),
+        updatedAt: new Date().toISOString()
+    };
+    try {
+        if (docId) {
+            await db.collection('family_pages').doc(docId).update(data);
+            toast('Page updated.', 'success');
+        } else {
+            data.createdAt = new Date().toISOString();
+            await db.collection('family_pages').add(data);
+            toast('Page created.', 'success');
+        }
+        closePageEditor();
+        await loadPages();
+    } catch(e) { toast('Save failed: ' + e.message, 'error'); }
+}
+
+async function deleteCurrentPage() {
+    const docId = document.getElementById('pe-doc-id').value;
+    if (!docId) return;
+    if (!confirm(`Delete the family page "${editingPage.name}"? Assigned users won't lose their accounts, but this page goes away.`)) return;
+    try {
+        await db.collection('family_pages').doc(docId).delete();
+        toast('Page deleted.', 'success');
+        closePageEditor();
+        await loadPages();
+    } catch(e) { toast('Delete failed: ' + e.message, 'error'); }
+}
+
+// ── CREATE FAMILY USER (secondary-app trick so admin stays signed in) ─────
+async function createFamilyUser() {
+    const email = document.getElementById('new-user-email').value.trim();
+    const pw    = document.getElementById('new-user-password').value;
+    const status = document.getElementById('new-user-status');
+    status.textContent = '';
+    if (!email || !email.includes('@')) { toast('Enter a valid email.', 'error'); return; }
+    if (!pw || pw.length < 6) { toast('Password must be at least 6 characters.', 'error'); return; }
+    let secondaryApp;
+    try {
+        secondaryApp = firebase.initializeApp(FIREBASE_CONFIG, 'secondary-' + Date.now());
+        const secondaryAuth = secondaryApp.auth();
+        const cred = await secondaryAuth.createUserWithEmailAndPassword(email, pw);
+        await secondaryAuth.signOut();
+        document.getElementById('new-user-email').value = '';
+        document.getElementById('new-user-password').value = '';
+        status.textContent = `✅ Created ${email} (uid ${cred.user.uid.slice(0,8)}…). Add this email to a family page above.`;
+        status.style.color = 'var(--success)';
+        toast('User created.', 'success');
+    } catch(e) {
+        status.textContent = '❌ ' + e.message;
+        status.style.color = 'var(--danger)';
+    } finally {
+        if (secondaryApp) { try { await secondaryApp.delete(); } catch(e) {} }
+    }
+}
+
+// ── UTILS ─────────────────────────────────────
+function esc(s) { return s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;') : ''; }
+function toast(msg, type='') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'toast show' + (type ? ' ' + type : '');
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+showScreen('loading');
+</script>
+
+</body>
+</html>

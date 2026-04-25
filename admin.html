@@ -7,6 +7,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <style>
 * { box-sizing:border-box; margin:0; padding:0; }
 :root {
@@ -96,6 +97,18 @@ main { max-width:1100px; margin:0 auto; padding:24px 18px 80px; }
 .ann-row { border:1px solid var(--border); border-radius:8px; padding:10px 12px; background:#fff; margin-bottom:8px; display:flex; gap:10px; }
 .ann-fields { flex:1; display:flex; flex-direction:column; gap:6px; }
 .ann-fields input, .ann-fields textarea { padding:7px 10px; border:1px solid var(--border); border-radius:6px; font-family:inherit; font-size:0.86rem; }
+
+/* Card / document editor */
+.card-row { border:1px solid var(--border); border-radius:8px; padding:10px 12px; background:#fff; margin-bottom:8px; display:flex; gap:12px; align-items:flex-start; }
+.card-thumb { width:64px; height:48px; flex-shrink:0; border:1px solid var(--border); border-radius:6px; background:var(--bg-card); display:flex; align-items:center; justify-content:center; overflow:hidden; }
+.card-thumb img { max-width:100%; max-height:100%; object-fit:contain; }
+.card-thumb .ph { font-size:1.4rem; opacity:0.7; }
+.card-fields { flex:1; display:grid; grid-template-columns:1fr 150px; gap:6px; }
+.card-fields input { padding:7px 10px; border:1px solid var(--border); border-radius:6px; font-family:inherit; font-size:0.86rem; }
+.card-fields .full { grid-column:1 / -1; }
+.card-fileinfo { font-size:0.72rem; color:var(--text-secondary); grid-column:1 / -1; }
+.card-fileinfo a { color:var(--accent); text-decoration:none; }
+.card-fileinfo a:hover { text-decoration:underline; }
 
 /* Modal */
 .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.55); display:none; align-items:center; justify-content:center; padding:18px; z-index:1000; }
@@ -226,6 +239,12 @@ main { max-width:1100px; margin:0 auto; padding:24px 18px 80px; }
                 <div id="pe-announcements"></div>
                 <button class="btn btn-ghost btn-sm" onclick="addAnnouncement()" style="margin-top:6px;">+ Add Announcement</button>
             </div>
+            <div class="form-group full">
+                <label>🛡️ Insurance Cards & Documents</label>
+                <div id="pe-cards"></div>
+                <input type="file" id="pe-card-file" accept="image/*,application/pdf" style="display:none" onchange="addCardFile(this)">
+                <button class="btn btn-ghost btn-sm" onclick="document.getElementById('pe-card-file').click()" style="margin-top:6px;">+ Upload Card or Document</button>
+            </div>
         </div>
 
         <div class="modal-actions">
@@ -248,8 +267,9 @@ const FIREBASE_CONFIG = {
     appId: "1:911514107783:web:20e8a729fd66577c28dd22"
 };
 firebase.initializeApp(FIREBASE_CONFIG);
-const auth = firebase.auth();
-const db   = firebase.firestore();
+const auth    = firebase.auth();
+const db      = firebase.firestore();
+const storage = firebase.storage();
 
 const FALLBACK_ADMINS = ['jeff@stoebner.com'];
 let adminEmails = FALLBACK_ADMINS.slice();
@@ -329,12 +349,14 @@ function renderPages() {
     list.innerHTML = pages.map(p => {
         const emails = (p.assignedEmails||[]).join(', ');
         const annCount = (p.announcements||[]).length;
+        const attCount = (p.attachments||[]).length;
         return `<div class="page-row">
             <div style="flex:1;min-width:0;">
                 <div class="page-name">${esc(p.name)}</div>
                 <div class="page-meta">
                     ${emails ? `<strong>${(p.assignedEmails||[]).length}</strong> assigned: ${esc(emails)}` : '<em>No assignments yet</em>'}
                     ${annCount ? ` · ${annCount} announcement${annCount!==1?'s':''}` : ''}
+                    ${attCount ? ` · ${attCount} card${attCount!==1?'s':''}/doc${attCount!==1?'s':''}` : ''}
                 </div>
             </div>
             <button class="btn btn-ghost btn-sm" onclick="openPageEditor('${p._docId}')">Edit</button>
@@ -350,8 +372,17 @@ function openPageEditor(docId) {
     document.getElementById('pe-slug').value   = editingPage?.slug || '';
     peEmails = (editingPage?.assignedEmails || []).slice();
     peAnnouncements = (editingPage?.announcements || []).map(a => ({ ...a }));
+    peCards = (editingPage?.attachments || []).map(a => ({
+        tempId: 'c_' + Math.random().toString(36).slice(2,8),
+        name: a.name || '',
+        expirationDate: a.expirationDate || '',
+        url: a.url, mimeType: a.mimeType || '',
+        addedAt: a.addedAt || '',
+        file: null, base64: null, fileName: a.name || ''
+    }));
     renderEmailChips();
     renderAnnouncementsEditor();
+    renderCardsEditor();
     document.getElementById('pe-delete-btn').style.display = docId ? '' : 'none';
     document.getElementById('page-editor-modal').classList.add('show');
 }
@@ -362,6 +393,7 @@ document.getElementById('page-editor-modal').addEventListener('click', e => {
 
 let peEmails = [];
 let peAnnouncements = [];
+let peCards = []; // [{tempId, name, expirationDate, url?, mimeType, file?, base64?, fileName}]
 
 function renderEmailChips() {
     const el = document.getElementById('pe-emails-chips');
@@ -399,6 +431,60 @@ function addAnnouncement() {
 }
 function removeAnnouncement(i) { peAnnouncements.splice(i, 1); renderAnnouncementsEditor(); }
 
+function renderCardsEditor() {
+    const el = document.getElementById('pe-cards');
+    if (!peCards.length) { el.innerHTML = '<div style="font-size:0.85rem;color:var(--text-secondary);padding:6px 0;">No cards or documents attached yet.</div>'; return; }
+    el.innerHTML = peCards.map((c, i) => {
+        const isPdf = (c.mimeType || '').includes('pdf');
+        const previewSrc = c.base64 ? `data:${c.mimeType};base64,${c.base64}` : (c.url && !isPdf ? c.url : '');
+        const thumb = isPdf
+            ? `<span class="ph">📄</span>`
+            : (previewSrc ? `<img src="${esc(previewSrc)}">` : `<span class="ph">🛡️</span>`);
+        const fileLine = c.url
+            ? `<a href="${esc(c.url)}" target="_blank" rel="noopener">View / Download</a>`
+            : (c.fileName ? `${esc(c.fileName)} <em>(uploads on Save)</em>` : '');
+        return `<div class="card-row">
+            <div class="card-thumb">${thumb}</div>
+            <div class="card-fields">
+                <input type="text" placeholder="Name (e.g. Progressive — 2026)" value="${esc(c.name||'')}" oninput="setCardField(${i},'name',this.value)">
+                <input type="date" placeholder="Expiration" value="${esc(c.expirationDate||'')}" oninput="setCardField(${i},'expirationDate',this.value)">
+                <div class="card-fileinfo full">${fileLine}</div>
+            </div>
+            <button type="button" class="btn btn-danger btn-sm" onclick="removeCard(${i})" title="Remove">✕</button>
+        </div>`;
+    }).join('');
+}
+
+function setCardField(i, field, val) {
+    if (peCards[i]) peCards[i][field] = val;
+}
+
+function removeCard(i) {
+    peCards.splice(i, 1);
+    renderCardsEditor();
+}
+
+async function addCardFile(input) {
+    const file = input.files && input.files[0];
+    input.value = '';
+    if (!file) return;
+    const base64 = await new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload  = e => resolve(e.target.result.split(',')[1]);
+        fr.onerror = reject;
+        fr.readAsDataURL(file);
+    });
+    peCards.push({
+        tempId: 'c_' + Math.random().toString(36).slice(2,8),
+        name: file.name.replace(/\.[^.]+$/, ''),
+        expirationDate: '',
+        url: '', mimeType: file.type || 'application/octet-stream',
+        file, base64,
+        fileName: file.name
+    });
+    renderCardsEditor();
+}
+
 function slugify(s) { return (s||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,''); }
 
 async function savePage() {
@@ -406,10 +492,41 @@ async function savePage() {
     const name  = document.getElementById('pe-name').value.trim();
     if (!name) { toast('Page name is required.', 'error'); return; }
     const slug = (document.getElementById('pe-slug').value.trim() || slugify(name));
+
+    // Upload any new card files; preserve already-uploaded ones
+    let attachments = [];
+    try {
+        for (let i = 0; i < peCards.length; i++) {
+            const c = peCards[i];
+            if (c.file) {
+                const safeSlug = slug || 'unfiled';
+                const ext = (c.fileName && c.fileName.includes('.')) ? c.fileName.split('.').pop() : (c.mimeType.includes('pdf') ? 'pdf' : 'jpg');
+                const path = `family_attachments/${safeSlug}/${Date.now()}_${i}_${(c.fileName||'file').replace(/[^a-zA-Z0-9._-]/g,'_')}`;
+                const ref  = storage.ref().child(path);
+                await ref.put(c.file);
+                const url  = await ref.getDownloadURL();
+                attachments.push({
+                    name: c.name || c.fileName || 'Document',
+                    url, mimeType: c.mimeType || '',
+                    expirationDate: c.expirationDate || '',
+                    addedAt: new Date().toISOString()
+                });
+            } else if (c.url) {
+                attachments.push({
+                    name: c.name || 'Document',
+                    url: c.url, mimeType: c.mimeType || '',
+                    expirationDate: c.expirationDate || '',
+                    addedAt: c.addedAt || new Date().toISOString()
+                });
+            }
+        }
+    } catch(e) { toast('File upload failed: ' + e.message, 'error'); return; }
+
     const data = {
         name, slug,
         assignedEmails: peEmails.map(e => e.toLowerCase()),
         announcements: peAnnouncements.map(a => ({ title:a.title||'', body:a.body||'', createdAt:a.createdAt||new Date().toISOString() })),
+        attachments,
         updatedAt: new Date().toISOString()
     };
     try {

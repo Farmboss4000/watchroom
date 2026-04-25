@@ -693,7 +693,12 @@
                     <label>Storage Location</label>
                     <input type="text" id="f-location" placeholder="e.g. Garage Bay 2, North lot">
                 </div>
-                <div class="form-group span2">
+                <div class="form-group">
+                    <label>🛡️ Insurance Company</label>
+                    <input type="text" id="f-insurance" list="insurance-list" placeholder="e.g. State Farm, Progressive" autocomplete="off">
+                    <datalist id="insurance-list"></datalist>
+                </div>
+                <div class="form-group">
                     <label>👤 Default Driver / Assigned User</label>
                     <input type="text" id="f-driver" list="driver-list" placeholder="e.g. Jeff, Farm Crew, Ranch Manager" autocomplete="off">
                     <datalist id="driver-list"></datalist>
@@ -816,16 +821,12 @@
             <table id="inv-table">
                 <thead><tr>
                     <th class="no-sort" style="width:52px;">Photo</th>
-                    <th onclick="sortBy('id')">ID</th>
                     <th onclick="sortBy('category')">Type</th>
                     <th onclick="sortBy('make')">Make</th>
                     <th onclick="sortBy('model')">Model</th>
                     <th onclick="sortBy('year')">Year</th>
                     <th onclick="sortBy('serialNumber')">VIN</th>
                     <th onclick="sortBy('licensePlate')">Plate / Tabs</th>
-                    <th onclick="sortBy('mileage')">Mileage</th>
-                    <th onclick="sortBy('condition')">Condition</th>
-                    <th onclick="sortBy('location')">Location</th>
                     <th onclick="sortBy('defaultDriver')">Driver</th>
                     <th onclick="sortBy('purchaseDate')">Purchased</th>
                     <th onclick="sortBy('vendor')">Source</th>
@@ -2151,6 +2152,12 @@ function populateVendorList() {
     if (dl) dl.innerHTML = vendors.map(v=>`<option value="${esc(v)}">`).join('');
 }
 
+function populateInsuranceList() {
+    const list = [...new Set(items.map(i=>i.insuranceCompany).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+    const dl = document.getElementById('insurance-list');
+    if (dl) dl.innerHTML = list.map(v=>`<option value="${esc(v)}">`).join('');
+}
+
 document.getElementById('item-form').addEventListener('submit', async e => {
     e.preventDefault();
     const eid   = document.getElementById('edit-id').value;
@@ -2173,6 +2180,7 @@ document.getElementById('item-form').addEventListener('submit', async e => {
         price:        document.getElementById('f-price').value.trim(),
         vendor:       document.getElementById('f-vendor').value.trim(),
         location:      document.getElementById('f-location').value.trim(),
+        insuranceCompany: document.getElementById('f-insurance').value.trim(),
         defaultDriver: document.getElementById('f-driver').value.trim(),
         notes:         document.getElementById('f-notes').value.trim(),
     };
@@ -2219,7 +2227,7 @@ document.getElementById('item-form').addEventListener('submit', async e => {
             await dbAddItem(data, photos);
             toast('Vehicle added!','success');
         }
-        populateMakeList(); populateDriverList(); populateVendorList();
+        populateMakeList(); populateDriverList(); populateVendorList(); populateInsuranceList();
         resetForm();
         showView('inventory');
     } catch(err) {
@@ -2279,6 +2287,7 @@ function editItem(docId) {
     document.getElementById('f-price').value           = it.price||'';
     document.getElementById('f-vendor').value          = it.vendor||'';
     document.getElementById('f-location').value        = it.location||'';
+    document.getElementById('f-insurance').value       = it.insuranceCompany||'';
     document.getElementById('f-driver').value          = it.defaultDriver||'';
     document.getElementById('f-notes').value           = it.notes||'';
     document.getElementById('form-title').textContent      = `✏️ Edit Vehicle #${it.id}`;
@@ -2382,7 +2391,7 @@ function renderInventory() {
     const data  = sorted(filteredItems('inv-search','inv-filter-cat'), invSortField, invSortDir);
     document.getElementById('inv-count').textContent = `${data.length} item${data.length!==1?'s':''}`;
     document.querySelectorAll('#inv-table thead th').forEach(th=>th.classList.remove('sort-asc','sort-desc'));
-    const thIdx = {id:1,category:2,make:3,model:4,year:5,serialNumber:6,licensePlate:7,mileage:8,condition:9,location:10,defaultDriver:11,purchaseDate:12,vendor:13,price:14,marketValue:15};
+    const thIdx = {category:1,make:2,model:3,year:4,serialNumber:5,licensePlate:6,defaultDriver:7,purchaseDate:8,vendor:9,price:10,marketValue:11};
     const ti = thIdx[invSortField];
     if (ti!==undefined) document.querySelectorAll('#inv-table thead th')[ti]?.classList.add(invSortDir==='asc'?'sort-asc':'sort-desc');
     const tbody = document.getElementById('inv-tbody');
@@ -2394,11 +2403,8 @@ function renderInventory() {
         const thumb = mainUrl
             ? `<img src="${mainUrl}" class="thumb" alt="" style="cursor:pointer" onclick="window.open('${mainUrl}','_blank')" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb-placeholder',innerHTML:'🚗'}))">`
             : `<div class="thumb-placeholder">🚗</div>`;
-        const condBadge = it.condition ? `<span style="font-size:0.72rem;font-weight:600;color:${
-            it.condition==='Excellent'?'#15803d':it.condition==='Good'?'#1d4ed8':it.condition==='Fair'?'#92400e':'#dc2626'}">${it.condition}</span>` : '—';
         return `<tr>
             <td>${thumb}</td>
-            <td class="mono">#${it.id}</td>
             <td><span class="badge ${catClass(it.category)}">${it.category||'—'}</span></td>
             <td>${esc(it.make)||'—'}</td>
             <td>${esc(it.model)||'—'}</td>
@@ -2422,9 +2428,6 @@ function renderInventory() {
                 }
                 return html;
             })()}</td>
-            <td>${it.mileage ? Number(it.mileage).toLocaleString()+' mi' : '—'}</td>
-            <td>${condBadge}</td>
-            <td style="font-size:0.82rem">${esc(it.location)||'—'}</td>
             <td>${it.defaultDriver ? `<span style="display:inline-flex;align-items:center;gap:5px;background:var(--accent-dim);color:var(--accent);padding:2px 9px;border-radius:12px;font-size:0.78rem;font-weight:600;">👤 ${esc(it.defaultDriver)}</span>` : '<span style="color:var(--text-secondary);font-size:0.8rem;">—</span>'}</td>
             <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():'—'}</td>
             <td style="font-size:0.82rem;">${esc(it.vendor)||'—'}</td>
@@ -2445,7 +2448,7 @@ function renderInventory() {
     const priceStr   = totalPrice > 0 ? '$'+totalPrice.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
     const mvStr      = totalMV   > 0 ? '$'+totalMV.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
     document.getElementById('inv-tfoot').innerHTML = `<tr style="font-weight:700;border-top:2px solid var(--border);background:var(--bg-secondary);">
-        <td colspan="13" style="text-align:right;padding:8px 12px;color:var(--text-secondary);font-size:0.82rem;">TOTALS (${data.length} vehicle${data.length!==1?'s':''})</td>
+        <td colspan="9" style="text-align:right;padding:8px 12px;color:var(--text-secondary);font-size:0.82rem;">TOTALS (${data.length} vehicle${data.length!==1?'s':''})</td>
         <td style="padding:8px 12px;white-space:nowrap;color:#60a5fa;">${priceStr}</td>
         <td style="padding:8px 12px;white-space:nowrap;color:#22c55e;">${mvStr}</td>
         <td></td>

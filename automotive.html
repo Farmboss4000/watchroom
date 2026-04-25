@@ -2222,7 +2222,7 @@ document.getElementById('item-form').addEventListener('submit', async e => {
         location:      document.getElementById('f-location').value.trim(),
         insuranceCompany: document.getElementById('f-insurance').value.trim(),
         defaultDriver: document.getElementById('f-driver').value.trim(),
-        driverEmail:   document.getElementById('f-driver-email').value.trim(),
+        driverEmail:   document.getElementById('f-driver-email').value.trim().toLowerCase(),
         notes:         document.getElementById('f-notes').value.trim(),
     };
     btn.disabled = true; btn.textContent = 'Saving...';

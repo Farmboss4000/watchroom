@@ -431,8 +431,8 @@ function openPageEditor(docId) {
     renderAnnouncementsEditor();
     renderCardsEditor();
     renderVehiclesEditor();
-    // Lazy-load the automotive cache so renderVehiclesEditor can resolve names
-    if (!automotiveCacheLoaded && peVehicles.length) {
+    // Always lazy-load the automotive cache so the auto-matched-by-email section can render
+    if (!automotiveCacheLoaded) {
         ensureAutomotiveCache().then(renderVehiclesEditor).catch(()=>{});
     }
     document.getElementById('pe-delete-btn').style.display = docId ? '' : 'none';
@@ -466,8 +466,9 @@ function addAssignedEmail() {
     peEmails.push(val);
     input.value = '';
     renderEmailChips();
+    renderVehiclesEditor();
 }
-function removeAssignedEmail(i) { peEmails.splice(i, 1); renderEmailChips(); }
+function removeAssignedEmail(i) { peEmails.splice(i, 1); renderEmailChips(); renderVehiclesEditor(); }
 
 function renderAnnouncementsEditor() {
     const el = document.getElementById('pe-announcements');
@@ -534,35 +535,64 @@ function vehicleSummary(v) {
     return ymm || ('Vehicle #' + (v.id || ''));
 }
 
+function vehicleRowHtml(v, opts) {
+    const mainPhoto = (v.photos || []).find(p => p.slot === 'main')?.url;
+    const thumb = mainPhoto ? `<img src="${esc(mainPhoto)}">` : `<span class="ph">🚗</span>`;
+    const subBits = [v.licensePlate ? `Plate ${esc(v.licensePlate)}` : '', v.defaultDriver ? `Driver ${esc(v.defaultDriver)}` : '', v.driverEmail ? esc(v.driverEmail) : ''].filter(Boolean).join(' · ');
+    const cardCount = (v.documents||[]).filter(d => d.type === 'insurance_card').length;
+    const removeBtn = opts.readonly
+        ? `<span style="font-size:0.7rem;color:var(--text-secondary);align-self:center;text-align:right;max-width:120px;line-height:1.3;">edit Driver Email<br>on the vehicle<br>to remove</span>`
+        : `<button type="button" class="btn btn-danger btn-sm" onclick="removeVehicle('${v._docId}')" title="Remove">✕</button>`;
+    return `<div class="card-row">
+        <div class="card-thumb">${thumb}</div>
+        <div class="card-fields">
+            <div class="card-fileinfo full" style="font-size:0.86rem;">
+                <strong>${esc(vehicleSummary(v))}</strong>
+                ${subBits ? `<div style="font-size:0.74rem;color:var(--text-secondary);">${subBits}</div>` : ''}
+                ${cardCount ? `<div style="font-size:0.72rem;color:var(--success);font-weight:700;">🛡️ ${cardCount} insurance card${cardCount!==1?'s':''} on this vehicle</div>` : '<div style="font-size:0.72rem;color:var(--text-secondary);">No insurance cards on this vehicle yet</div>'}
+            </div>
+        </div>
+        ${removeBtn}
+    </div>`;
+}
+
 function renderVehiclesEditor() {
     const el = document.getElementById('pe-vehicles');
-    if (!peVehicles.length) {
-        el.innerHTML = '<div style="font-size:0.85rem;color:var(--text-secondary);padding:6px 0;">No vehicles attached yet.</div>';
+    const explicitIds = new Set(peVehicles);
+    const pageEmails = new Set((peEmails || []).map(e => (e||'').toLowerCase()));
+    const autoMatched = automotiveCacheLoaded
+        ? automotiveCache.filter(v => !explicitIds.has(v._docId) && pageEmails.has((v.driverEmail || '').toLowerCase()))
+        : [];
+
+    if (!peVehicles.length && !autoMatched.length) {
+        const hint = automotiveCacheLoaded
+            ? 'No vehicles attached, and no vehicles in inventory have a Driver Email matching this page.'
+            : 'No vehicles attached yet.';
+        el.innerHTML = `<div style="font-size:0.85rem;color:var(--text-secondary);padding:6px 0;">${hint}</div>`;
         return;
     }
-    el.innerHTML = peVehicles.map(docId => {
-        const v = automotiveCache.find(x => x._docId === docId);
-        if (!v) {
-            return `<div class="card-row"><div class="card-thumb"><span class="ph">🚗</span></div>
-                <div class="card-fields"><div class="card-fileinfo full"><em>Vehicle (loading…)</em><br><span style="font-size:0.7rem;">id ${esc(docId).slice(0,8)}…</span></div></div>
-                <button type="button" class="btn btn-danger btn-sm" onclick="removeVehicle('${docId}')" title="Remove">✕</button></div>`;
-        }
-        const mainPhoto = (v.photos || []).find(p => p.slot === 'main')?.url;
-        const thumb = mainPhoto ? `<img src="${esc(mainPhoto)}">` : `<span class="ph">🚗</span>`;
-        const subBits = [v.licensePlate ? `Plate ${esc(v.licensePlate)}` : '', v.defaultDriver ? `Driver ${esc(v.defaultDriver)}` : '', v.driverEmail ? esc(v.driverEmail) : ''].filter(Boolean).join(' · ');
-        const cardCount = (v.documents||[]).filter(d => d.type === 'insurance_card').length;
-        return `<div class="card-row">
-            <div class="card-thumb">${thumb}</div>
-            <div class="card-fields">
-                <div class="card-fileinfo full" style="font-size:0.86rem;">
-                    <strong>${esc(vehicleSummary(v))}</strong>
-                    ${subBits ? `<div style="font-size:0.74rem;color:var(--text-secondary);">${subBits}</div>` : ''}
-                    ${cardCount ? `<div style="font-size:0.72rem;color:var(--success);font-weight:700;">🛡️ ${cardCount} insurance card${cardCount!==1?'s':''} on this vehicle</div>` : '<div style="font-size:0.72rem;color:var(--text-secondary);">No insurance cards on this vehicle yet</div>'}
-                </div>
-            </div>
-            <button type="button" class="btn btn-danger btn-sm" onclick="removeVehicle('${docId}')" title="Remove">✕</button>
-        </div>`;
-    }).join('');
+
+    const sectionTitle = (label, sub) =>
+        `<div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-secondary);margin:8px 0 4px;">${label}${sub ? ` <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-secondary);">${sub}</span>` : ''}</div>`;
+
+    let html = '';
+    if (peVehicles.length) {
+        html += sectionTitle('Explicitly Attached', `(${peVehicles.length})`);
+        html += peVehicles.map(docId => {
+            const v = automotiveCache.find(x => x._docId === docId);
+            if (!v) {
+                return `<div class="card-row"><div class="card-thumb"><span class="ph">🚗</span></div>
+                    <div class="card-fields"><div class="card-fileinfo full"><em>Vehicle (loading…)</em><br><span style="font-size:0.7rem;">id ${esc(docId).slice(0,8)}…</span></div></div>
+                    <button type="button" class="btn btn-danger btn-sm" onclick="removeVehicle('${docId}')" title="Remove">✕</button></div>`;
+            }
+            return vehicleRowHtml(v, { readonly: false });
+        }).join('');
+    }
+    if (autoMatched.length) {
+        html += sectionTitle('Auto-matched by Driver Email', `(${autoMatched.length}) — read-only`);
+        html += autoMatched.map(v => vehicleRowHtml(v, { readonly: true })).join('');
+    }
+    el.innerHTML = html;
 }
 
 function removeVehicle(docId) {

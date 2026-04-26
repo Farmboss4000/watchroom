@@ -94,6 +94,11 @@ main { max-width:1100px; margin:0 auto; padding:24px 18px 80px; }
 /* No-page screen */
 #no-page-screen { display:none; min-height:60vh; padding:40px 20px; text-align:center; color:var(--text-secondary); }
 #no-page-screen h2 { font-size:1.4rem; color:var(--text-primary); margin-bottom:10px; }
+
+/* Admin preview banner */
+#preview-banner { display:none; background:#f59e0b; color:#1a1f2e; padding:9px 18px; font-size:0.86rem; font-weight:600; text-align:center; border-bottom:2px solid #b45309; }
+#preview-banner a { color:#1a1f2e; text-decoration:underline; margin-left:10px; }
+#preview-banner .pb-tag { background:rgba(0,0,0,0.18); padding:2px 8px; border-radius:6px; margin:0 4px; font-size:0.78rem; }
 </style>
 </head>
 <body>
@@ -115,6 +120,11 @@ main { max-width:1100px; margin:0 auto; padding:24px 18px 80px; }
 </div>
 
 <div id="family-app" style="display:none;">
+    <div id="preview-banner">
+        🔧 ADMIN PREVIEW —
+        viewing <span class="pb-tag" id="pb-page-name"></span> as if you were the family member.
+        <a href="admin.html">← Back to Admin</a>
+    </div>
     <header>
         <div class="logo-area">
             <div class="logo-icon">👨‍👩‍👧</div>
@@ -214,23 +224,44 @@ function getQueryParam(name) {
     try { return new URLSearchParams(window.location.search).get(name); } catch(e) { return null; }
 }
 
+async function isCurrentUserAdmin(userEmail) {
+    const fallback = ['jeff@stoebner.com'];
+    try {
+        const doc = await db.collection('settings').doc('admins').get();
+        if (doc.exists) {
+            const d = doc.data();
+            if (Array.isArray(d.emails) && d.emails.length) {
+                return d.emails.map(e => (e||'').toLowerCase()).includes((userEmail||'').toLowerCase());
+            }
+        }
+    } catch(e) {}
+    return fallback.includes((userEmail||'').toLowerCase());
+}
+
 async function renderFamilyPage(user) {
     const userEmail = (user.email || '').toLowerCase();
     const slugParam = getQueryParam('p');
+    const isPreviewParam = getQueryParam('preview') === '1' || getQueryParam('preview') === 'true';
     const noPageEl  = document.getElementById('no-page-screen');
     const contentEl = document.getElementById('content');
 
     // Find the family page: explicit slug from URL takes precedence, else fall back to email lookup
     let page = null;
+    let viewingAsAdmin = false;
     try {
         if (slugParam) {
             const snap = await db.collection('family_pages').where('slug', '==', slugParam).limit(1).get();
             if (!snap.empty) {
                 const candidate = { _docId: snap.docs[0].id, ...snap.docs[0].data() };
                 const allowed = (candidate.assignedEmails || []).map(e => (e||'').toLowerCase()).includes(userEmail);
-                if (allowed) page = candidate;
-                // If not allowed, intentionally do NOT fall through to email lookup —
-                // the URL was specific, so a non-match means "you don't have access".
+                if (allowed) {
+                    page = candidate;
+                } else if (isPreviewParam && await isCurrentUserAdmin(userEmail)) {
+                    page = candidate;
+                    viewingAsAdmin = true;
+                }
+                // Otherwise: intentionally do NOT fall through to email lookup —
+                // the URL was specific, so a non-match (and non-admin) means "no access".
             }
         } else {
             const snap = await db.collection('family_pages').where('assignedEmails', 'array-contains', userEmail).limit(1).get();
@@ -243,6 +274,12 @@ async function renderFamilyPage(user) {
         contentEl.style.display = 'none';
         document.getElementById('np-email').textContent = userEmail;
         return;
+    }
+
+    // Show admin preview banner if applicable
+    if (viewingAsAdmin) {
+        document.getElementById('preview-banner').style.display = 'block';
+        document.getElementById('pb-page-name').textContent = page.name || page.slug || 'this family page';
     }
     noPageEl.style.display = 'none';
     contentEl.style.display = 'block';

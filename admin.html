@@ -401,6 +401,7 @@ function renderPages() {
                     ${vehCount ? ` · ${vehCount} vehicle${vehCount!==1?'s':''}` : ''}
                 </div>
             </div>
+            <button class="btn btn-ghost btn-sm" onclick="openFamilyPreview('${p._docId}')" title="Preview this page as the family member would see it">👁 Preview</button>
             <button class="btn btn-ghost btn-sm" onclick="copyFamilyLink('${p._docId}')" title="Copy shareable link">🔗 Copy Link</button>
             <button class="btn btn-ghost btn-sm" onclick="openPageEditor('${p._docId}')">Edit</button>
         </div>`;
@@ -860,6 +861,14 @@ function copyFamilyLink(docId) {
         () => toast('Link copied: ' + url, 'success'),
         () => window.prompt('Copy this link:', url)
     );
+}
+
+function openFamilyPreview(docId) {
+    const p = pages.find(x => x._docId === docId);
+    if (!p) return;
+    if (!p.slug) { toast('This page has no slug yet — open Edit and save first.', 'error'); return; }
+    const url = familyLinkFor(p) + '&preview=1';
+    window.open(url, '_blank', 'noopener');
 }
 
 async function deleteCurrentPage() {

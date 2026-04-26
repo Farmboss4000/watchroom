@@ -248,12 +248,33 @@ main { max-width:1100px; margin:0 auto; padding:24px 18px 80px; }
                     <button class="btn btn-ghost btn-sm" onclick="openInvPicker()">📦 Pick from Inventory</button>
                 </div>
             </div>
+            <div class="form-group full">
+                <label>🚗 Assigned Vehicles <span style="font-weight:400;color:var(--text-secondary);font-size:0.78rem;text-transform:none;letter-spacing:0;">(every insurance card on these vehicles auto-appears on the family page)</span></label>
+                <div id="pe-vehicles"></div>
+                <button class="btn btn-ghost btn-sm" onclick="openVehiclePicker()" style="margin-top:6px;">+ Pick Vehicles from Inventory</button>
+            </div>
         </div>
 
         <div class="modal-actions">
             <button class="btn btn-danger" id="pe-delete-btn" onclick="deleteCurrentPage()" style="margin-right:auto;display:none;">Delete Page</button>
             <button class="btn btn-ghost" onclick="closePageEditor()">Cancel</button>
             <button class="btn btn-primary" onclick="savePage()">Save Page</button>
+        </div>
+    </div>
+</div>
+
+<!-- Vehicle picker (sub-modal, z above page editor) -->
+<div class="modal-overlay" id="vehicle-picker-modal" style="z-index:1500;">
+    <div class="modal" style="max-width:780px;">
+        <div class="modal-title">🚗 Pick Vehicles from Inventory</div>
+        <div class="modal-sub">Select the vehicles to attach to this family page. Insurance cards on these vehicles will automatically appear on the family page. Vehicles whose driverEmail matches this page's assigned emails are listed first.</div>
+        <div style="margin:12px 0;">
+            <input type="text" id="vehicle-picker-search" placeholder="Filter by year, make, model, plate, driver…" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border);font-size:0.9rem;" oninput="renderVehiclePickerList()">
+        </div>
+        <div id="vehicle-picker-list" style="max-height:55vh;overflow-y:auto;"></div>
+        <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="closeVehiclePicker()">Cancel</button>
+            <button class="btn btn-primary" id="vehicle-picker-attach-btn" onclick="attachSelectedVehicles()" disabled>Attach Selected</button>
         </div>
     </div>
 </div>
@@ -369,6 +390,7 @@ function renderPages() {
         const emails = (p.assignedEmails||[]).join(', ');
         const annCount = (p.announcements||[]).length;
         const attCount = (p.attachments||[]).length;
+        const vehCount = (p.assignedVehicleDocIds||[]).length;
         return `<div class="page-row">
             <div style="flex:1;min-width:0;">
                 <div class="page-name">${esc(p.name)}</div>
@@ -376,6 +398,7 @@ function renderPages() {
                     ${emails ? `<strong>${(p.assignedEmails||[]).length}</strong> assigned: ${esc(emails)}` : '<em>No assignments yet</em>'}
                     ${annCount ? ` · ${annCount} announcement${annCount!==1?'s':''}` : ''}
                     ${attCount ? ` · ${attCount} card${attCount!==1?'s':''}/doc${attCount!==1?'s':''}` : ''}
+                    ${vehCount ? ` · ${vehCount} vehicle${vehCount!==1?'s':''}` : ''}
                 </div>
             </div>
             <button class="btn btn-ghost btn-sm" onclick="copyFamilyLink('${p._docId}')" title="Copy shareable link">🔗 Copy Link</button>
@@ -400,9 +423,15 @@ function openPageEditor(docId) {
         addedAt: a.addedAt || '',
         file: null, base64: null, fileName: a.name || ''
     }));
+    peVehicles = (editingPage?.assignedVehicleDocIds || []).slice();
     renderEmailChips();
     renderAnnouncementsEditor();
     renderCardsEditor();
+    renderVehiclesEditor();
+    // Lazy-load the automotive cache so renderVehiclesEditor can resolve names
+    if (!automotiveCacheLoaded && peVehicles.length) {
+        ensureAutomotiveCache().then(renderVehiclesEditor).catch(()=>{});
+    }
     document.getElementById('pe-delete-btn').style.display = docId ? '' : 'none';
     document.getElementById('page-editor-modal').classList.add('show');
 }
@@ -414,6 +443,9 @@ document.getElementById('page-editor-modal').addEventListener('click', e => {
 let peEmails = [];
 let peAnnouncements = [];
 let peCards = []; // [{tempId, name, expirationDate, url?, mimeType, file?, base64?, fileName}]
+let peVehicles = []; // [docId,...]
+let automotiveCache = []; // [{_docId, ...automotive_items data}]
+let automotiveCacheLoaded = false;
 
 function renderEmailChips() {
     const el = document.getElementById('pe-emails-chips');
@@ -482,6 +514,137 @@ function setCardField(i, field, val) {
 function removeCard(i) {
     peCards.splice(i, 1);
     renderCardsEditor();
+}
+
+// ── ASSIGNED VEHICLES (multi-attach to family page) ──
+async function ensureAutomotiveCache() {
+    if (automotiveCacheLoaded) return automotiveCache;
+    const snap = await db.collection('automotive_items').get();
+    automotiveCache = snap.docs.map(d => ({ _docId: d.id, ...d.data() }));
+    automotiveCacheLoaded = true;
+    return automotiveCache;
+}
+
+function vehicleSummary(v) {
+    if (!v) return '';
+    const ymm = [v.year, v.make, v.model].filter(Boolean).join(' ').trim();
+    return ymm || ('Vehicle #' + (v.id || ''));
+}
+
+function renderVehiclesEditor() {
+    const el = document.getElementById('pe-vehicles');
+    if (!peVehicles.length) {
+        el.innerHTML = '<div style="font-size:0.85rem;color:var(--text-secondary);padding:6px 0;">No vehicles attached yet.</div>';
+        return;
+    }
+    el.innerHTML = peVehicles.map(docId => {
+        const v = automotiveCache.find(x => x._docId === docId);
+        if (!v) {
+            return `<div class="card-row"><div class="card-thumb"><span class="ph">🚗</span></div>
+                <div class="card-fields"><div class="card-fileinfo full"><em>Vehicle (loading…)</em><br><span style="font-size:0.7rem;">id ${esc(docId).slice(0,8)}…</span></div></div>
+                <button type="button" class="btn btn-danger btn-sm" onclick="removeVehicle('${docId}')" title="Remove">✕</button></div>`;
+        }
+        const mainPhoto = (v.photos || []).find(p => p.slot === 'main')?.url;
+        const thumb = mainPhoto ? `<img src="${esc(mainPhoto)}">` : `<span class="ph">🚗</span>`;
+        const subBits = [v.licensePlate ? `Plate ${esc(v.licensePlate)}` : '', v.defaultDriver ? `Driver ${esc(v.defaultDriver)}` : '', v.driverEmail ? esc(v.driverEmail) : ''].filter(Boolean).join(' · ');
+        const cardCount = (v.documents||[]).filter(d => d.type === 'insurance_card').length;
+        return `<div class="card-row">
+            <div class="card-thumb">${thumb}</div>
+            <div class="card-fields">
+                <div class="card-fileinfo full" style="font-size:0.86rem;">
+                    <strong>${esc(vehicleSummary(v))}</strong>
+                    ${subBits ? `<div style="font-size:0.74rem;color:var(--text-secondary);">${subBits}</div>` : ''}
+                    ${cardCount ? `<div style="font-size:0.72rem;color:var(--success);font-weight:700;">🛡️ ${cardCount} insurance card${cardCount!==1?'s':''} on this vehicle</div>` : '<div style="font-size:0.72rem;color:var(--text-secondary);">No insurance cards on this vehicle yet</div>'}
+                </div>
+            </div>
+            <button type="button" class="btn btn-danger btn-sm" onclick="removeVehicle('${docId}')" title="Remove">✕</button>
+        </div>`;
+    }).join('');
+}
+
+function removeVehicle(docId) {
+    peVehicles = peVehicles.filter(d => d !== docId);
+    renderVehiclesEditor();
+}
+
+let vehiclePickerSelected = new Set();
+
+async function openVehiclePicker() {
+    vehiclePickerSelected = new Set();
+    document.getElementById('vehicle-picker-search').value = '';
+    document.getElementById('vehicle-picker-attach-btn').disabled = true;
+    document.getElementById('vehicle-picker-list').innerHTML = '<div class="empty" style="padding:30px;text-align:center;color:var(--text-secondary);border:2px dashed var(--border);border-radius:10px;">Loading…</div>';
+    document.getElementById('vehicle-picker-modal').classList.add('show');
+    try {
+        // Force-refresh the cache when the picker opens so admin sees recent inventory changes
+        automotiveCacheLoaded = false;
+        await ensureAutomotiveCache();
+        renderVehiclePickerList();
+    } catch(e) {
+        document.getElementById('vehicle-picker-list').innerHTML = `<div class="empty" style="padding:30px;text-align:center;color:var(--danger);">Error loading inventory: ${esc(e.message)}</div>`;
+    }
+}
+function closeVehiclePicker() { document.getElementById('vehicle-picker-modal').classList.remove('show'); }
+document.getElementById('vehicle-picker-modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('vehicle-picker-modal')) closeVehiclePicker();
+});
+
+function renderVehiclePickerList() {
+    const filter = (document.getElementById('vehicle-picker-search').value || '').toLowerCase().trim();
+    const pageEmails = new Set((peEmails || []).map(e => e.toLowerCase()));
+    const alreadyAttached = new Set(peVehicles);
+    const sorted = automotiveCache.slice().sort((a, b) => {
+        const am = pageEmails.has((a.driverEmail||'').toLowerCase()) ? 1 : 0;
+        const bm = pageEmails.has((b.driverEmail||'').toLowerCase()) ? 1 : 0;
+        if (am !== bm) return bm - am;
+        return vehicleSummary(a).localeCompare(vehicleSummary(b));
+    });
+    const matches = sorted.filter(v => {
+        if (!filter) return true;
+        const hay = [v.year, v.make, v.model, v.licensePlate, v.defaultDriver, v.driverEmail, v.serialNumber].filter(Boolean).join(' ').toLowerCase();
+        return hay.includes(filter);
+    });
+    const list = document.getElementById('vehicle-picker-list');
+    if (!matches.length) {
+        list.innerHTML = '<div class="empty" style="padding:30px;text-align:center;color:var(--text-secondary);border:2px dashed var(--border);border-radius:10px;">No matching vehicles.</div>';
+        return;
+    }
+    list.innerHTML = matches.map(v => {
+        const checked = vehiclePickerSelected.has(v._docId) ? 'checked' : '';
+        const matched = pageEmails.has((v.driverEmail||'').toLowerCase());
+        const already = alreadyAttached.has(v._docId);
+        const disabled = already ? 'disabled' : '';
+        const matchBadge = matched ? `<span style="color:var(--success);font-size:0.7rem;font-weight:700;margin-left:6px;">✓ FOR THIS PAGE</span>` : '';
+        const alreadyBadge = already ? `<span style="color:var(--text-secondary);font-size:0.7rem;font-weight:700;margin-left:6px;">— ALREADY ATTACHED</span>` : '';
+        const cardCount = (v.documents||[]).filter(d => d.type === 'insurance_card').length;
+        const cardLine = cardCount ? `<span style="color:var(--success);">🛡️ ${cardCount} insurance card${cardCount!==1?'s':''}</span>` : `<span style="color:var(--text-secondary);">No insurance cards yet</span>`;
+        const subBits = [v.licensePlate, v.defaultDriver, v.driverEmail].filter(Boolean).join(' · ');
+        return `<label style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:#fff;margin-bottom:6px;cursor:${already?'not-allowed':'pointer'};opacity:${already?'0.55':'1'};">
+            <input type="checkbox" ${checked} ${disabled} onchange="toggleVehiclePick('${v._docId}', this.checked)" style="margin-top:2px;cursor:${already?'not-allowed':'pointer'};">
+            <div style="flex:1;min-width:0;">
+                <div style="font-size:0.9rem;font-weight:700;">${esc(vehicleSummary(v))}${matchBadge}${alreadyBadge}</div>
+                ${subBits ? `<div style="font-size:0.78rem;color:var(--text-secondary);margin-top:2px;">${esc(subBits)}</div>` : ''}
+                <div style="font-size:0.78rem;margin-top:2px;">${cardLine}</div>
+            </div>
+        </label>`;
+    }).join('');
+    document.getElementById('vehicle-picker-attach-btn').disabled = vehiclePickerSelected.size === 0;
+}
+
+function toggleVehiclePick(docId, checked) {
+    if (checked) vehiclePickerSelected.add(docId); else vehiclePickerSelected.delete(docId);
+    document.getElementById('vehicle-picker-attach-btn').disabled = vehiclePickerSelected.size === 0;
+}
+
+function attachSelectedVehicles() {
+    let added = 0;
+    const existing = new Set(peVehicles);
+    for (const docId of vehiclePickerSelected) {
+        if (!existing.has(docId)) { peVehicles.push(docId); added++; }
+    }
+    closeVehiclePicker();
+    renderVehiclesEditor();
+    if (added) toast(`Attached ${added} vehicle${added!==1?'s':''}.`, 'success');
 }
 
 // ── INVENTORY CARD PICKER ─────────────────────────
@@ -664,6 +827,7 @@ async function savePage() {
         assignedEmails: peEmails.map(e => e.toLowerCase()),
         announcements: peAnnouncements.map(a => ({ title:a.title||'', body:a.body||'', createdAt:a.createdAt||new Date().toISOString() })),
         attachments,
+        assignedVehicleDocIds: peVehicles.slice(),
         updatedAt: new Date().toISOString()
     };
     try {

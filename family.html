@@ -263,12 +263,28 @@ async function renderFamilyPage(user) {
         annSection.style.display = 'none';
     }
 
-    // Vehicles assigned by driverEmail
+    // Vehicles: union of (driverEmail-matched) and (explicitly assigned to the family page)
+    const seen = new Set();
     let vehicles = [];
     try {
         const vsnap = await db.collection('automotive_items').where('driverEmail', '==', userEmail).get();
-        vehicles = vsnap.docs.map(d => ({ _docId: d.id, ...d.data() }));
-    } catch(e) { console.error('Vehicle lookup failed:', e); }
+        vsnap.docs.forEach(d => {
+            if (!seen.has(d.id)) { seen.add(d.id); vehicles.push({ _docId: d.id, ...d.data() }); }
+        });
+    } catch(e) { console.error('driverEmail vehicle lookup failed:', e); }
+    const assignedIds = (page.assignedVehicleDocIds || []).filter(id => !seen.has(id));
+    if (assignedIds.length) {
+        try {
+            // Firestore "in" supports up to 30 values per query; chunk for safety
+            for (let i = 0; i < assignedIds.length; i += 30) {
+                const batch = assignedIds.slice(i, i+30);
+                const snap = await db.collection('automotive_items').where(firebase.firestore.FieldPath.documentId(), 'in', batch).get();
+                snap.docs.forEach(d => {
+                    if (!seen.has(d.id)) { seen.add(d.id); vehicles.push({ _docId: d.id, ...d.data() }); }
+                });
+            }
+        } catch(e) { console.error('assigned-vehicle lookup failed:', e); }
+    }
 
     renderVehicles(vehicles);
     renderInsuranceCards(vehicles, page.attachments || []);

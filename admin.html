@@ -176,6 +176,7 @@ main { max-width:1100px; margin:0 auto; padding:24px 18px 80px; }
             <section class="card">
                 <h2>👨‍👩‍👧 Family Pages
                     <div class="h2-actions">
+                        <button class="btn btn-ghost btn-sm" id="btn-refresh-all-pages" onclick="refreshAllFamilyPages()" title="Re-sync all family pages with current inventory; remove attachments whose source has been deleted or reassigned">🔄 Refresh All</button>
                         <button class="btn btn-primary btn-sm" onclick="openPageEditor()">+ New Family Page</button>
                     </div>
                 </h2>
@@ -422,7 +423,8 @@ function openPageEditor(docId) {
         expirationDate: a.expirationDate || '',
         url: a.url, mimeType: a.mimeType || '',
         addedAt: a.addedAt || '',
-        file: null, base64: null, fileName: a.name || ''
+        file: null, base64: null, fileName: a.name || '',
+        source: a.source || null
     }));
     peVehicles = (editingPage?.assignedVehicleDocIds || []).slice();
     renderEmailChips();
@@ -756,7 +758,8 @@ function attachSelectedFromInv() {
             mimeType: c.mimeType || '',
             file: null, base64: null,
             fileName: c.name,
-            addedAt: new Date().toISOString()
+            addedAt: new Date().toISOString(),
+            source: { kind: 'inventory', vehicleDocId: c.vehicleDocId }
         });
         added++;
     }
@@ -806,19 +809,23 @@ async function savePage() {
                 const ref  = storage.ref().child(path);
                 await ref.put(c.file);
                 const url  = await ref.getDownloadURL();
-                attachments.push({
+                const a = {
                     name: c.name || c.fileName || 'Document',
                     url, mimeType: c.mimeType || '',
                     expirationDate: c.expirationDate || '',
                     addedAt: new Date().toISOString()
-                });
+                };
+                if (c.source) a.source = c.source;
+                attachments.push(a);
             } else if (c.url) {
-                attachments.push({
+                const a = {
                     name: c.name || 'Document',
                     url: c.url, mimeType: c.mimeType || '',
                     expirationDate: c.expirationDate || '',
                     addedAt: c.addedAt || new Date().toISOString()
-                });
+                };
+                if (c.source) a.source = c.source;
+                attachments.push(a);
             }
         }
     } catch(e) { toast('File upload failed: ' + e.message, 'error'); return; }
@@ -843,6 +850,80 @@ async function savePage() {
         closePageEditor();
         await loadPages();
     } catch(e) { toast('Save failed: ' + e.message, 'error'); }
+}
+
+async function refreshAllFamilyPages() {
+    if (!confirm('Refresh All Family Pages?\n\n• Re-syncs each family page against current inventory.\n• Removes attachments that came from Inventory whose source vehicle has been deleted, reassigned away from this page, or had the original card removed.\n• Removes assigned-vehicle links to vehicles that no longer exist.\n• Direct uploads on family pages are kept untouched.\n\nProceed?')) return;
+    const btn = document.getElementById('btn-refresh-all-pages');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Refreshing…'; }
+    try {
+        // Snapshot inventory once
+        const vSnap = await db.collection('automotive_items').get();
+        const vehiclesById = new Map();
+        vSnap.docs.forEach(d => vehiclesById.set(d.id, { _docId: d.id, ...d.data() }));
+
+        // Snapshot family pages fresh (in case the in-memory list is stale)
+        const pSnap = await db.collection('family_pages').get();
+        const allPages = pSnap.docs.map(d => ({ _docId: d.id, ...d.data() }));
+
+        let totalAttRemoved = 0, totalVehRemoved = 0, pagesUpdated = 0;
+        for (const p of allPages) {
+            const assignedEmails = (p.assignedEmails || []).map(e => (e||'').toLowerCase());
+            const explicitVehIds = new Set(p.assignedVehicleDocIds || []);
+
+            // Pool of vehicle docIds this page legitimately covers
+            const pool = new Set();
+            vehiclesById.forEach((v, docId) => {
+                if (assignedEmails.includes((v.driverEmail || '').toLowerCase())) pool.add(docId);
+                if (explicitVehIds.has(docId)) pool.add(docId);
+            });
+
+            // Filter attachments
+            const beforeAtt = p.attachments || [];
+            const afterAtt = [];
+            for (const a of beforeAtt) {
+                const src = a.source;
+                if (!src || !src.vehicleDocId) { afterAtt.push(a); continue; } // direct upload — keep
+                const v = vehiclesById.get(src.vehicleDocId);
+                if (!v) continue; // vehicle gone
+                if (!pool.has(src.vehicleDocId)) continue; // vehicle no longer in this page's pool
+                // Verify the URL still exists somewhere on that vehicle
+                const inDocs = (v.documents || []).some(d => d.url === a.url);
+                const insPhoto = (v.photos || []).find(ph => ph.slot === 'insurance');
+                const inInsPhoto = !!(insPhoto && insPhoto.url === a.url);
+                if (!inDocs && !inInsPhoto) continue; // original card was deleted from inventory
+                afterAtt.push(a);
+            }
+            const attRemoved = beforeAtt.length - afterAtt.length;
+
+            // Filter assignedVehicleDocIds — drop ones that no longer exist
+            const beforeVeh = p.assignedVehicleDocIds || [];
+            const afterVeh = beforeVeh.filter(id => vehiclesById.has(id));
+            const vehRemoved = beforeVeh.length - afterVeh.length;
+
+            if (attRemoved > 0 || vehRemoved > 0) {
+                await db.collection('family_pages').doc(p._docId).update({
+                    attachments: afterAtt,
+                    assignedVehicleDocIds: afterVeh,
+                    updatedAt: new Date().toISOString()
+                });
+                totalAttRemoved += attRemoved;
+                totalVehRemoved += vehRemoved;
+                pagesUpdated++;
+            }
+        }
+
+        await loadPages();
+        if (totalAttRemoved === 0 && totalVehRemoved === 0) {
+            toast('Nothing stale found — all family pages are already in sync.', 'success');
+        } else {
+            toast(`Refreshed: removed ${totalAttRemoved} attachment${totalAttRemoved!==1?'s':''} and ${totalVehRemoved} vehicle link${totalVehRemoved!==1?'s':''} across ${pagesUpdated} page${pagesUpdated!==1?'s':''}.`, 'success');
+        }
+    } catch(err) {
+        toast('Refresh failed: ' + err.message, 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = '🔄 Refresh All'; }
+    }
 }
 
 function familyLinkFor(p) {

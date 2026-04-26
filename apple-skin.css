@@ -1,0 +1,153 @@
+/* ============================================================
+   APPLE SKIN — sitewide typography & interaction polish.
+   Loaded after each page's own <style> block, so per-page
+   palettes (knives red, armory gold, addison purple, etc.)
+   keep their identity. This sheet only refines:
+     • typography (SF Pro stack + smoothing + tracking)
+     • selection color
+     • button + input interactions (transitions, focus rings)
+     • the dark site-switcher → translucent glass nav
+     • subtle scrollbar
+   No background colors are forced; cards keep their per-page
+   look. Reskin one page at a time on top of this.
+   ============================================================ */
+
+/* ── Typography ──────────────────────────────────────────── */
+html, body {
+    font-family:
+        "SF Pro Display", "SF Pro Text",
+        -apple-system, BlinkMacSystemFont,
+        "Helvetica Neue", "Segoe UI", Roboto, Arial, sans-serif !important;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.01em;
+    font-feature-settings: "kern", "liga", "calt";
+    text-rendering: optimizeLegibility;
+}
+
+/* Headline tightening — Apple's signature negative tracking */
+h1, h2, h3, h4, h5,
+.login-title, .login-subtitle,
+.modal-title, .modal-sub,
+.section-title, .section-title *,
+.hero h2, .hero p,
+.veh-title, .veh-sub,
+.ins-card-title,
+.page-name, .ann-title,
+header h1, header h2 {
+    letter-spacing: -0.022em;
+}
+
+/* SF-style mono for VIN / code-ish text where a class hint exists */
+.mono, code, kbd, samp, pre, .vin-display, .serial-display {
+    font-family: "SF Mono", ui-monospace, Menlo, Monaco, "Cascadia Mono",
+                 "Roboto Mono", Consolas, monospace !important;
+    font-feature-settings: "ss01", "ss02", "calt";
+}
+
+/* ── Selection ───────────────────────────────────────────── */
+::selection         { background: rgba(0, 113, 227, 0.22); color: inherit; }
+::-moz-selection    { background: rgba(0, 113, 227, 0.22); color: inherit; }
+
+/* ── Buttons ─────────────────────────────────────────────── */
+button, .btn, .btn-primary, .btn-ghost, .btn-danger, .btn-info, .btn-sm,
+.signout-btn, .login-btn {
+    transition:
+        background-color 0.18s ease,
+        color 0.18s ease,
+        border-color 0.18s ease,
+        box-shadow 0.18s ease,
+        transform 0.12s ease,
+        opacity 0.18s ease !important;
+    font-family: inherit;
+}
+button:active, .btn:active, .login-btn:active, .signout-btn:active {
+    transform: scale(0.985);
+}
+
+/* Pill the most prominent buttons. Per-page styles can still override
+   border-radius if a page has a strong identity reason not to. */
+.btn-primary, .login-btn, .btn-ai {
+    border-radius: 980px !important;
+}
+
+/* ── Inputs ──────────────────────────────────────────────── */
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
+textarea:focus,
+select:focus {
+    outline: none !important;
+    box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.12);
+}
+
+/* ── Site-switcher → glass nav (Apple's signature) ───────── */
+.site-switcher {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(11, 15, 26, 0.78) !important;
+    -webkit-backdrop-filter: saturate(180%) blur(22px);
+    backdrop-filter: saturate(180%) blur(22px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.site-switcher .site-link {
+    transition:
+        background-color 0.18s ease,
+        color 0.18s ease !important;
+    letter-spacing: -0.01em;
+}
+
+/* Page header (where pages have a top app-bar inside <header>) */
+header > .logo-area + nav button,
+header nav button,
+header h1 {
+    letter-spacing: -0.022em;
+}
+
+/* ── Cards: subtle shadow if the page declared no shadow ─── */
+.card,
+.veh-card,
+.ins-card,
+.modal,
+.login-box,
+.page-row {
+    transition: box-shadow 0.3s ease, transform 0.3s ease, border-color 0.18s ease;
+}
+
+/* ── Links ───────────────────────────────────────────────── */
+a {
+    transition: color 0.15s ease, opacity 0.15s ease;
+}
+
+/* ── Scrollbars (WebKit) ─────────────────────────────────── */
+::-webkit-scrollbar         { width: 12px; height: 12px; }
+::-webkit-scrollbar-track   { background: transparent; }
+::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 980px;
+    border: 3px solid transparent;
+    background-clip: padding-box;
+    transition: background 0.2s ease;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.30);
+    border: 3px solid transparent;
+    background-clip: padding-box;
+}
+/* Dark-bg pages get a lighter scrollbar */
+@media (prefers-color-scheme: dark) {
+    ::-webkit-scrollbar-thumb       { background: rgba(255, 255, 255, 0.18); }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.30); }
+}
+
+/* ── Modal polish ────────────────────────────────────────── */
+.modal-overlay {
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+}
+
+/* ── Toast: pill the toast for Apple-style chip notifications */
+.toast {
+    border-radius: 980px !important;
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+}

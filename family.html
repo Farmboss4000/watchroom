@@ -349,6 +349,15 @@ function renderVehicles(vehicles) {
             if (diffDays <= 60) return `<span class="tab-warn">⚠ Exp soon ${esc(v.tabsExpiration)}</span>`;
             return esc(v.tabsExpiration);
         })();
+        const insExpHtml = (() => {
+            if (!v.insuranceExpirationDate) return '';
+            const exp = new Date(v.insuranceExpirationDate + 'T00:00:00');
+            const now = new Date(); now.setHours(0,0,0,0);
+            const diffDays = Math.round((exp - now) / 86400000);
+            if (diffDays < 0)   return `<span class="tab-exp">⚠ EXPIRED ${esc(v.insuranceExpirationDate)}</span>`;
+            if (diffDays <= 30) return `<span class="tab-warn">⚠ Exp soon ${esc(v.insuranceExpirationDate)}</span>`;
+            return esc(v.insuranceExpirationDate);
+        })();
         return `<div class="veh-card">
             <div class="veh-card-photo">${photoHtml}</div>
             <div class="veh-title">${esc([v.year, v.make, v.model].filter(Boolean).join(' ')) || 'Vehicle'}</div>
@@ -359,14 +368,34 @@ function renderVehicles(vehicles) {
                 <div><strong>VIN</strong><span style="font-family:monospace;font-size:0.78rem;">${esc(v.serialNumber || '—')}</span></div>
                 <div><strong>Mileage</strong>${v.mileage ? Number(v.mileage).toLocaleString() + ' mi' : '—'}</div>
                 ${v.insuranceCompany ? `<div style="grid-column:1 / -1;"><strong>Insurance</strong>${esc(v.insuranceCompany)}</div>` : ''}
+                ${v.insuranceEffectiveDate ? `<div><strong>Effective</strong>${esc(v.insuranceEffectiveDate)}</div>` : ''}
+                ${insExpHtml ? `<div><strong>Expires</strong>${insExpHtml}</div>` : ''}
             </div>
         </div>`;
     }).join('')}</div>`;
 }
 
 function renderInsuranceCards(vehicles, pageAttachments) {
-    // Aggregate insurance_card documents from all assigned vehicles
     const cards = [];
+    // Per-vehicle Insurance Card photo (the new slot='insurance' on the vehicle form)
+    for (const v of vehicles) {
+        const insPhoto = (v.photos || []).find(p => p.slot === 'insurance');
+        if (insPhoto?.url) {
+            const vehicleLabel = [v.year, v.make, v.model].filter(Boolean).join(' ') || ('Vehicle #' + (v.id || ''));
+            const namePieces = [v.insuranceCompany || 'Proof of Insurance', vehicleLabel].filter(Boolean);
+            cards.push({
+                name: namePieces.join(' — '),
+                url: insPhoto.url,
+                mimeType: '',
+                effectiveDate: v.insuranceEffectiveDate || '',
+                expirationDate: v.insuranceExpirationDate || '',
+                addedAt: '',
+                vehicleLabel,
+                licensePlate: v.licensePlate || ''
+            });
+        }
+    }
+    // Insurance_card documents from each vehicle (existing bulk-upload flow)
     for (const v of vehicles) {
         for (const d of (v.documents || [])) {
             if (d.type === 'insurance_card' && d.url) {
@@ -389,13 +418,17 @@ function renderInsuranceCards(vehicles, pageAttachments) {
     list.innerHTML = `<div class="ins-list">${cards.map(c => {
         const isPdf = (c.mimeType || '').includes('pdf');
         const icon = isPdf ? '📄' : '🛡️';
-        const expBit = c.expirationDate ? `Expires ${esc(c.expirationDate)}` : '';
+        const dateBits = [];
+        if (c.effectiveDate)  dateBits.push(`Effective ${esc(c.effectiveDate)}`);
+        if (c.expirationDate) dateBits.push(`Expires ${esc(c.expirationDate)}`);
+        const dateLine = dateBits.join(' · ');
         const vehBit = c.vehicleLabel ? esc(c.vehicleLabel) + (c.licensePlate ? ` (${esc(c.licensePlate)})` : '') : '';
         return `<div class="ins-card">
             <div class="ins-card-icon">${icon}</div>
             <div class="ins-card-body">
                 <div class="ins-card-title">${esc(c.name || 'Proof of Insurance')}</div>
-                <div class="ins-card-meta">${vehBit}${vehBit && expBit ? ' · ' : ''}${expBit}</div>
+                ${vehBit ? `<div class="ins-card-meta">${vehBit}</div>` : ''}
+                ${dateLine ? `<div class="ins-card-meta">${dateLine}</div>` : ''}
                 <a href="${c.url}" target="_blank" rel="noopener">View / Download →</a>
             </div>
         </div>`;

@@ -300,15 +300,24 @@ async function renderFamilyPage(user) {
         annSection.style.display = 'none';
     }
 
-    // Vehicles: union of (driverEmail-matched) and (explicitly assigned to the family page)
+    // Vehicles: union of (driverEmail in page.assignedEmails) and (explicitly assigned to the family page).
+    // Use the PAGE's assigned emails — not the logged-in user's email — so admin preview mode and
+    // shared-email pages both produce correct results.
     const seen = new Set();
     let vehicles = [];
-    try {
-        const vsnap = await db.collection('automotive_items').where('driverEmail', '==', userEmail).get();
-        vsnap.docs.forEach(d => {
-            if (!seen.has(d.id)) { seen.add(d.id); vehicles.push({ _docId: d.id, ...d.data() }); }
-        });
-    } catch(e) { console.error('driverEmail vehicle lookup failed:', e); }
+    const pageEmails = (page.assignedEmails || []).map(e => (e||'').toLowerCase()).filter(Boolean);
+    if (pageEmails.length) {
+        try {
+            // Firestore "in" supports up to 10 values per query; chunk for safety
+            for (let i = 0; i < pageEmails.length; i += 10) {
+                const batch = pageEmails.slice(i, i+10);
+                const vsnap = await db.collection('automotive_items').where('driverEmail', 'in', batch).get();
+                vsnap.docs.forEach(d => {
+                    if (!seen.has(d.id)) { seen.add(d.id); vehicles.push({ _docId: d.id, ...d.data() }); }
+                });
+            }
+        } catch(e) { console.error('driverEmail vehicle lookup failed:', e); }
+    }
     const assignedIds = (page.assignedVehicleDocIds || []).filter(id => !seen.has(id));
     if (assignedIds.length) {
         try {

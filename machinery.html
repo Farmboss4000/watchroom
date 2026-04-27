@@ -387,6 +387,28 @@
         .view-menu input[type=checkbox] { margin:0; cursor:pointer; }
     </style>
     <link rel="stylesheet" href="apple-skin.css">
+    <style id="patriotic-skin">
+        /* ── PATRIOTIC SKIN ── faint flag watermark + red/white/blue accent stripes */
+        html, body {
+            background:
+                url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1235 650' preserveAspectRatio='xMidYMid slice'><defs><filter id='b' x='-10%25' y='-10%25' width='120%25' height='120%25'><feGaussianBlur stdDeviation='4'/></filter></defs><g opacity='0.09' filter='url(%23b)'><rect y='0' width='1235' height='50' fill='%23b22234'/><rect y='100' width='1235' height='50' fill='%23b22234'/><rect y='200' width='1235' height='50' fill='%23b22234'/><rect y='300' width='1235' height='50' fill='%23b22234'/><rect y='400' width='1235' height='50' fill='%23b22234'/><rect y='500' width='1235' height='50' fill='%23b22234'/><rect y='600' width='1235' height='50' fill='%23b22234'/><rect width='494' height='350' fill='%233c3b6e'/></g></svg>") center center / cover no-repeat fixed,
+                #fbfbfd !important;
+        }
+        body > header { position: relative; }
+        body > header::after {
+            content: "";
+            position: absolute; left: 0; right: 0; bottom: 0; height: 3px;
+            background: linear-gradient(90deg, #b22234 0 33.34%, #ffffff 33.34% 66.66%, #3c3b6e 66.66% 100%);
+            pointer-events: none;
+        }
+        .site-switcher { position: relative; }
+        .site-switcher::after {
+            content: "";
+            position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+            background: linear-gradient(90deg, #b22234 0 33.34%, #ffffff 33.34% 66.66%, #3c3b6e 66.66% 100%);
+            pointer-events: none;
+        }
+    </style>
 </head>
 <body>
 

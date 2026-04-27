@@ -141,6 +141,20 @@ header h1 span { color: var(--accent); font-weight: 500; }
     animation: spin 0.8s cubic-bezier(0.5,0.1,0.5,0.9) infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+@keyframes susPulse { 0%,100% { opacity:1; transform:scale(1);} 50% { opacity:0.55; transform:scale(1.18);} }
+@keyframes susBannerPulse { 0%,100% { box-shadow:0 0 0 0 rgba(220,38,38,0.55);} 50% { box-shadow:0 0 0 14px rgba(220,38,38,0);} }
+.sus-banner { background: linear-gradient(135deg,#dc2626 0%,#991b1b 100%); color:#fff; padding:18px 22px; border-radius:14px;
+    margin: 0 0 28px; display:flex; align-items:flex-start; gap:16px; flex-wrap:wrap;
+    border:2px solid #fca5a5; animation: susBannerPulse 1.8s ease-in-out infinite; }
+.sus-banner-icon { font-size:1.9rem; line-height:1; flex-shrink:0; }
+.sus-banner-title { font-weight:800; font-size:1.1rem; letter-spacing:0.4px; text-transform:uppercase; }
+.sus-banner-sub { font-size:0.9rem; opacity:0.95; margin-top:4px; }
+.sus-banner-list { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
+.sus-banner-chip { background:rgba(255,255,255,0.18); border:1px solid rgba(255,255,255,0.4); padding:4px 12px;
+    border-radius:14px; font-size:0.82rem; font-weight:600; }
+.veh-suspended-badge { display:flex; align-items:center; gap:8px; background:#fee2e2; border-left:5px solid #dc2626;
+    color:#991b1b; padding:10px 14px; margin: 0 0 14px; border-radius:6px; font-weight:700; font-size:0.9rem; letter-spacing:0.3px; }
+.veh-suspended-badge .pulse { color:#dc2626; font-size:1.1rem; animation: susPulse 1.6s ease-in-out infinite; }
 
 /* Layout */
 main { max-width: 1200px; margin: 0 auto; padding: 48px 24px 96px; }
@@ -434,6 +448,8 @@ main { max-width: 1200px; margin: 0 auto; padding: 48px 24px 96px; }
                 <p id="hero-sub">Here's what's been shared with you.</p>
             </div>
 
+            <div id="family-sus-banner" class="sus-banner" style="display:none;"></div>
+
             <div class="section" id="announcements-section" style="display:none;">
                 <div class="section-title">📣 Announcements</div>
                 <div id="announcements-list"></div>
@@ -616,8 +632,29 @@ async function renderFamilyPage(user) {
         } catch(e) { console.error('assigned-vehicle lookup failed:', e); }
     }
 
+    renderSuspenseBanner(vehicles);
     renderVehicles(vehicles);
     renderInsuranceCards(vehicles, page.attachments || []);
+}
+
+function renderSuspenseBanner(vehicles) {
+    const el = document.getElementById('family-sus-banner');
+    if (!el) return;
+    const sus = (vehicles || []).filter(v => v.insuranceSuspended);
+    if (!sus.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    el.style.display = 'flex';
+    const chips = sus.map(v => {
+        const lbl = [v.year, v.make, v.model].filter(Boolean).join(' ') || ('Vehicle #' + (v.id || ''));
+        return `<span class="sus-banner-chip">❗ ${esc(lbl)}${v.licensePlate ? ' · ' + esc(v.licensePlate) : ''}</span>`;
+    }).join('');
+    el.innerHTML = `
+        <div class="sus-banner-icon">⚠️</div>
+        <div style="flex:1;min-width:0;">
+            <div class="sus-banner-title">Insurance Suspended on ${sus.length} of Your Vehicle${sus.length!==1?'s':''}</div>
+            <div class="sus-banner-sub">Coverage is currently paused. Do not drive ${sus.length===1?'this vehicle':'these vehicles'} on public roads until insurance is reinstated.</div>
+            <div class="sus-banner-list">${chips}</div>
+        </div>
+    `;
 }
 
 function renderVehicles(vehicles) {
@@ -651,9 +688,13 @@ function renderVehicles(vehicles) {
             if (diffDays <= 30) return `<span class="tab-warn">⚠ Exp soon ${esc(v.insuranceExpirationDate)}</span>`;
             return esc(v.insuranceExpirationDate);
         })();
+        const susBadge = v.insuranceSuspended
+            ? `<div class="veh-suspended-badge"><span class="pulse">❗</span><span>INSURANCE SUSPENDED — DO NOT DRIVE</span></div>`
+            : '';
         return `<div class="veh-card">
             <div class="veh-card-photo">${photoHtml}</div>
             <div class="veh-card-body">
+                ${susBadge}
                 <div class="veh-title">${esc([v.year, v.make, v.model].filter(Boolean).join(' ')) || 'Vehicle'}</div>
                 <div class="veh-sub">${esc(v.category || '')}${v.color ? ' · ' + esc(v.color) : ''}</div>
                 <div class="veh-meta">

@@ -532,49 +532,6 @@
         }
         .site-switcher-label { color:#fef3c7 !important; }
 
-        /* — BUNTING STRIP — */
-        .patriot-bunting {
-            background: linear-gradient(180deg, #0a3161 0%, #061a3a 100%);
-            padding: 0; margin: 0; height: 38px; position:relative; overflow:hidden;
-            border-bottom: 3px double #fff;
-        }
-        .patriot-bunting::before {
-            content:''; position:absolute; inset:0;
-            background:
-                radial-gradient(circle at 6% 50%, #fff 2px, transparent 2.6px) 0 0/40px 38px,
-                radial-gradient(circle at 6% 25%, #fff 1.4px, transparent 1.8px) 20px 0/40px 38px;
-            opacity:0.65;
-        }
-        .patriot-bunting-swag {
-            position:absolute; left:0; right:0; top:0; height:100%;
-            background:
-                /* alternating red & white dome arches via radial-gradient */
-                repeating-radial-gradient(circle at 24px 0, var(--us-red) 0 22px, transparent 22.5px 48px),
-                repeating-radial-gradient(circle at 72px 0, #fff 0 22px, transparent 22.5px 48px);
-            background-size: 96px 50px;
-            opacity: 0.6;
-            mix-blend-mode: screen;
-        }
-
-        /* — MOTTO TICKER — */
-        .patriot-ticker {
-            background: linear-gradient(90deg, var(--us-red) 0%, var(--us-red-bright) 50%, var(--us-red) 100%);
-            color:#fff; font-weight:900; letter-spacing:1.5px; text-transform:uppercase;
-            font-family: 'Georgia', 'Times New Roman', serif;
-            padding:9px 0; overflow:hidden; position:relative;
-            border-top: 2px solid #fff; border-bottom: 2px solid var(--us-blue);
-            font-size: 0.92rem;
-            text-shadow: 1px 1px 0 rgba(0,0,0,0.4), 0 0 12px rgba(255,235,150,0.4);
-        }
-        .patriot-ticker-track {
-            display:inline-block; white-space:nowrap;
-            padding-left:100%;
-            animation: patriotScroll 38s linear infinite;
-        }
-        .patriot-ticker-track span { padding: 0 28px; }
-        .patriot-ticker-track span::before { content:'⭐ '; color:#fde68a; }
-        @keyframes patriotScroll { 0% { transform:translateX(0);} 100% { transform:translateX(-100%);} }
-
         /* — HEADER — navy with star canton + red bottom band — */
         header {
             background:
@@ -770,19 +727,6 @@
         <a href="family.html" class="site-link">👨‍👩‍👧 Family</a>
         <a href="admin.html" class="site-link">🔧 Admin</a>
     </div>
-
-<!-- ══ PATRIOT BUNTING + MOTTO TICKER ══ -->
-<div class="patriot-bunting"><div class="patriot-bunting-swag"></div></div>
-<div class="patriot-ticker">
-    <div class="patriot-ticker-track">
-        <span>Live Free or Die</span><span>Home of the Brave</span><span>Don't Tread on Me</span>
-        <span>NRA Life Member</span><span>Second Amendment Forever</span><span>God Bless America</span>
-        <span>Protect &amp; Serve</span><span>Land of the Free</span><span>Ruger Strong</span>
-        <span>Molon Labe</span><span>We the People</span><span>Stars &amp; Stripes Forever</span>
-        <span>One Nation Under God</span><span>Old Glory Flies High</span><span>Patriots Stand Ready</span>
-        <span>Bald Eagles &amp; Brass Casings</span><span>Liberty or Death</span><span>USA · USA · USA</span>
-    </div>
-</div>
 
 <!-- ══ LOGIN ══ -->
 <div id="login-screen">

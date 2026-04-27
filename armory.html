@@ -469,6 +469,14 @@
         @keyframes dp-pulse { 0%,100%{opacity:1} 50%{opacity:0.45} }
         .site-link[href="dontpush.html"] { animation: dp-pulse 3.5s ease-in-out infinite; }
         .site-link[href="dontpush.html"].active { animation: dp-pulse 3.5s ease-in-out infinite; }
+
+        /* ── COLUMN VIEW PICKER ── */
+        .view-menu { display:none; position:absolute; top:calc(100% + 4px); right:0; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px; padding:8px 4px; min-width:200px; max-height:320px; overflow-y:auto; box-shadow:0 6px 18px rgba(0,0,0,0.18); z-index:200; }
+        .view-menu.open { display:block; }
+        .view-menu-title { font-size:0.72rem; font-weight:700; color:var(--text-secondary); padding:4px 10px 6px; text-transform:uppercase; letter-spacing:0.5px; }
+        .view-menu label { display:flex; align-items:center; gap:8px; padding:6px 10px; font-size:0.85rem; cursor:pointer; user-select:none; border-radius:4px; }
+        .view-menu label:hover { background:var(--bg-card); }
+        .view-menu input[type=checkbox] { margin:0; cursor:pointer; }
     </style>
     <link rel="stylesheet" href="apple-skin.css">
 </head>
@@ -900,23 +908,31 @@
             <button class="btn btn-ghost btn-sm" id="btn-refresh-all-mv" onclick="refreshAllMarketValues()" title="Re-estimate market value for all firearms">💲 Refresh All Values</button>
             <button class="btn btn-ghost btn-sm" onclick="exportCSV()">↓ Export CSV</button>
             <button class="btn btn-ghost btn-sm" onclick="showView('packing-list')">🎒 Packing List</button>
+            <div class="view-picker-wrap" style="position:relative;display:inline-block;">
+                <button class="btn btn-ghost btn-sm" onclick="toggleViewMenu(event)" title="Show / hide columns">👁 View</button>
+                <div id="view-menu" class="view-menu">
+                    <div class="view-menu-title">Show columns</div>
+                    <div id="view-menu-items"></div>
+                </div>
+            </div>
         </div>
+        <style id="inv-col-style"></style>
         <div class="table-wrapper">
             <table id="inv-table">
                 <thead><tr>
-                    <th class="no-sort">Barcode</th>
-                    <th class="no-sort" style="width:52px;">Photo</th>
-                    <th onclick="sortBy('category')">Category</th>
-                    <th onclick="sortBy('manufacturer')">Manufacturer</th>
-                    <th onclick="sortBy('model')">Model</th>
-                    <th onclick="sortBy('serialNumber')">Serial #</th>
-                    <th onclick="sortBy('caliber')">Caliber</th>
-                    <th onclick="sortBy('quantity')">Qty</th>
-                    <th onclick="sortBy('purchaseDate')">Purchased</th>
-                    <th onclick="sortBy('vendor')">Vendor</th>
-                    <th onclick="sortBy('price')">Purchase Price</th>
-                    <th onclick="sortBy('marketValue')">Market Value</th>
-                    <th class="no-sort">Actions</th>
+                    <th class="no-sort" data-col="barcode">Barcode</th>
+                    <th class="no-sort" data-col="photo" style="width:52px;">Photo</th>
+                    <th onclick="sortBy('category')" data-col="category">Category</th>
+                    <th onclick="sortBy('manufacturer')" data-col="manufacturer">Manufacturer</th>
+                    <th onclick="sortBy('model')" data-col="model">Model</th>
+                    <th onclick="sortBy('serialNumber')" data-col="serialNumber">Serial #</th>
+                    <th onclick="sortBy('caliber')" data-col="caliber">Caliber</th>
+                    <th onclick="sortBy('quantity')" data-col="quantity">Qty</th>
+                    <th onclick="sortBy('purchaseDate')" data-col="purchaseDate">Purchased</th>
+                    <th onclick="sortBy('vendor')" data-col="vendor">Vendor</th>
+                    <th onclick="sortBy('price')" data-col="price">Purchase Price</th>
+                    <th onclick="sortBy('marketValue')" data-col="marketValue">Market Value</th>
+                    <th class="no-sort" data-col="actions">Actions</th>
                 </tr></thead>
                 <tbody id="inv-tbody"></tbody>
                 <tfoot id="inv-tfoot"></tfoot>
@@ -3478,19 +3494,19 @@ function renderInventory() {
             ? `<span style="display:inline-flex;align-items:center;gap:3px;background:#2a2030;color:#c084fc;padding:2px 7px;border-radius:10px;font-size:0.72rem;font-weight:600;margin-right:4px;cursor:default;" title="Suppressor: ${esc([mySuppressor.manufacturer,mySuppressor.model].filter(Boolean).join(' '))} (#${mySuppressor.id})">🔇</span>`
             : '';
         return `<tr>
-            <td><input type="checkbox" class="pack-check" data-docid="${it._docId}"></td>
-            <td>${thumb}</td>
-            <td><span class="badge ${catClass(it.category)}">${it.category||'—'}</span></td>
-            <td>${esc(it.manufacturer)||'—'}</td>
-            <td>${esc(it.model)||'—'}</td>
-            <td class="mono">${esc(it.serialNumber)||'—'}</td>
-            <td>${esc(it.caliber)||'—'}</td>
-            <td style="text-align:center">${it.quantity||1}</td>
-            <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():'—'}</td>
-            <td style="font-size:0.82rem;">${esc(it.vendor)||'—'}</td>
-            <td style="white-space:nowrap;">${it.price ? '$'+Number(it.price).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—'}</td>
-            <td id="mv-cell-${it._docId}" style="white-space:nowrap;min-width:90px;">${marketValueCell(it)}</td>
-            <td style="white-space:nowrap">
+            <td data-col="barcode"><input type="checkbox" class="pack-check" data-docid="${it._docId}"></td>
+            <td data-col="photo">${thumb}</td>
+            <td data-col="category"><span class="badge ${catClass(it.category)}">${it.category||'—'}</span></td>
+            <td data-col="manufacturer">${esc(it.manufacturer)||'—'}</td>
+            <td data-col="model">${esc(it.model)||'—'}</td>
+            <td data-col="serialNumber" class="mono">${esc(it.serialNumber)||'—'}</td>
+            <td data-col="caliber">${esc(it.caliber)||'—'}</td>
+            <td data-col="quantity" style="text-align:center">${it.quantity||1}</td>
+            <td data-col="purchaseDate">${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():'—'}</td>
+            <td data-col="vendor" style="font-size:0.82rem;">${esc(it.vendor)||'—'}</td>
+            <td data-col="price" style="white-space:nowrap;">${it.price ? '$'+Number(it.price).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—'}</td>
+            <td data-col="marketValue" id="mv-cell-${it._docId}" style="white-space:nowrap;min-width:90px;">${marketValueCell(it)}</td>
+            <td data-col="actions" style="white-space:nowrap">
                 ${(it.magazines&&it.magazines.length) ? `<span style="display:inline-flex;align-items:center;gap:3px;background:var(--accent-dim);color:var(--accent);padding:2px 7px;border-radius:10px;font-size:0.72rem;font-weight:600;margin-right:4px;" title="${it.magazines.length} magazine${it.magazines.length!==1?'s':''} logged">📦 ${it.magazines.length}</span>` : ''}
                 ${suppHostBadge}${mySuppBadge}
                 <button class="btn btn-info btn-sm" onclick="showBarcode('${it._docId}')" title="Barcode/Photos">▣</button>
@@ -5278,6 +5294,55 @@ function showDiarySummary(summary, date) {
     if (text) text.textContent = summary;
     if (dateEl) dateEl.textContent = '— ' + date;
 }
+
+// ═══════════════════════════════════════
+//  COLUMN VIEW PICKER
+// ═══════════════════════════════════════
+const INV_VIEW_COLUMNS = [
+    ['barcode','Barcode'], ['photo','Photo'], ['category','Category'], ['manufacturer','Manufacturer'],
+    ['model','Model'], ['serialNumber','Serial #'], ['caliber','Caliber'], ['quantity','Qty'],
+    ['purchaseDate','Purchased'], ['vendor','Vendor'], ['price','Purchase Price'],
+    ['marketValue','Market Value'], ['actions','Actions']
+];
+const INV_HIDDEN_COLS_KEY = 'armory-inv-hidden-cols';
+let invHiddenCols = (() => {
+    try { const s = localStorage.getItem(INV_HIDDEN_COLS_KEY); if (s) return JSON.parse(s); } catch(e) {}
+    return [];
+})();
+function applyInvColumnVisibility() {
+    const styleEl = document.getElementById('inv-col-style');
+    if (!styleEl) return;
+    styleEl.textContent = invHiddenCols.length
+        ? invHiddenCols.map(k => `#inv-table [data-col="${k}"]{display:none;}`).join('')
+        : '';
+}
+function renderViewMenu() {
+    const items = document.getElementById('view-menu-items');
+    if (!items) return;
+    items.innerHTML = INV_VIEW_COLUMNS.map(([key,label]) => {
+        const checked = !invHiddenCols.includes(key);
+        return `<label><input type="checkbox" ${checked?'checked':''} onchange="toggleInvColumn('${key}', this.checked)"> ${label}</label>`;
+    }).join('');
+}
+function toggleInvColumn(key, visible) {
+    if (visible) invHiddenCols = invHiddenCols.filter(k=>k!==key);
+    else if (!invHiddenCols.includes(key)) invHiddenCols.push(key);
+    try { localStorage.setItem(INV_HIDDEN_COLS_KEY, JSON.stringify(invHiddenCols)); } catch(e) {}
+    applyInvColumnVisibility();
+}
+function toggleViewMenu(e) {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('view-menu');
+    if (!menu) return;
+    if (!menu.classList.contains('open')) renderViewMenu();
+    menu.classList.toggle('open');
+}
+document.addEventListener('click', e => {
+    const menu = document.getElementById('view-menu');
+    if (!menu || !menu.classList.contains('open')) return;
+    if (!e.target.closest('.view-picker-wrap')) menu.classList.remove('open');
+});
+applyInvColumnVisibility();
 </script>
 </body>
 </html>

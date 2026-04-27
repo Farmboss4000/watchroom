@@ -377,6 +377,14 @@
         @keyframes dp-pulse { 0%,100%{opacity:1} 50%{opacity:0.45} }
         .site-link[href="dontpush.html"] { animation: dp-pulse 3.5s ease-in-out infinite; }
         .site-link[href="dontpush.html"].active { animation: dp-pulse 3.5s ease-in-out infinite; }
+
+        /* ── COLUMN VIEW PICKER ── */
+        .view-menu { display:none; position:absolute; top:calc(100% + 4px); right:0; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px; padding:8px 4px; min-width:200px; max-height:320px; overflow-y:auto; box-shadow:0 6px 18px rgba(0,0,0,0.18); z-index:200; }
+        .view-menu.open { display:block; }
+        .view-menu-title { font-size:0.72rem; font-weight:700; color:var(--text-secondary); padding:4px 10px 6px; text-transform:uppercase; letter-spacing:0.5px; }
+        .view-menu label { display:flex; align-items:center; gap:8px; padding:6px 10px; font-size:0.85rem; cursor:pointer; user-select:none; border-radius:4px; }
+        .view-menu label:hover { background:var(--bg-card); }
+        .view-menu input[type=checkbox] { margin:0; cursor:pointer; }
     </style>
     <link rel="stylesheet" href="apple-skin.css">
 </head>
@@ -590,6 +598,10 @@
                     <input type="text" id="f-serial" placeholder="e.g. 1RW8370RCJD123456">
                 </div>
                 <div class="form-group">
+                    <label>License Plate</label>
+                    <input type="text" id="f-license" placeholder="e.g. ABC-1234" style="text-transform:uppercase;">
+                </div>
+                <div class="form-group">
                     <label>Engine Hours</label>
                     <input type="number" id="f-hours" placeholder="e.g. 4250" min="0">
                 </div>
@@ -659,6 +671,18 @@
                             <input type="file" id="file-serial" accept="image/*" onchange="onPhotoSelected('serial',this)">
                         </div>
                         <button type="button" class="btn-ai" id="btn-ocr" onclick="extractSerial()" disabled>🔍 Extract Serial/PIN with AI</button>
+                    </div>
+                    <!-- LICENSE PLATE PHOTO -->
+                    <div class="photo-slot">
+                        <div class="photo-slot-label">🏷 License Plate Photo</div>
+                        <div class="photo-preview" id="prev-plate">
+                            <span class="no-photo">🏷</span>
+                            <button type="button" class="remove-photo" onclick="removePhoto('plate')">✕</button>
+                        </div>
+                        <div class="photo-file-input">
+                            <input type="file" id="file-plate" accept="image/*" onchange="onPhotoSelected('plate',this)">
+                        </div>
+                        <button type="button" class="btn-ai" id="btn-plate-ocr" onclick="extractLicensePlate()" disabled>🔍 Read Plate with AI</button>
                     </div>
                     <!-- ADDITIONAL PHOTO -->
                     <div class="photo-slot">
@@ -740,23 +764,31 @@
             <button class="btn btn-ghost btn-sm" onclick="openScanner()" title="Scan barcode">📷 Scan</button>
             <button class="btn btn-ghost btn-sm" id="btn-refresh-all-mv" onclick="refreshAllMarketValues()">💲 Refresh All Values</button>
             <button class="btn btn-ghost btn-sm" onclick="exportCSV()">↓ Export CSV</button>
+            <div class="view-picker-wrap" style="position:relative;display:inline-block;">
+                <button class="btn btn-ghost btn-sm" onclick="toggleViewMenu(event)" title="Show / hide columns">👁 View</button>
+                <div id="view-menu" class="view-menu">
+                    <div class="view-menu-title">Show columns</div>
+                    <div id="view-menu-items"></div>
+                </div>
+            </div>
         </div>
+        <style id="inv-col-style"></style>
         <div class="table-wrapper">
             <table id="inv-table">
                 <thead><tr>
-                    <th class="no-sort" style="width:52px;">Photo</th>
-                    <th onclick="sortBy('id')">ID</th>
-                    <th onclick="sortBy('category')">Type</th>
-                    <th onclick="sortBy('make')">Make</th>
-                    <th onclick="sortBy('model')">Model</th>
-                    <th onclick="sortBy('year')">Year</th>
-                    <th onclick="sortBy('serialNumber')">Serial / PIN</th>
-                    <th onclick="sortBy('hours')">Hours</th>
-                    <th onclick="sortBy('condition')">Condition</th>
-                    <th onclick="sortBy('location')">Location</th>
-                    <th onclick="sortBy('purchaseDate')">Purchased</th>
-                    <th onclick="sortBy('marketValue')">Market Value</th>
-                    <th class="no-sort">Actions</th>
+                    <th class="no-sort" data-col="photo" style="width:52px;">Photo</th>
+                    <th onclick="sortBy('id')" data-col="id">ID</th>
+                    <th onclick="sortBy('category')" data-col="category">Type</th>
+                    <th onclick="sortBy('make')" data-col="make">Make</th>
+                    <th onclick="sortBy('model')" data-col="model">Model</th>
+                    <th onclick="sortBy('year')" data-col="year">Year</th>
+                    <th onclick="sortBy('serialNumber')" data-col="serialNumber">Serial / PIN</th>
+                    <th onclick="sortBy('hours')" data-col="hours">Hours</th>
+                    <th onclick="sortBy('condition')" data-col="condition">Condition</th>
+                    <th onclick="sortBy('location')" data-col="location">Location</th>
+                    <th onclick="sortBy('purchaseDate')" data-col="purchaseDate">Purchased</th>
+                    <th onclick="sortBy('marketValue')" data-col="marketValue">Market Value</th>
+                    <th class="no-sort" data-col="actions">Actions</th>
                 </tr></thead>
                 <tbody id="inv-tbody"></tbody>
             </table>
@@ -1076,6 +1108,7 @@ let scannerActive = false;
 let formPhotos = {
     main:      { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false },
     serial:    { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false },
+    plate:     { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false },
     extra:     { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false },
     paperwork: { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false }
 };
@@ -1381,6 +1414,7 @@ async function onPhotoSelected(slot, input) {
     }
     if (slot==='main')      document.getElementById('btn-identify').disabled = false;
     if (slot==='serial')    document.getElementById('btn-ocr').disabled      = false;
+    if (slot==='plate')     document.getElementById('btn-plate-ocr').disabled = false;
     if (slot==='paperwork') document.getElementById('btn-paperwork').disabled = false;
 }
 
@@ -1391,12 +1425,13 @@ function renderPhotoPreview(slot, dataUrl) {
 
 function removePhoto(slot) {
     formPhotos[slot] = { file:null, base64:null, mimeType:null, existingUrl:null, deleted:true };
-    const icons = { main:'📷', serial:'📋', extra:'🖼', paperwork:'📄' };
+    const icons = { main:'📷', serial:'📋', plate:'🏷', extra:'🖼', paperwork:'📄' };
     document.getElementById('prev-'+slot).innerHTML =
         `<span class="no-photo">${icons[slot]}</span><button type="button" class="remove-photo" onclick="removePhoto('${slot}')">✕</button>`;
     document.getElementById('file-'+slot).value = '';
     if (slot==='main')      document.getElementById('btn-identify').disabled = true;
     if (slot==='serial')    document.getElementById('btn-ocr').disabled      = true;
+    if (slot==='plate')     document.getElementById('btn-plate-ocr').disabled = true;
     if (slot==='paperwork') document.getElementById('btn-paperwork').disabled = true;
 }
 
@@ -1498,6 +1533,34 @@ async function extractSerial() {
     } finally {
         btn.disabled = false; btn.classList.remove('scanning');
         btn.innerHTML = '🔍 Extract Serial/PIN with AI';
+    }
+}
+
+async function extractLicensePlate() {
+    const p = formPhotos.plate; if (!p.base64) return;
+    const btn    = document.getElementById('btn-plate-ocr');
+    const status = document.getElementById('ai-status');
+    btn.disabled = true; btn.classList.add('scanning'); btn.textContent = '⏳ Reading...';
+    status.textContent = 'Reading license plate...';
+    try {
+        const prompt = `This is a photo of a license plate on a piece of farm equipment, machinery, or trailer. Extract the license plate number — the alphanumeric characters exactly as displayed. Return ONLY the plate number (uppercase, no spaces; preserve hyphens only if clearly present), no explanation, no labels, no other text.`;
+        const result = await callClaude(p.base64, p.mimeType, prompt);
+        if (!result) return;
+        const plate = result.trim().toUpperCase().replace(/[^A-Z0-9-]/g,'');
+        if (plate) {
+            document.getElementById('f-license').value = plate;
+            status.textContent = `✅ Plate extracted: ${plate}`;
+            status.style.color  = 'var(--success)';
+        } else {
+            status.textContent = '⚠️ Could not read plate clearly — fill in manually.';
+            status.style.color  = 'var(--text-secondary)';
+        }
+    } catch(err) {
+        status.textContent = '❌ Error: '+err.message;
+        status.style.color  = 'var(--danger)';
+    } finally {
+        btn.disabled = false; btn.classList.remove('scanning');
+        btn.innerHTML = '🔍 Read Plate with AI';
     }
 }
 
@@ -1665,6 +1728,7 @@ document.getElementById('item-form').addEventListener('submit', async e => {
         model:        document.getElementById('f-model').value.trim(),
         year:         document.getElementById('f-year').value.trim(),
         serialNumber: document.getElementById('f-serial').value.trim(),
+        licensePlate: document.getElementById('f-license').value.trim().toUpperCase(),
         hours:        document.getElementById('f-hours').value.trim(),
         condition:    document.getElementById('f-condition').value,
         purchaseDate: document.getElementById('f-purchase-date').value,
@@ -1678,7 +1742,7 @@ document.getElementById('item-form').addEventListener('submit', async e => {
         addMakeIfNew(data.make);
         const existingPhotos = docId ? (items.find(i=>i._docId===docId)?.photos||[]) : [];
         const photos = [];
-        for (const slot of ['main','serial','extra','paperwork']) {
+        for (const slot of ['main','serial','plate','extra','paperwork']) {
             const p = formPhotos[slot];
             if (p.file) {
                 try {
@@ -1736,12 +1800,13 @@ function resetForm() {
     document.getElementById('form-submit-btn').disabled    = false;
     document.getElementById('ai-status').textContent   = '';
     populateCatSelect(); populateMakeList();
-    for (const slot of ['main','serial','extra','paperwork']) {
+    for (const slot of ['main','serial','plate','extra','paperwork']) {
         formPhotos[slot] = { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false };
     }
-    removePhoto('main'); removePhoto('serial'); removePhoto('extra'); removePhoto('paperwork');
+    removePhoto('main'); removePhoto('serial'); removePhoto('plate'); removePhoto('extra'); removePhoto('paperwork');
     document.getElementById('btn-identify').disabled  = true;
     document.getElementById('btn-ocr').disabled       = true;
+    document.getElementById('btn-plate-ocr').disabled = true;
     document.getElementById('btn-paperwork').disabled = true;
     // Clear documentation
     formDocs = [];
@@ -1763,6 +1828,7 @@ function editItem(docId) {
     document.getElementById('f-model').value           = it.model||'';
     document.getElementById('f-year').value            = it.year||'';
     document.getElementById('f-serial').value          = it.serialNumber||'';
+    document.getElementById('f-license').value         = it.licensePlate||'';
     document.getElementById('f-hours').value           = it.hours||'';
     document.getElementById('f-condition').value       = it.condition||'';
     document.getElementById('f-purchase-date').value   = it.purchaseDate||'';
@@ -1772,7 +1838,7 @@ function editItem(docId) {
     document.getElementById('f-notes').value           = it.notes||'';
     document.getElementById('form-title').textContent      = `✏️ Edit Equipment #${it.id}`;
     document.getElementById('form-submit-btn').textContent = 'Update Equipment';
-    for (const slot of ['main','serial','extra','paperwork']) {
+    for (const slot of ['main','serial','plate','extra','paperwork']) {
         const ph = it.photos?.find(p=>p.slot===slot);
         if (ph) {
             formPhotos[slot] = { file:null, base64:null, mimeType:null, existingUrl:ph.url, deleted:false };
@@ -1780,6 +1846,7 @@ function editItem(docId) {
                 `<img src="${ph.url}" alt="${slot}"><button type="button" class="remove-photo" onclick="removePhoto('${slot}')">✕</button>`;
             if (slot==='main')      document.getElementById('btn-identify').disabled = false;
             if (slot==='serial')    document.getElementById('btn-ocr').disabled      = false;
+            if (slot==='plate')     document.getElementById('btn-plate-ocr').disabled = false;
             if (slot==='paperwork') document.getElementById('btn-paperwork').disabled = false;
         }
     }
@@ -1884,19 +1951,19 @@ function renderInventory() {
         const condBadge = it.condition ? `<span style="font-size:0.72rem;font-weight:600;color:${
             it.condition==='Excellent'?'#15803d':it.condition==='Good'?'#1d4ed8':it.condition==='Fair'?'#92400e':'#dc2626'}">${it.condition}</span>` : '—';
         return `<tr>
-            <td>${thumb}</td>
-            <td class="mono">#${it.id}</td>
-            <td><span class="badge ${catClass(it.category)}">${it.category||'—'}</span></td>
-            <td>${esc(it.make)||'—'}</td>
-            <td>${esc(it.model)||'—'}</td>
-            <td>${it.year||'—'}</td>
-            <td class="mono">${esc(it.serialNumber)||'—'}</td>
-            <td>${it.hours ? Number(it.hours).toLocaleString()+' hrs' : '—'}</td>
-            <td>${condBadge}</td>
-            <td style="font-size:0.82rem">${esc(it.location)||'—'}</td>
-            <td>${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():'—'}</td>
-            <td id="mv-cell-${it._docId}">${marketValueCell(it)}</td>
-            <td style="white-space:nowrap">
+            <td data-col="photo">${thumb}</td>
+            <td data-col="id" class="mono">#${it.id}</td>
+            <td data-col="category"><span class="badge ${catClass(it.category)}">${it.category||'—'}</span></td>
+            <td data-col="make">${esc(it.make)||'—'}</td>
+            <td data-col="model">${esc(it.model)||'—'}</td>
+            <td data-col="year">${it.year||'—'}</td>
+            <td data-col="serialNumber" class="mono">${esc(it.serialNumber)||'—'}</td>
+            <td data-col="hours">${it.hours ? Number(it.hours).toLocaleString()+' hrs' : '—'}</td>
+            <td data-col="condition">${condBadge}</td>
+            <td data-col="location" style="font-size:0.82rem">${esc(it.location)||'—'}</td>
+            <td data-col="purchaseDate">${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():'—'}</td>
+            <td data-col="marketValue" id="mv-cell-${it._docId}">${marketValueCell(it)}</td>
+            <td data-col="actions" style="white-space:nowrap">
                 <button class="btn btn-info btn-sm" onclick="showBarcode('${it._docId}')" title="Barcode/Photos">▣</button>
                 <button class="btn btn-ghost btn-sm" style="color:#d4941a;border-color:#d4941a;" onclick="openMaintenance('${it._docId}')" title="Maintenance Log">🔧</button>
                 <button class="btn btn-ghost btn-sm" onclick="editItem('${it._docId}')" title="Edit">✎</button>
@@ -2706,6 +2773,54 @@ async function permanentDeleteBinItem(binId) {
         toast('Error: ' + e.message, true);
     }
 }
+
+// ═══════════════════════════════════════
+//  COLUMN VIEW PICKER
+// ═══════════════════════════════════════
+const INV_VIEW_COLUMNS = [
+    ['photo','Photo'], ['id','ID'], ['category','Type'], ['make','Make'], ['model','Model'],
+    ['year','Year'], ['serialNumber','Serial / PIN'], ['hours','Hours'], ['condition','Condition'],
+    ['location','Location'], ['purchaseDate','Purchased'], ['marketValue','Market Value'], ['actions','Actions']
+];
+const INV_HIDDEN_COLS_KEY = 'mach-inv-hidden-cols';
+let invHiddenCols = (() => {
+    try { const s = localStorage.getItem(INV_HIDDEN_COLS_KEY); if (s) return JSON.parse(s); } catch(e) {}
+    return [];
+})();
+function applyInvColumnVisibility() {
+    const styleEl = document.getElementById('inv-col-style');
+    if (!styleEl) return;
+    styleEl.textContent = invHiddenCols.length
+        ? invHiddenCols.map(k => `#inv-table [data-col="${k}"]{display:none;}`).join('')
+        : '';
+}
+function renderViewMenu() {
+    const items = document.getElementById('view-menu-items');
+    if (!items) return;
+    items.innerHTML = INV_VIEW_COLUMNS.map(([key,label]) => {
+        const checked = !invHiddenCols.includes(key);
+        return `<label><input type="checkbox" ${checked?'checked':''} onchange="toggleInvColumn('${key}', this.checked)"> ${label}</label>`;
+    }).join('');
+}
+function toggleInvColumn(key, visible) {
+    if (visible) invHiddenCols = invHiddenCols.filter(k=>k!==key);
+    else if (!invHiddenCols.includes(key)) invHiddenCols.push(key);
+    try { localStorage.setItem(INV_HIDDEN_COLS_KEY, JSON.stringify(invHiddenCols)); } catch(e) {}
+    applyInvColumnVisibility();
+}
+function toggleViewMenu(e) {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('view-menu');
+    if (!menu) return;
+    if (!menu.classList.contains('open')) renderViewMenu();
+    menu.classList.toggle('open');
+}
+document.addEventListener('click', e => {
+    const menu = document.getElementById('view-menu');
+    if (!menu || !menu.classList.contains('open')) return;
+    if (!e.target.closest('.view-picker-wrap')) menu.classList.remove('open');
+});
+applyInvColumnVisibility();
 </script>
 </body>
 </html>

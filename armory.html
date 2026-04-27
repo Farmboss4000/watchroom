@@ -518,40 +518,6 @@
         #app { position:relative; z-index:1; }
         #login-screen { z-index:9000; }
 
-        /* — site-switcher gets star pattern under navy — */
-        .site-switcher {
-            background:
-                radial-gradient(circle at 12% 50%, rgba(255,255,255,0.32) 1.4px, transparent 1.8px) 0 0/22px 22px,
-                linear-gradient(180deg, #0a1f4a 0%, #061538 100%) !important;
-            border-bottom: 4px solid var(--us-red) !important;
-            box-shadow: inset 0 -8px 0 0 #fff, inset 0 -12px 0 0 var(--us-red);
-        }
-        .site-link.active {
-            background: var(--us-red) !important; color:#fff !important;
-            box-shadow: 0 0 0 1.5px #fff inset, 0 0 8px rgba(220,38,38,0.6);
-        }
-        .site-switcher-label { color:#fef3c7 !important; }
-
-        /* — HEADER — navy with star canton + red bottom band — */
-        header {
-            background:
-                radial-gradient(circle at 4% 50%, rgba(255,255,255,0.22) 1.3px, transparent 1.7px) 0 0/22px 22px,
-                linear-gradient(135deg, var(--us-blue-deep) 0%, #0a3161 100%) !important;
-            border-bottom: 4px solid var(--us-red) !important;
-            box-shadow: 0 4px 0 0 #fff, 0 7px 0 0 var(--us-red), 0 2px 12px rgba(0,0,0,0.25) !important;
-        }
-        header h1 { color:#fff !important; text-shadow: 0 0 14px rgba(220,38,38,0.55); font-family: 'Georgia', 'Times New Roman', serif; }
-        header h1 span { color:#fde68a !important; }
-        .logo-icon {
-            background: linear-gradient(180deg, var(--us-red) 0% 50%, #fff 50% 100%) !important;
-            box-shadow: 0 0 0 2px var(--us-blue) inset, 0 0 0 3px #fff inset, 0 0 8px rgba(220,38,38,0.55);
-        }
-        nav button.active {
-            background: var(--us-red) !important; color:#fff !important; font-weight:800 !important;
-            box-shadow: 0 0 0 2px #fff inset, 0 0 0 3px var(--us-blue) inset;
-        }
-        nav button:hover { background: rgba(220,38,38,0.35) !important; color:#fff !important; }
-
         /* — HERO — giant flag treatment, eagle silhouette, glory text — */
         .hero {
             background:
@@ -638,13 +604,6 @@
         .btn-primary:hover, .btn-gold:hover {
             background: linear-gradient(180deg, var(--us-red) 0%, #991b1b 100%) !important;
         }
-
-        /* — HONOR ROLL: scrolling flag glow on active nav buttons — */
-        @keyframes patriotPulse {
-            0%,100% { box-shadow: 0 0 0 2px #fff inset, 0 0 0 3px var(--us-blue) inset, 0 0 12px rgba(220,38,38,0.7);}
-            50%     { box-shadow: 0 0 0 2px #fff inset, 0 0 0 3px var(--us-blue) inset, 0 0 22px rgba(254,230,138,0.9);}
-        }
-        nav button.active { animation: patriotPulse 2.4s ease-in-out infinite; }
 
         /* — DASHBOARD: motto rail (blue strip with mottos) above stats — */
         .patriot-rail {

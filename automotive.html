@@ -3999,15 +3999,32 @@ async function refreshMarketValue(docId) {
     if (cell) cell.innerHTML = '<span style="font-size:0.78rem;color:var(--text-secondary);">⏳ Estimating…</span>';
 
     try {
-        const prompt = `You are a vehicle valuation expert using NADA Guides methodology. Estimate the current fair market value for this vehicle in US dollars. Consider year, make, model, mileage, and condition. Return ONLY a whole number integer with no dollar sign, no commas, no text — just the number.
+        const prompt = `You are a vehicle valuation expert using NADA / J.D. Power / Kelley Blue Book methodology, with deep familiarity with heavy trucks, RVs, motorhome conversions, ATVs, boats, trailers, and equipment.
 
+Estimate the CURRENT FAIR MARKET VALUE in US dollars for the SPECIFIC configuration described below. Return ONLY a whole-number integer (no dollar sign, no commas, no text — just the number).
+
+CRITICAL RULES:
+- The Model field may include a trim, package, body code, or conversion identifier in addition to the base model. You MUST value the SPECIFIC configuration, not the base model.
+  Examples of identifiers to recognize and value at full configured price:
+    • Motorhome / RV conversions on truck chassis: "Renegade Classic 45CBF", "Renegade XL", "Showhauler", "Haulmark Motorcoach", "Featherlite Motorcoach", "United Specialties" — these are $400K-$1M+ luxury Class A/Super-C motorhomes built on Peterbilt / Kenworth / Freightliner / Western Star / Volvo chassis. NEVER value as a bare day-cab tractor.
+    • Pickup trim packages: "King Ranch", "Limited", "Platinum", "Raptor", "TRX", "Denali", "High Country", "Longhorn", "Power Wagon", "Tremor", "Lariat", "Laramie".
+    • Heavy-truck sleeper/spec packages: "Legacy Edition", "Pride & Class", "ProStar", "Anniversary Edition".
+    • Performance / luxury trims: "M Sport", "AMG", "ST", "STI", "Type R", "Trackhawk", "SVR", "Z06".
+- If the Category indicates RV / Motorhome / Travel Trailer / Toy Hauler, value as the RV — not the chassis.
+- For specialty / low-volume / luxury configurations where market data is thin, use MSRP minus reasonable depreciation by age and miles (15-22% first-year drop, then ~8-12% per year, less for diesel pushers and luxury motorhomes).
+- If the configuration is genuinely unknown to you, give your best informed estimate; do NOT default to a base-model value.
+
+VEHICLE:
+Category: ${it.category || 'Unknown'}
 Year: ${it.year}
 Make: ${it.make}
 Model: ${it.model}
 ${it.mileage ? 'Mileage: ' + Number(it.mileage).toLocaleString() + ' miles' : ''}
 ${it.condition ? 'Condition: ' + it.condition : ''}
 ${it.engine ? 'Engine: ' + it.engine : ''}
-${it.transmission ? 'Transmission: ' + it.transmission : ''}`;
+${it.transmission ? 'Transmission: ' + it.transmission : ''}
+
+Return only the integer value.`;
 
         // Use text-only Claude call (no image)
         const msgPayload = { model: aiModel, max_tokens: 64,

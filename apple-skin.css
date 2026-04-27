@@ -1,32 +1,102 @@
 /* ============================================================
-   APPLE SKIN — sitewide typography & interaction polish.
-   Loaded after each page's own <style> block, so per-page
-   palettes (knives red, armory gold, addison purple, etc.)
-   keep their identity. This sheet only refines:
-     • typography (SF Pro stack + smoothing + tracking)
-     • selection color
-     • button + input interactions (transitions, focus rings)
-     • the dark site-switcher → translucent glass nav
-     • subtle scrollbar
-   No background colors are forced; cards keep their per-page
-   look. Reskin one page at a time on top of this.
+   APPLE SKIN — sitewide reskin.
+   This file is loaded AFTER each page's inline <style> block,
+   so it wins the cascade. It redefines the common CSS variables
+   every page uses (--bg-primary, --accent, --text-primary, etc.)
+   to Apple values, then layers on universal Apple typography
+   and component polish.
+
+   Per-page accent identity (gold, red, green, purple, etc.) is
+   intentionally unified to Apple-blue here — the goal is
+   uniform Apple feel across all 22 pages.
    ============================================================ */
 
-/* ── Typography ──────────────────────────────────────────── */
+/* ── Variable overrides ─────────────────────────────────────
+   Forces Apple values on every common variable name we've
+   seen across pages. Inline :root blocks lose because we're
+   later in the cascade and we use !important. */
+:root {
+    /* Standard names */
+    --bg-primary:    #fbfbfd !important;
+    --bg-secondary:  #ffffff !important;
+    --bg-card:       #f5f5f7 !important;
+    --bg-raised:     #ffffff !important;
+    --bg:            #fbfbfd !important;
+    --bg2:           #ffffff !important;
+    --bg3:           #f5f5f7 !important;
+    --card:          #ffffff !important;
+    --surface:       #ffffff !important;
+    --surface-2:     #f5f5f7 !important;
+
+    --text-primary:    #1d1d1f !important;
+    --text-secondary:  #6e6e73 !important;
+    --text-tertiary:   #86868b !important;
+    --text:            #1d1d1f !important;
+    --text2:           #6e6e73 !important;
+    --text3:           #86868b !important;
+
+    --border:        rgba(0,0,0,0.08) !important;
+    --border2:       rgba(0,0,0,0.14) !important;
+    --border-strong: rgba(0,0,0,0.14) !important;
+
+    --accent:         #0071e3 !important;
+    --accent-hover:   #0077ed !important;
+    --accent-pressed: #0063c1 !important;
+    --accent-dim:     rgba(0,113,227,0.10) !important;
+    --accent-soft:    rgba(0,113,227,0.10) !important;
+    --accent2:        #0077ed !important;
+    --dim:            rgba(0,113,227,0.10) !important;
+
+    --success:  #34c759 !important;
+    --danger:   #ff3b30 !important;
+    --warn:     #ff9500 !important;
+    --warning:  #ff9500 !important;
+    --info:     #0071e3 !important;
+    --green:    #34c759 !important;
+    --red:      #ff3b30 !important;
+    --yellow:   #ff9500 !important;
+
+    /* Page-specific brand vars repointed to Apple-blue */
+    --gold:     #0071e3 !important;
+    --gold2:    #0077ed !important;
+    --gold-dim: rgba(0,113,227,0.10) !important;
+    --purple:   #0071e3 !important;
+
+    /* Headers / nav background — keep dark but unified */
+    --hdr-bg:   #1d1d1f !important;
+    --navy:     #1d1d1f !important;
+    --navy2:    #2d3748 !important;
+    --navy3:    #1a4d7a !important;
+
+    /* Apple-style shadow + radius tokens (override / add) */
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.06) !important;
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04) !important;
+    --shadow-lg: 0 16px 32px rgba(0,0,0,0.08), 0 4px 8px rgba(0,0,0,0.05) !important;
+    --shadow:    0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06) !important;
+    --radius:    16px !important;
+    --radius-sm: 12px !important;
+    --radius-md: 16px !important;
+    --radius-lg: 22px !important;
+    --radius-pill: 980px !important;
+}
+
+/* ── Page canvas ────────────────────────────────────────── */
 html, body {
+    background: #fbfbfd !important;
+    color: #1d1d1f !important;
     font-family:
-        "SF Pro Display", "SF Pro Text",
+        "SF Pro Display","SF Pro Text",
         -apple-system, BlinkMacSystemFont,
-        "Helvetica Neue", "Segoe UI", Roboto, Arial, sans-serif !important;
+        "Helvetica Neue","Segoe UI",Roboto,Arial,sans-serif !important;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     letter-spacing: -0.01em;
-    font-feature-settings: "kern", "liga", "calt";
+    font-feature-settings: "kern","liga","calt";
     text-rendering: optimizeLegibility;
 }
 
-/* Headline tightening — Apple's signature negative tracking */
-h1, h2, h3, h4, h5,
+/* Headline tightening */
+h1, h2, h3, h4, h5, h6,
 .login-title, .login-subtitle,
 .modal-title, .modal-sub,
 .section-title, .section-title *,
@@ -38,48 +108,46 @@ header h1, header h2 {
     letter-spacing: -0.022em;
 }
 
-/* SF-style mono for VIN / code-ish text where a class hint exists */
+/* Mono */
 .mono, code, kbd, samp, pre, .vin-display, .serial-display {
     font-family: "SF Mono", ui-monospace, Menlo, Monaco, "Cascadia Mono",
                  "Roboto Mono", Consolas, monospace !important;
-    font-feature-settings: "ss01", "ss02", "calt";
+    font-feature-settings: "ss01","ss02","calt";
 }
 
 /* ── Selection ───────────────────────────────────────────── */
-::selection         { background: rgba(0, 113, 227, 0.22); color: inherit; }
-::-moz-selection    { background: rgba(0, 113, 227, 0.22); color: inherit; }
+::selection      { background: rgba(0,113,227,0.22); color: inherit; }
+::-moz-selection { background: rgba(0,113,227,0.22); color: inherit; }
 
-/* ── Buttons ─────────────────────────────────────────────── */
-button, .btn, .btn-primary, .btn-ghost, .btn-danger, .btn-info, .btn-sm,
-.signout-btn, .login-btn {
-    transition:
-        background-color 0.18s ease,
-        color 0.18s ease,
-        border-color 0.18s ease,
-        box-shadow 0.18s ease,
-        transform 0.12s ease,
-        opacity 0.18s ease !important;
-    font-family: inherit;
+/* ── Header (per-page top app-bar) → Apple frosted white ── */
+body > header,
+#app > header,
+header.app-header,
+header[id]:not(.site-switcher) {
+    background: rgba(255,255,255,0.85) !important;
+    color: #1d1d1f !important;
+    border-bottom: 1px solid rgba(0,0,0,0.08) !important;
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
 }
-button:active, .btn:active, .login-btn:active, .signout-btn:active {
-    transform: scale(0.985);
+body > header *,
+#app > header *,
+header.app-header * {
+    /* Pull text colors back to dark on the now-light header.
+       Don't recolor links or accent-bearing pills — they keep their existing rule via inheritance/specificity. */
+    color: #1d1d1f;
 }
-
-/* Pill the most prominent buttons. Per-page styles can still override
-   border-radius if a page has a strong identity reason not to. */
-.btn-primary, .login-btn, .btn-ai {
-    border-radius: 980px !important;
-}
-
-/* ── Inputs ──────────────────────────────────────────────── */
-input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
-textarea:focus,
-select:focus {
-    outline: none !important;
-    box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.12);
+body > header a,
+#app > header a {
+    color: #0071e3;
 }
 
-/* ── Site-switcher → glass nav (Apple's signature) ───────── */
+/* Generic <header> not inside special containers (most pages have <header> directly) */
+body > header {
+    background: rgba(255,255,255,0.85) !important;
+}
+
+/* ── Site-switcher (the colored top bar with HQ/Armory/etc.) ── */
 .site-switcher {
     position: sticky;
     top: 0;
@@ -87,67 +155,247 @@ select:focus {
     background: rgba(11, 15, 26, 0.78) !important;
     -webkit-backdrop-filter: saturate(180%) blur(22px);
     backdrop-filter: saturate(180%) blur(22px);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
 }
-.site-switcher .site-link {
+
+/* ── Cards / surfaces ────────────────────────────────────── */
+.card,
+.modal,
+.login-box,
+.veh-card,
+.ins-card,
+.page-row,
+.stat-card,
+.dash-card,
+.section-card,
+.form-card {
+    background: #ffffff !important;
+    border-radius: 18px !important;
+    border: none !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06) !important;
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+.card:hover,
+.veh-card:hover,
+.ins-card:hover,
+.page-row:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05) !important;
+    transform: translateY(-1px);
+}
+
+/* ── Buttons ─────────────────────────────────────────────── */
+button, .btn, .signout-btn, .login-btn {
     transition:
         background-color 0.18s ease,
-        color 0.18s ease !important;
+        color 0.18s ease,
+        border-color 0.18s ease,
+        box-shadow 0.18s ease,
+        transform 0.12s ease,
+        opacity 0.18s ease !important;
+    font-family: inherit !important;
+}
+button:active, .btn:active, .login-btn:active, .signout-btn:active {
+    transform: scale(0.985);
+}
+
+/* Primary buttons → solid Apple blue, pill-shaped */
+.btn-primary,
+button.btn-primary,
+.login-btn,
+.btn-ai {
+    background: #0071e3 !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 980px !important;
+    box-shadow: none !important;
+}
+.btn-primary:hover,
+.login-btn:hover,
+.btn-ai:hover {
+    background: #0077ed !important;
+}
+
+/* Ghost buttons → subtle Apple style */
+.btn-ghost {
+    background: transparent !important;
+    color: #1d1d1f !important;
+    border: 1px solid rgba(0,0,0,0.10) !important;
+    border-radius: 980px !important;
+}
+.btn-ghost:hover {
+    background: #f5f5f7 !important;
+    border-color: rgba(0,0,0,0.14) !important;
+}
+
+/* Danger buttons */
+.btn-danger {
+    background: #ff3b30 !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 980px !important;
+}
+.btn-danger:hover { background: #ff5147 !important; }
+
+/* Info buttons */
+.btn-info {
+    background: #0071e3 !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 980px !important;
+}
+
+/* Small buttons keep the pill but slimmer */
+.btn-sm { padding: 6px 12px !important; font-size: 0.82rem !important; }
+
+/* ── Inputs ──────────────────────────────────────────────── */
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+textarea,
+select {
+    background: #f5f5f7 !important;
+    border: 1px solid transparent !important;
+    border-radius: 12px !important;
+    color: #1d1d1f !important;
+    font-family: inherit !important;
+}
+input:focus, textarea:focus, select:focus {
+    outline: none !important;
+    background: #ffffff !important;
+    border-color: #0071e3 !important;
+    box-shadow: 0 0 0 4px rgba(0,113,227,0.12) !important;
+}
+
+/* ── Modals ──────────────────────────────────────────────── */
+.modal-overlay {
+    background: rgba(0,0,0,0.45) !important;
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+}
+
+/* ── Toast: pill chip ───────────────────────────────────── */
+.toast {
+    border-radius: 980px !important;
+    background: rgba(29,29,31,0.92) !important;
+    color: #f5f5f7 !important;
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+}
+
+/* ── Tables (used in many pages' inventory views) ────────── */
+table {
+    background: #ffffff;
+    border-radius: 16px;
+    overflow: hidden;
+}
+thead th {
+    background: #f5f5f7 !important;
+    color: #6e6e73 !important;
+    font-weight: 500 !important;
+    font-size: 0.72rem !important;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border: none !important;
+}
+tbody tr { border-top: 1px solid rgba(0,0,0,0.06); }
+tbody tr:hover { background: #fafafd !important; }
+tbody td {
+    border: none !important;
+    color: #1d1d1f !important;
+}
+
+/* ── Badges / chips ──────────────────────────────────────── */
+.badge, .chip {
+    font-weight: 500 !important;
     letter-spacing: -0.01em;
 }
 
-/* Page header (where pages have a top app-bar inside <header>) */
-header > .logo-area + nav button,
-header nav button,
-header h1 {
-    letter-spacing: -0.022em;
+/* ── Links ──────────────────────────────────────────────── */
+a { color: #0071e3; transition: color 0.15s ease, opacity 0.15s ease; }
+a:hover { color: #0077ed; }
+
+/* ── Spinner: refined Apple style ──────────────────────── */
+.spinner {
+    border-color: rgba(0,113,227,0.15) !important;
+    border-top-color: #0071e3 !important;
 }
 
-/* ── Cards: subtle shadow if the page declared no shadow ─── */
-.card,
-.veh-card,
-.ins-card,
-.modal,
-.login-box,
-.page-row {
-    transition: box-shadow 0.3s ease, transform 0.3s ease, border-color 0.18s ease;
-}
-
-/* ── Links ───────────────────────────────────────────────── */
-a {
-    transition: color 0.15s ease, opacity 0.15s ease;
-}
-
-/* ── Scrollbars (WebKit) ─────────────────────────────────── */
+/* ── Scrollbars ─────────────────────────────────────────── */
 ::-webkit-scrollbar         { width: 12px; height: 12px; }
 ::-webkit-scrollbar-track   { background: transparent; }
 ::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.15);
+    background: rgba(0,0,0,0.15);
     border-radius: 980px;
     border: 3px solid transparent;
     background-clip: padding-box;
     transition: background 0.2s ease;
 }
 ::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 0, 0, 0.30);
+    background: rgba(0,0,0,0.30);
     border: 3px solid transparent;
     background-clip: padding-box;
 }
-/* Dark-bg pages get a lighter scrollbar */
-@media (prefers-color-scheme: dark) {
-    ::-webkit-scrollbar-thumb       { background: rgba(255, 255, 255, 0.18); }
-    ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.30); }
+
+/* ── Specific dark-page rescue: force them light ────────── */
+/* Pages that originally had #08080e or #0f0f1a or #0f172a backgrounds
+   declared on body directly (without using --bg-primary) get
+   overridden by the html/body !important rule above. Their
+   dark-on-dark text needs to be repaired so it reads on white. */
+body, body * {
+    /* Don't blanket-recolor — that would erase intentional accents.
+       Specific element-level fixes below if needed. */
 }
 
-/* ── Modal polish ────────────────────────────────────────── */
-.modal-overlay {
-    -webkit-backdrop-filter: blur(6px);
-    backdrop-filter: blur(6px);
+/* Photo / image containers stay neutral */
+img { background: transparent; }
+
+/* ── Login screens — force Apple light theme ─────────────── */
+#login-screen,
+.login-screen,
+[id$="-login-screen"] {
+    background: #fbfbfd !important;
+    background-image: none !important;
+    color: #1d1d1f !important;
+}
+.login-box {
+    background: #ffffff !important;
+    color: #1d1d1f !important;
+    border: none !important;
+    box-shadow: 0 16px 32px rgba(0,0,0,0.08), 0 4px 8px rgba(0,0,0,0.05) !important;
+    border-radius: 22px !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+}
+.login-title, .login-subtitle, .login-label {
+    color: #1d1d1f !important;
+}
+.login-subtitle, .login-label {
+    color: #6e6e73 !important;
+}
+.login-input {
+    background: #f5f5f7 !important;
+    border: 1px solid transparent !important;
+    color: #1d1d1f !important;
+    border-radius: 12px !important;
+}
+.login-input::placeholder { color: #86868b !important; }
+.login-input:focus {
+    background: #ffffff !important;
+    border-color: #0071e3 !important;
+    box-shadow: 0 0 0 4px rgba(0,113,227,0.12) !important;
+    outline: none !important;
+}
+.login-error { color: #ff3b30 !important; }
+.login-reset { color: #0071e3 !important; }
+.login-links a, .login-site-links a {
+    color: rgba(29,29,31,0.55) !important;
+    border-color: rgba(0,0,0,0.10) !important;
+}
+.login-links a:hover, .login-site-links a:hover {
+    color: #0071e3 !important;
+    border-color: #0071e3 !important;
 }
 
-/* ── Toast: pill the toast for Apple-style chip notifications */
-.toast {
-    border-radius: 980px !important;
-    backdrop-filter: saturate(180%) blur(20px);
-    -webkit-backdrop-filter: saturate(180%) blur(20px);
+/* ── Loading screens — light too ─────────────────────────── */
+#loading-screen, .loading-screen {
+    background: #fbfbfd !important;
+    color: #6e6e73 !important;
 }

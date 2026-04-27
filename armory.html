@@ -538,18 +538,26 @@
             box-shadow: 0 0 0 6px #fff, 0 0 0 9px var(--us-red), 0 18px 40px rgba(0,0,0,0.35);
             position:relative; overflow:hidden;
         }
+        /* Navy plate behind the hero text so letters stay legible regardless of stripe behind them */
+        .hero > div:first-of-type {
+            background: linear-gradient(135deg, rgba(6,26,58,0.94) 0%, rgba(10,49,97,0.92) 100%);
+            padding: 18px 28px; border-radius: 10px;
+            border: 2px solid #fff;
+            box-shadow: 0 0 0 3px var(--us-red), 0 6px 22px rgba(0,0,0,0.45);
+            position: relative; z-index: 1;
+        }
         .hero-title {
             color:#fff !important; text-transform: uppercase; letter-spacing: 2.5px;
             font-family: 'Georgia', 'Times New Roman', serif !important;
-            text-shadow: 3px 3px 0 var(--us-blue-deep), -1px -1px 0 var(--us-red), 0 0 22px rgba(255,235,150,0.7);
+            text-shadow: 0 2px 0 var(--us-blue-deep), 0 0 16px rgba(0,0,0,0.6);
             font-size: 2.1rem !important;
         }
-        .hero-title span { color: #fde68a !important; }
+        .hero-title span { color: #fde68a !important; text-shadow: 0 2px 0 var(--us-blue-deep), 0 0 18px rgba(254,230,138,0.45); }
         .hero-title::before { content:'🇺🇸  '; }
         .hero-title::after { content:'  🦅'; }
         .hero-sub {
             color:#fff !important; text-transform: uppercase; letter-spacing: 3px; font-weight:800;
-            text-shadow: 1px 1px 0 var(--us-blue-deep), 0 0 10px rgba(0,0,0,0.5);
+            text-shadow: 0 1px 0 #000, 0 0 8px rgba(0,0,0,0.6);
         }
         .hero-sub::before { content:'★ '; color:#fde68a; }
         .hero-sub::after  { content:' ★'; color:#fde68a; }

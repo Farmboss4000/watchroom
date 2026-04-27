@@ -79,6 +79,18 @@
         .spinner { width:44px; height:44px; border:4px solid var(--border); border-top-color:var(--accent);
             border-radius:50%; animation:spin 0.8s linear infinite; }
         @keyframes spin { to { transform:rotate(360deg); } }
+        @keyframes susPulse { 0%,100% { opacity:1; transform:scale(1);} 50% { opacity:0.55; transform:scale(1.18);} }
+        @keyframes susBannerPulse { 0%,100% { box-shadow:0 0 0 0 rgba(220,38,38,0.55);} 50% { box-shadow:0 0 0 14px rgba(220,38,38,0);} }
+        .sus-banner { background:linear-gradient(135deg,#dc2626 0%,#991b1b 100%); color:#fff; padding:14px 20px; border-radius:10px;
+            margin-bottom:18px; display:flex; align-items:flex-start; gap:14px; flex-wrap:wrap;
+            border:2px solid #fca5a5; animation:susBannerPulse 1.8s ease-in-out infinite; }
+        .sus-banner-icon { font-size:1.7rem; line-height:1; flex-shrink:0; }
+        .sus-banner-title { font-weight:800; font-size:1.05rem; letter-spacing:0.4px; text-transform:uppercase; }
+        .sus-banner-sub { font-size:0.85rem; opacity:0.95; margin-top:3px; }
+        .sus-banner-list { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+        .sus-banner-chip { background:rgba(255,255,255,0.18); border:1px solid rgba(255,255,255,0.35); padding:3px 10px;
+            border-radius:14px; font-size:0.78rem; font-weight:600; cursor:pointer; }
+        .sus-banner-chip:hover { background:rgba(255,255,255,0.3); }
         #loading-screen p { color:var(--text-secondary); font-size:0.9rem; }
 
         /* ── APP ── */
@@ -501,6 +513,7 @@
 
 <!-- ══ DASHBOARD ══ -->
 <div id="view-dashboard" class="view active">
+    <div id="sus-banner" class="sus-banner" style="display:none;"></div>
     <div class="hero">
         <div>
             <div class="hero-title">Farmboss <span>Automotive</span></div>
@@ -729,6 +742,14 @@
                         <option value="12mo">12 Months</option>
                     </select>
                     <div id="f-premium-hint" style="font-size:0.75rem;color:var(--text-secondary);margin-top:4px;min-height:1em;"></div>
+                </div>
+                <div class="form-group">
+                    <label>🚫 Insurance Suspense</label>
+                    <label style="display:flex;align-items:center;gap:8px;padding:9px 12px;border:1px solid var(--border);border-radius:7px;background:var(--bg-secondary);cursor:pointer;font-weight:500;font-size:0.9rem;">
+                        <input type="checkbox" id="f-insurance-suspended" style="width:18px;height:18px;accent-color:#dc2626;cursor:pointer;">
+                        <span>Insurance is currently <strong style="color:#dc2626;">SUSPENDED</strong></span>
+                    </label>
+                    <div style="font-size:0.72rem;color:var(--text-secondary);margin-top:4px;">Check this if coverage has been paused (off-season storage, non-op, etc.). The vehicle is flagged on the dashboard and inventory.</div>
                 </div>
                 <div class="form-group">
                     <label>👤 Default Driver / Assigned User</label>
@@ -1428,7 +1449,29 @@ function showView(v) {
 // ═══════════════════════════════════════
 //  DASHBOARD
 // ═══════════════════════════════════════
+function renderSuspenseBanner() {
+    const el = document.getElementById('sus-banner');
+    if (!el) return;
+    const sus = items.filter(i => i.insuranceSuspended);
+    if (!sus.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    el.style.display = 'flex';
+    const chips = sus.map(it => {
+        const lbl = [it.year, it.make, it.model].filter(Boolean).join(' ') || `Vehicle #${it.id}`;
+        return `<span class="sus-banner-chip" onclick="editItem('${it._docId}')" title="Click to edit">❗ ${esc(lbl)}</span>`;
+    }).join('');
+    el.innerHTML = `
+        <div class="sus-banner-icon">⚠️</div>
+        <div style="flex:1;min-width:0;">
+            <div class="sus-banner-title">Insurance Suspended on ${sus.length} Vehicle${sus.length!==1?'s':''}</div>
+            <div class="sus-banner-sub">Coverage is currently paused. These vehicles should not be driven on public roads.</div>
+            <div class="sus-banner-list">${chips}</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" style="background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.45);color:#fff;flex-shrink:0;" onclick="showView('inventory')">View Inventory →</button>
+    `;
+}
+
 function renderDashboard() {
+    renderSuspenseBanner();
     const total  = items.length;
     const ms30   = 30*24*60*60*1000;
     const recent = items.filter(i => i.addedAt && (Date.now()-new Date(i.addedAt).getTime())<ms30).length;
@@ -2349,6 +2392,7 @@ document.getElementById('item-form').addEventListener('submit', async e => {
         insuranceExpirationDate: document.getElementById('f-insurance-expiration').value,
         premium:        (() => { const v = document.getElementById('f-premium').value.trim(); return v ? Number(v) : null; })(),
         premiumTerm:    document.getElementById('f-premium-term').value || '',
+        insuranceSuspended: document.getElementById('f-insurance-suspended').checked,
         defaultDriver: document.getElementById('f-driver').value.trim(),
         driverEmail:   document.getElementById('f-driver-email').value.trim().toLowerCase(),
         notes:         document.getElementById('f-notes').value.trim(),
@@ -2474,6 +2518,7 @@ function resetForm() {
     document.getElementById('f-tabs-year').value  = '';
     document.getElementById('f-premium').value      = '';
     document.getElementById('f-premium-term').value = '';
+    document.getElementById('f-insurance-suspended').checked = false;
     updatePremiumHint();
     for (const slot of ['main','serial','extra','plate','insurance']) {
         formPhotos[slot] = { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false };
@@ -2519,6 +2564,7 @@ function editItem(docId) {
     document.getElementById('f-insurance-expiration').value  = it.insuranceExpirationDate||'';
     document.getElementById('f-premium').value               = it.premium != null ? it.premium : '';
     document.getElementById('f-premium-term').value          = it.premiumTerm || '';
+    document.getElementById('f-insurance-suspended').checked = !!it.insuranceSuspended;
     updatePremiumHint();
     document.getElementById('f-driver').value          = it.defaultDriver||'';
     document.getElementById('f-driver-email').value    = it.driverEmail||'';
@@ -2732,7 +2778,7 @@ function renderInventory() {
             <td data-col="defaultDriver">${it.defaultDriver ? `<span style="display:inline-flex;align-items:center;gap:5px;background:var(--accent-dim);color:var(--accent);padding:2px 9px;border-radius:12px;font-size:0.78rem;font-weight:600;">👤 ${esc(it.defaultDriver)}</span>` : '<span style="color:var(--text-secondary);font-size:0.8rem;">—</span>'}</td>
             <td data-col="purchaseDate">${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():'—'}</td>
             <td data-col="vendor" style="font-size:0.82rem;">${esc(it.vendor)||'—'}</td>
-            <td data-col="insuranceCompany" style="font-size:0.82rem;">${esc(it.insuranceCompany)||'—'}</td>
+            <td data-col="insuranceCompany" style="font-size:0.82rem;">${it.insuranceSuspended ? '<span title="Insurance SUSPENDED" style="color:#dc2626;font-weight:900;font-size:1.1rem;margin-right:5px;animation:susPulse 1.6s ease-in-out infinite;">❗</span>' : ''}${esc(it.insuranceCompany)||'—'}${it.insuranceSuspended ? '<div style="font-size:0.68rem;font-weight:800;color:#dc2626;letter-spacing:0.4px;">SUSPENDED</div>' : ''}</td>
             <td data-col="premiumAnnualized" style="white-space:nowrap;">${premiumCell(it)}</td>
             <td data-col="price" style="white-space:nowrap;">${it.price ? '$'+Number(it.price).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—'}</td>
             <td data-col="marketValue" style="white-space:nowrap;min-width:120px;" id="mv-cell-${it._docId}">

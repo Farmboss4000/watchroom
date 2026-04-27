@@ -602,6 +602,10 @@
                     <input type="text" id="f-license" placeholder="e.g. ABC-1234" style="text-transform:uppercase;">
                 </div>
                 <div class="form-group">
+                    <label>VIN</label>
+                    <input type="text" id="f-vin" placeholder="e.g. 4A2MB2526N3007687" style="text-transform:uppercase;">
+                </div>
+                <div class="form-group">
                     <label>Engine Hours</label>
                     <input type="number" id="f-hours" placeholder="e.g. 4250" min="0">
                 </div>
@@ -1588,7 +1592,7 @@ async function extractTitle() {
     try {
         const prompt = `This is a photo of a vehicle, trailer, or farm equipment title document (certificate of title or ownership).
 Extract the available information and return ONLY valid JSON with these exact fields (use empty string if not clearly readable):
-{"make":"manufacturer or brand name","model":"model name or number","year":"4-digit year","serialNumber":"VIN or serial number / PIN exactly as written","licensePlate":"plate number if shown, uppercase no spaces","titleNumber":"the title document number","owner":"registered owner name as shown"}
+{"make":"manufacturer or brand name","model":"model name or number","year":"4-digit year","vin":"VIN exactly as written, typically 17 alphanumeric characters","licensePlate":"plate number if shown, uppercase no spaces","titleNumber":"the title document number","owner":"registered owner name as shown"}
 Read what is clearly visible on the document. Return only the JSON object, no other text.`;
         const raw = await callClaude(p.base64, p.mimeType, prompt);
         if (!raw) return;
@@ -1599,7 +1603,7 @@ Read what is clearly visible on the document. Return only the JSON object, no ot
         if (result.make)         { document.getElementById('f-make').value    = result.make; filled.push('Make'); }
         if (result.model)        { document.getElementById('f-model').value   = result.model; filled.push('Model'); }
         if (result.year)         { document.getElementById('f-year').value    = result.year; filled.push('Year'); }
-        if (result.serialNumber) { document.getElementById('f-serial').value  = result.serialNumber; filled.push('Serial/VIN'); }
+        if (result.vin)          { document.getElementById('f-vin').value     = result.vin.toUpperCase().replace(/[^A-Z0-9]/g,''); filled.push('VIN'); }
         if (result.licensePlate) { document.getElementById('f-license').value = result.licensePlate.toUpperCase().replace(/[^A-Z0-9-]/g,''); filled.push('Plate'); }
         const extras = [];
         if (result.titleNumber) extras.push(`Title #${result.titleNumber}`);
@@ -1783,6 +1787,7 @@ document.getElementById('item-form').addEventListener('submit', async e => {
         year:         document.getElementById('f-year').value.trim(),
         serialNumber: document.getElementById('f-serial').value.trim(),
         licensePlate: document.getElementById('f-license').value.trim().toUpperCase(),
+        vin:          document.getElementById('f-vin').value.trim().toUpperCase(),
         hours:        document.getElementById('f-hours').value.trim(),
         condition:    document.getElementById('f-condition').value,
         purchaseDate: document.getElementById('f-purchase-date').value,
@@ -1884,6 +1889,7 @@ function editItem(docId) {
     document.getElementById('f-year').value            = it.year||'';
     document.getElementById('f-serial').value          = it.serialNumber||'';
     document.getElementById('f-license').value         = it.licensePlate||'';
+    document.getElementById('f-vin').value             = it.vin||'';
     document.getElementById('f-hours').value           = it.hours||'';
     document.getElementById('f-condition').value       = it.condition||'';
     document.getElementById('f-purchase-date').value   = it.purchaseDate||'';

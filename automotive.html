@@ -718,6 +718,19 @@
                     <input type="date" id="f-insurance-expiration">
                 </div>
                 <div class="form-group">
+                    <label>💵 Premium Amount ($)</label>
+                    <input type="number" id="f-premium" min="0" step="0.01" placeholder="0.00" oninput="updatePremiumHint()">
+                </div>
+                <div class="form-group">
+                    <label>📆 Premium Term</label>
+                    <select id="f-premium-term" onchange="updatePremiumHint()">
+                        <option value="">— Select —</option>
+                        <option value="6mo">6 Months</option>
+                        <option value="12mo">12 Months</option>
+                    </select>
+                    <div id="f-premium-hint" style="font-size:0.75rem;color:var(--text-secondary);margin-top:4px;min-height:1em;"></div>
+                </div>
+                <div class="form-group">
                     <label>👤 Default Driver / Assigned User</label>
                     <input type="text" id="f-driver" list="driver-list" placeholder="e.g. Jeff, Farm Crew, Ranch Manager" autocomplete="off">
                     <datalist id="driver-list"></datalist>
@@ -853,7 +866,7 @@
             <button class="btn btn-primary btn-sm" onclick="showView('add-item');resetForm()">+ Add Vehicle</button>
             <button class="btn btn-ghost btn-sm" onclick="openScanner()" title="Scan barcode">📷 Scan</button>
             <button class="btn btn-ghost btn-sm" id="btn-refresh-all-mv" onclick="refreshAllMarketValues()" title="Re-estimate market value for every vehicle">💲 Refresh All Values</button>
-            <button class="btn btn-ghost btn-sm" onclick="openInsCardsModal()" title="Bulk-upload proof-of-insurance cards and assign to vehicles">🛡️ Insurance Cards</button>
+            <button class="btn btn-ghost btn-sm" onclick="openInsCardsModal()" title="Upload insurance cards, declarations pages, renewal emails, or PDFs — AI reads premiums, expirations, and assigns to vehicles">🛡️ Scan Insurance</button>
             <div class="view-picker-wrap" style="position:relative;display:inline-block;">
                 <button class="btn btn-ghost btn-sm" onclick="toggleViewMenu(event)" title="Show / hide columns">👁 View</button>
                 <div id="view-menu" class="view-menu"><div class="view-menu-title">Show columns</div><div id="view-menu-items"></div></div>
@@ -879,6 +892,7 @@
                     <th onclick="sortBy('purchaseDate')" data-col="purchaseDate">Purchased</th>
                     <th onclick="sortBy('vendor')" data-col="vendor">Source</th>
                     <th onclick="sortBy('insuranceCompany')" data-col="insuranceCompany">Insurance Co.</th>
+                    <th onclick="sortBy('premiumAnnualized')" data-col="premiumAnnualized">Premium ($/yr)</th>
                     <th onclick="sortBy('price')" data-col="price">Purchase Price</th>
                     <th onclick="sortBy('marketValue')" data-col="marketValue">Market Value</th>
                     <th class="no-sort" data-col="actions">Actions</th>
@@ -896,6 +910,29 @@
 
 <!-- ══ REPORTS ══ -->
 <div id="view-reports" class="view">
+    <div class="card" style="margin-bottom:20px;">
+        <div class="card-title">
+            <div class="card-title-left">💵 Insurance Premium Analysis</div>
+            <span id="prem-last-snap" style="font-size:0.8rem;color:var(--text-secondary);"></span>
+        </div>
+        <div id="prem-stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:14px;"></div>
+        <div id="prem-empty" style="color:var(--text-secondary);font-size:0.88rem;padding:20px 0;text-align:center;display:none;">No premium data yet — enter premiums on vehicles or use 🛡️ Scan Insurance to start tracking.</div>
+        <canvas id="prem-chart" style="max-height:240px;"></canvas>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-top:18px;">
+            <div>
+                <div style="font-size:0.85rem;font-weight:700;margin-bottom:8px;">By Carrier</div>
+                <div class="table-wrapper"><table style="font-size:0.82rem;"><thead><tr>
+                    <th style="text-align:left">Carrier</th><th>Vehicles</th><th style="text-align:right">Annual Total</th><th style="text-align:right">Avg / Vehicle</th>
+                </tr></thead><tbody id="prem-carrier-tbody"></tbody></table></div>
+            </div>
+            <div>
+                <div style="font-size:0.85rem;font-weight:700;margin-bottom:8px;">By Vehicle</div>
+                <div class="table-wrapper"><table style="font-size:0.82rem;"><thead><tr>
+                    <th style="text-align:left">Vehicle</th><th style="text-align:left">Carrier</th><th>Term</th><th style="text-align:right">Premium</th><th style="text-align:right">Annualized</th><th>History</th>
+                </tr></thead><tbody id="prem-vehicle-tbody"></tbody></table></div>
+            </div>
+        </div>
+    </div>
     <div class="card" style="margin-bottom:20px;">
         <div class="card-title">
             <div class="card-title-left">📈 Fleet Value Over Time</div>
@@ -1140,13 +1177,13 @@ service firebase.storage {
     </div>
 </div>
 
-<!-- ══ INSURANCE CARDS BULK UPLOAD MODAL ══ -->
+<!-- ══ SCAN INSURANCE MODAL (cards, declarations, renewal emails) ══ -->
 <div class="modal-overlay" id="ins-cards-modal">
     <div class="modal" style="max-width:920px;">
-        <div class="modal-title">🛡️ Upload Insurance Cards</div>
-        <div class="modal-sub">Upload one or more cards as photos or PDFs. Multi-page PDFs will be split into individual cards. AI reads VIN / plate / expiration and suggests the matching vehicle — confirm and save.</div>
+        <div class="modal-title">🛡️ Scan Insurance</div>
+        <div class="modal-sub">Upload insurance cards, declarations pages, renewal notices, or emails — as photos, PDFs, or .eml/.html/.txt. Multi-page PDFs are split into individual cards. AI reads VIN / plate / carrier / premium / expiration and assigns to vehicles. New premiums replace the current value and the prior premium is archived to history.</div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:14px 0;">
-            <input type="file" id="ins-cards-files" accept="image/*,application/pdf" multiple style="display:none" onchange="onInsCardsFilesSelected(this)">
+            <input type="file" id="ins-cards-files" accept="image/*,application/pdf,message/rfc822,.eml,text/plain,.txt,text/html,.html,.htm" multiple style="display:none" onchange="onInsCardsFilesSelected(this)">
             <button type="button" class="btn btn-primary" onclick="document.getElementById('ins-cards-files').click()">📁 Choose Files</button>
             <span id="ins-cards-status" style="font-size:0.85rem;color:var(--text-secondary);"></span>
         </div>
@@ -1382,7 +1419,7 @@ function showView(v) {
     document.querySelectorAll('nav button').forEach((btn,i) => btn.classList.toggle('active', VIEWS[i]===v));
     if (v==='dashboard')  renderDashboard();
     if (v==='inventory')  { syncCatFilters(); renderInventory(); }
-    if (v==='reports')    { syncCatFilters(); renderReport(); loadValueHistory('automotive_value_snapshots','avc-chart','avc-empty','avc-last-snap'); }
+    if (v==='reports')    { syncCatFilters(); renderReport(); loadValueHistory('automotive_value_snapshots','avc-chart','avc-empty','avc-last-snap'); renderPremiumAnalysis(); }
     if (v==='categories') renderCatTags();
     if (v==='add-item')   populateCatSelect();
     if (v==='recycle-bin') loadRecycleBin();
@@ -2310,6 +2347,8 @@ document.getElementById('item-form').addEventListener('submit', async e => {
         insuranceCompany: document.getElementById('f-insurance').value.trim(),
         insuranceEffectiveDate:  document.getElementById('f-insurance-effective').value,
         insuranceExpirationDate: document.getElementById('f-insurance-expiration').value,
+        premium:        (() => { const v = document.getElementById('f-premium').value.trim(); return v ? Number(v) : null; })(),
+        premiumTerm:    document.getElementById('f-premium-term').value || '',
         defaultDriver: document.getElementById('f-driver').value.trim(),
         driverEmail:   document.getElementById('f-driver-email').value.trim().toLowerCase(),
         notes:         document.getElementById('f-notes').value.trim(),
@@ -2349,6 +2388,40 @@ document.getElementById('item-form').addEventListener('submit', async e => {
         }
         data.documents = docsToSave;
 
+        // Premium history bookkeeping — if premium / term / carrier changed since the saved record,
+        // archive the prior premium snapshot and stamp a new premiumDate.
+        const prior = docId ? items.find(i => i._docId === docId) : null;
+        const priorAnn  = prior ? annualizedPremium(prior.premium, prior.premiumTerm) : null;
+        const newAnn    = annualizedPremium(data.premium, data.premiumTerm);
+        const carrier   = data.insuranceCompany || '';
+        const priorHist = (prior?.premiumHistory || []).slice();
+        const premiumChanged =
+            (Number(prior?.premium) || 0) !== (Number(data.premium) || 0) ||
+            (prior?.premiumTerm || '') !== (data.premiumTerm || '') ||
+            (prior?.insuranceCompany || '') !== carrier;
+        if (prior && premiumChanged && (Number(prior.premium) || 0) > 0) {
+            priorHist.push({
+                amount: Number(prior.premium) || 0,
+                term: prior.premiumTerm || '',
+                annualized: priorAnn || 0,
+                carrier: prior.insuranceCompany || '',
+                source: prior.premiumSource || 'manual',
+                effectiveDate: prior.insuranceEffectiveDate || '',
+                expirationDate: prior.insuranceExpirationDate || '',
+                recordedAt: prior.premiumDate || prior.addedAt || new Date().toISOString()
+            });
+        }
+        data.premiumAnnualized = newAnn || 0;
+        data.premiumCarrier = carrier;
+        if (data.premium && (premiumChanged || !prior?.premiumDate)) {
+            data.premiumDate = new Date().toISOString();
+            data.premiumSource = data.premiumSource || 'manual';
+        } else if (prior) {
+            data.premiumDate = prior.premiumDate || '';
+            data.premiumSource = prior.premiumSource || '';
+        }
+        data.premiumHistory = priorHist;
+
         if (eid && docId) {
             await dbUpdateItem(docId, data, photos);
             await saveConfig();
@@ -2357,6 +2430,7 @@ document.getElementById('item-form').addEventListener('submit', async e => {
             await dbAddItem(data, photos);
             toast('Vehicle added!','success');
         }
+        if (data.premium) savePremiumSnapshot();
         populateMakeList(); populateDriverList(); populateVendorList(); populateInsuranceList();
         resetForm();
         showView('inventory');
@@ -2367,6 +2441,25 @@ document.getElementById('item-form').addEventListener('submit', async e => {
         btn.textContent = eid ? 'Update Vehicle' : 'Save Vehicle';
     }
 });
+
+function annualizedPremium(amount, term) {
+    const a = Number(amount) || 0;
+    if (!a) return 0;
+    if (term === '6mo')  return Math.round(a * 2);
+    if (term === '12mo') return Math.round(a);
+    return Math.round(a); // unknown term — treat as annual
+}
+
+function updatePremiumHint() {
+    const hint = document.getElementById('f-premium-hint'); if (!hint) return;
+    const amt  = Number(document.getElementById('f-premium').value) || 0;
+    const term = document.getElementById('f-premium-term').value;
+    if (!amt) { hint.textContent = ''; return; }
+    if (!term) { hint.innerHTML = '<span style="color:#b45309;">Pick a term to annualize.</span>'; return; }
+    const ann = annualizedPremium(amt, term);
+    if (term === '6mo') hint.innerHTML = `≈ <strong>$${ann.toLocaleString()}/yr</strong> (6-month × 2)`;
+    else                hint.innerHTML = `≈ <strong>$${ann.toLocaleString()}/yr</strong>`;
+}
 
 function resetForm() {
     document.getElementById('edit-id').value           = '';
@@ -2379,6 +2472,9 @@ function resetForm() {
     populateCatSelect(); populateMakeList(); populateDriverList();
     document.getElementById('f-tabs-month').value = '';
     document.getElementById('f-tabs-year').value  = '';
+    document.getElementById('f-premium').value      = '';
+    document.getElementById('f-premium-term').value = '';
+    updatePremiumHint();
     for (const slot of ['main','serial','extra','plate','insurance']) {
         formPhotos[slot] = { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false };
     }
@@ -2421,6 +2517,9 @@ function editItem(docId) {
     document.getElementById('f-insurance').value             = it.insuranceCompany||'';
     document.getElementById('f-insurance-effective').value   = it.insuranceEffectiveDate||'';
     document.getElementById('f-insurance-expiration').value  = it.insuranceExpirationDate||'';
+    document.getElementById('f-premium').value               = it.premium != null ? it.premium : '';
+    document.getElementById('f-premium-term').value          = it.premiumTerm || '';
+    updatePremiumHint();
     document.getElementById('f-driver').value          = it.defaultDriver||'';
     document.getElementById('f-driver-email').value    = it.driverEmail||'';
     document.getElementById('f-notes').value           = it.notes||'';
@@ -2516,7 +2615,11 @@ function filteredItems(searchId, catId) {
 function sorted(arr, field, dir) {
     return [...arr].sort((a,b) => {
         let va=a[field]??'', vb=b[field]??'';
-        if (['id','mileage','price'].includes(field)) { va=Number(va)||0; vb=Number(vb)||0; }
+        if (field === 'premiumAnnualized') {
+            va = annualizedPremium(a.premium, a.premiumTerm) || 0;
+            vb = annualizedPremium(b.premium, b.premiumTerm) || 0;
+        }
+        else if (['id','mileage','price','marketValue','premium'].includes(field)) { va=Number(va)||0; vb=Number(vb)||0; }
         else if (field==='year')         { va=Number(va)||0; vb=Number(vb)||0; }
         else if (field==='purchaseDate') { va=va?new Date(va).getTime():0; vb=vb?new Date(vb).getTime():0; }
         else                             { va=String(va).toLowerCase(); vb=String(vb).toLowerCase(); }
@@ -2529,7 +2632,9 @@ const INV_VIEW_COLUMNS = [
     ['photo','Photo'], ['id','ID'], ['category','Type'], ['make','Make'], ['model','Model'],
     ['year','Year'], ['serialNumber','VIN'], ['licensePlate','Plate / Tabs'], ['mileage','Mileage'],
     ['condition','Condition'], ['location','Location'], ['defaultDriver','Driver'],
-    ['purchaseDate','Purchased'], ['vendor','Source'], ['insuranceCompany','Insurance Co.'], ['price','Purchase Price'], ['marketValue','Market Value']
+    ['purchaseDate','Purchased'], ['vendor','Source'], ['insuranceCompany','Insurance Co.'],
+    ['premiumAnnualized','Premium ($/yr)'],
+    ['price','Purchase Price'], ['marketValue','Market Value']
 ];
 const INV_HIDDEN_COLS_KEY = 'auto-inv-hidden-cols';
 let invHiddenCols = (() => {
@@ -2581,7 +2686,7 @@ function renderInventory() {
     const data  = sorted(filteredItems('inv-search','inv-filter-cat'), invSortField, invSortDir);
     document.getElementById('inv-count').textContent = `${data.length} item${data.length!==1?'s':''}`;
     document.querySelectorAll('#inv-table thead th').forEach(th=>th.classList.remove('sort-asc','sort-desc'));
-    const thIdx = {id:1,category:2,make:3,model:4,year:5,serialNumber:6,licensePlate:7,mileage:8,condition:9,location:10,defaultDriver:11,purchaseDate:12,vendor:13,insuranceCompany:14,price:15,marketValue:16};
+    const thIdx = {id:1,category:2,make:3,model:4,year:5,serialNumber:6,licensePlate:7,mileage:8,condition:9,location:10,defaultDriver:11,purchaseDate:12,vendor:13,insuranceCompany:14,premiumAnnualized:15,price:16,marketValue:17};
     const ti = thIdx[invSortField];
     if (ti!==undefined) document.querySelectorAll('#inv-table thead th')[ti]?.classList.add(invSortDir==='asc'?'sort-asc':'sort-desc');
     const tbody = document.getElementById('inv-tbody');
@@ -2628,6 +2733,7 @@ function renderInventory() {
             <td data-col="purchaseDate">${it.purchaseDate?new Date(it.purchaseDate+'T00:00:00').toLocaleDateString():'—'}</td>
             <td data-col="vendor" style="font-size:0.82rem;">${esc(it.vendor)||'—'}</td>
             <td data-col="insuranceCompany" style="font-size:0.82rem;">${esc(it.insuranceCompany)||'—'}</td>
+            <td data-col="premiumAnnualized" style="white-space:nowrap;">${premiumCell(it)}</td>
             <td data-col="price" style="white-space:nowrap;">${it.price ? '$'+Number(it.price).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—'}</td>
             <td data-col="marketValue" style="white-space:nowrap;min-width:120px;" id="mv-cell-${it._docId}">
                 ${marketValueCell(it)}
@@ -2643,14 +2749,28 @@ function renderInventory() {
     // ── Totals footer ──
     const totalPrice = data.reduce((s,it) => s + (Number(it.price)||0), 0);
     const totalMV    = data.reduce((s,it) => s + (Number(it.marketValue)||0), 0);
+    const totalPrem  = data.reduce((s,it) => s + (annualizedPremium(it.premium, it.premiumTerm)||0), 0);
     const priceStr   = totalPrice > 0 ? '$'+totalPrice.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
     const mvStr      = totalMV   > 0 ? '$'+totalMV.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
+    const premStr    = totalPrem > 0 ? '$'+totalPrem.toLocaleString() + '/yr' : '—';
     document.getElementById('inv-tfoot').innerHTML = `<tr style="font-weight:700;border-top:2px solid var(--border);background:var(--bg-secondary);">
         <td colspan="14" style="text-align:right;padding:8px 12px;color:var(--text-secondary);font-size:0.82rem;">TOTALS (${data.length} vehicle${data.length!==1?'s':''})</td>
+        <td data-col="premiumAnnualized" style="padding:8px 12px;white-space:nowrap;color:#a855f7;">${premStr}</td>
         <td data-col="price" style="padding:8px 12px;white-space:nowrap;color:#60a5fa;">${priceStr}</td>
         <td data-col="marketValue" style="padding:8px 12px;white-space:nowrap;color:#22c55e;">${mvStr}</td>
         <td data-col="actions"></td>
     </tr>`;
+}
+
+function premiumCell(it) {
+    const ann = annualizedPremium(it.premium, it.premiumTerm);
+    if (!ann) return '<span style="color:var(--text-secondary);">—</span>';
+    const termLabel = it.premiumTerm === '6mo' ? '6-mo' : it.premiumTerm === '12mo' ? '12-mo' : '';
+    const rawAmt = Number(it.premium) || 0;
+    const sub = termLabel
+        ? `<div style="font-size:0.68rem;color:var(--text-secondary);">$${rawAmt.toLocaleString()} / ${termLabel}${it.premiumSource && it.premiumSource!=='manual' ? ' · '+it.premiumSource : ''}</div>`
+        : '';
+    return `<div style="font-weight:700;color:#a855f7;">$${ann.toLocaleString()}/yr</div>${sub}`;
 }
 
 function sortBy(field) {
@@ -3147,22 +3267,51 @@ async function pdfToPageImages(file) {
     return pages;
 }
 
-async function extractInsuranceCardData(base64, mimeType) {
-    const prompt = `This is a proof-of-insurance card. It may list ONE OR MORE vehicles on the same card. Extract these fields and return ONLY valid JSON — no markdown, no code fences:
-{"expirationDate":"YYYY-MM-DD","vehicles":[{"vin":"17 chars","plate":"plate if shown","year":"YYYY","make":"...","model":"..."}]}
+async function extractInsuranceCardData(base64OrText, mimeType, kind) {
+    const prompt = `This is an auto insurance document — it could be a proof-of-insurance card, a declarations page, a renewal notice, a quote, or a forwarded email about a policy. It may list ONE OR MORE vehicles. Extract these fields and return ONLY valid JSON — no markdown, no code fences:
+
+{
+  "carrier": "insurance company name",
+  "expirationDate": "YYYY-MM-DD",
+  "effectiveDate": "YYYY-MM-DD",
+  "policyPremium": 0,
+  "policyTerm": "6mo|12mo|",
+  "vehicles": [
+    {
+      "vin": "17 chars",
+      "plate": "plate if shown",
+      "year": "YYYY",
+      "make": "...",
+      "model": "...",
+      "premium": 0,
+      "premiumTerm": "6mo|12mo|"
+    }
+  ]
+}
 
 Rules:
-- "vehicles" is ALWAYS an array, even if there is only one vehicle. List every vehicle visible on the card.
-- "expirationDate" is the policy/card expiration date in YYYY-MM-DD format. Omit if not shown.
-- For each vehicle, include whichever of vin, plate, year, make, model are clearly readable. Omit fields you can't determine with confidence.
-- vin must be exactly 17 alphanumeric characters (no I, O, or Q).
-- plate is uppercase, no spaces.
+- "vehicles" is ALWAYS an array. List every vehicle visible.
+- "carrier" = the insurance company (Progressive, State Farm, GEICO, etc.). Omit if unknown.
+- "expirationDate" / "effectiveDate" — use YYYY-MM-DD. Omit if not shown.
+- "policyPremium" = the total policy premium for the listed term, as a number (no currency symbol, no commas). Omit if not shown.
+- "policyTerm" = "6mo" if the premium is for a 6-month term, "12mo" if for a 12-month / annual term. Empty string if unclear.
+- For each vehicle, include vin / plate / year / make / model only when clearly readable.
+  - vin must be exactly 17 alphanumeric chars (no I, O, Q).
+  - plate is uppercase, no spaces.
+  - "premium" is the per-vehicle premium for that vehicle if the document breaks it out (declarations pages often do). Use the same number format as policyPremium. If only a total is shown, leave per-vehicle premium empty and let the caller distribute the total.
+  - "premiumTerm" mirrors the policy term unless the per-vehicle line clearly shows a different term.
+- Omit any field you cannot determine with confidence. Do not invent values.
 - Return ONLY the JSON object.`;
-    const content = [
-        { type:'image', source:{ type:'base64', media_type: mimeType, data: base64 }},
-        { type:'text',  text: prompt }
-    ];
-    const raw = await callClaudeRaw(content, 1024);
+    const content = (kind === 'text')
+        ? [
+            { type:'text',  text: 'Document contents (email or text):\n\n' + String(base64OrText).slice(0, 60000) },
+            { type:'text',  text: prompt }
+          ]
+        : [
+            { type:'image', source:{ type:'base64', media_type: mimeType, data: base64OrText }},
+            { type:'text',  text: prompt }
+          ];
+    const raw = await callClaudeRaw(content, 1500);
     if (!raw) return { vehicles: [] };
     const m = raw.match(/\{[\s\S]*\}/); if (!m) return { vehicles: [] };
     try {
@@ -3190,6 +3339,26 @@ function vehicleLabel(it) {
     return `${it.year||''} ${it.make||''} ${it.model||''}`.trim() + (it.licensePlate?` (${it.licensePlate})`:'') + ` · #${it.id}`;
 }
 
+function isEmailOrTextFile(f) {
+    const n = (f.name||'').toLowerCase();
+    if (n.endsWith('.eml') || n.endsWith('.txt') || n.endsWith('.html') || n.endsWith('.htm')) return true;
+    const t = (f.type||'').toLowerCase();
+    return t.startsWith('text/') || t === 'message/rfc822';
+}
+
+async function readFileAsText(f) {
+    return new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(String(r.result || ''));
+        r.onerror = reject;
+        r.readAsText(f);
+    });
+}
+
+function stripHtmlBasic(s) {
+    return String(s||'').replace(/<style[\s\S]*?<\/style>/gi,' ').replace(/<script[\s\S]*?<\/script>/gi,' ').replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/\s+/g,' ').trim();
+}
+
 async function onInsCardsFilesSelected(input) {
     const files = Array.from(input.files || []);
     input.value = '';
@@ -3197,7 +3366,7 @@ async function onInsCardsFilesSelected(input) {
     if (!apiKey) { toast('Set your Anthropic API key in Settings first.','error'); return; }
     const status = document.getElementById('ins-cards-status');
 
-    // Expand each file into one or more "pages"
+    // Expand each file into one or more "pages" (or a single text doc for emails)
     const pages = [];
     for (const f of files) {
         const isPdf = f.type === 'application/pdf' || (f.name||'').toLowerCase().endsWith('.pdf');
@@ -3205,13 +3374,22 @@ async function onInsCardsFilesSelected(input) {
             try {
                 status.textContent = `Splitting PDF "${f.name}"…`;
                 const pgs = await pdfToPageImages(f);
-                pgs.forEach(p => pages.push({ ...p, fileName: f.name }));
+                pgs.forEach(p => pages.push({ ...p, fileName: f.name, kind: 'image' }));
             } catch(err) {
                 toast(`Failed to split "${f.name}": ${err.message}`, 'error');
             }
+        } else if (isEmailOrTextFile(f)) {
+            try {
+                const raw = await readFileAsText(f);
+                const isHtml = (f.name||'').toLowerCase().match(/\.html?$/) || (f.type||'').toLowerCase().startsWith('text/html');
+                const text = isHtml ? stripHtmlBasic(raw) : raw;
+                pages.push({ text, mimeType: f.type || 'text/plain', fileName: f.name, pageNum: 1, totalPages: 1, kind: 'text' });
+            } catch(err) {
+                toast(`Failed to read "${f.name}": ${err.message}`, 'error');
+            }
         } else {
             const base64 = await readFileAsBase64(f);
-            pages.push({ base64, mimeType: f.type || 'image/jpeg', fileName: f.name, pageNum: 1, totalPages: 1 });
+            pages.push({ base64, mimeType: f.type || 'image/jpeg', fileName: f.name, pageNum: 1, totalPages: 1, kind: 'image' });
         }
     }
     if (!pages.length) { status.textContent = ''; return; }
@@ -3220,18 +3398,27 @@ async function onInsCardsFilesSelected(input) {
     let processed = 0;
     for (const pg of pages) {
         processed++;
-        status.textContent = `Reading card ${processed} of ${pages.length} with AI…`;
+        status.textContent = `Reading document ${processed} of ${pages.length} with AI…`;
         let data = { vehicles: [] };
-        try { data = await extractInsuranceCardData(pg.base64, pg.mimeType); }
-        catch(err) { console.warn('AI extract failed:', err); }
+        try {
+            data = (pg.kind === 'text')
+                ? await extractInsuranceCardData(pg.text, pg.mimeType, 'text')
+                : await extractInsuranceCardData(pg.base64, pg.mimeType, 'image');
+        } catch(err) { console.warn('AI extract failed:', err); }
         const tempId = 'ic_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
+
+        const policyPrem = Number(data.policyPremium) || 0;
+        const policyTerm = data.policyTerm || '';
+
         // Build a row per detected vehicle. If AI found none, still create one empty row so user can manually assign.
-        const detectedVehicles = (data.vehicles || []).map(v => {
+        let detectedVehicles = (data.vehicles || []).map(v => {
             const matchedDocId = findMatchingVehicle(v.vin, v.plate);
             return {
                 rowId: 'r_' + Math.random().toString(36).slice(2,8),
                 vin: v.vin || '', plate: v.plate || '',
                 year: v.year || '', make: v.make || '', model: v.model || '',
+                premium: Number(v.premium) || 0,
+                premiumTerm: v.premiumTerm || policyTerm || '',
                 suggestedDocId: matchedDocId,
                 selectedDocId: matchedDocId,
                 manuallyAdded: false
@@ -3241,33 +3428,55 @@ async function onInsCardsFilesSelected(input) {
             detectedVehicles.push({
                 rowId: 'r_' + Math.random().toString(36).slice(2,8),
                 vin: '', plate: '', year: '', make: '', model: '',
+                premium: 0, premiumTerm: policyTerm,
                 suggestedDocId: '', selectedDocId: '', manuallyAdded: true
             });
         }
+        // If document gave a single policy total but no per-vehicle split, divide evenly across detected vehicles.
+        const anyPerVehiclePremium = detectedVehicles.some(v => v.premium > 0);
+        if (!anyPerVehiclePremium && policyPrem > 0 && detectedVehicles.length) {
+            const split = Math.round(policyPrem / detectedVehicles.length);
+            detectedVehicles.forEach(v => { v.premium = split; if (!v.premiumTerm) v.premiumTerm = policyTerm; });
+        }
+
         pendingInsCards.push({
-            tempId, base64: pg.base64, mimeType: pg.mimeType,
+            tempId,
+            base64: pg.base64 || '',
+            text: pg.text || '',
+            kind: pg.kind || 'image',
+            mimeType: pg.mimeType,
             fileName: pg.fileName, pageNum: pg.pageNum, totalPages: pg.totalPages,
+            carrier: data.carrier || '',
             expirationDate: data.expirationDate || '',
+            effectiveDate: data.effectiveDate || '',
+            policyPremium: policyPrem,
+            policyTerm: policyTerm,
             assignments: detectedVehicles
         });
         renderInsCardsList();
     }
     const totalAssignments = pendingInsCards.reduce((s,c) => s + c.assignments.length, 0);
     const matchedAssignments = pendingInsCards.reduce((s,c) => s + c.assignments.filter(a => a.suggestedDocId).length, 0);
-    status.textContent = `${pendingInsCards.length} card${pendingInsCards.length!==1?'s':''} read · ${totalAssignments} vehicle assignment${totalAssignments!==1?'s':''} detected · ${matchedAssignments} auto-matched. Review and confirm below.`;
+    const withPrem = pendingInsCards.reduce((s,c) => s + c.assignments.filter(a => a.premium > 0).length, 0);
+    status.textContent = `${pendingInsCards.length} document${pendingInsCards.length!==1?'s':''} read · ${totalAssignments} assignment${totalAssignments!==1?'s':''} · ${matchedAssignments} auto-matched · ${withPrem} with premium. Review and confirm below.`;
     document.getElementById('btn-save-ins-cards').disabled = false;
 }
 
 function renderInsCardsList() {
     const list = document.getElementById('ins-cards-list');
-    if (!pendingInsCards.length) { list.innerHTML = '<p style="color:var(--text-secondary);padding:20px 0;text-align:center;">No cards uploaded yet.</p>'; return; }
+    if (!pendingInsCards.length) { list.innerHTML = '<p style="color:var(--text-secondary);padding:20px 0;text-align:center;">No documents uploaded yet.</p>'; return; }
     const vehicleOpts = items.slice().sort((a,b) => (a.make||'').localeCompare(b.make||'')).map(i =>
         `<option value="${i._docId}">${esc(vehicleLabel(i))}</option>`
     ).join('');
     list.innerHTML = pendingInsCards.map(c => {
         const fileLabel = c.totalPages > 1 ? `${esc(c.fileName)} · page ${c.pageNum}/${c.totalPages}` : esc(c.fileName);
         const cardSummaryParts = [];
+        if (c.carrier) cardSummaryParts.push(`<strong>Carrier:</strong> ${esc(c.carrier)}`);
         if (c.expirationDate) cardSummaryParts.push(`<strong>Exp:</strong> ${esc(c.expirationDate)}`);
+        if (c.policyPremium) {
+            const tStr = c.policyTerm === '6mo' ? '6-mo' : c.policyTerm === '12mo' ? '12-mo' : 'term';
+            cardSummaryParts.push(`<strong>Total premium:</strong> $${Number(c.policyPremium).toLocaleString()} (${tStr})`);
+        }
         const detectedCount = c.assignments.filter(a => !a.manuallyAdded).length;
         const matchedCount  = c.assignments.filter(a => a.suggestedDocId).length;
         if (detectedCount) cardSummaryParts.push(`${detectedCount} vehicle${detectedCount!==1?'s':''} detected · ${matchedCount} auto-matched`);
@@ -3289,35 +3498,69 @@ function renderInsCardsList() {
                 : (a.manuallyAdded
                     ? `<span style="color:var(--accent);font-size:0.7rem;font-weight:700;white-space:nowrap;">＋ MANUAL</span>`
                     : `<span style="color:#b45309;font-size:0.7rem;font-weight:700;white-space:nowrap;">⚠ NO MATCH</span>`);
-            return `<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-top:1px dashed var(--border);">
-                <div style="flex:1;min-width:0;font-size:0.78rem;color:var(--text-secondary);">${detectedLabel}</div>
-                ${statusBadge}
-                <select onchange="setInsRowVehicle('${c.tempId}','${a.rowId}', this.value)" style="min-width:240px;">
-                    <option value="">— Skip —</option>
-                    ${optsWithSelected}
-                </select>
-                <button type="button" class="btn btn-danger btn-sm" onclick="removeInsRow('${c.tempId}','${a.rowId}')" title="Remove this assignment">✗</button>
+            const ann = annualizedPremium(a.premium, a.premiumTerm);
+            const annHint = ann ? `<span style="font-size:0.68rem;color:var(--text-secondary);white-space:nowrap;">≈ $${ann.toLocaleString()}/yr</span>` : '';
+            return `<div style="padding:6px 0;border-top:1px dashed var(--border);">
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                    <div style="flex:1;min-width:200px;font-size:0.78rem;color:var(--text-secondary);">${detectedLabel}</div>
+                    ${statusBadge}
+                    <select onchange="setInsRowVehicle('${c.tempId}','${a.rowId}', this.value)" style="min-width:240px;">
+                        <option value="">— Skip —</option>
+                        ${optsWithSelected}
+                    </select>
+                    <button type="button" class="btn btn-danger btn-sm" onclick="removeInsRow('${c.tempId}','${a.rowId}')" title="Remove this assignment">✗</button>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:0.74rem;color:var(--text-secondary);">
+                    <span>💵 Premium $</span>
+                    <input type="number" min="0" step="0.01" value="${a.premium || ''}" placeholder="0.00"
+                        oninput="setInsRowPremium('${c.tempId}','${a.rowId}', this.value)"
+                        style="width:110px;padding:4px 6px;border:1px solid var(--border);border-radius:5px;font-size:0.78rem;">
+                    <span>📆 Term</span>
+                    <select onchange="setInsRowTerm('${c.tempId}','${a.rowId}', this.value)" style="padding:4px 6px;font-size:0.78rem;">
+                        <option value=""${!a.premiumTerm?' selected':''}>—</option>
+                        <option value="6mo"${a.premiumTerm==='6mo'?' selected':''}>6 months</option>
+                        <option value="12mo"${a.premiumTerm==='12mo'?' selected':''}>12 months</option>
+                    </select>
+                    ${annHint}
+                </div>
             </div>`;
         }).join('');
 
+        const previewHtml = c.kind === 'text'
+            ? `<div style="width:140px;height:100px;background:#fff;border:1px solid var(--border);border-radius:6px;flex-shrink:0;font-size:0.65rem;padding:6px;overflow:hidden;color:var(--text-secondary);line-height:1.3;">📧 ${esc((c.text||'').slice(0, 240))}…</div>`
+            : `<img src="data:${c.mimeType};base64,${c.base64}" style="width:140px;height:100px;object-fit:contain;background:#fff;border-radius:6px;border:1px solid var(--border);cursor:pointer;flex-shrink:0;" onclick="openInsCardPreview('${c.tempId}')" title="Click to open full-size">`;
+
         return `<div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px;background:var(--bg-secondary);" data-temp-id="${c.tempId}">
             <div style="display:flex;gap:14px;align-items:flex-start;">
-                <img src="data:${c.mimeType};base64,${c.base64}" style="width:140px;height:100px;object-fit:contain;background:#fff;border-radius:6px;border:1px solid var(--border);cursor:pointer;flex-shrink:0;" onclick="openInsCardPreview('${c.tempId}')" title="Click to open full-size">
+                ${previewHtml}
                 <div style="flex:1;min-width:0;">
                     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px;">
                         <span style="font-size:0.82rem;font-weight:700;">${fileLabel}</span>
-                        <button type="button" class="btn btn-danger btn-sm" onclick="removeInsCard('${c.tempId}')" title="Remove this card entirely">✗ Card</button>
+                        <button type="button" class="btn btn-danger btn-sm" onclick="removeInsCard('${c.tempId}')" title="Remove this document entirely">✗ Document</button>
                     </div>
                     <div style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:6px;">${cardSummary}</div>
                 </div>
             </div>
             <div style="margin-top:8px;">
-                <div style="font-size:0.72rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px;">Assign this card to:</div>
+                <div style="font-size:0.72rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px;">Assign this document &amp; premium to:</div>
                 ${rowsHtml}
                 <button type="button" class="btn btn-ghost btn-sm" onclick="addInsRow('${c.tempId}')" style="margin-top:6px;">+ Add another vehicle</button>
             </div>
         </div>`;
     }).join('');
+}
+
+function setInsRowPremium(tempId, rowId, val) {
+    const c = pendingInsCards.find(x => x.tempId === tempId); if (!c) return;
+    const r = c.assignments.find(a => a.rowId === rowId); if (!r) return;
+    r.premium = Number(val) || 0;
+}
+
+function setInsRowTerm(tempId, rowId, val) {
+    const c = pendingInsCards.find(x => x.tempId === tempId); if (!c) return;
+    const r = c.assignments.find(a => a.rowId === rowId); if (!r) return;
+    r.premiumTerm = val || '';
+    renderInsCardsList(); // refresh annualized hint
 }
 
 function setInsRowVehicle(tempId, rowId, docId) {
@@ -3331,6 +3574,7 @@ function addInsRow(tempId) {
     c.assignments.push({
         rowId: 'r_' + Math.random().toString(36).slice(2,8),
         vin:'', plate:'', year:'', make:'', model:'',
+        premium: 0, premiumTerm: c.policyTerm || '',
         suggestedDocId:'', selectedDocId:'', manuallyAdded:true
     });
     renderInsCardsList();
@@ -3355,7 +3599,13 @@ function removeInsCard(tempId) {
 
 function openInsCardPreview(tempId) {
     const c = pendingInsCards.find(x => x.tempId === tempId);
-    if (c) window.open('data:'+c.mimeType+';base64,'+c.base64, '_blank');
+    if (!c) return;
+    if (c.kind === 'text') {
+        const w = window.open('', '_blank');
+        if (w) { w.document.write(`<pre style="font-family:monospace;white-space:pre-wrap;padding:16px;">${esc(c.text||'')}</pre>`); w.document.close(); }
+    } else {
+        window.open('data:'+c.mimeType+';base64,'+c.base64, '_blank');
+    }
 }
 
 async function saveInsuranceCards() {
@@ -3370,16 +3620,22 @@ async function saveInsuranceCards() {
     btn.disabled = true; btn.textContent = '⏳ Saving…';
     const status = document.getElementById('ins-cards-status');
 
-    // Upload each unique card image only once, then write a document entry per assignment
+    // Upload each unique card image/file only once, then write a document entry per assignment
     const cardUrls = {}; // tempId → url
-    let saved = 0, failed = 0;
+    let saved = 0, failed = 0, premiumsApplied = 0;
     for (let i = 0; i < work.length; i++) {
         const { card, assign } = work[i];
         try {
             status.textContent = `Saving ${i+1} of ${work.length}…`;
             if (!cardUrls[card.tempId]) {
-                const blob = await fetch(`data:${card.mimeType};base64,${card.base64}`).then(r => r.blob());
-                const ext = card.mimeType === 'application/pdf' ? 'pdf' : 'jpg';
+                let blob, ext;
+                if (card.kind === 'text') {
+                    blob = new Blob([card.text || ''], { type: card.mimeType || 'text/plain' });
+                    ext = (card.mimeType||'').includes('html') ? 'html' : (card.mimeType||'').includes('rfc822') ? 'eml' : 'txt';
+                } else {
+                    blob = await fetch(`data:${card.mimeType};base64,${card.base64}`).then(r => r.blob());
+                    ext = card.mimeType === 'application/pdf' ? 'pdf' : 'jpg';
+                }
                 const file = new File([blob], `insurance-${Date.now()}.${ext}`, { type: card.mimeType });
                 const path = `automotive_docs/insurance/${Date.now()}_${card.tempId}.${ext}`;
                 const ref = storage.ref().child(path);
@@ -3390,10 +3646,12 @@ async function saveInsuranceCards() {
             const veh = items.find(it => it._docId === assign.selectedDocId);
             const existingDocs = veh?.documents || [];
             const summaryBits = [
-                'Insurance card',
+                card.kind === 'text' ? 'Insurance email/document' : 'Insurance document',
+                card.carrier ? `Carrier ${card.carrier}` : '',
                 assign.vin ? `VIN ${assign.vin}` : '',
                 assign.plate ? `Plate ${assign.plate}` : '',
-                (assign.year || assign.make || assign.model) ? [assign.year, assign.make, assign.model].filter(Boolean).join(' ') : ''
+                (assign.year || assign.make || assign.model) ? [assign.year, assign.make, assign.model].filter(Boolean).join(' ') : '',
+                assign.premium ? `Premium $${Number(assign.premium).toLocaleString()}${assign.premiumTerm ? ' ('+assign.premiumTerm+')' : ''}` : ''
             ].filter(Boolean);
             const newDoc = {
                 name: 'Proof of Insurance' + (card.expirationDate ? ` (exp ${card.expirationDate})` : ''),
@@ -3403,11 +3661,54 @@ async function saveInsuranceCards() {
                 type: 'insurance_card',
                 expirationDate: card.expirationDate || ''
             };
-            await db.collection('automotive_items').doc(assign.selectedDocId).update({
-                documents: [...existingDocs, newDoc]
-            });
-            // Reflect locally so subsequent saves see the new doc array
-            if (veh) veh.documents = [...existingDocs, newDoc];
+
+            // Build vehicle update — always append the document; if premium was extracted, update it + history.
+            const update = { documents: [...existingDocs, newDoc] };
+            const newAssignAnn = annualizedPremium(assign.premium, assign.premiumTerm);
+            if (assign.premium && newAssignAnn) {
+                const priorHist = (veh?.premiumHistory || []).slice();
+                if (veh && Number(veh.premium) > 0) {
+                    priorHist.push({
+                        amount: Number(veh.premium) || 0,
+                        term: veh.premiumTerm || '',
+                        annualized: annualizedPremium(veh.premium, veh.premiumTerm) || 0,
+                        carrier: veh.insuranceCompany || veh.premiumCarrier || '',
+                        source: veh.premiumSource || 'manual',
+                        effectiveDate: veh.insuranceEffectiveDate || '',
+                        expirationDate: veh.insuranceExpirationDate || '',
+                        recordedAt: veh.premiumDate || veh.addedAt || new Date().toISOString()
+                    });
+                }
+                update.premium = Number(assign.premium) || 0;
+                update.premiumTerm = assign.premiumTerm || '';
+                update.premiumAnnualized = newAssignAnn;
+                update.premiumDate = new Date().toISOString();
+                update.premiumSource = 'scan';
+                update.premiumCarrier = card.carrier || veh?.insuranceCompany || '';
+                update.premiumHistory = priorHist;
+                if (card.carrier) update.insuranceCompany = card.carrier;
+                if (card.expirationDate) update.insuranceExpirationDate = card.expirationDate;
+                if (card.effectiveDate) update.insuranceEffectiveDate = card.effectiveDate;
+                premiumsApplied++;
+            }
+
+            await db.collection('automotive_items').doc(assign.selectedDocId).update(update);
+            // Reflect locally so subsequent saves see the new doc array & premium
+            if (veh) {
+                veh.documents = update.documents;
+                if (update.premium != null) {
+                    veh.premium = update.premium;
+                    veh.premiumTerm = update.premiumTerm;
+                    veh.premiumAnnualized = update.premiumAnnualized;
+                    veh.premiumDate = update.premiumDate;
+                    veh.premiumSource = update.premiumSource;
+                    veh.premiumCarrier = update.premiumCarrier;
+                    veh.premiumHistory = update.premiumHistory;
+                    if (update.insuranceCompany) veh.insuranceCompany = update.insuranceCompany;
+                    if (update.insuranceExpirationDate) veh.insuranceExpirationDate = update.insuranceExpirationDate;
+                    if (update.insuranceEffectiveDate) veh.insuranceEffectiveDate = update.insuranceEffectiveDate;
+                }
+            }
             saved++;
         } catch(err) {
             console.error('Save card failed:', err);
@@ -3415,7 +3716,8 @@ async function saveInsuranceCards() {
         }
     }
     btn.disabled = false; btn.textContent = 'Save Assignments';
-    if (saved) toast(`Saved ${saved} card assignment${saved!==1?'s':''}${failed?` (${failed} failed)`:''}.`, failed?'error':'success');
+    if (premiumsApplied) savePremiumSnapshot();
+    if (saved) toast(`Saved ${saved} assignment${saved!==1?'s':''}${premiumsApplied?` · ${premiumsApplied} premium${premiumsApplied!==1?'s':''} updated`:''}${failed?` (${failed} failed)`:''}.`, failed?'error':'success');
     else toast('Could not save any assignments.','error');
     if (saved && !failed) closeInsCardsModal();
     else status.textContent = `Saved ${saved}, failed ${failed}.`;
@@ -3832,6 +4134,146 @@ async function refreshAllMarketValues() {
     if (btn) { btn.disabled = false; btn.textContent = '💲 Refresh All Values'; }
     toast(`✅ Market values updated for ${eligible.length} vehicle${eligible.length !== 1 ? 's' : ''}`);
     await saveValueSnapshot('automotive_value_snapshots');
+}
+
+// ═══════════════════════════════════════
+//  PREMIUM SNAPSHOTS + REPORT
+// ═══════════════════════════════════════
+let premChartInstance = null;
+
+async function savePremiumSnapshot() {
+    try {
+        const valued = items.filter(i => Number(i.premium) > 0);
+        const totalAnnual = valued.reduce((s, i) => s + (annualizedPremium(i.premium, i.premiumTerm) || 0), 0);
+        if (!totalAnnual) return;
+        const today = new Date().toISOString().slice(0, 10);
+        await db.collection('automotive_premium_snapshots').doc(today).set({
+            date: today,
+            totalAnnual,
+            itemCount: valued.length,
+            recordedAt: new Date().toISOString()
+        });
+    } catch(e) { console.warn('Premium snapshot save failed', e); }
+}
+
+async function renderPremiumAnalysis() {
+    const valued = items.filter(i => Number(i.premium) > 0);
+    const statsEl    = document.getElementById('prem-stats');
+    const emptyEl    = document.getElementById('prem-empty');
+    const canvas     = document.getElementById('prem-chart');
+    const carrierTb  = document.getElementById('prem-carrier-tbody');
+    const vehicleTb  = document.getElementById('prem-vehicle-tbody');
+    const lastSnap   = document.getElementById('prem-last-snap');
+    if (!statsEl || !canvas) return;
+
+    if (!valued.length) {
+        statsEl.innerHTML = '';
+        if (carrierTb) carrierTb.innerHTML = '';
+        if (vehicleTb) vehicleTb.innerHTML = '';
+        if (lastSnap) lastSnap.textContent = '';
+        canvas.style.display = 'none';
+        if (premChartInstance) { premChartInstance.destroy(); premChartInstance = null; }
+        if (emptyEl) emptyEl.style.display = 'block';
+        return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+    canvas.style.display = '';
+
+    // ── Stat cards ──
+    const totalAnnual = valued.reduce((s, i) => s + (annualizedPremium(i.premium, i.premiumTerm) || 0), 0);
+    const avgPerVeh   = Math.round(totalAnnual / valued.length);
+    const carriersUsed = new Set(valued.map(i => (i.insuranceCompany || i.premiumCarrier || '').trim()).filter(Boolean));
+    const totalHistEntries = items.reduce((s, i) => s + ((i.premiumHistory||[]).length), 0);
+    statsEl.innerHTML = `
+        <div class="stat-card" style="border-color:#a855f7;"><div class="stat-value" style="color:#a855f7;font-size:1.4rem;">$${totalAnnual.toLocaleString()}</div><div class="stat-label">Total Annual Premium</div></div>
+        <div class="stat-card"><div class="stat-value" style="font-size:1.4rem;">$${avgPerVeh.toLocaleString()}</div><div class="stat-label">Avg / Vehicle</div></div>
+        <div class="stat-card"><div class="stat-value" style="font-size:1.4rem;">${valued.length} <span style="font-size:0.75rem;opacity:0.6;">/ ${items.length}</span></div><div class="stat-label">Vehicles Tracked</div></div>
+        <div class="stat-card"><div class="stat-value" style="font-size:1.4rem;">${carriersUsed.size}</div><div class="stat-label">Carriers</div></div>
+        <div class="stat-card"><div class="stat-value" style="font-size:1.4rem;">${totalHistEntries}</div><div class="stat-label">History Entries</div></div>
+    `;
+
+    // ── Carrier breakdown ──
+    const byCarrier = {};
+    for (const it of valued) {
+        const c = (it.insuranceCompany || it.premiumCarrier || '— Unknown —').trim() || '— Unknown —';
+        if (!byCarrier[c]) byCarrier[c] = { count:0, annual:0 };
+        byCarrier[c].count++;
+        byCarrier[c].annual += annualizedPremium(it.premium, it.premiumTerm) || 0;
+    }
+    const carrierRows = Object.entries(byCarrier).sort((a,b) => b[1].annual - a[1].annual);
+    carrierTb.innerHTML = carrierRows.map(([c, v]) => `<tr>
+        <td>${esc(c)}</td>
+        <td style="text-align:center;">${v.count}</td>
+        <td style="text-align:right;font-weight:700;color:#a855f7;">$${v.annual.toLocaleString()}</td>
+        <td style="text-align:right;color:var(--text-secondary);">$${Math.round(v.annual/v.count).toLocaleString()}</td>
+    </tr>`).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--text-secondary);padding:14px;">No carriers yet.</td></tr>';
+
+    // ── Per-vehicle table with history hint ──
+    const vehSorted = [...valued].sort((a,b) =>
+        (annualizedPremium(b.premium, b.premiumTerm)||0) - (annualizedPremium(a.premium, a.premiumTerm)||0));
+    vehicleTb.innerHTML = vehSorted.map(it => {
+        const lbl = [it.year, it.make, it.model].filter(Boolean).join(' ') || `Vehicle #${it.id}`;
+        const ann = annualizedPremium(it.premium, it.premiumTerm) || 0;
+        const term = it.premiumTerm === '6mo' ? '6-mo' : it.premiumTerm === '12mo' ? '12-mo' : '—';
+        const hist = it.premiumHistory || [];
+        const histTip = hist.length
+            ? hist.slice(-5).map(h => `${(h.recordedAt||'').slice(0,10)}: $${Math.round(h.annualized||0).toLocaleString()}/yr · ${h.carrier||'—'}`).join('\n')
+            : 'No prior premiums on file.';
+        const histCell = hist.length
+            ? `<span title="${esc(histTip)}" style="cursor:help;color:var(--accent);font-weight:600;">${hist.length} change${hist.length!==1?'s':''}</span>`
+            : '<span style="color:var(--text-secondary);">—</span>';
+        return `<tr>
+            <td>${esc(lbl)}<div style="font-size:0.7rem;color:var(--text-secondary);">#${it.id}</div></td>
+            <td>${esc(it.insuranceCompany || it.premiumCarrier || '—')}</td>
+            <td style="text-align:center;">${term}</td>
+            <td style="text-align:right;">$${Number(it.premium||0).toLocaleString()}</td>
+            <td style="text-align:right;font-weight:700;color:#a855f7;">$${ann.toLocaleString()}</td>
+            <td style="text-align:center;">${histCell}</td>
+        </tr>`;
+    }).join('');
+
+    // ── Premium-over-time chart from snapshots ──
+    try {
+        const snap = await db.collection('automotive_premium_snapshots').orderBy('date', 'asc').get();
+        const docs = snap.docs.map(d => d.data()).filter(d => d.date && d.totalAnnual);
+        if (!docs.length) {
+            // No history yet — synthesize a single-point series so the chart isn't empty
+            const today = new Date().toISOString().slice(0,10);
+            docs.push({ date: today, totalAnnual, itemCount: valued.length });
+        }
+        if (lastSnap) {
+            const last = docs[docs.length - 1];
+            lastSnap.textContent = `Last snapshot: ${last.date} · $${Number(last.totalAnnual).toLocaleString()}/yr across ${last.itemCount} vehicle${last.itemCount!==1?'s':''}`;
+        }
+        if (premChartInstance) { premChartInstance.destroy(); premChartInstance = null; }
+        premChartInstance = new Chart(canvas, {
+            type: 'line',
+            data: {
+                labels: docs.map(d => d.date),
+                datasets: [{
+                    label: 'Annual Premium Total',
+                    data: docs.map(d => Number(d.totalAnnual)),
+                    borderColor: '#a855f7',
+                    backgroundColor: 'rgba(168,85,247,0.12)',
+                    borderWidth: 2.5,
+                    pointRadius: docs.length > 60 ? 2 : 4,
+                    pointBackgroundColor: '#a855f7',
+                    tension: 0.3, fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: ctx => ` $${Number(ctx.parsed.y).toLocaleString()}/yr` } }
+                },
+                scales: {
+                    x: { ticks: { maxTicksLimit: 10, color: '#6b7280' }, grid: { color: 'rgba(0,0,0,0.06)' } },
+                    y: { ticks: { color: '#6b7280', callback: v => '$' + Number(v).toLocaleString() }, grid: { color: 'rgba(0,0,0,0.06)' } }
+                }
+            }
+        });
+    } catch(e) { console.warn('Premium history chart failed', e); }
 }
 
 // Auto-refresh stale or missing values on page load (if API key is set)

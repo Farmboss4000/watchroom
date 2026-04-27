@@ -1660,6 +1660,7 @@ function renderQuoteCard(cardId, v, quotes, state, driverAgeLabel, recordLabel) 
                         ${sorted.map((carrier, ci) => {
                             const isBest = carrier.monthly === cheapest;
                             const isHigh = carrier.monthly === priciest;
+                            const carrierJSON = esc(JSON.stringify({ name: carrier.name, annual: carrier.annual, monthly: carrier.monthly }));
                             return `<div class="carrier-card">
                                 <div class="carrier-name">${esc(carrier.name)}</div>
                                 <div class="carrier-monthly">$${carrier.monthly}<span style="font-size:0.8rem;font-weight:400;">/mo</span></div>
@@ -1667,6 +1668,7 @@ function renderQuoteCard(cardId, v, quotes, state, driverAgeLabel, recordLabel) 
                                 ${isBest ? '<span class="carrier-badge carrier-badge-best">Lowest</span>' : ''}
                                 ${isHigh ? '<span class="carrier-badge carrier-badge-high">Highest</span>' : ''}
                                 ${carrier.notes ? `<div style="font-size:0.68rem;color:var(--text-secondary);margin-top:4px;">${esc(carrier.notes)}</div>` : ''}
+                                <button type="button" class="btn btn-ghost btn-sm" style="margin-top:8px;width:100%;font-size:0.74rem;padding:5px 8px;" onclick='setVehiclePremiumFromQuote("${v._docId}", ${carrierJSON})'>📌 Set as current premium</button>
                             </div>`;
                         }).join('')}
                     </div>
@@ -1694,6 +1696,52 @@ function switchCoverage(cardId, coverageKey, btn) {
     const pane = document.getElementById(cardId + '-' + coverageKey);
     if (pane) pane.classList.add('active');
     btn.classList.add('active');
+}
+
+// Push a quote into the matched automotive_items vehicle as its current premium,
+// archiving the prior premium into premiumHistory. Mirrors automotive.html save logic.
+async function setVehiclePremiumFromQuote(vehicleDocId, carrier) {
+    if (!vehicleDocId || !carrier) return;
+    const annual = Math.round(Number(carrier.annual) || (Number(carrier.monthly) * 12) || 0);
+    if (!annual) { toast('Quote has no annual amount.','error'); return; }
+    if (!confirm(`Set this vehicle's current premium to $${annual.toLocaleString()}/yr with ${carrier.name}? The prior premium (if any) will be saved to history.`)) return;
+    try {
+        const ref = db.collection('automotive_items').doc(vehicleDocId);
+        const snap = await ref.get();
+        if (!snap.exists) { toast('Vehicle not found.','error'); return; }
+        const veh = snap.data();
+        const priorHist = (veh.premiumHistory || []).slice();
+        const annualizedPrior = (() => {
+            const a = Number(veh.premium) || 0;
+            if (!a) return 0;
+            return veh.premiumTerm === '6mo' ? Math.round(a * 2) : Math.round(a);
+        })();
+        if (Number(veh.premium) > 0) {
+            priorHist.push({
+                amount: Number(veh.premium) || 0,
+                term: veh.premiumTerm || '',
+                annualized: annualizedPrior,
+                carrier: veh.insuranceCompany || veh.premiumCarrier || '',
+                source: veh.premiumSource || 'manual',
+                effectiveDate: veh.insuranceEffectiveDate || '',
+                expirationDate: veh.insuranceExpirationDate || '',
+                recordedAt: veh.premiumDate || veh.addedAt || new Date().toISOString()
+            });
+        }
+        await ref.update({
+            premium: annual,
+            premiumTerm: '12mo',
+            premiumAnnualized: annual,
+            premiumDate: new Date().toISOString(),
+            premiumSource: 'quote',
+            premiumCarrier: carrier.name || '',
+            insuranceCompany: carrier.name || veh.insuranceCompany || '',
+            premiumHistory: priorHist
+        });
+        toast(`✅ Set ${carrier.name} @ $${annual.toLocaleString()}/yr as current premium`,'success');
+    } catch(err) {
+        toast('Failed to save: ' + err.message, 'error');
+    }
 }
 
 // auto-quotes vehicle load is handled in showView above

@@ -684,6 +684,18 @@
                         </div>
                         <button type="button" class="btn-ai" id="btn-plate-ocr" onclick="extractLicensePlate()" disabled>🔍 Read Plate with AI</button>
                     </div>
+                    <!-- TITLE PHOTO -->
+                    <div class="photo-slot">
+                        <div class="photo-slot-label">📜 Title Photo</div>
+                        <div class="photo-preview" id="prev-title">
+                            <span class="no-photo">📜</span>
+                            <button type="button" class="remove-photo" onclick="removePhoto('title')">✕</button>
+                        </div>
+                        <div class="photo-file-input">
+                            <input type="file" id="file-title" accept="image/*,application/pdf" onchange="onPhotoSelected('title',this)">
+                        </div>
+                        <button type="button" class="btn-ai" id="btn-title-ocr" onclick="extractTitle()" disabled>🔍 Read Title with AI</button>
+                    </div>
                     <!-- ADDITIONAL PHOTO -->
                     <div class="photo-slot">
                         <div class="photo-slot-label">🖼 Additional Photo</div>
@@ -1109,6 +1121,7 @@ let formPhotos = {
     main:      { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false },
     serial:    { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false },
     plate:     { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false },
+    title:     { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false },
     extra:     { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false },
     paperwork: { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false }
 };
@@ -1415,6 +1428,7 @@ async function onPhotoSelected(slot, input) {
     if (slot==='main')      document.getElementById('btn-identify').disabled = false;
     if (slot==='serial')    document.getElementById('btn-ocr').disabled      = false;
     if (slot==='plate')     document.getElementById('btn-plate-ocr').disabled = false;
+    if (slot==='title')     document.getElementById('btn-title-ocr').disabled = false;
     if (slot==='paperwork') document.getElementById('btn-paperwork').disabled = false;
 }
 
@@ -1425,13 +1439,14 @@ function renderPhotoPreview(slot, dataUrl) {
 
 function removePhoto(slot) {
     formPhotos[slot] = { file:null, base64:null, mimeType:null, existingUrl:null, deleted:true };
-    const icons = { main:'📷', serial:'📋', plate:'🏷', extra:'🖼', paperwork:'📄' };
+    const icons = { main:'📷', serial:'📋', plate:'🏷', title:'📜', extra:'🖼', paperwork:'📄' };
     document.getElementById('prev-'+slot).innerHTML =
         `<span class="no-photo">${icons[slot]}</span><button type="button" class="remove-photo" onclick="removePhoto('${slot}')">✕</button>`;
     document.getElementById('file-'+slot).value = '';
     if (slot==='main')      document.getElementById('btn-identify').disabled = true;
     if (slot==='serial')    document.getElementById('btn-ocr').disabled      = true;
     if (slot==='plate')     document.getElementById('btn-plate-ocr').disabled = true;
+    if (slot==='title')     document.getElementById('btn-title-ocr').disabled = true;
     if (slot==='paperwork') document.getElementById('btn-paperwork').disabled = true;
 }
 
@@ -1561,6 +1576,45 @@ async function extractLicensePlate() {
     } finally {
         btn.disabled = false; btn.classList.remove('scanning');
         btn.innerHTML = '🔍 Read Plate with AI';
+    }
+}
+
+async function extractTitle() {
+    const p = formPhotos.title; if (!p.base64) return;
+    const btn    = document.getElementById('btn-title-ocr');
+    const status = document.getElementById('ai-status');
+    btn.disabled = true; btn.classList.add('scanning'); btn.textContent = '⏳ Reading...';
+    status.textContent = 'Reading title document...';
+    try {
+        const prompt = `This is a photo of a vehicle, trailer, or farm equipment title document (certificate of title or ownership).
+Extract the available information and return ONLY valid JSON with these exact fields (use empty string if not clearly readable):
+{"make":"manufacturer or brand name","model":"model name or number","year":"4-digit year","serialNumber":"VIN or serial number / PIN exactly as written","licensePlate":"plate number if shown, uppercase no spaces","titleNumber":"the title document number","owner":"registered owner name as shown"}
+Read what is clearly visible on the document. Return only the JSON object, no other text.`;
+        const raw = await callClaude(p.base64, p.mimeType, prompt);
+        if (!raw) return;
+        const jsonMatch = raw.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error('Could not parse AI response');
+        const result = JSON.parse(jsonMatch[0]);
+        const filled = [];
+        if (result.make)         { document.getElementById('f-make').value    = result.make; filled.push('Make'); }
+        if (result.model)        { document.getElementById('f-model').value   = result.model; filled.push('Model'); }
+        if (result.year)         { document.getElementById('f-year').value    = result.year; filled.push('Year'); }
+        if (result.serialNumber) { document.getElementById('f-serial').value  = result.serialNumber; filled.push('Serial/VIN'); }
+        if (result.licensePlate) { document.getElementById('f-license').value = result.licensePlate.toUpperCase().replace(/[^A-Z0-9-]/g,''); filled.push('Plate'); }
+        const extras = [];
+        if (result.titleNumber) extras.push(`Title #${result.titleNumber}`);
+        if (result.owner)       extras.push(`Owner: ${result.owner}`);
+        const tail = extras.length ? ` (${extras.join(' · ')})` : '';
+        status.textContent = filled.length
+            ? `✅ Title read — filled: ${filled.join(', ')}.${tail} Review and adjust as needed.`
+            : `⚠️ Could not read title details clearly${tail || ' — fill in manually.'}`;
+        status.style.color = filled.length ? 'var(--success)' : 'var(--text-secondary)';
+    } catch(err) {
+        status.textContent = '❌ Error: ' + err.message;
+        status.style.color  = 'var(--danger)';
+    } finally {
+        btn.disabled = false; btn.classList.remove('scanning');
+        btn.innerHTML = '🔍 Read Title with AI';
     }
 }
 
@@ -1742,7 +1796,7 @@ document.getElementById('item-form').addEventListener('submit', async e => {
         addMakeIfNew(data.make);
         const existingPhotos = docId ? (items.find(i=>i._docId===docId)?.photos||[]) : [];
         const photos = [];
-        for (const slot of ['main','serial','plate','extra','paperwork']) {
+        for (const slot of ['main','serial','plate','title','extra','paperwork']) {
             const p = formPhotos[slot];
             if (p.file) {
                 try {
@@ -1800,13 +1854,14 @@ function resetForm() {
     document.getElementById('form-submit-btn').disabled    = false;
     document.getElementById('ai-status').textContent   = '';
     populateCatSelect(); populateMakeList();
-    for (const slot of ['main','serial','plate','extra','paperwork']) {
+    for (const slot of ['main','serial','plate','title','extra','paperwork']) {
         formPhotos[slot] = { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false };
     }
-    removePhoto('main'); removePhoto('serial'); removePhoto('plate'); removePhoto('extra'); removePhoto('paperwork');
+    removePhoto('main'); removePhoto('serial'); removePhoto('plate'); removePhoto('title'); removePhoto('extra'); removePhoto('paperwork');
     document.getElementById('btn-identify').disabled  = true;
     document.getElementById('btn-ocr').disabled       = true;
     document.getElementById('btn-plate-ocr').disabled = true;
+    document.getElementById('btn-title-ocr').disabled = true;
     document.getElementById('btn-paperwork').disabled = true;
     // Clear documentation
     formDocs = [];
@@ -1838,7 +1893,7 @@ function editItem(docId) {
     document.getElementById('f-notes').value           = it.notes||'';
     document.getElementById('form-title').textContent      = `✏️ Edit Equipment #${it.id}`;
     document.getElementById('form-submit-btn').textContent = 'Update Equipment';
-    for (const slot of ['main','serial','plate','extra','paperwork']) {
+    for (const slot of ['main','serial','plate','title','extra','paperwork']) {
         const ph = it.photos?.find(p=>p.slot===slot);
         if (ph) {
             formPhotos[slot] = { file:null, base64:null, mimeType:null, existingUrl:ph.url, deleted:false };
@@ -1847,6 +1902,7 @@ function editItem(docId) {
             if (slot==='main')      document.getElementById('btn-identify').disabled = false;
             if (slot==='serial')    document.getElementById('btn-ocr').disabled      = false;
             if (slot==='plate')     document.getElementById('btn-plate-ocr').disabled = false;
+            if (slot==='title')     document.getElementById('btn-title-ocr').disabled = false;
             if (slot==='paperwork') document.getElementById('btn-paperwork').disabled = false;
         }
     }

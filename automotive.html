@@ -1404,6 +1404,10 @@ async function initApp() {
                 const cur = items.find(i => i._docId === currentDetailDocId);
                 if (cur) renderVehicleDetail(cur);
             }
+            if (currentMaintDocId) {
+                const cur = items.find(i => i._docId === currentMaintDocId);
+                if (cur) renderMaintenanceHistory(cur.maintenance || []);
+            }
             if (firstLoad) { firstLoad = false; autoRefreshMarketValues(); }
         });
         document.getElementById('loading-screen').style.display = 'none';
@@ -3184,8 +3188,9 @@ function renderVehicleDetail(it) {
     const records = it.maintenance || [];
     const totalCost = records.reduce((s, r) => s + (Number(r.cost) || 0), 0);
     const lastRecord = records.length ? records[records.length - 1] : null;
+    const indexedRecs = records.map((r, idx) => ({ r, idx }));
     const maintHistoryHtml = records.length
-        ? [...records].reverse().map(r => `
+        ? indexedRecs.reverse().map(({r, idx}) => `
             <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg-secondary);">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
                     <span style="font-weight:700;font-size:0.9rem;">${esc(r.type||'Service')}</span>
@@ -3197,6 +3202,9 @@ function renderVehicleDetail(it) {
                     ${r.miles?`<span>🚗 ${Number(r.miles).toLocaleString()} mi</span>`:''}
                     ${r.nextDate?`<span>📅 Next: ${new Date(r.nextDate+'T00:00:00').toLocaleDateString()}</span>`:''}
                     ${maintReceiptLinkHtml(r)}
+                    ${r.receipt && r.receipt.url
+                        ? `<button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:0.72rem;" onclick="attachReceiptFromDetail(${idx})" title="Replace source receipt">↻ Replace</button>`
+                        : `<button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:0.72rem;" onclick="attachReceiptFromDetail(${idx})" title="Attach a source receipt to this record">📎 Attach Receipt</button>`}
                 </div>
             </div>`).join('')
         : '<p style="color:var(--text-secondary);padding:12px 0;">No maintenance records yet.</p>';
@@ -3283,7 +3291,8 @@ function showMaintenance(docId) {
 function renderMaintenanceHistory(records) {
     const el = document.getElementById('maint-history');
     if (!records.length) { el.innerHTML = '<p style="color:var(--text-secondary);padding:12px 0;">No maintenance records yet.</p>'; return; }
-    el.innerHTML = [...records].reverse().map((r,i)=>`
+    const indexed = records.map((r, idx) => ({ r, idx }));
+    el.innerHTML = indexed.reverse().map(({r, idx}) => `
         <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg-secondary);">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
                 <span style="font-weight:700;font-size:0.9rem;">${esc(r.type||'Service')}</span>
@@ -3295,6 +3304,9 @@ function renderMaintenanceHistory(records) {
                 ${r.miles?`<span>🚗 ${Number(r.miles).toLocaleString()} mi</span>`:''}
                 ${r.nextDate?`<span>📅 Next: ${new Date(r.nextDate+'T00:00:00').toLocaleDateString()}</span>`:''}
                 ${maintReceiptLinkHtml(r)}
+                ${r.receipt && r.receipt.url
+                    ? `<button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:0.72rem;" onclick="attachReceiptToExisting(${idx})" title="Replace source receipt">↻ Replace</button>`
+                    : `<button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:0.72rem;" onclick="attachReceiptToExisting(${idx})" title="Attach a source receipt to this record">📎 Attach Receipt</button>`}
             </div>
         </div>`).join('');
 }
@@ -3303,6 +3315,50 @@ function maintReceiptLinkHtml(r) {
     if (!r || !r.receipt || !r.receipt.url) return '';
     const label = esc(r.receipt.fileName || 'receipt');
     return `<a href="${esc(r.receipt.url)}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;font-weight:600;">📎 View receipt${r.receipt.fileName ? ` <span style="font-weight:400;color:var(--text-secondary);">(${label})</span>` : ''}</a>`;
+}
+
+async function _attachReceiptToRecord(docId, idx, file, statusEl) {
+    const it = items.find(i => i._docId === docId);
+    if (!it || !it.maintenance || !it.maintenance[idx]) { toast('Record not found.','error'); return; }
+    try {
+        if (statusEl) { statusEl.textContent = '⬆️ Uploading receipt...'; statusEl.style.color = 'var(--text-secondary)'; }
+        const url = await uploadMaintReceipt(file);
+        const maintenance = it.maintenance.map((rec, i) => i === idx
+            ? { ...rec, receipt: { url, fileName: file.name || 'receipt', mimeType: file.type || '' } }
+            : rec);
+        await db.collection('automotive_items').doc(docId).update({ maintenance });
+        if (statusEl) { statusEl.textContent = '✅ Receipt attached.'; statusEl.style.color = 'var(--success)'; }
+        toast('Receipt attached.','success');
+    } catch(err) {
+        if (statusEl) { statusEl.textContent = '❌ ' + err.message; statusEl.style.color = 'var(--danger)'; }
+        toast('Upload failed: ' + err.message,'error');
+    }
+}
+
+function attachReceiptFromDetail(idx) {
+    if (!currentDetailDocId) { toast('No vehicle selected.','error'); return; }
+    const fi = document.createElement('input');
+    fi.type = 'file';
+    fi.accept = 'image/*,application/pdf,message/rfc822,.eml,text/plain,.txt,.html,.htm';
+    fi.onchange = () => {
+        const file = fi.files && fi.files[0];
+        if (!file) return;
+        _attachReceiptToRecord(currentDetailDocId, idx, file, null);
+    };
+    fi.click();
+}
+
+function attachReceiptToExisting(idx) {
+    if (!currentMaintDocId) { toast('No vehicle selected.','error'); return; }
+    const fi = document.createElement('input');
+    fi.type = 'file';
+    fi.accept = 'image/*,application/pdf,message/rfc822,.eml,text/plain,.txt,.html,.htm';
+    fi.onchange = () => {
+        const file = fi.files && fi.files[0];
+        if (!file) return;
+        _attachReceiptToRecord(currentMaintDocId, idx, file, document.getElementById('maint-scan-status'));
+    };
+    fi.click();
 }
 
 async function callClaudeRaw(content, maxTokens) {

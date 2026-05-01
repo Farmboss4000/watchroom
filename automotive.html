@@ -1195,7 +1195,12 @@ service firebase.storage {
         <div style="background:var(--bg-card);border-radius:8px;padding:16px;margin-bottom:16px;">
             <div style="font-size:0.85rem;font-weight:700;margin-bottom:12px;">Add New Record</div>
             <input type="file" id="maint-receipt-input" accept="image/*,application/pdf,message/rfc822,.eml,text/plain,.txt,.html,.htm" style="display:none" onchange="scanMaintenanceReceipt(this)">
-            <button type="button" class="btn-ai" id="btn-scan-receipt" onclick="document.getElementById('maint-receipt-input').click()" style="margin-top:0;margin-bottom:10px;">📷 Scan Receipt with AI <span style="font-weight:400;opacity:0.8;">— photo, PDF, or email</span></button>
+            <input type="file" id="maint-attach-input" accept="image/*,application/pdf,message/rfc822,.eml,text/plain,.txt,.html,.htm" style="display:none" onchange="attachMaintenanceReceipt(this)">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+                <button type="button" class="btn-ai" id="btn-scan-receipt" onclick="document.getElementById('maint-receipt-input').click()" style="margin:0;">📷 Scan Receipt with AI <span style="font-weight:400;opacity:0.8;">— photo, PDF, or email</span></button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('maint-attach-input').click()" title="Attach a receipt without AI scanning">📎 Attach Only</button>
+            </div>
+            <div id="maint-receipt-chip" style="display:none;margin-bottom:10px;font-size:0.8rem;background:var(--accent-dim);color:var(--accent);padding:6px 10px;border-radius:6px;"></div>
             <div id="maint-scan-status" style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:12px;min-height:1em;"></div>
             <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:12px;">
                 <div class="form-group"><label>Date</label><input type="date" id="maint-date"></div>
@@ -1312,6 +1317,7 @@ let aiModel      = 'claude-sonnet-4-6';
 let scannerStream = null;
 let scannerActive = false;
 let currentMaintDocId = null;
+let pendingMaintReceipt = null;  // { file, fileName, mimeType } — uploaded on save
 
 let formDocs = [];  // multi-document documentation array
 let formPhotos = {
@@ -1422,6 +1428,15 @@ async function saveConfig() {
 async function uploadPhoto(slot, file) {
     const ext  = file.name ? file.name.split('.').pop() : 'jpg';
     const path = `automotive_photos/${Date.now()}_${slot}.${ext}`;
+    const ref  = storage.ref().child(path);
+    await ref.put(file);
+    return await ref.getDownloadURL();
+}
+
+async function uploadMaintReceipt(file) {
+    const ext  = file.name && file.name.includes('.') ? file.name.split('.').pop() : 'bin';
+    const rand = Math.random().toString(36).slice(2, 8);
+    const path = `automotive_maint_receipts/${Date.now()}_${rand}.${ext}`;
     const ref  = storage.ref().child(path);
     await ref.put(file);
     return await ref.getDownloadURL();
@@ -3177,10 +3192,11 @@ function renderVehicleDetail(it) {
                     <span style="font-size:0.78rem;color:var(--text-secondary);">${r.date?new Date(r.date+'T00:00:00').toLocaleDateString():''}</span>
                 </div>
                 ${r.description?`<p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:4px;">${esc(r.description)}</p>`:''}
-                <div style="display:flex;gap:16px;font-size:0.78rem;color:var(--text-secondary);flex-wrap:wrap;">
+                <div style="display:flex;gap:16px;font-size:0.78rem;color:var(--text-secondary);flex-wrap:wrap;align-items:center;">
                     ${r.cost?`<span>💰 $${Number(r.cost).toLocaleString()}</span>`:''}
                     ${r.miles?`<span>🚗 ${Number(r.miles).toLocaleString()} mi</span>`:''}
                     ${r.nextDate?`<span>📅 Next: ${new Date(r.nextDate+'T00:00:00').toLocaleDateString()}</span>`:''}
+                    ${maintReceiptLinkHtml(r)}
                 </div>
             </div>`).join('')
         : '<p style="color:var(--text-secondary);padding:12px 0;">No maintenance records yet.</p>';
@@ -3259,6 +3275,7 @@ function showMaintenance(docId) {
     document.getElementById('maint-modal-sub').textContent = `${it.year||''} ${it.category||''} | VIN: ${it.serialNumber||'N/A'}`;
     document.getElementById('maint-date').value = new Date().toISOString().split('T')[0];
     document.getElementById('maint-scan-status').textContent = '';
+    clearPendingMaintReceipt();
     renderMaintenanceHistory(it.maintenance||[]);
     document.getElementById('maint-modal').classList.add('show');
 }
@@ -3273,12 +3290,19 @@ function renderMaintenanceHistory(records) {
                 <span style="font-size:0.78rem;color:var(--text-secondary);">${r.date?new Date(r.date+'T00:00:00').toLocaleDateString():''}</span>
             </div>
             ${r.description?`<p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:4px;">${esc(r.description)}</p>`:''}
-            <div style="display:flex;gap:16px;font-size:0.78rem;color:var(--text-secondary);">
+            <div style="display:flex;gap:16px;font-size:0.78rem;color:var(--text-secondary);flex-wrap:wrap;align-items:center;">
                 ${r.cost?`<span>💰 $${Number(r.cost).toLocaleString()}</span>`:''}
                 ${r.miles?`<span>🚗 ${Number(r.miles).toLocaleString()} mi</span>`:''}
                 ${r.nextDate?`<span>📅 Next: ${new Date(r.nextDate+'T00:00:00').toLocaleDateString()}</span>`:''}
+                ${maintReceiptLinkHtml(r)}
             </div>
         </div>`).join('');
+}
+
+function maintReceiptLinkHtml(r) {
+    if (!r || !r.receipt || !r.receipt.url) return '';
+    const label = esc(r.receipt.fileName || 'receipt');
+    return `<a href="${esc(r.receipt.url)}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;font-weight:600;">📎 View receipt${r.receipt.fileName ? ` <span style="font-weight:400;color:var(--text-secondary);">(${label})</span>` : ''}</a>`;
 }
 
 async function callClaudeRaw(content, maxTokens) {
@@ -3326,11 +3350,35 @@ function readFileAsBase64(file) {
     });
 }
 
+function attachMaintenanceReceipt(input) {
+    const file = input.files && input.files[0];
+    input.value = '';
+    if (!file) return;
+    pendingMaintReceipt = { file, fileName: file.name || 'receipt', mimeType: file.type || '' };
+    renderMaintReceiptChip();
+}
+
+function renderMaintReceiptChip() {
+    const chip = document.getElementById('maint-receipt-chip');
+    if (!chip) return;
+    if (!pendingMaintReceipt) { chip.style.display = 'none'; chip.innerHTML = ''; return; }
+    chip.style.display = 'block';
+    chip.innerHTML = `📎 <strong>${esc(pendingMaintReceipt.fileName)}</strong> attached — will save with record
+        <a href="#" onclick="clearPendingMaintReceipt();return false;" style="margin-left:8px;color:var(--danger);text-decoration:underline;">remove</a>`;
+}
+
+function clearPendingMaintReceipt() {
+    pendingMaintReceipt = null;
+    renderMaintReceiptChip();
+}
+
 async function scanMaintenanceReceipt(input) {
     const file = input.files && input.files[0];
     input.value = '';
     if (!file) return;
     if (!apiKey) { toast('Set your Anthropic API key in Settings first.','error'); return; }
+    pendingMaintReceipt = { file, fileName: file.name || 'receipt', mimeType: file.type || '' };
+    renderMaintReceiptChip();
     const btn    = document.getElementById('btn-scan-receipt');
     const status = document.getElementById('maint-scan-status');
     const origBtnHtml = '📷 Scan Receipt with AI <span style="font-weight:400;opacity:0.8;">— photo, PDF, or email</span>';
@@ -3424,6 +3472,14 @@ async function saveMaintenance() {
     };
     if (!record.type) { toast('Enter a service type.','error'); return; }
     const it = items.find(i=>i._docId===currentMaintDocId); if (!it) return;
+    const status = document.getElementById('maint-scan-status');
+    if (pendingMaintReceipt && pendingMaintReceipt.file) {
+        try {
+            status.textContent = '⬆️ Uploading receipt...'; status.style.color = 'var(--text-secondary)';
+            const url = await uploadMaintReceipt(pendingMaintReceipt.file);
+            record.receipt = { url, fileName: pendingMaintReceipt.fileName, mimeType: pendingMaintReceipt.mimeType };
+        } catch(err) { toast('Receipt upload failed: '+err.message,'error'); return; }
+    }
     const maintenance = [...(it.maintenance||[]), record];
     try {
         await db.collection('automotive_items').doc(currentMaintDocId).update({ maintenance });
@@ -3433,11 +3489,12 @@ async function saveMaintenance() {
         document.getElementById('maint-next-date').value='';
         document.getElementById('maint-miles').value='';
         document.getElementById('maint-scan-status').textContent='';
+        clearPendingMaintReceipt();
         toast('Record added!','success');
     } catch(err) { toast('Error: '+err.message,'error'); }
 }
 
-function closeMaintModal() { document.getElementById('maint-modal').classList.remove('show'); currentMaintDocId=null; }
+function closeMaintModal() { document.getElementById('maint-modal').classList.remove('show'); currentMaintDocId=null; clearPendingMaintReceipt(); }
 document.getElementById('maint-modal').addEventListener('click', e => { if(e.target===document.getElementById('maint-modal'))closeMaintModal(); });
 
 // ═══════════════════════════════════════

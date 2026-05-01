@@ -1103,6 +1103,21 @@ service firebase.storage {
     </div>
 </div>
 
+<!-- ══ VEHICLE DETAIL / SUMMARY ══ -->
+<div id="view-vehicle-detail" class="view">
+    <div class="toolbar">
+        <div class="toolbar-left">
+            <button class="btn btn-ghost btn-sm" onclick="showView('inventory')">← Back to Inventory</button>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-ghost btn-sm" id="vd-btn-edit" title="Edit vehicle">✎ Edit</button>
+            <button class="btn btn-ghost btn-sm" id="vd-btn-barcode" title="Barcode / Photos">▣ Barcode</button>
+            <button class="btn btn-ghost btn-sm" id="vd-btn-email" title="Email proof of insurance">✉️ Email Insurance</button>
+        </div>
+    </div>
+    <div id="vd-content"></div>
+</div>
+
 <!-- ══ VIN SCAN MODAL ══ -->
 <div class="modal-overlay" id="vin-scan-modal">
     <div class="modal" style="max-width:560px;">
@@ -1307,7 +1322,7 @@ let formPhotos = {
     insurance: { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false }
 };
 
-const VIEWS = ['dashboard','add-item','inventory','reports','categories','settings','recycle-bin'];
+const VIEWS = ['dashboard','add-item','inventory','reports','categories','settings','recycle-bin','vehicle-detail'];
 
 // ═══════════════════════════════════════
 //  AUTH
@@ -1379,6 +1394,10 @@ async function initApp() {
             items = snap.docs.map(doc => ({ _docId:doc.id, ...doc.data() }));
             renderDashboard(); renderInventory(); renderReport();
             populateDriverList();
+            if (currentDetailDocId) {
+                const cur = items.find(i => i._docId === currentDetailDocId);
+                if (cur) renderVehicleDetail(cur);
+            }
             if (firstLoad) { firstLoad = false; autoRefreshMarketValues(); }
         });
         document.getElementById('loading-screen').style.display = 'none';
@@ -2746,7 +2765,7 @@ function renderInventory() {
             : `<div class="thumb-placeholder">🚗</div>`;
         const condBadge = it.condition ? `<span style="font-size:0.72rem;font-weight:600;color:${
             it.condition==='Excellent'?'#15803d':it.condition==='Good'?'#1d4ed8':it.condition==='Fair'?'#92400e':'#dc2626'}">${it.condition}</span>` : '—';
-        return `<tr>
+        return `<tr style="cursor:pointer" onclick="if(!event.target.closest('button,a,img,input'))showVehicleDetail('${it._docId}')">
             <td data-col="photo">${thumb}</td>
             <td data-col="id" class="mono">#${it.id}</td>
             <td data-col="category"><span class="badge ${catClass(it.category)}">${it.category||'—'}</span></td>
@@ -3085,6 +3104,150 @@ function closeScanner() {
     document.getElementById('scanner-modal').classList.remove('show');
 }
 document.getElementById('scanner-modal').addEventListener('click', e => { if(e.target===document.getElementById('scanner-modal'))closeScanner(); });
+
+// ═══════════════════════════════════════
+//  VEHICLE DETAIL / SUMMARY
+// ═══════════════════════════════════════
+let currentDetailDocId = null;
+
+function showVehicleDetail(docId) {
+    const it = items.find(i => i._docId === docId);
+    if (!it) { toast('Vehicle not found.', 'error'); return; }
+    currentDetailDocId = docId;
+    renderVehicleDetail(it);
+    showView('vehicle-detail');
+}
+
+function renderVehicleDetail(it) {
+    document.getElementById('vd-btn-edit').onclick    = () => editItem(it._docId);
+    document.getElementById('vd-btn-barcode').onclick = () => showBarcode(it._docId);
+    document.getElementById('vd-btn-email').onclick   = () => emailInsuranceCard(it._docId);
+
+    const mainUrl = it.photos?.find(p => p.slot === 'main')?.url;
+    const photoHtml = mainUrl
+        ? `<img src="${mainUrl}" alt="" style="width:100%;max-width:380px;border-radius:10px;cursor:pointer;object-fit:cover;aspect-ratio:4/3;" onclick="window.open('${mainUrl}','_blank')">`
+        : `<div style="width:100%;max-width:380px;aspect-ratio:4/3;background:var(--bg-secondary);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:4rem;">🚗</div>`;
+
+    const tabsHtml = (() => {
+        if (!it.tabsExpiration) return '—';
+        const [m, y] = it.tabsExpiration.split('/');
+        const expDate = new Date(parseInt(y), parseInt(m)-1, 1);
+        const now = new Date(); now.setDate(1);
+        const diffDays = Math.round((expDate - now) / 86400000);
+        const isExp  = diffDays < 0;
+        const isSoon = !isExp && diffDays <= 60;
+        const color  = isExp ? '#dc2626' : isSoon ? '#f59e0b' : 'var(--text-secondary)';
+        const label  = isExp ? '⚠ EXPIRED · ' : isSoon ? '⚠ Expires soon · ' : '';
+        return `<span style="color:${color};">${label}${it.tabsExpiration}</span>`;
+    })();
+
+    const condColor = it.condition === 'Excellent' ? '#15803d'
+                    : it.condition === 'Good'      ? '#1d4ed8'
+                    : it.condition === 'Fair'      ? '#92400e'
+                    : it.condition === 'Poor'      ? '#dc2626' : 'var(--text-secondary)';
+
+    const ann = annualizedPremium(it.premium, it.premiumTerm);
+    const premiumHtml = ann
+        ? `<div style="font-weight:700;color:#a855f7;">$${ann.toLocaleString()}/yr</div>`
+          + (it.premiumTerm ? `<div style="font-size:0.75rem;color:var(--text-secondary);">$${Number(it.premium||0).toLocaleString()} / ${it.premiumTerm==='6mo'?'6-mo':'12-mo'}</div>` : '')
+        : '—';
+
+    const mvHtml = it.marketValue
+        ? `<span style="color:#22c55e;font-weight:700;">$${Number(it.marketValue).toLocaleString()}</span>`
+        : '—';
+
+    const priceHtml = it.price
+        ? `<span style="color:#60a5fa;font-weight:700;">$${Number(it.price).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>`
+        : '—';
+
+    const field = (label, value) => `
+        <div style="padding:10px 0;border-bottom:1px solid var(--border);">
+            <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary);margin-bottom:3px;">${label}</div>
+            <div style="font-size:0.92rem;">${value || '—'}</div>
+        </div>`;
+
+    const records = it.maintenance || [];
+    const totalCost = records.reduce((s, r) => s + (Number(r.cost) || 0), 0);
+    const lastRecord = records.length ? records[records.length - 1] : null;
+    const maintHistoryHtml = records.length
+        ? [...records].reverse().map(r => `
+            <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg-secondary);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                    <span style="font-weight:700;font-size:0.9rem;">${esc(r.type||'Service')}</span>
+                    <span style="font-size:0.78rem;color:var(--text-secondary);">${r.date?new Date(r.date+'T00:00:00').toLocaleDateString():''}</span>
+                </div>
+                ${r.description?`<p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:4px;">${esc(r.description)}</p>`:''}
+                <div style="display:flex;gap:16px;font-size:0.78rem;color:var(--text-secondary);flex-wrap:wrap;">
+                    ${r.cost?`<span>💰 $${Number(r.cost).toLocaleString()}</span>`:''}
+                    ${r.miles?`<span>🚗 ${Number(r.miles).toLocaleString()} mi</span>`:''}
+                    ${r.nextDate?`<span>📅 Next: ${new Date(r.nextDate+'T00:00:00').toLocaleDateString()}</span>`:''}
+                </div>
+            </div>`).join('')
+        : '<p style="color:var(--text-secondary);padding:12px 0;">No maintenance records yet.</p>';
+
+    document.getElementById('vd-content').innerHTML = `
+        <div class="card" style="margin-bottom:20px;">
+            <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;">
+                <div style="flex:0 0 auto;">${photoHtml}</div>
+                <div style="flex:1;min-width:280px;">
+                    <div style="font-size:0.78rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">
+                        <span class="badge ${catClass(it.category)}">${it.category||'—'}</span>
+                        <span style="margin-left:8px;" class="mono">#${it.id}</span>
+                    </div>
+                    <h2 style="font-size:1.6rem;font-weight:800;margin:6px 0;">${esc(it.year)||''} ${esc(it.make)||''} ${esc(it.model)||''}</h2>
+                    ${it.condition ? `<div style="font-weight:600;color:${condColor};margin-bottom:8px;">${esc(it.condition)} condition</div>` : ''}
+                    ${it.insuranceSuspended ? '<div style="display:inline-block;background:#fee2e2;color:#dc2626;padding:6px 12px;border-radius:6px;font-weight:800;font-size:0.78rem;letter-spacing:0.5px;margin-bottom:10px;">❗ INSURANCE SUSPENDED</div>' : ''}
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0 24px;">
+                        ${field('VIN', `<span class="mono" style="font-size:0.82rem;">${esc(it.serialNumber)||'—'}</span>`)}
+                        ${field('License Plate', esc(it.licensePlate) ? `<span style="font-weight:700;letter-spacing:1px;">${esc(it.licensePlate)}</span>` : '—')}
+                        ${field('Tabs Expiration', tabsHtml)}
+                        ${field('Mileage', it.mileage ? Number(it.mileage).toLocaleString() + ' mi' : '—')}
+                        ${field('Color', esc(it.color))}
+                        ${field('Engine', esc(it.engine))}
+                        ${field('Transmission', esc(it.transmission))}
+                        ${field('Location', esc(it.location))}
+                        ${field('Default Driver', it.defaultDriver ? `<span style="display:inline-flex;align-items:center;gap:5px;background:var(--accent-dim);color:var(--accent);padding:2px 9px;border-radius:12px;font-size:0.82rem;font-weight:600;">👤 ${esc(it.defaultDriver)}</span>` : '—')}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:20px;">
+            <div class="card">
+                <div class="card-title"><div class="card-title-left">💰 Purchase</div></div>
+                ${field('Purchase Date', it.purchaseDate ? new Date(it.purchaseDate+'T00:00:00').toLocaleDateString() : '—')}
+                ${field('Purchase Price', priceHtml)}
+                ${field('Source / Vendor', esc(it.vendor))}
+                ${field('Market Value', mvHtml)}
+            </div>
+            <div class="card">
+                <div class="card-title"><div class="card-title-left">🛡️ Insurance</div></div>
+                ${field('Carrier', esc(it.insuranceCompany))}
+                ${field('Premium', premiumHtml)}
+                ${field('Effective', it.insuranceEffectiveDate ? new Date(it.insuranceEffectiveDate+'T00:00:00').toLocaleDateString() : '—')}
+                ${field('Expires', it.insuranceExpirationDate ? new Date(it.insuranceExpirationDate+'T00:00:00').toLocaleDateString() : '—')}
+            </div>
+        </div>
+
+        ${it.notes ? `<div class="card" style="margin-bottom:20px;">
+            <div class="card-title"><div class="card-title-left">📝 Notes</div></div>
+            <div style="white-space:pre-wrap;font-size:0.9rem;">${esc(it.notes)}</div>
+        </div>` : ''}
+
+        <div class="card">
+            <div class="card-title">
+                <div class="card-title-left">🔧 Maintenance Log</div>
+                <span style="font-size:0.82rem;color:var(--text-secondary);font-weight:400;">
+                    ${records.length} record${records.length!==1?'s':''}${totalCost>0?' · $'+totalCost.toLocaleString()+' total':''}${lastRecord&&lastRecord.date?' · last: '+new Date(lastRecord.date+'T00:00:00').toLocaleDateString():''}
+                </span>
+            </div>
+            <div style="margin-bottom:14px;">
+                <button class="btn btn-primary btn-sm" onclick="showMaintenance('${it._docId}')">+ Add / Manage Records</button>
+            </div>
+            ${maintHistoryHtml}
+        </div>
+    `;
+}
 
 // ═══════════════════════════════════════
 //  MAINTENANCE

@@ -584,6 +584,16 @@
             <tbody id="recent-tbody"></tbody></table>
         </div>
     </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px;margin-top:16px;">
+        <div class="card">
+            <div class="card-title"><div class="card-title-left">🔧 Recent Maintenance</div><span id="recent-maint-count" style="font-size:0.8rem;color:var(--text-secondary);font-weight:400;"></span></div>
+            <div id="recent-maint-list"></div>
+        </div>
+        <div class="card">
+            <div class="card-title"><div class="card-title-left">📢 Recent Recalls</div><span id="recent-recalls-count" style="font-size:0.8rem;color:var(--text-secondary);font-weight:400;"></span></div>
+            <div id="recent-recalls-list"></div>
+        </div>
+    </div>
 </div>
 
 <!-- ══ ADD / EDIT ══ -->
@@ -1649,6 +1659,86 @@ function renderDashboard() {
                 <td style="color:var(--text-secondary)">${it.addedAt?new Date(it.addedAt).toLocaleDateString():'—'}</td>
             </tr>`;}).join('')
         : '<tr><td colspan="8" style="text-align:center;color:var(--text-secondary);padding:30px;">No vehicles yet.</td></tr>';
+    renderRecentMaintenance();
+    renderRecentRecalls();
+}
+
+function renderRecentMaintenance() {
+    const el = document.getElementById('recent-maint-list');
+    if (!el) return;
+    const flat = items.flatMap(it => (it.maintenance || []).map(r => ({ it, r })));
+    const totalAll = flat.length;
+    flat.sort((a, b) => {
+        const da = a.r.date || a.r.addedAt || '';
+        const db = b.r.date || b.r.addedAt || '';
+        return db.localeCompare(da);
+    });
+    const recent = flat.slice(0, 10);
+    document.getElementById('recent-maint-count').textContent = totalAll
+        ? `showing ${recent.length} of ${totalAll}`
+        : '';
+    if (!recent.length) {
+        el.innerHTML = '<p style="color:var(--text-secondary);padding:16px 0;">No maintenance records yet.</p>';
+        return;
+    }
+    el.innerHTML = recent.map(({it, r}) => {
+        const veh = [it.year, it.make, it.model].filter(Boolean).join(' ') || `Vehicle #${it.id}`;
+        const hasReceipt = !!(r.receipt && r.receipt.url);
+        return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;" onclick="showMaintenance('${it._docId}')" title="Open maintenance log">
+            <div style="flex:1;min-width:0;">
+                <div style="font-weight:700;font-size:0.9rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                    <span>${esc(r.type || 'Service')}</span>
+                    ${hasReceipt ? '<span style="color:var(--accent);font-size:0.78rem;" title="Receipt attached">📎</span>' : ''}
+                </div>
+                <div style="font-size:0.78rem;color:var(--text-secondary);">${esc(veh)}</div>
+                ${r.description ? `<div style="font-size:0.78rem;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:340px;">${esc(r.description)}</div>` : ''}
+            </div>
+            <div style="text-align:right;flex-shrink:0;">
+                <div style="font-size:0.78rem;color:var(--text-secondary);">${r.date ? new Date(r.date+'T00:00:00').toLocaleDateString() : ''}</div>
+                ${r.cost ? `<div style="font-size:0.85rem;font-weight:600;">$${Number(r.cost).toLocaleString()}</div>` : ''}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function renderRecentRecalls() {
+    const el = document.getElementById('recent-recalls-list');
+    if (!el) return;
+    const flat = items.flatMap(it => (it.recalls || []).map(r => ({ it, r })));
+    const totalAll = flat.length;
+    flat.sort((a, b) => {
+        const da = a.r.date || a.r.addedAt || '';
+        const db = b.r.date || b.r.addedAt || '';
+        return db.localeCompare(da);
+    });
+    const recent = flat.slice(0, 10);
+    document.getElementById('recent-recalls-count').textContent = totalAll
+        ? `showing ${recent.length} of ${totalAll}`
+        : '';
+    if (!recent.length) {
+        el.innerHTML = '<p style="color:var(--text-secondary);padding:16px 0;">No recalls logged yet.</p>';
+        return;
+    }
+    el.innerHTML = recent.map(({it, r}) => {
+        const veh = [it.year, it.make, it.model].filter(Boolean).join(' ') || `Vehicle #${it.id}`;
+        const isCompleted = isRecallCompleted(r);
+        const statusBadge = `<span style="font-size:0.68rem;font-weight:700;padding:2px 8px;border-radius:10px;background:${isCompleted?'#dcfce7':'#fef3c7'};color:${isCompleted?'#15803d':'#92400e'};">${isCompleted?'Completed':'Pending'}</span>`;
+        const hasDoc = !!(r.document && r.document.url);
+        return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;" onclick="showRecalls('${it._docId}')" title="Open recall log">
+            <div style="flex:1;min-width:0;">
+                <div style="font-weight:700;font-size:0.9rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                    ${r.recallNumber ? `<span class="mono" style="background:var(--bg-secondary);padding:1px 6px;border-radius:4px;font-size:0.75rem;">${esc(r.recallNumber)}</span>` : ''}
+                    <span>${esc(r.title || 'Recall')}</span>
+                    ${statusBadge}
+                    ${hasDoc ? '<span style="color:var(--accent);font-size:0.78rem;" title="Document attached">📎</span>' : ''}
+                </div>
+                <div style="font-size:0.78rem;color:var(--text-secondary);">${esc(veh)}</div>
+            </div>
+            <div style="text-align:right;flex-shrink:0;">
+                <div style="font-size:0.78rem;color:var(--text-secondary);">${r.date ? new Date(r.date+'T00:00:00').toLocaleDateString() : ''}</div>
+            </div>
+        </div>`;
+    }).join('');
 }
 
 // ═══════════════════════════════════════

@@ -3190,23 +3190,7 @@ function renderVehicleDetail(it) {
     const lastRecord = records.length ? records[records.length - 1] : null;
     const indexedRecs = records.map((r, idx) => ({ r, idx }));
     const maintHistoryHtml = records.length
-        ? indexedRecs.reverse().map(({r, idx}) => `
-            <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg-secondary);">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-                    <span style="font-weight:700;font-size:0.9rem;">${esc(r.type||'Service')}</span>
-                    <span style="font-size:0.78rem;color:var(--text-secondary);">${r.date?new Date(r.date+'T00:00:00').toLocaleDateString():''}</span>
-                </div>
-                ${r.description?`<p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:4px;">${esc(r.description)}</p>`:''}
-                <div style="display:flex;gap:16px;font-size:0.78rem;color:var(--text-secondary);flex-wrap:wrap;align-items:center;">
-                    ${r.cost?`<span>💰 $${Number(r.cost).toLocaleString()}</span>`:''}
-                    ${r.miles?`<span>🚗 ${Number(r.miles).toLocaleString()} mi</span>`:''}
-                    ${r.nextDate?`<span>📅 Next: ${new Date(r.nextDate+'T00:00:00').toLocaleDateString()}</span>`:''}
-                    ${maintReceiptLinkHtml(r)}
-                    ${r.receipt && r.receipt.url
-                        ? `<button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:0.72rem;" onclick="attachReceiptFromDetail(${idx})" title="Replace source receipt">↻ Replace</button>`
-                        : `<button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:0.72rem;" onclick="attachReceiptFromDetail(${idx})" title="Attach a source receipt to this record">📎 Attach Receipt</button>`}
-                </div>
-            </div>`).join('')
+        ? indexedRecs.reverse().map(({r, idx}) => maintRowHtml(r, idx, 'attachReceiptFromDetail')).join('')
         : '<p style="color:var(--text-secondary);padding:12px 0;">No maintenance records yet.</p>';
 
     document.getElementById('vd-content').innerHTML = `
@@ -3292,10 +3276,18 @@ function renderMaintenanceHistory(records) {
     const el = document.getElementById('maint-history');
     if (!records.length) { el.innerHTML = '<p style="color:var(--text-secondary);padding:12px 0;">No maintenance records yet.</p>'; return; }
     const indexed = records.map((r, idx) => ({ r, idx }));
-    el.innerHTML = indexed.reverse().map(({r, idx}) => `
-        <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg-secondary);">
+    el.innerHTML = indexed.reverse().map(({r, idx}) => maintRowHtml(r, idx, 'attachReceiptToExisting')).join('');
+}
+
+function maintRowHtml(r, idx, attachFnName) {
+    const hasReceipt = !!(r.receipt && r.receipt.url);
+    const rowAttrs = hasReceipt
+        ? `style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg-secondary);cursor:pointer;transition:background 0.1s, border-color 0.1s;" onclick="if(!event.target.closest('button,a,input'))window.open('${esc(r.receipt.url)}','_blank')" onmouseover="this.style.borderColor='var(--accent)';this.style.background='var(--accent-dim)'" onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--bg-secondary)'" title="Click to view source document"`
+        : `style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg-secondary);"`;
+    return `
+        <div ${rowAttrs}>
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-                <span style="font-weight:700;font-size:0.9rem;">${esc(r.type||'Service')}</span>
+                <span style="font-weight:700;font-size:0.9rem;">${esc(r.type||'Service')}${hasReceipt ? ' <span style="font-size:0.78rem;color:var(--accent);font-weight:600;">📎</span>' : ''}</span>
                 <span style="font-size:0.78rem;color:var(--text-secondary);">${r.date?new Date(r.date+'T00:00:00').toLocaleDateString():''}</span>
             </div>
             ${r.description?`<p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:4px;">${esc(r.description)}</p>`:''}
@@ -3303,18 +3295,12 @@ function renderMaintenanceHistory(records) {
                 ${r.cost?`<span>💰 $${Number(r.cost).toLocaleString()}</span>`:''}
                 ${r.miles?`<span>🚗 ${Number(r.miles).toLocaleString()} mi</span>`:''}
                 ${r.nextDate?`<span>📅 Next: ${new Date(r.nextDate+'T00:00:00').toLocaleDateString()}</span>`:''}
-                ${maintReceiptLinkHtml(r)}
-                ${r.receipt && r.receipt.url
-                    ? `<button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:0.72rem;" onclick="attachReceiptToExisting(${idx})" title="Replace source receipt">↻ Replace</button>`
-                    : `<button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:0.72rem;" onclick="attachReceiptToExisting(${idx})" title="Attach a source receipt to this record">📎 Attach Receipt</button>`}
+                ${hasReceipt ? `<span style="color:var(--accent);font-weight:600;">${esc(r.receipt.fileName||'receipt')}</span>` : ''}
+                ${hasReceipt
+                    ? `<button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:0.72rem;margin-left:auto;" onclick="${attachFnName}(${idx})" title="Replace source receipt">↻ Replace</button>`
+                    : `<button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:0.72rem;margin-left:auto;" onclick="${attachFnName}(${idx})" title="Attach a source receipt to this record">📎 Attach Receipt</button>`}
             </div>
-        </div>`).join('');
-}
-
-function maintReceiptLinkHtml(r) {
-    if (!r || !r.receipt || !r.receipt.url) return '';
-    const label = esc(r.receipt.fileName || 'receipt');
-    return `<a href="${esc(r.receipt.url)}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;font-weight:600;">📎 View receipt${r.receipt.fileName ? ` <span style="font-weight:400;color:var(--text-secondary);">(${label})</span>` : ''}</a>`;
+        </div>`;
 }
 
 async function _attachReceiptToRecord(docId, idx, file, statusEl) {

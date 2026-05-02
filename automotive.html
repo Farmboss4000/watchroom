@@ -514,6 +514,7 @@
 <!-- ══ DASHBOARD ══ -->
 <div id="view-dashboard" class="view active">
     <div id="sus-banner" class="sus-banner" style="display:none;"></div>
+    <div id="recall-banner" class="sus-banner" style="display:none;background:linear-gradient(135deg,#f59e0b 0%,#b45309 100%);"></div>
     <div class="hero">
         <div>
             <div class="hero-title">Farmboss <span>Automotive</span></div>
@@ -1237,7 +1238,7 @@ service firebase.storage {
                 <div class="form-group"><label>Issue Date</label><input type="date" id="recall-date"></div>
                 <div class="form-group" style="grid-column:1/-1"><label>Title</label><input type="text" id="recall-title" placeholder="Short headline"></div>
                 <div class="form-group" style="grid-column:1/-1"><label>Summary</label><textarea id="recall-desc" rows="3" placeholder="Defect and remedy summary..."></textarea></div>
-                <div class="form-group"><label>Status</label><select id="recall-status"><option>Open</option><option>Scheduled</option><option>Repaired</option><option>N/A</option></select></div>
+                <div class="form-group"><label>Status</label><select id="recall-status"><option>Pending</option><option>Completed</option></select></div>
                 <div class="form-group"><label>Repair Date</label><input type="date" id="recall-repair-date"></div>
             </div>
             <button class="btn btn-primary" style="margin-top:8px;" onclick="saveRecall()">+ Add Recall</button>
@@ -1553,8 +1554,41 @@ function renderSuspenseBanner() {
     `;
 }
 
+function isRecallCompleted(r) {
+    return r && (r.status === 'Completed' || r.status === 'Repaired');
+}
+
+function renderRecallBanner() {
+    const el = document.getElementById('recall-banner');
+    if (!el) return;
+    const pending = items.flatMap(it =>
+        (it.recalls || [])
+            .filter(r => !isRecallCompleted(r))
+            .map(r => ({ it, r }))
+    );
+    if (!pending.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    el.style.display = 'flex';
+    const vehicleCount = new Set(pending.map(p => p.it._docId)).size;
+    const chips = pending.map(({it, r}) => {
+        const lbl = [it.year, it.make, it.model].filter(Boolean).join(' ') || `Vehicle #${it.id}`;
+        const recallTag = r.recallNumber || (r.title ? (r.title.length > 30 ? r.title.slice(0,30)+'…' : r.title) : 'Recall');
+        const tip = r.title || r.description || 'Pending recall';
+        return `<span class="sus-banner-chip" onclick="showRecalls('${it._docId}')" title="${esc(tip)}">📢 ${esc(lbl)} · ${esc(recallTag)}</span>`;
+    }).join('');
+    el.innerHTML = `
+        <div class="sus-banner-icon">📢</div>
+        <div style="flex:1;min-width:0;">
+            <div class="sus-banner-title">${pending.length} Pending Recall${pending.length!==1?'s':''} on ${vehicleCount} Vehicle${vehicleCount!==1?'s':''}</div>
+            <div class="sus-banner-sub">Open recalls awaiting repair. Mark each Completed once the work is done.</div>
+            <div class="sus-banner-list">${chips}</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" style="background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.45);color:#fff;flex-shrink:0;" onclick="showView('inventory')">View Inventory →</button>
+    `;
+}
+
 function renderDashboard() {
     renderSuspenseBanner();
+    renderRecallBanner();
     const total  = items.length;
     const ms30   = 30*24*60*60*1000;
     const recent = items.filter(i => i.addedAt && (Date.now()-new Date(i.addedAt).getTime())<ms30).length;
@@ -3302,7 +3336,7 @@ function renderVehicleDetail(it) {
 
         ${(() => {
             const recalls = it.recalls || [];
-            const openCount = recalls.filter(r => !r.status || r.status === 'Open' || r.status === 'Scheduled').length;
+            const pendingCount = recalls.filter(r => !isRecallCompleted(r)).length;
             const recallHtmlContent = recalls.length
                 ? sortRecallsForDisplay(recalls).map(({r, idx}) => recallRowHtml(r, idx, 'attachDocFromDetail', 'deleteRecallFromDetail')).join('')
                 : '<p style="color:var(--text-secondary);padding:12px 0;">No recalls logged yet.</p>';
@@ -3310,7 +3344,7 @@ function renderVehicleDetail(it) {
                 <div class="card-title">
                     <div class="card-title-left">📢 Recall Log</div>
                     <span style="font-size:0.82rem;color:var(--text-secondary);font-weight:400;">
-                        ${recalls.length} record${recalls.length!==1?'s':''}${openCount>0?' · <span style="color:#dc2626;font-weight:600;">'+openCount+' open</span>':''}
+                        ${recalls.length} record${recalls.length!==1?'s':''}${pendingCount>0?' · <span style="color:#b45309;font-weight:600;">'+pendingCount+' pending</span>':''}
                     </span>
                 </div>
                 <div style="margin-bottom:14px;">
@@ -3654,7 +3688,7 @@ function showRecalls(docId) {
     document.getElementById('recall-date').value = new Date().toISOString().split('T')[0];
     document.getElementById('recall-title').value = '';
     document.getElementById('recall-desc').value = '';
-    document.getElementById('recall-status').value = 'Open';
+    document.getElementById('recall-status').value = 'Pending';
     document.getElementById('recall-repair-date').value = '';
     document.getElementById('recall-scan-status').textContent = '';
     clearPendingRecallDoc();
@@ -3702,7 +3736,7 @@ async function scanRecallDocument(input) {
                      || type === 'text/html' || name.endsWith('.html') || name.endsWith('.htm');
 
         const extractRules = `Extract the following fields and return ONLY valid JSON — no explanation, no markdown, no code fences:
-{"recallNumber":"NHTSA campaign code or manufacturer code (often shaped like '24V-712' or '24E-022')","date":"YYYY-MM-DD of recall issuance or notification date","title":"short one-line headline of the recall, under 80 chars, focused on the affected component","description":"2-4 sentence summary combining the defect description and the remedy / repair","status":"one of: Open, Scheduled, Repaired — default to Open unless the document confirms a completed repair","repairDate":"YYYY-MM-DD only if a repair has been completed and the date is shown"}
+{"recallNumber":"NHTSA campaign code or manufacturer code (often shaped like '24V-712' or '24E-022')","date":"YYYY-MM-DD of recall issuance or notification date","title":"short one-line headline of the recall, under 80 chars, focused on the affected component","description":"2-4 sentence summary combining the defect description and the remedy / repair","status":"one of: Pending, Completed — default to Pending unless the document confirms the repair has been performed","repairDate":"YYYY-MM-DD only if a repair has been completed and the date is shown"}
 
 Rules:
 - Omit any field you cannot determine with reasonable confidence.
@@ -3792,7 +3826,7 @@ async function saveRecall() {
         document.getElementById('recall-number').value = '';
         document.getElementById('recall-title').value  = '';
         document.getElementById('recall-desc').value   = '';
-        document.getElementById('recall-status').value = 'Open';
+        document.getElementById('recall-status').value = 'Pending';
         document.getElementById('recall-repair-date').value = '';
         document.getElementById('recall-scan-status').textContent = '';
         clearPendingRecallDoc();
@@ -3821,9 +3855,9 @@ function recallRowHtml(r, idx, attachFnName, deleteFnName) {
     const rowAttrs = hasDoc
         ? `style="border:1px solid var(--accent);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg-secondary);cursor:pointer;transition:background 0.1s, border-color 0.1s;" onclick="if(!event.target.closest('button,a,input'))window.open('${esc(r.document.url)}','_blank')" onmouseover="this.style.background='var(--accent-dim)'" onmouseout="this.style.background='var(--bg-secondary)'" title="Click anywhere on this row to view the source document"`
         : `style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg-secondary);"`;
-    const statusBadge = r.status
-        ? `<span style="font-size:0.7rem;font-weight:700;padding:2px 8px;border-radius:10px;background:${r.status==='Repaired'?'#dcfce7':r.status==='Scheduled'?'#fef3c7':r.status==='N/A'?'#e5e7eb':'#fee2e2'};color:${r.status==='Repaired'?'#15803d':r.status==='Scheduled'?'#92400e':r.status==='N/A'?'#374151':'#dc2626'};">${esc(r.status)}</span>`
-        : '';
+    const isCompleted = r.status === 'Completed' || r.status === 'Repaired';
+    const statusLabel = isCompleted ? 'Completed' : 'Pending';
+    const statusBadge = `<span style="font-size:0.7rem;font-weight:700;padding:2px 8px;border-radius:10px;background:${isCompleted?'#dcfce7':'#fef3c7'};color:${isCompleted?'#15803d':'#92400e'};">${statusLabel}</span>`;
     return `
         <div ${rowAttrs}>
             <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;">

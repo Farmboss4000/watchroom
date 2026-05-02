@@ -3282,7 +3282,7 @@ function renderMaintenanceHistory(records) {
 function maintRowHtml(r, idx, attachFnName) {
     const hasReceipt = !!(r.receipt && r.receipt.url);
     const rowAttrs = hasReceipt
-        ? `style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg-secondary);cursor:pointer;transition:background 0.1s, border-color 0.1s;" onclick="if(!event.target.closest('button,a,input'))window.open('${esc(r.receipt.url)}','_blank')" onmouseover="this.style.borderColor='var(--accent)';this.style.background='var(--accent-dim)'" onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--bg-secondary)'" title="Click to view source document"`
+        ? `style="border:1px solid var(--accent);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg-secondary);cursor:pointer;transition:background 0.1s, border-color 0.1s;" onclick="if(!event.target.closest('button,a,input'))window.open('${esc(r.receipt.url)}','_blank')" onmouseover="this.style.background='var(--accent-dim)'" onmouseout="this.style.background='var(--bg-secondary)'" title="Click anywhere on this row to view the source document"`
         : `style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg-secondary);"`;
     return `
         <div ${rowAttrs}>
@@ -3291,14 +3291,17 @@ function maintRowHtml(r, idx, attachFnName) {
                 <span style="font-size:0.78rem;color:var(--text-secondary);">${r.date?new Date(r.date+'T00:00:00').toLocaleDateString():''}</span>
             </div>
             ${r.description?`<p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:4px;">${esc(r.description)}</p>`:''}
-            <div style="display:flex;gap:16px;font-size:0.78rem;color:var(--text-secondary);flex-wrap:wrap;align-items:center;">
+            <div style="display:flex;gap:12px;font-size:0.78rem;color:var(--text-secondary);flex-wrap:wrap;align-items:center;">
                 ${r.cost?`<span>💰 $${Number(r.cost).toLocaleString()}</span>`:''}
                 ${r.miles?`<span>🚗 ${Number(r.miles).toLocaleString()} mi</span>`:''}
                 ${r.nextDate?`<span>📅 Next: ${new Date(r.nextDate+'T00:00:00').toLocaleDateString()}</span>`:''}
-                ${hasReceipt ? `<span style="color:var(--accent);font-weight:600;">${esc(r.receipt.fileName||'receipt')}</span>` : ''}
-                ${hasReceipt
-                    ? `<button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:0.72rem;margin-left:auto;" onclick="${attachFnName}(${idx})" title="Replace source receipt">↻ Replace</button>`
-                    : `<button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:0.72rem;margin-left:auto;" onclick="${attachFnName}(${idx})" title="Attach a source receipt to this record">📎 Attach Receipt</button>`}
+                ${hasReceipt ? `<span style="color:var(--accent);font-weight:600;">📎 ${esc(r.receipt.fileName||'receipt')}</span>` : ''}
+                <span style="margin-left:auto;display:flex;gap:6px;">
+                    ${hasReceipt
+                        ? `<a href="${esc(r.receipt.url)}" target="_blank" rel="noopener" class="btn btn-primary btn-sm" style="padding:3px 10px;font-size:0.75rem;text-decoration:none;" title="Open source document in new tab">👁 View Receipt</a>
+                           <button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:0.72rem;" onclick="${attachFnName}(${idx})" title="Replace source receipt">↻ Replace</button>`
+                        : `<button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:0.72rem;" onclick="${attachFnName}(${idx})" title="Attach a source receipt to this record">📎 Attach Receipt</button>`}
+                </span>
             </div>
         </div>`;
 }

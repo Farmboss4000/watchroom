@@ -1218,6 +1218,36 @@ service firebase.storage {
     </div>
 </div>
 
+<div class="modal-overlay" id="recall-modal">
+    <div class="modal" style="max-width:680px;">
+        <div class="modal-title" id="recall-modal-title">📢 Recall Log</div>
+        <div class="modal-sub" id="recall-modal-sub"></div>
+        <div style="background:var(--bg-card);border-radius:8px;padding:16px;margin-bottom:16px;">
+            <div style="font-size:0.85rem;font-weight:700;margin-bottom:12px;">Add New Recall</div>
+            <input type="file" id="recall-scan-input" accept="image/*,application/pdf,message/rfc822,.eml,text/plain,.txt,.html,.htm" style="display:none" onchange="scanRecallDocument(this)">
+            <input type="file" id="recall-attach-input" accept="image/*,application/pdf,message/rfc822,.eml,text/plain,.txt,.html,.htm" style="display:none" onchange="attachRecallDocument(this)">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+                <button type="button" class="btn-ai" id="btn-scan-recall" onclick="document.getElementById('recall-scan-input').click()" style="margin:0;">📷 Scan Recall with AI <span style="font-weight:400;opacity:0.8;">— photo, PDF, or email</span></button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('recall-attach-input').click()" title="Attach a recall document without AI scanning">📎 Attach Only</button>
+            </div>
+            <div id="recall-doc-chip" style="display:none;margin-bottom:10px;font-size:0.8rem;background:var(--accent-dim);color:var(--accent);padding:6px 10px;border-radius:6px;"></div>
+            <div id="recall-scan-status" style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:12px;min-height:1em;"></div>
+            <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+                <div class="form-group"><label>Recall Number</label><input type="text" id="recall-number" placeholder="e.g. 24V-712"></div>
+                <div class="form-group"><label>Issue Date</label><input type="date" id="recall-date"></div>
+                <div class="form-group" style="grid-column:1/-1"><label>Title</label><input type="text" id="recall-title" placeholder="Short headline"></div>
+                <div class="form-group" style="grid-column:1/-1"><label>Summary</label><textarea id="recall-desc" rows="3" placeholder="Defect and remedy summary..."></textarea></div>
+                <div class="form-group"><label>Status</label><select id="recall-status"><option>Open</option><option>Scheduled</option><option>Repaired</option><option>N/A</option></select></div>
+                <div class="form-group"><label>Repair Date</label><input type="date" id="recall-repair-date"></div>
+            </div>
+            <button class="btn btn-primary" style="margin-top:8px;" onclick="saveRecall()">+ Add Recall</button>
+        </div>
+        <div style="font-size:0.85rem;font-weight:700;margin-bottom:10px;">History</div>
+        <div id="recall-history" style="max-height:300px;overflow-y:auto;"></div>
+        <div class="modal-actions"><button class="btn btn-ghost" onclick="closeRecallModal()">Close</button></div>
+    </div>
+</div>
+
 <!-- ══ SCAN INSURANCE MODAL (cards, declarations, renewal emails) ══ -->
 <div class="modal-overlay" id="ins-cards-modal">
     <div class="modal" style="max-width:920px;">
@@ -1318,6 +1348,8 @@ let scannerStream = null;
 let scannerActive = false;
 let currentMaintDocId = null;
 let pendingMaintReceipt = null;  // { file, fileName, mimeType } — uploaded on save
+let currentRecallDocId = null;
+let pendingRecallDoc = null;     // { file, fileName, mimeType } — uploaded on save
 
 let formDocs = [];  // multi-document documentation array
 let formPhotos = {
@@ -1408,6 +1440,10 @@ async function initApp() {
                 const cur = items.find(i => i._docId === currentMaintDocId);
                 if (cur) renderMaintenanceHistory(cur.maintenance || []);
             }
+            if (currentRecallDocId) {
+                const cur = items.find(i => i._docId === currentRecallDocId);
+                if (cur) renderRecallHistory(cur.recalls || []);
+            }
             if (firstLoad) { firstLoad = false; autoRefreshMarketValues(); }
         });
         document.getElementById('loading-screen').style.display = 'none';
@@ -1441,6 +1477,15 @@ async function uploadMaintReceipt(file) {
     const ext  = file.name && file.name.includes('.') ? file.name.split('.').pop() : 'bin';
     const rand = Math.random().toString(36).slice(2, 8);
     const path = `automotive_maint_receipts/${Date.now()}_${rand}.${ext}`;
+    const ref  = storage.ref().child(path);
+    await ref.put(file);
+    return await ref.getDownloadURL();
+}
+
+async function uploadRecallDoc(file) {
+    const ext  = file.name && file.name.includes('.') ? file.name.split('.').pop() : 'bin';
+    const rand = Math.random().toString(36).slice(2, 8);
+    const path = `automotive_recall_docs/${Date.now()}_${rand}.${ext}`;
     const ref  = storage.ref().child(path);
     await ref.put(file);
     return await ref.getDownloadURL();
@@ -2824,6 +2869,7 @@ function renderInventory() {
             </td>
             <td data-col="actions" style="white-space:nowrap">
                 <button class="btn btn-ghost btn-sm" onclick="showMaintenance('${it._docId}')" title="Maintenance Log">🔧</button>
+                <button class="btn btn-ghost btn-sm" onclick="showRecalls('${it._docId}')" title="Recall Log">📢</button>
                 <button class="btn btn-info btn-sm" onclick="showBarcode('${it._docId}')" title="Barcode/Photos">▣</button>
                 <button class="btn btn-ghost btn-sm" onclick="emailInsuranceCard('${it._docId}')" title="Email proof of insurance to driver">✉️</button>
                 <button class="btn btn-ghost btn-sm" onclick="editItem('${it._docId}')" title="Edit">✎</button>
@@ -3253,6 +3299,26 @@ function renderVehicleDetail(it) {
             </div>
             ${maintHistoryHtml}
         </div>
+
+        ${(() => {
+            const recalls = it.recalls || [];
+            const openCount = recalls.filter(r => !r.status || r.status === 'Open' || r.status === 'Scheduled').length;
+            const recallHtmlContent = recalls.length
+                ? sortRecallsForDisplay(recalls).map(({r, idx}) => recallRowHtml(r, idx, 'attachDocFromDetail', 'deleteRecallFromDetail')).join('')
+                : '<p style="color:var(--text-secondary);padding:12px 0;">No recalls logged yet.</p>';
+            return `<div class="card" style="margin-top:20px;">
+                <div class="card-title">
+                    <div class="card-title-left">📢 Recall Log</div>
+                    <span style="font-size:0.82rem;color:var(--text-secondary);font-weight:400;">
+                        ${recalls.length} record${recalls.length!==1?'s':''}${openCount>0?' · <span style="color:#dc2626;font-weight:600;">'+openCount+' open</span>':''}
+                    </span>
+                </div>
+                <div style="margin-bottom:14px;">
+                    <button class="btn btn-primary btn-sm" onclick="showRecalls('${it._docId}')">+ Add / Manage Recalls</button>
+                </div>
+                ${recallHtmlContent}
+            </div>`;
+        })()}
     `;
 }
 
@@ -3575,6 +3641,287 @@ async function saveMaintenance() {
 
 function closeMaintModal() { document.getElementById('maint-modal').classList.remove('show'); currentMaintDocId=null; clearPendingMaintReceipt(); }
 document.getElementById('maint-modal').addEventListener('click', e => { if(e.target===document.getElementById('maint-modal'))closeMaintModal(); });
+
+// ═══════════════════════════════════════
+//  RECALLS
+// ═══════════════════════════════════════
+function showRecalls(docId) {
+    const it = items.find(i => i._docId === docId); if (!it) return;
+    currentRecallDocId = docId;
+    document.getElementById('recall-modal-title').textContent = `📢 ${it.make||''} ${it.model||''} — Recalls`;
+    document.getElementById('recall-modal-sub').textContent = `${it.year||''} ${it.category||''} | VIN: ${it.serialNumber||'N/A'}`;
+    document.getElementById('recall-number').value = '';
+    document.getElementById('recall-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('recall-title').value = '';
+    document.getElementById('recall-desc').value = '';
+    document.getElementById('recall-status').value = 'Open';
+    document.getElementById('recall-repair-date').value = '';
+    document.getElementById('recall-scan-status').textContent = '';
+    clearPendingRecallDoc();
+    renderRecallHistory(it.recalls || []);
+    document.getElementById('recall-modal').classList.add('show');
+}
+
+function clearPendingRecallDoc() { pendingRecallDoc = null; renderRecallDocChip(); }
+
+function renderRecallDocChip() {
+    const chip = document.getElementById('recall-doc-chip');
+    if (!chip) return;
+    if (!pendingRecallDoc) { chip.style.display = 'none'; chip.innerHTML = ''; return; }
+    chip.style.display = 'block';
+    chip.innerHTML = `📎 <strong>${esc(pendingRecallDoc.fileName)}</strong> attached — will save with recall
+        <a href="#" onclick="clearPendingRecallDoc();return false;" style="margin-left:8px;color:var(--danger);text-decoration:underline;">remove</a>`;
+}
+
+function attachRecallDocument(input) {
+    const file = input.files && input.files[0];
+    input.value = '';
+    if (!file) return;
+    pendingRecallDoc = { file, fileName: file.name || 'recall', mimeType: file.type || '' };
+    renderRecallDocChip();
+}
+
+async function scanRecallDocument(input) {
+    const file = input.files && input.files[0];
+    input.value = '';
+    if (!file) return;
+    if (!apiKey) { toast('Set your Anthropic API key in Settings first.','error'); return; }
+    pendingRecallDoc = { file, fileName: file.name || 'recall', mimeType: file.type || '' };
+    renderRecallDocChip();
+    const btn    = document.getElementById('btn-scan-recall');
+    const status = document.getElementById('recall-scan-status');
+    btn.disabled = true; btn.classList.add('scanning'); btn.textContent = '⏳ Reading recall...';
+    status.textContent = 'Analyzing recall with AI...'; status.style.color = 'var(--text-secondary)';
+    try {
+        const name = (file.name || '').toLowerCase();
+        const type = (file.type || '').toLowerCase();
+        const isImage = type.startsWith('image/');
+        const isPdf   = type === 'application/pdf' || name.endsWith('.pdf');
+        const isEmail = type === 'message/rfc822' || name.endsWith('.eml') || name.endsWith('.msg')
+                     || type.startsWith('text/') || name.endsWith('.txt')
+                     || type === 'text/html' || name.endsWith('.html') || name.endsWith('.htm');
+
+        const extractRules = `Extract the following fields and return ONLY valid JSON — no explanation, no markdown, no code fences:
+{"recallNumber":"NHTSA campaign code or manufacturer code (often shaped like '24V-712' or '24E-022')","date":"YYYY-MM-DD of recall issuance or notification date","title":"short one-line headline of the recall, under 80 chars, focused on the affected component","description":"2-4 sentence summary combining the defect description and the remedy / repair","status":"one of: Open, Scheduled, Repaired — default to Open unless the document confirms a completed repair","repairDate":"YYYY-MM-DD only if a repair has been completed and the date is shown"}
+
+Rules:
+- Omit any field you cannot determine with reasonable confidence.
+- "recallNumber" is the official campaign code; if multiple are listed, pick the most prominent.
+- "title" reads like a list item — name the part or fix.
+- "description" reads like a service advisor's note — what's wrong + what gets done.
+- Return ONLY the JSON object.`;
+
+        let content;
+        if (isImage) {
+            status.textContent = 'Reading photo with AI...';
+            const base64 = await readFileAsBase64(file);
+            content = [
+                { type:'image', source:{ type:'base64', media_type: type || 'image/jpeg', data: base64 }},
+                { type:'text',  text: `This is a photo of a vehicle recall notice or document. ${extractRules}` }
+            ];
+        } else if (isPdf) {
+            status.textContent = 'Reading PDF with AI...';
+            const base64 = await readFileAsBase64(file);
+            content = [
+                { type:'document', source:{ type:'base64', media_type:'application/pdf', data: base64 }},
+                { type:'text',     text: `This PDF is a vehicle recall notice or document. ${extractRules}` }
+            ];
+        } else if (isEmail) {
+            status.textContent = 'Reading email with AI...';
+            const text = await file.text();
+            if (!text || !text.trim()) throw new Error('Email file was empty or unreadable.');
+            const truncated = text.length > 60000 ? text.slice(0, 60000) + '\n\n[...truncated]' : text;
+            content = [
+                { type:'text', text: `The following is the raw content of an email about a vehicle recall. ${extractRules}\n\n--- EMAIL CONTENT ---\n${truncated}` }
+            ];
+        } else {
+            throw new Error('Unsupported file type. Use an image, PDF, or email (.eml/.txt/.html).');
+        }
+
+        const raw = await callClaudeRaw(content, 1024);
+        if (!raw) return;
+        const jsonMatch = raw.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error('Could not parse AI response');
+        const data = JSON.parse(jsonMatch[0]);
+        const filled = [];
+        if (data.recallNumber) { document.getElementById('recall-number').value = data.recallNumber; filled.push('Recall Number'); }
+        if (data.date)         { document.getElementById('recall-date').value   = data.date;         filled.push('Date'); }
+        if (data.title)        { document.getElementById('recall-title').value  = data.title;        filled.push('Title'); }
+        if (data.description)  { document.getElementById('recall-desc').value   = data.description;  filled.push('Summary'); }
+        if (data.status)       { document.getElementById('recall-status').value = data.status;       filled.push('Status'); }
+        if (data.repairDate)   { document.getElementById('recall-repair-date').value = data.repairDate; filled.push('Repair Date'); }
+        if (filled.length) {
+            status.textContent = `✅ AI filled in: ${filled.join(', ')}. Review and adjust before saving.`;
+            status.style.color = 'var(--success)';
+        } else {
+            status.textContent = '⚠️ Could not read recall details clearly — fill in manually.';
+            status.style.color = 'var(--text-secondary)';
+        }
+    } catch(err) {
+        status.textContent = '❌ Error: ' + err.message;
+        status.style.color = 'var(--danger)';
+    } finally {
+        btn.disabled = false; btn.classList.remove('scanning');
+        btn.innerHTML = '📷 Scan Recall with AI <span style="font-weight:400;opacity:0.8;">— photo, PDF, or email</span>';
+    }
+}
+
+async function saveRecall() {
+    const record = {
+        recallNumber: document.getElementById('recall-number').value.trim(),
+        date: document.getElementById('recall-date').value,
+        title: document.getElementById('recall-title').value.trim(),
+        description: document.getElementById('recall-desc').value.trim(),
+        status: document.getElementById('recall-status').value,
+        repairDate: document.getElementById('recall-repair-date').value,
+        addedAt: new Date().toISOString()
+    };
+    if (!record.title && !record.recallNumber) { toast('Enter a recall number or title.','error'); return; }
+    const it = items.find(i => i._docId === currentRecallDocId); if (!it) return;
+    const status = document.getElementById('recall-scan-status');
+    if (pendingRecallDoc && pendingRecallDoc.file) {
+        try {
+            status.textContent = '⬆️ Uploading document...'; status.style.color = 'var(--text-secondary)';
+            const url = await uploadRecallDoc(pendingRecallDoc.file);
+            record.document = { url, fileName: pendingRecallDoc.fileName, mimeType: pendingRecallDoc.mimeType };
+        } catch(err) { toast('Upload failed: ' + err.message, 'error'); return; }
+    }
+    const recalls = [...(it.recalls || []), record];
+    try {
+        await db.collection('automotive_items').doc(currentRecallDocId).update({ recalls });
+        document.getElementById('recall-number').value = '';
+        document.getElementById('recall-title').value  = '';
+        document.getElementById('recall-desc').value   = '';
+        document.getElementById('recall-status').value = 'Open';
+        document.getElementById('recall-repair-date').value = '';
+        document.getElementById('recall-scan-status').textContent = '';
+        clearPendingRecallDoc();
+        toast('Recall added!','success');
+    } catch(err) { toast('Error: ' + err.message,'error'); }
+}
+
+function sortRecallsForDisplay(records) {
+    return records.map((r, idx) => ({ r, idx }))
+        .sort((a, b) => {
+            const da = a.r.date || a.r.addedAt || '';
+            const db = b.r.date || b.r.addedAt || '';
+            if (da === db) return b.idx - a.idx;
+            return db.localeCompare(da);
+        });
+}
+
+function renderRecallHistory(records) {
+    const el = document.getElementById('recall-history');
+    if (!records.length) { el.innerHTML = '<p style="color:var(--text-secondary);padding:12px 0;">No recalls logged yet.</p>'; return; }
+    el.innerHTML = sortRecallsForDisplay(records).map(({r, idx}) => recallRowHtml(r, idx, 'attachDocToExistingRecall', 'deleteRecallFromModal')).join('');
+}
+
+function recallRowHtml(r, idx, attachFnName, deleteFnName) {
+    const hasDoc = !!(r.document && r.document.url);
+    const rowAttrs = hasDoc
+        ? `style="border:1px solid var(--accent);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg-secondary);cursor:pointer;transition:background 0.1s, border-color 0.1s;" onclick="if(!event.target.closest('button,a,input'))window.open('${esc(r.document.url)}','_blank')" onmouseover="this.style.background='var(--accent-dim)'" onmouseout="this.style.background='var(--bg-secondary)'" title="Click anywhere on this row to view the source document"`
+        : `style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg-secondary);"`;
+    const statusBadge = r.status
+        ? `<span style="font-size:0.7rem;font-weight:700;padding:2px 8px;border-radius:10px;background:${r.status==='Repaired'?'#dcfce7':r.status==='Scheduled'?'#fef3c7':r.status==='N/A'?'#e5e7eb':'#fee2e2'};color:${r.status==='Repaired'?'#15803d':r.status==='Scheduled'?'#92400e':r.status==='N/A'?'#374151':'#dc2626'};">${esc(r.status)}</span>`
+        : '';
+    return `
+        <div ${rowAttrs}>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
+                <span style="font-weight:700;font-size:0.9rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                    ${r.recallNumber?`<span class="mono" style="background:var(--bg-card);padding:2px 6px;border-radius:4px;font-size:0.78rem;">${esc(r.recallNumber)}</span>`:''}
+                    <span>${esc(r.title || 'Recall')}${hasDoc ? ' <span style="font-size:0.78rem;color:var(--accent);font-weight:600;">📎</span>' : ''}</span>
+                    ${statusBadge}
+                </span>
+                <span style="font-size:0.78rem;color:var(--text-secondary);">${r.date?new Date(r.date+'T00:00:00').toLocaleDateString():''}</span>
+            </div>
+            ${r.description?`<p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:4px;">${esc(r.description)}</p>`:''}
+            <div style="display:flex;gap:12px;font-size:0.78rem;color:var(--text-secondary);flex-wrap:wrap;align-items:center;">
+                ${r.repairDate?`<span>🔧 Repaired: ${new Date(r.repairDate+'T00:00:00').toLocaleDateString()}</span>`:''}
+                ${hasDoc ? `<span style="color:var(--accent);font-weight:600;">📎 ${esc(r.document.fileName||'recall')}</span>` : ''}
+                <span style="margin-left:auto;display:flex;gap:6px;">
+                    ${hasDoc
+                        ? `<a href="${esc(r.document.url)}" target="_blank" rel="noopener" class="btn btn-primary btn-sm" style="padding:3px 10px;font-size:0.75rem;text-decoration:none;" title="Open source document in new tab">👁 View Document</a>
+                           <button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:0.72rem;" onclick="${attachFnName}(${idx})" title="Replace source document">↻ Replace</button>`
+                        : `<button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:0.72rem;" onclick="${attachFnName}(${idx})" title="Attach a source document to this recall">📎 Attach Document</button>`}
+                    <button class="btn btn-danger btn-sm" style="padding:3px 10px;font-size:0.72rem;" onclick="${deleteFnName}(${idx})" title="Delete this recall record">✗ Delete</button>
+                </span>
+            </div>
+        </div>`;
+}
+
+async function _attachDocToRecall(docId, idx, file, statusEl) {
+    const it = items.find(i => i._docId === docId);
+    if (!it || !it.recalls || !it.recalls[idx]) { toast('Recall not found.','error'); return; }
+    try {
+        if (statusEl) { statusEl.textContent = '⬆️ Uploading document...'; statusEl.style.color = 'var(--text-secondary)'; }
+        const url = await uploadRecallDoc(file);
+        const recalls = it.recalls.map((rec, i) => i === idx
+            ? { ...rec, document: { url, fileName: file.name || 'recall', mimeType: file.type || '' } }
+            : rec);
+        await db.collection('automotive_items').doc(docId).update({ recalls });
+        if (statusEl) { statusEl.textContent = '✅ Document attached.'; statusEl.style.color = 'var(--success)'; }
+        toast('Document attached.','success');
+    } catch(err) {
+        if (statusEl) { statusEl.textContent = '❌ ' + err.message; statusEl.style.color = 'var(--danger)'; }
+        toast('Upload failed: ' + err.message,'error');
+    }
+}
+
+function attachDocToExistingRecall(idx) {
+    if (!currentRecallDocId) return;
+    const fi = document.createElement('input');
+    fi.type = 'file';
+    fi.accept = 'image/*,application/pdf,message/rfc822,.eml,text/plain,.txt,.html,.htm';
+    fi.onchange = () => {
+        const file = fi.files && fi.files[0];
+        if (!file) return;
+        _attachDocToRecall(currentRecallDocId, idx, file, document.getElementById('recall-scan-status'));
+    };
+    fi.click();
+}
+
+function attachDocFromDetail(idx) {
+    if (!currentDetailDocId) return;
+    const fi = document.createElement('input');
+    fi.type = 'file';
+    fi.accept = 'image/*,application/pdf,message/rfc822,.eml,text/plain,.txt,.html,.htm';
+    fi.onchange = () => {
+        const file = fi.files && fi.files[0];
+        if (!file) return;
+        _attachDocToRecall(currentDetailDocId, idx, file, null);
+    };
+    fi.click();
+}
+
+async function _deleteRecallRecord(docId, idx) {
+    const it = items.find(i => i._docId === docId);
+    if (!it || !it.recalls || !it.recalls[idx]) { toast('Recall not found.','error'); return; }
+    const rec = it.recalls[idx];
+    const label = `${rec.recallNumber ? rec.recallNumber+' · ' : ''}${rec.title || 'Recall'}`;
+    if (!confirm(`Delete this recall?\n\n${label}\n\nThis cannot be undone.`)) return;
+    try {
+        const recalls = it.recalls.filter((_, i) => i !== idx);
+        await db.collection('automotive_items').doc(docId).update({ recalls });
+        toast('Recall deleted.','success');
+    } catch(err) { toast('Delete failed: ' + err.message,'error'); }
+}
+
+function deleteRecallFromModal(idx) {
+    if (!currentRecallDocId) return;
+    _deleteRecallRecord(currentRecallDocId, idx);
+}
+
+function deleteRecallFromDetail(idx) {
+    if (!currentDetailDocId) return;
+    _deleteRecallRecord(currentDetailDocId, idx);
+}
+
+function closeRecallModal() {
+    document.getElementById('recall-modal').classList.remove('show');
+    currentRecallDocId = null;
+    clearPendingRecallDoc();
+}
+document.getElementById('recall-modal').addEventListener('click', e => { if(e.target===document.getElementById('recall-modal'))closeRecallModal(); });
 
 // ═══════════════════════════════════════
 //  INSURANCE CARDS — bulk upload + AI match

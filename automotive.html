@@ -3188,9 +3188,8 @@ function renderVehicleDetail(it) {
     const records = it.maintenance || [];
     const totalCost = records.reduce((s, r) => s + (Number(r.cost) || 0), 0);
     const lastRecord = records.length ? records[records.length - 1] : null;
-    const indexedRecs = records.map((r, idx) => ({ r, idx }));
     const maintHistoryHtml = records.length
-        ? indexedRecs.reverse().map(({r, idx}) => maintRowHtml(r, idx, 'attachReceiptFromDetail')).join('')
+        ? sortMaintenanceForDisplay(records).map(({r, idx}) => maintRowHtml(r, idx, 'attachReceiptFromDetail', 'deleteMaintenanceFromDetail')).join('')
         : '<p style="color:var(--text-secondary);padding:12px 0;">No maintenance records yet.</p>';
 
     document.getElementById('vd-content').innerHTML = `
@@ -3275,11 +3274,10 @@ function showMaintenance(docId) {
 function renderMaintenanceHistory(records) {
     const el = document.getElementById('maint-history');
     if (!records.length) { el.innerHTML = '<p style="color:var(--text-secondary);padding:12px 0;">No maintenance records yet.</p>'; return; }
-    const indexed = records.map((r, idx) => ({ r, idx }));
-    el.innerHTML = indexed.reverse().map(({r, idx}) => maintRowHtml(r, idx, 'attachReceiptToExisting')).join('');
+    el.innerHTML = sortMaintenanceForDisplay(records).map(({r, idx}) => maintRowHtml(r, idx, 'attachReceiptToExisting', 'deleteMaintenanceFromModal')).join('');
 }
 
-function maintRowHtml(r, idx, attachFnName) {
+function maintRowHtml(r, idx, attachFnName, deleteFnName) {
     const hasReceipt = !!(r.receipt && r.receipt.url);
     const rowAttrs = hasReceipt
         ? `style="border:1px solid var(--accent);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg-secondary);cursor:pointer;transition:background 0.1s, border-color 0.1s;" onclick="if(!event.target.closest('button,a,input'))window.open('${esc(r.receipt.url)}','_blank')" onmouseover="this.style.background='var(--accent-dim)'" onmouseout="this.style.background='var(--bg-secondary)'" title="Click anywhere on this row to view the source document"`
@@ -3301,9 +3299,45 @@ function maintRowHtml(r, idx, attachFnName) {
                         ? `<a href="${esc(r.receipt.url)}" target="_blank" rel="noopener" class="btn btn-primary btn-sm" style="padding:3px 10px;font-size:0.75rem;text-decoration:none;" title="Open source document in new tab">👁 View Receipt</a>
                            <button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:0.72rem;" onclick="${attachFnName}(${idx})" title="Replace source receipt">↻ Replace</button>`
                         : `<button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:0.72rem;" onclick="${attachFnName}(${idx})" title="Attach a source receipt to this record">📎 Attach Receipt</button>`}
+                    <button class="btn btn-danger btn-sm" style="padding:3px 10px;font-size:0.72rem;" onclick="${deleteFnName}(${idx})" title="Delete this maintenance record">✗ Delete</button>
                 </span>
             </div>
         </div>`;
+}
+
+function sortMaintenanceForDisplay(records) {
+    return records.map((r, idx) => ({ r, idx }))
+        .sort((a, b) => {
+            const da = a.r.date || a.r.addedAt || '';
+            const db = b.r.date || b.r.addedAt || '';
+            if (da === db) return b.idx - a.idx;
+            return db.localeCompare(da);
+        });
+}
+
+async function _deleteMaintenanceRecord(docId, idx) {
+    const it = items.find(i => i._docId === docId);
+    if (!it || !it.maintenance || !it.maintenance[idx]) { toast('Record not found.','error'); return; }
+    const rec = it.maintenance[idx];
+    const label = `${rec.type || 'Service'}${rec.date ? ' on ' + new Date(rec.date+'T00:00:00').toLocaleDateString() : ''}`;
+    if (!confirm(`Delete this maintenance record?\n\n${label}\n\nThis cannot be undone.`)) return;
+    try {
+        const maintenance = it.maintenance.filter((_, i) => i !== idx);
+        await db.collection('automotive_items').doc(docId).update({ maintenance });
+        toast('Maintenance record deleted.','success');
+    } catch(err) {
+        toast('Delete failed: ' + err.message,'error');
+    }
+}
+
+function deleteMaintenanceFromModal(idx) {
+    if (!currentMaintDocId) return;
+    _deleteMaintenanceRecord(currentMaintDocId, idx);
+}
+
+function deleteMaintenanceFromDetail(idx) {
+    if (!currentDetailDocId) return;
+    _deleteMaintenanceRecord(currentDetailDocId, idx);
 }
 
 async function _attachReceiptToRecord(docId, idx, file, statusEl) {

@@ -200,6 +200,28 @@
         /* ── RECYCLE BIN ── */
         .bin-item{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;}
         .bin-item:last-child{border-bottom:none;}
+        /* ── TAX IMPORT ── */
+        .tax-drop{border:2px dashed var(--border);border-radius:12px;padding:32px 20px;text-align:center;background:var(--bg-card);cursor:pointer;transition:border-color 0.15s,background 0.15s;}
+        .tax-drop:hover,.tax-drop.dragover{border-color:var(--accent);background:var(--accent-dim);}
+        .tax-drop-icon{font-size:2.4rem;margin-bottom:8px;}
+        .tax-drop-title{font-weight:700;font-size:1rem;margin-bottom:4px;}
+        .tax-drop-sub{font-size:0.82rem;color:var(--text-secondary);}
+        .tax-queue{margin-top:16px;display:flex;flex-direction:column;gap:8px;}
+        .tax-q-row{display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;}
+        .tax-q-icon{font-size:1.5rem;flex-shrink:0;}
+        .tax-q-body{flex:1;min-width:0;}
+        .tax-q-name{font-size:0.85rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+        .tax-q-status{font-size:0.76rem;color:var(--text-secondary);margin-top:2px;}
+        .tax-q-row.processing{border-color:var(--accent);}
+        .tax-q-row.success{border-color:var(--success);background:#f0fdf4;}
+        .tax-q-row.error{border-color:var(--danger);background:#fef2f2;}
+        .tax-q-spinner{width:18px;height:18px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;flex-shrink:0;}
+        .tax-history-table{width:100%;border-collapse:collapse;font-size:0.82rem;}
+        .tax-history-table th{background:var(--bg-card);padding:8px 10px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-secondary);border-bottom:2px solid var(--border);white-space:nowrap;}
+        .tax-history-table td{padding:8px 10px;border-bottom:1px solid var(--border);white-space:nowrap;}
+        .tax-history-table tr:last-child td{border-bottom:none;}
+        .tax-history-table .delta-up{color:var(--danger);font-weight:600;}
+        .tax-history-table .delta-down{color:var(--success);font-weight:600;}
         /* ── RESPONSIVE ── */
         @media(max-width:720px){
             header{flex-wrap:wrap;padding:10px 14px;gap:6px;}
@@ -328,6 +350,7 @@
         <button onclick="showView('property-search')">🔍 Property Search</button>
         <button onclick="showView('financial')">Financial</button>
         <button onclick="showView('reports')">Reports</button>
+        <button onclick="showView('tax-import')">📄 Tax Statements</button>
         <button onclick="showView('recycle-bin')">🗑 Recycle Bin</button>
     </nav>
     <div class="header-right">
@@ -611,6 +634,32 @@
     <div id="ps-results"></div>
 </div>
 
+<!-- ══════════════════════════════════════
+     TAX STATEMENT BULK IMPORT
+══════════════════════════════════════ -->
+<div class="view" id="view-tax-import">
+    <div class="card">
+        <div class="card-title">
+            <div class="card-title-left">📄 Bulk Property Tax Statement Import</div>
+        </div>
+        <p style="font-size:0.86rem;color:var(--text-secondary);line-height:1.55;margin-bottom:14px;">
+            Upload one or many property tax statements (PDF or image). Claude AI will extract the parcel #, owner, address, classification, market &amp; taxable values, total tax, due dates, and special assessments — then match each statement to an existing property by parcel number or address (or create a new property if no match). Upload statements from multiple years to track values and taxes over time.
+        </p>
+        <div class="tax-drop" id="tax-drop" onclick="document.getElementById('tax-file-input').click()">
+            <div class="tax-drop-icon">📥</div>
+            <div class="tax-drop-title">Click to choose files, or drag &amp; drop</div>
+            <div class="tax-drop-sub">PDFs or images · multiple files OK · one statement per file</div>
+        </div>
+        <input type="file" id="tax-file-input" accept="application/pdf,image/*" multiple style="display:none;" onchange="onTaxFilesPicked(this)">
+        <div id="tax-queue" class="tax-queue"></div>
+        <div id="tax-actions" style="margin-top:14px;display:none;gap:10px;flex-wrap:wrap;">
+            <button class="btn btn-primary" id="tax-process-btn" onclick="processTaxQueue()">⚡ Process All</button>
+            <button class="btn btn-ghost" onclick="clearTaxQueue()">Clear Queue</button>
+        </div>
+        <div id="tax-summary" style="margin-top:14px;font-size:0.85rem;color:var(--text-secondary);"></div>
+    </div>
+</div>
+
 <div class="view" id="view-recycle-bin">
     <div class="card">
         <div class="card-title">
@@ -719,11 +768,12 @@ function showView(name) {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.getElementById('view-' + name).classList.add('active');
     document.querySelectorAll('nav button').forEach((b,i) => {
-        const map = ['dashboard','properties','add-property','property-search','financial','reports','recycle-bin'];
+        const map = ['dashboard','properties','add-property','property-search','financial','reports','tax-import','recycle-bin'];
         b.classList.toggle('active', map[i] === name);
     });
     if (name === 'add-property' && !editingId) resetForm();
     if (name === 'recycle-bin') loadBin();
+    if (name === 'tax-import') renderTaxQueue();
 }
 
 // ── HELPERS ──
@@ -1002,6 +1052,7 @@ function openDetail(id) {
                 ${f('Agent Phone', esc(p.insAgentPhone))}
             </div>
         </div>` : ''}
+        ${(p.taxStatements && p.taxStatements.length) ? renderTaxHistorySection(p) : ''}
         ${p.notes ? `<div class="modal-section"><div class="modal-section-title">Notes</div><p style="font-size:0.88rem;line-height:1.6;white-space:pre-wrap;">${esc(p.notes)}</p></div>` : ''}
         <div class="modal-section">
             <div class="modal-section-title">Photos</div>
@@ -1329,6 +1380,424 @@ async function permanentDelete(id) {
 
 // INIT photo slots on load
 buildPhotoSlots();
+
+// ── TAX STATEMENT BULK IMPORT ────────────────────────────────────
+const AI_MODEL = 'claude-sonnet-4-6';
+let taxQueue = [];   // { id, file, fileName, mimeType, status, message, extracted, propertyId, propertyName }
+let taxQueueId = 0;
+let taxProcessing = false;
+
+function onTaxFilesPicked(input) {
+    const files = Array.from(input.files || []);
+    input.value = '';
+    if (!files.length) return;
+    files.forEach(f => taxQueue.push({
+        id: ++taxQueueId,
+        file: f,
+        fileName: f.name || 'statement',
+        mimeType: f.type || '',
+        status: 'queued',
+        message: 'Waiting to process…'
+    }));
+    renderTaxQueue();
+}
+
+(function initTaxDrop(){
+    const drop = document.getElementById('tax-drop');
+    if (!drop) return;
+    ['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('dragover'); }));
+    ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('dragover'); }));
+    drop.addEventListener('drop', e => {
+        const files = Array.from(e.dataTransfer?.files || []).filter(f =>
+            f.type === 'application/pdf' || f.type.startsWith('image/'));
+        if (!files.length) return;
+        files.forEach(f => taxQueue.push({
+            id: ++taxQueueId, file: f, fileName: f.name || 'statement',
+            mimeType: f.type || '', status: 'queued', message: 'Waiting to process…'
+        }));
+        renderTaxQueue();
+    });
+})();
+
+function clearTaxQueue() {
+    if (taxProcessing) { showToast('Wait for processing to finish.', true); return; }
+    taxQueue = [];
+    renderTaxQueue();
+    document.getElementById('tax-summary').textContent = '';
+}
+
+function renderTaxQueue() {
+    const el = document.getElementById('tax-queue');
+    const actions = document.getElementById('tax-actions');
+    if (!el) return;
+    if (!taxQueue.length) {
+        el.innerHTML = '';
+        if (actions) actions.style.display = 'none';
+        return;
+    }
+    if (actions) actions.style.display = 'flex';
+    el.innerHTML = taxQueue.map(q => {
+        const icon = q.status === 'success' ? '✅'
+                  : q.status === 'error'   ? '❌'
+                  : q.status === 'processing' ? '<div class="tax-q-spinner"></div>'
+                  : (q.mimeType === 'application/pdf' ? '📄' : '🖼️');
+        return `<div class="tax-q-row ${q.status}">
+            <div class="tax-q-icon">${icon}</div>
+            <div class="tax-q-body">
+                <div class="tax-q-name">${esc(q.fileName)}</div>
+                <div class="tax-q-status">${esc(q.message || '')}${q.propertyName ? ' → <strong>'+esc(q.propertyName)+'</strong>' : ''}</div>
+            </div>
+            ${q.status === 'queued' ? `<button class="btn btn-ghost btn-sm" onclick="removeFromTaxQueue(${q.id})">✕</button>` : ''}
+        </div>`;
+    }).join('');
+}
+
+function removeFromTaxQueue(id) {
+    taxQueue = taxQueue.filter(q => q.id !== id);
+    renderTaxQueue();
+}
+
+async function processTaxQueue() {
+    if (taxProcessing) return;
+    if (!psApiKey) {
+        showToast('Set your Anthropic API key in Agents → Settings first.', true);
+        return;
+    }
+    taxProcessing = true;
+    const btn = document.getElementById('tax-process-btn');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Processing…'; }
+
+    let created = 0, updated = 0, errors = 0;
+    for (const q of taxQueue) {
+        if (q.status !== 'queued') continue;
+        q.status = 'processing'; q.message = 'Reading with AI…';
+        renderTaxQueue();
+        try {
+            const extracted = await extractTaxStatement(q.file);
+            if (!extracted) throw new Error('AI returned no usable data.');
+            q.message = 'Uploading PDF…';
+            renderTaxQueue();
+            let pdfUrl = '';
+            try { pdfUrl = await uploadTaxStatement(q.file); } catch(e) { /* non-fatal */ }
+            q.message = 'Saving to property…';
+            renderTaxQueue();
+            const result = await applyTaxStatement(extracted, pdfUrl, q.fileName);
+            q.status = 'success';
+            q.propertyId = result.propertyId;
+            q.propertyName = result.propertyName;
+            q.message = result.created
+                ? `Created new property · year ${extracted.taxYear || extracted.payableYear || '—'}`
+                : `Updated property · year ${extracted.taxYear || extracted.payableYear || '—'}${result.replaced ? ' (replaced existing year)' : ''}`;
+            if (result.created) created++; else updated++;
+        } catch(err) {
+            q.status = 'error';
+            q.message = err.message || 'Failed';
+            errors++;
+        }
+        renderTaxQueue();
+    }
+    document.getElementById('tax-summary').innerHTML =
+        `Done. <strong>${created}</strong> new propert${created!==1?'ies':'y'} created, <strong>${updated}</strong> updated, <strong>${errors}</strong> error${errors!==1?'s':''}.`;
+    if (btn) { btn.disabled = false; btn.textContent = '⚡ Process All'; }
+    taxProcessing = false;
+}
+
+async function extractTaxStatement(file) {
+    const isPdf = file.type === 'application/pdf' || (file.name||'').toLowerCase().endsWith('.pdf');
+    const base64 = await new Promise((res, rej) => {
+        const fr = new FileReader();
+        fr.onload = e => res(e.target.result.split(',')[1]);
+        fr.onerror = rej;
+        fr.readAsDataURL(file);
+    });
+    const prompt = `This is a property tax statement. Extract every relevant field and return ONLY valid JSON — no markdown, no explanation, no code fences. Use this exact shape, with null for any field you cannot determine confidently:
+{
+  "taxYear": 2024,
+  "payableYear": 2025,
+  "parcelNumber": "string",
+  "ownerName": "string",
+  "ownerMailingAddress": "string",
+  "propertyStreet": "string",
+  "propertyCity": "string",
+  "propertyState": "two-letter code",
+  "propertyZip": "string",
+  "county": "string",
+  "schoolDistrict": "string",
+  "legalDescription": "string",
+  "classification": "string e.g. Residential Homestead, Agricultural Homestead, Commercial, Non-Homestead, Seasonal Recreational",
+  "acres": 1.5,
+  "estMarketValueLand": 0,
+  "estMarketValueBuilding": 0,
+  "estMarketValueTotal": 0,
+  "taxableMarketValue": 0,
+  "totalTax": 0,
+  "firstHalfDue": "YYYY-MM-DD",
+  "firstHalfAmount": 0,
+  "secondHalfDue": "YYYY-MM-DD",
+  "secondHalfAmount": 0,
+  "specialAssessments": 0,
+  "taxBreakdown": [{"label":"County","amount":0}],
+  "notes": "any flags like Truth-in-Taxation hearing, delinquencies, exemptions, refunds"
+}
+
+Strict rules:
+- All numeric fields are PLAIN NUMBERS — no commas, no dollar signs, no units.
+- "taxYear" is the assessment year; "payableYear" is the year payments are due. Some statements show only one — populate both if known, else null the unknown.
+- "propertyState" is 2 letters uppercase.
+- Dates are YYYY-MM-DD or null.
+- Output ONLY the JSON object, nothing else.`;
+
+    const content = isPdf
+        ? [{ type:'document', source:{ type:'base64', media_type:'application/pdf', data: base64 }}, { type:'text', text: prompt }]
+        : [{ type:'image',    source:{ type:'base64', media_type: file.type || 'image/jpeg', data: base64 }}, { type:'text', text: prompt }];
+
+    const raw = await callClaudeRawRE(content, 1500);
+    if (!raw) return null;
+    const cleaned = raw.replace(/```json/gi,'').replace(/```/g,'').trim();
+    const m = cleaned.match(/\{[\s\S]*\}/);
+    if (!m) throw new Error('AI did not return JSON');
+    const jsonStr = m[0]
+        .replace(/"(\d{1,3}(?:,\d{3})+(?:\.\d+)?)"/g, (_, n) => n.replace(/,/g,''))
+        .replace(/:\s*\$?([\d,]+(?:\.\d+)?)\s*([,}\]])/g, (_, n, end) => ': ' + n.replace(/,/g,'') + end);
+    return JSON.parse(jsonStr);
+}
+
+async function callClaudeRawRE(content, maxTokens) {
+    if (!psApiKey) throw new Error('No API key configured.');
+    const payload = {
+        model: AI_MODEL,
+        max_tokens: maxTokens || 1500,
+        messages: [{ role:'user', content }]
+    };
+    let res;
+    try {
+        if (psProxyUrl) {
+            res = await fetch(psProxyUrl, {
+                method:'POST',
+                headers:{ 'Content-Type':'application/json' },
+                body: JSON.stringify({ ...payload, apiKey: psApiKey })
+            });
+        } else {
+            res = await fetch('https://api.anthropic.com/v1/messages', {
+                method:'POST', mode:'cors',
+                headers:{ 'Content-Type':'application/json','x-api-key':psApiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true' },
+                body: JSON.stringify(payload)
+            });
+        }
+    } catch(e) { throw new Error('Network error — set Proxy URL in Agents → Settings.'); }
+    if (!res.ok) {
+        let msg = `API error ${res.status}`;
+        try { const d = await res.json(); msg = d.error?.message || msg; } catch(e){}
+        if (res.status === 401) msg = 'Invalid API key.';
+        if (res.status === 429) msg = 'Rate limit — try again shortly.';
+        throw new Error(msg);
+    }
+    const data = await res.json();
+    const blocks = (data.content || []).filter(b => b.type === 'text').map(b => b.text);
+    return blocks.join('') || data.content?.[0]?.text || '';
+}
+
+async function uploadTaxStatement(file) {
+    const ext = file.name && file.name.includes('.') ? file.name.split('.').pop() : 'pdf';
+    const rand = Math.random().toString(36).slice(2, 8);
+    const path = `realestate_tax_statements/${Date.now()}_${rand}.${ext}`;
+    const ref = stor.ref().child(path);
+    await ref.put(file);
+    return await ref.getDownloadURL();
+}
+
+function normalizeAddr(s) {
+    return (s || '').toLowerCase().replace(/[^a-z0-9]/g,'');
+}
+function normalizeParcel(s) {
+    return (s || '').toString().replace(/[^a-zA-Z0-9]/g,'').toLowerCase();
+}
+
+function findMatchingProperty(extracted) {
+    const parcel = normalizeParcel(extracted.parcelNumber);
+    if (parcel) {
+        const byParcel = properties.find(p => normalizeParcel(p.parcel) === parcel);
+        if (byParcel) return byParcel;
+    }
+    const street = normalizeAddr(extracted.propertyStreet);
+    if (street) {
+        const byAddr = properties.find(p => {
+            if (normalizeAddr(p.street) !== street) return false;
+            if (extracted.propertyCity && p.city) {
+                if (normalizeAddr(p.city) !== normalizeAddr(extracted.propertyCity)) return false;
+            }
+            return true;
+        });
+        if (byAddr) return byAddr;
+    }
+    return null;
+}
+
+function buildTaxStatementEntry(extracted, pdfUrl, fileName) {
+    return {
+        taxYear: extracted.taxYear ?? null,
+        payableYear: extracted.payableYear ?? null,
+        parcelNumber: extracted.parcelNumber || '',
+        ownerName: extracted.ownerName || '',
+        ownerMailingAddress: extracted.ownerMailingAddress || '',
+        classification: extracted.classification || '',
+        legalDescription: extracted.legalDescription || '',
+        schoolDistrict: extracted.schoolDistrict || '',
+        acres: extracted.acres ?? null,
+        estMarketValueLand: extracted.estMarketValueLand ?? null,
+        estMarketValueBuilding: extracted.estMarketValueBuilding ?? null,
+        estMarketValueTotal: extracted.estMarketValueTotal ?? null,
+        taxableMarketValue: extracted.taxableMarketValue ?? null,
+        totalTax: extracted.totalTax ?? null,
+        firstHalfDue: extracted.firstHalfDue || '',
+        firstHalfAmount: extracted.firstHalfAmount ?? null,
+        secondHalfDue: extracted.secondHalfDue || '',
+        secondHalfAmount: extracted.secondHalfAmount ?? null,
+        specialAssessments: extracted.specialAssessments ?? null,
+        taxBreakdown: Array.isArray(extracted.taxBreakdown) ? extracted.taxBreakdown : [],
+        statementNotes: extracted.notes || '',
+        pdfUrl: pdfUrl || '',
+        sourceFileName: fileName || '',
+        importedAt: new Date().toISOString()
+    };
+}
+
+function inferYearKey(stmt) {
+    return stmt.taxYear || stmt.payableYear || null;
+}
+
+async function applyTaxStatement(extracted, pdfUrl, fileName) {
+    const entry = buildTaxStatementEntry(extracted, pdfUrl, fileName);
+    const yearKey = inferYearKey(entry);
+    const match = findMatchingProperty(extracted);
+
+    if (match) {
+        const existing = Array.isArray(match.taxStatements) ? [...match.taxStatements] : [];
+        let replaced = false;
+        if (yearKey != null) {
+            const idx = existing.findIndex(s => inferYearKey(s) === yearKey);
+            if (idx >= 0) { existing[idx] = entry; replaced = true; }
+            else existing.push(entry);
+        } else {
+            existing.push(entry);
+        }
+        existing.sort((a,b) => (inferYearKey(b)||0) - (inferYearKey(a)||0));
+
+        const update = {
+            taxStatements: existing,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        // Backfill top-level fields if blank
+        if (!match.parcel && extracted.parcelNumber) update.parcel = extracted.parcelNumber;
+        if (!match.county && extracted.county) update.county = extracted.county;
+        if (!match.lotAcres && extracted.acres != null) update.lotAcres = String(extracted.acres);
+        // Sync tax fields from the most recent year
+        const latest = existing[0];
+        if (latest && latest === entry) {
+            if (entry.totalTax != null) update.taxAnnual = String(entry.totalTax);
+            if (entry.firstHalfDue) update.taxDue = entry.firstHalfDue;
+            if (entry.estMarketValueTotal != null && !match.currentValue) {
+                update.currentValue = String(entry.estMarketValueTotal);
+                update.valueDate = new Date().toISOString().slice(0,10);
+            }
+        }
+        await db.collection('realestate_items').doc(match._id).update(update);
+        return { propertyId: match._id, propertyName: match.name || match.street || 'Property', created: false, replaced };
+    }
+
+    // Create new property
+    const name = extracted.propertyStreet
+        ? extracted.propertyStreet
+        : (extracted.parcelNumber ? `Parcel ${extracted.parcelNumber}` : `Tax Import ${entry.importedAt.slice(0,10)}`);
+    const guessType = (() => {
+        const c = (extracted.classification || '').toLowerCase();
+        if (c.includes('agricultural') || c.includes('farm')) return 'Farm';
+        if (c.includes('commercial')) return 'Commercial';
+        if (c.includes('seasonal') || c.includes('cabin')) return 'Vacation';
+        if (c.includes('vacant') || c.includes('land')) return 'Land';
+        if (c.includes('rental') || c.includes('non-homestead')) return 'Rental';
+        if (c.includes('homestead') || c.includes('residential')) return 'Primary Home';
+        return 'Other';
+    })();
+    const newProp = {
+        name,
+        type: guessType,
+        status: 'Active',
+        street: extracted.propertyStreet || '',
+        city: extracted.propertyCity || '',
+        state: (extracted.propertyState || '').toUpperCase().slice(0,2),
+        zip: extracted.propertyZip || '',
+        county: extracted.county || '',
+        parcel: extracted.parcelNumber || '',
+        lotAcres: extracted.acres != null ? String(extracted.acres) : '',
+        currentValue: extracted.estMarketValueTotal != null ? String(extracted.estMarketValueTotal) : '',
+        valueDate: new Date().toISOString().slice(0,10),
+        taxAnnual: extracted.totalTax != null ? String(extracted.totalTax) : '',
+        taxDue: extracted.firstHalfDue || '',
+        notes: extracted.legalDescription ? `Legal: ${extracted.legalDescription}` : '',
+        taxStatements: [entry],
+        deleted: false,
+        addedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    const ref = await db.collection('realestate_items').add(newProp);
+    return { propertyId: ref.id, propertyName: name, created: true, replaced: false };
+}
+
+// ── TAX HISTORY (in detail modal) ────────────────────────────────
+function renderTaxHistorySection(p) {
+    const stmts = [...(p.taxStatements || [])].sort((a,b) => (inferYearKey(b)||0) - (inferYearKey(a)||0));
+    if (!stmts.length) return '';
+    const rows = stmts.map((s, i) => {
+        const prev = stmts[i+1];
+        const valDelta = (prev && s.estMarketValueTotal != null && prev.estMarketValueTotal != null)
+            ? deltaCell(s.estMarketValueTotal - prev.estMarketValueTotal) : '';
+        const taxDelta = (prev && s.totalTax != null && prev.totalTax != null)
+            ? deltaCell(s.totalTax - prev.totalTax) : '';
+        return `<tr>
+            <td><strong>${inferYearKey(s) || '—'}</strong></td>
+            <td>${s.classification ? esc(s.classification) : '—'}</td>
+            <td>${s.estMarketValueTotal != null ? fmt$(s.estMarketValueTotal) : '—'} ${valDelta}</td>
+            <td>${s.taxableMarketValue != null ? fmt$(s.taxableMarketValue) : '—'}</td>
+            <td>${s.totalTax != null ? fmt$(s.totalTax) : '—'} ${taxDelta}</td>
+            <td>${s.firstHalfDue ? fmtDate(s.firstHalfDue) : '—'}</td>
+            <td>${s.pdfUrl ? `<a href="${esc(s.pdfUrl)}" target="_blank" style="color:var(--accent);text-decoration:none;">📄 View</a>` : '—'}</td>
+            <td><button class="btn btn-ghost btn-sm" onclick="deleteTaxStatement('${p._id}', ${inferYearKey(s) || 'null'})" style="color:var(--danger);">🗑</button></td>
+        </tr>`;
+    }).join('');
+    return `<div class="modal-section">
+        <div class="modal-section-title">Tax History (${stmts.length} year${stmts.length!==1?'s':''})</div>
+        <div style="overflow-x:auto;"><table class="tax-history-table">
+            <thead><tr>
+                <th>Year</th><th>Class</th><th>Market Value</th><th>Taxable</th>
+                <th>Total Tax</th><th>1st Half Due</th><th>PDF</th><th></th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+        </table></div>
+    </div>`;
+}
+
+function deltaCell(diff) {
+    if (!diff) return '';
+    const cls = diff > 0 ? 'delta-up' : 'delta-down';
+    const sign = diff > 0 ? '▲' : '▼';
+    return `<span class="${cls}" style="font-size:0.72rem;margin-left:4px;">${sign} ${fmt$(Math.abs(diff))}</span>`;
+}
+
+async function deleteTaxStatement(propId, yearKey) {
+    if (!confirm(`Remove the ${yearKey || 'undated'} tax statement from this property?`)) return;
+    const p = properties.find(x => x._id === propId);
+    if (!p) return;
+    const remaining = (p.taxStatements || []).filter(s => inferYearKey(s) !== yearKey);
+    try {
+        await db.collection('realestate_items').doc(propId).update({
+            taxStatements: remaining,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        showToast('Tax statement removed.');
+        closeModal('detail-modal');
+    } catch(err) { showToast('Error: ' + err.message, true); }
+}
 
 // ── PROPERTY SEARCH ──────────────────────────────────────────────
 let psApiKey = '', psProxyUrl = '';

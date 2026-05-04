@@ -648,6 +648,11 @@
             Upload one or many property tax statements (PDF or image). Claude AI will extract the parcel #, owner, address, classification, market &amp; taxable values, total tax, due dates, and special assessments — then match each statement to an existing property by parcel number or address (or create a new property if no match). Upload statements from multiple years to track values and taxes over time.
         </p>
         <div id="tax-settings-status" style="margin-bottom:14px;font-size:0.82rem;"></div>
+        <div style="margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <button class="btn btn-ghost btn-sm" onclick="runAITest()" id="ai-test-btn">🔧 Test AI Connection</button>
+            <span style="font-size:0.78rem;color:var(--text-secondary);">Runs a tiny round-trip to verify the proxy + API are reachable. This same proxy is used by every AI feature in every site (automotive scans, Property Search, etc.) — if it works here, it works site-wide.</span>
+        </div>
+        <div id="ai-test-result" style="margin-bottom:14px;font-size:0.82rem;"></div>
         <div class="tax-drop" id="tax-drop" onclick="document.getElementById('tax-file-input').click()">
             <div class="tax-drop-icon">📥</div>
             <div class="tax-drop-title">Click to choose files, or drag &amp; drop</div>
@@ -1392,6 +1397,96 @@ const TAX_JPEG_QUALITY = 0.82;
 let taxQueue = [];   // { id, file, fileName, mimeType, status, message, extracted, propertyId, propertyName }
 let taxQueueId = 0;
 let taxProcessing = false;
+
+async function runAITest() {
+    const btn = document.getElementById('ai-test-btn');
+    const out = document.getElementById('ai-test-result');
+    if (!btn || !out) return;
+    btn.disabled = true; btn.textContent = '⏳ Testing…';
+    out.innerHTML = '';
+    const log = [];
+    const add = (cls, html) => { log.push(`<div class="alert-banner ${cls}" style="font-size:0.82rem;display:block;margin-bottom:6px;">${html}</div>`); out.innerHTML = log.join(''); };
+
+    try {
+        const kd = await db.collection('settings').doc('apikey').get();
+        psApiKey = (kd.exists && kd.data().key) || psApiKey;
+        const pd = await db.collection('settings').doc('proxy').get();
+        psProxyUrl = (pd.exists && pd.data().url) || psProxyUrl;
+    } catch(e) {}
+
+    if (!psApiKey) { add('alert-danger', '❌ <strong>API key not set.</strong> Configure it in Agents → Settings.'); btn.disabled = false; btn.textContent = '🔧 Test AI Connection'; return; }
+
+    const tinyPayload = { model: AI_MODEL, max_tokens: 8, messages: [{ role:'user', content:'Say hi.' }] };
+
+    let proxyOK = false, directOK = false;
+
+    if (psProxyUrl) {
+        add('alert-info', `⏳ Testing proxy: <code>${esc(psProxyUrl)}</code>…`);
+        try {
+            const t0 = performance.now();
+            const r = await fetch(psProxyUrl, {
+                method:'POST', headers:{ 'Content-Type':'application/json' },
+                body: JSON.stringify({ ...tinyPayload, apiKey: psApiKey })
+            });
+            const ms = Math.round(performance.now()-t0);
+            if (r.ok) {
+                const d = await r.json();
+                const txt = (d.content?.[0]?.text || '').slice(0, 60);
+                proxyOK = true;
+                log.pop(); add('alert-info', `✅ <strong>Proxy OK</strong> (${ms}ms) — Claude said: <code>${esc(txt)}</code>`);
+            } else {
+                let body = '';
+                try { body = (await r.text()).slice(0, 200); } catch(e){}
+                log.pop(); add('alert-warning', `⚠️ <strong>Proxy returned ${r.status}</strong> (${ms}ms): <code>${esc(body)}</code>`);
+            }
+        } catch(e) {
+            log.pop();
+            const isCert = /cert|TLS|SSL/i.test(e.message || '');
+            add('alert-danger', `❌ <strong>Proxy unreachable:</strong> ${esc(e.name||'Error')}: ${esc(e.message||'fetch failed')}.<br>
+                ${isCert ? 'This looks like a TLS / cert issue — check network for an SSL-inspection middlebox (Cisco Umbrella, corporate filter, antivirus).' : 'Network failure or CORS rejection. Open DevTools Network tab to see the exact reason.'}`);
+        }
+    } else {
+        add('alert-warning', '⚠️ Proxy URL not set — skipping proxy test.');
+    }
+
+    add('alert-info', '⏳ Testing direct call to <code>api.anthropic.com</code>…');
+    try {
+        const t0 = performance.now();
+        const r = await fetch('https://api.anthropic.com/v1/messages', {
+            method:'POST', mode:'cors',
+            headers:{
+                'Content-Type':'application/json',
+                'x-api-key': psApiKey,
+                'anthropic-version': '2023-06-01',
+                'anthropic-dangerous-direct-browser-calls': 'true'
+            },
+            body: JSON.stringify(tinyPayload)
+        });
+        const ms = Math.round(performance.now()-t0);
+        if (r.ok) {
+            const d = await r.json();
+            const txt = (d.content?.[0]?.text || '').slice(0, 60);
+            directOK = true;
+            log.pop(); add('alert-info', `✅ <strong>Direct API OK</strong> (${ms}ms) — Claude said: <code>${esc(txt)}</code>`);
+        } else {
+            let body = '';
+            try { body = (await r.text()).slice(0, 200); } catch(e){}
+            log.pop(); add('alert-warning', `⚠️ <strong>Direct API returned ${r.status}</strong> (${ms}ms): <code>${esc(body)}</code>`);
+        }
+    } catch(e) {
+        log.pop();
+        const isCors = /CORS|Access-Control|preflight/i.test(e.message || '');
+        add('alert-danger', `❌ <strong>Direct API unreachable:</strong> ${esc(e.name||'Error')}: ${esc(e.message||'fetch failed')}.<br>
+            ${isCors ? 'CORS preflight blocked — Anthropic\'s response is missing access-control headers (often happens when an SSL-inspection proxy strips them).' : 'Network or TLS failure.'}`);
+    }
+
+    if (proxyOK || directOK) {
+        add('alert-info', `<strong>✅ AI is reachable.</strong> The path that succeeded above will be used by every AI feature across all sites.`);
+    } else {
+        add('alert-danger', `<strong>❌ AI cannot reach Anthropic via either path.</strong> All AI features in every site (Property Search, automotive scans, etc.) will be broken until this is resolved. Most common cause is an SSL-inspection middlebox (Cisco Umbrella, corporate web filter, or antivirus). Try a different network (e.g. phone hotspot) to confirm.`);
+    }
+    btn.disabled = false; btn.textContent = '🔧 Test AI Connection';
+}
 
 async function refreshTaxSettingsStatus() {
     const el = document.getElementById('tax-settings-status');

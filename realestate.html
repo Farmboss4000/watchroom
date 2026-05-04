@@ -8,6 +8,8 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>if(window.pdfjsLib){pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';}</script>
     <style>
         *{box-sizing:border-box;margin:0;padding:0;}
         :root{
@@ -1383,7 +1385,10 @@ async function permanentDelete(id) {
 buildPhotoSlots();
 
 // ── TAX STATEMENT BULK IMPORT ────────────────────────────────────
-const AI_MODEL = 'claude-sonnet-4-6';
+const AI_MODEL = 'claude-haiku-4-5-20251001';
+const TAX_PDF_MAX_PAGES = 4;
+const TAX_PDF_RENDER_SCALE = 1.6;
+const TAX_JPEG_QUALITY = 0.82;
 let taxQueue = [];   // { id, file, fileName, mimeType, status, message, extracted, propertyId, propertyName }
 let taxQueueId = 0;
 let taxProcessing = false;
@@ -1498,10 +1503,12 @@ async function processTaxQueue() {
     let created = 0, updated = 0, errors = 0;
     for (const q of taxQueue) {
         if (q.status !== 'queued') continue;
-        q.status = 'processing'; q.message = 'Reading with AI…';
+        const isPdf = q.mimeType === 'application/pdf' || (q.fileName||'').toLowerCase().endsWith('.pdf');
+        q.status = 'processing';
+        q.message = isPdf ? 'Rendering PDF page(s)…' : 'Reading with AI…';
         renderTaxQueue();
         try {
-            const extracted = await extractTaxStatement(q.file);
+            const extracted = await extractTaxStatement(q.file, msg => { q.message = msg; renderTaxQueue(); });
             if (!extracted) throw new Error('AI returned no usable data.');
             q.message = 'Uploading PDF…';
             renderTaxQueue();
@@ -1530,14 +1537,63 @@ async function processTaxQueue() {
     taxProcessing = false;
 }
 
-async function extractTaxStatement(file) {
+async function pdfFileToImageBase64(file) {
+    if (!window.pdfjsLib) throw new Error('PDF renderer failed to load. Refresh and try again.');
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf, disableFontFace: true }).promise;
+    const numPages = Math.min(pdf.numPages, TAX_PDF_MAX_PAGES);
+    const canvases = [];
+    for (let i = 1; i <= numPages; i++) {
+        const page = await pdf.getPage(i);
+        const viewport = page.getViewport({ scale: TAX_PDF_RENDER_SCALE });
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.min(viewport.width, 2000);
+        canvas.height = Math.min(viewport.height, 2600);
+        const scaleX = canvas.width / viewport.width;
+        const scaleY = canvas.height / viewport.height;
+        const scaled = page.getViewport({ scale: TAX_PDF_RENDER_SCALE * Math.min(scaleX, scaleY) });
+        canvas.width = scaled.width;
+        canvas.height = scaled.height;
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport: scaled }).promise;
+        canvases.push(canvas);
+    }
+    let combined;
+    if (canvases.length === 1) {
+        combined = canvases[0];
+    } else {
+        const maxW = Math.max(...canvases.map(c => c.width));
+        const totalH = canvases.reduce((s,c) => s + c.height + 8, -8);
+        combined = document.createElement('canvas');
+        combined.width = maxW;
+        combined.height = totalH;
+        const ctx = combined.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, maxW, totalH);
+        let y = 0;
+        for (const c of canvases) {
+            ctx.drawImage(c, 0, y);
+            y += c.height + 8;
+        }
+    }
+    return combined.toDataURL('image/jpeg', TAX_JPEG_QUALITY).split(',')[1];
+}
+
+async function extractTaxStatement(file, onProgress) {
+    const progress = (m) => { try { onProgress && onProgress(m); } catch(e){} };
     const isPdf = file.type === 'application/pdf' || (file.name||'').toLowerCase().endsWith('.pdf');
-    const base64 = await new Promise((res, rej) => {
-        const fr = new FileReader();
-        fr.onload = e => res(e.target.result.split(',')[1]);
-        fr.onerror = rej;
-        fr.readAsDataURL(file);
-    });
+    let imgBase64;
+    if (isPdf) {
+        progress('Rendering PDF page(s)…');
+        imgBase64 = await pdfFileToImageBase64(file);
+        progress('Reading with AI…');
+    } else {
+        imgBase64 = await new Promise((res, rej) => {
+            const fr = new FileReader();
+            fr.onload = e => res(e.target.result.split(',')[1]);
+            fr.onerror = rej;
+            fr.readAsDataURL(file);
+        });
+    }
     const prompt = `This is a property tax statement. Extract every relevant field and return ONLY valid JSON — no markdown, no explanation, no code fences. Use this exact shape, with null for any field you cannot determine confidently:
 {
   "taxYear": 2024,
@@ -1575,9 +1631,11 @@ Strict rules:
 - Dates are YYYY-MM-DD or null.
 - Output ONLY the JSON object, nothing else.`;
 
-    const content = isPdf
-        ? [{ type:'document', source:{ type:'base64', media_type:'application/pdf', data: base64 }}, { type:'text', text: prompt }]
-        : [{ type:'image',    source:{ type:'base64', media_type: file.type || 'image/jpeg', data: base64 }}, { type:'text', text: prompt }];
+    const mediaType = isPdf ? 'image/jpeg' : (file.type || 'image/jpeg');
+    const content = [
+        { type:'image', source:{ type:'base64', media_type: mediaType, data: imgBase64 }},
+        { type:'text',  text: prompt }
+    ];
 
     const raw = await callClaudeRawRE(content, 1500);
     if (!raw) return null;

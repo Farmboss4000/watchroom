@@ -645,6 +645,7 @@
         <p style="font-size:0.86rem;color:var(--text-secondary);line-height:1.55;margin-bottom:14px;">
             Upload one or many property tax statements (PDF or image). Claude AI will extract the parcel #, owner, address, classification, market &amp; taxable values, total tax, due dates, and special assessments — then match each statement to an existing property by parcel number or address (or create a new property if no match). Upload statements from multiple years to track values and taxes over time.
         </p>
+        <div id="tax-settings-status" style="margin-bottom:14px;font-size:0.82rem;"></div>
         <div class="tax-drop" id="tax-drop" onclick="document.getElementById('tax-file-input').click()">
             <div class="tax-drop-icon">📥</div>
             <div class="tax-drop-title">Click to choose files, or drag &amp; drop</div>
@@ -773,7 +774,7 @@ function showView(name) {
     });
     if (name === 'add-property' && !editingId) resetForm();
     if (name === 'recycle-bin') loadBin();
-    if (name === 'tax-import') renderTaxQueue();
+    if (name === 'tax-import') { renderTaxQueue(); refreshTaxSettingsStatus(); }
 }
 
 // ── HELPERS ──
@@ -1387,6 +1388,33 @@ let taxQueue = [];   // { id, file, fileName, mimeType, status, message, extract
 let taxQueueId = 0;
 let taxProcessing = false;
 
+async function refreshTaxSettingsStatus() {
+    const el = document.getElementById('tax-settings-status');
+    if (!el) return;
+    el.innerHTML = '<span style="color:var(--text-secondary);">Checking AI settings…</span>';
+    try {
+        const kd = await db.collection('settings').doc('apikey').get();
+        psApiKey = (kd.exists && kd.data().key) || psApiKey;
+        const pd = await db.collection('settings').doc('proxy').get();
+        psProxyUrl = (pd.exists && pd.data().url) || psProxyUrl;
+    } catch(e) {}
+    const keyOK = !!psApiKey;
+    const proxyOK = !!psProxyUrl;
+    const proxyDisplay = proxyOK ? psProxyUrl.replace(/^https?:\/\//,'').slice(0,50) : '— not set —';
+    const keyDisplay = keyOK ? psApiKey.slice(0,7) + '…' + psApiKey.slice(-4) : '— not set —';
+    const allOK = keyOK && proxyOK;
+    const cls = allOK ? 'alert-info' : 'alert-warning';
+    const icon = allOK ? '✅' : '⚠️';
+    const note = allOK
+        ? 'Ready to extract statements with AI.'
+        : 'Configure both in <strong>Agents → Settings</strong> before processing. Browser CORS blocks direct calls to api.anthropic.com — a proxy URL is required for PDF extraction.';
+    el.innerHTML = `<div class="alert-banner ${cls}" style="font-size:0.82rem;display:block;">
+        ${icon} <strong>API key:</strong> <code>${esc(keyDisplay)}</code> &nbsp;·&nbsp;
+        <strong>Proxy URL:</strong> <code>${esc(proxyDisplay)}</code><br>
+        <span style="font-weight:400;">${note}</span>
+    </div>`;
+}
+
 function onTaxFilesPicked(input) {
     const files = Array.from(input.files || []);
     input.value = '';
@@ -1563,7 +1591,8 @@ Strict rules:
 }
 
 async function callClaudeRawRE(content, maxTokens) {
-    if (!psApiKey) throw new Error('No API key configured.');
+    if (!psApiKey) throw new Error('No API key configured in Agents → Settings.');
+    if (!psProxyUrl) throw new Error('No Proxy URL configured in Agents → Settings (required for browser PDF calls — direct calls to api.anthropic.com are blocked by CORS).');
     const payload = {
         model: AI_MODEL,
         max_tokens: maxTokens || 1500,
@@ -1571,25 +1600,24 @@ async function callClaudeRawRE(content, maxTokens) {
     };
     let res;
     try {
-        if (psProxyUrl) {
-            res = await fetch(psProxyUrl, {
-                method:'POST',
-                headers:{ 'Content-Type':'application/json' },
-                body: JSON.stringify({ ...payload, apiKey: psApiKey })
-            });
-        } else {
-            res = await fetch('https://api.anthropic.com/v1/messages', {
-                method:'POST', mode:'cors',
-                headers:{ 'Content-Type':'application/json','x-api-key':psApiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true' },
-                body: JSON.stringify(payload)
-            });
-        }
-    } catch(e) { throw new Error('Network error — set Proxy URL in Agents → Settings.'); }
+        res = await fetch(psProxyUrl, {
+            method:'POST',
+            headers:{ 'Content-Type':'application/json' },
+            body: JSON.stringify({ ...payload, apiKey: psApiKey })
+        });
+    } catch(e) {
+        console.error('Tax extract fetch error:', e);
+        throw new Error('Proxy unreachable: ' + (e.message || e.name || 'network failure') + '. The PDF may be too large for the proxy or the proxy may have timed out.');
+    }
     if (!res.ok) {
         let msg = `API error ${res.status}`;
-        try { const d = await res.json(); msg = d.error?.message || msg; } catch(e){}
+        try { const d = await res.json(); msg = d.error?.message || JSON.stringify(d).slice(0,200); } catch(e){
+            try { msg = (await res.text()).slice(0,200) || msg; } catch(e2){}
+        }
         if (res.status === 401) msg = 'Invalid API key.';
+        if (res.status === 413) msg = 'PDF too large for proxy (413). Try a smaller file or a higher-limit proxy.';
         if (res.status === 429) msg = 'Rate limit — try again shortly.';
+        if (res.status === 504 || res.status === 524) msg = 'Proxy timeout — PDF took too long to process.';
         throw new Error(msg);
     }
     const data = await res.json();

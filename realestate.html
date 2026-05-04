@@ -1385,7 +1385,7 @@ async function permanentDelete(id) {
 buildPhotoSlots();
 
 // ── TAX STATEMENT BULK IMPORT ────────────────────────────────────
-const AI_MODEL = 'claude-haiku-4-5-20251001';
+const AI_MODEL = 'claude-sonnet-4-6';
 const TAX_PDF_MAX_PAGES = 4;
 const TAX_PDF_RENDER_SCALE = 1.6;
 const TAX_JPEG_QUALITY = 0.82;
@@ -1650,22 +1650,54 @@ Strict rules:
 
 async function callClaudeRawRE(content, maxTokens) {
     if (!psApiKey) throw new Error('No API key configured in Agents → Settings.');
-    if (!psProxyUrl) throw new Error('No Proxy URL configured in Agents → Settings (required for browser PDF calls — direct calls to api.anthropic.com are blocked by CORS).');
     const payload = {
         model: AI_MODEL,
         max_tokens: maxTokens || 1500,
         messages: [{ role:'user', content }]
     };
-    let res;
-    try {
-        res = await fetch(psProxyUrl, {
+    const bodyStr = JSON.stringify({ ...payload, apiKey: psApiKey });
+    console.log('[tax] request size:', (bodyStr.length / 1024).toFixed(1) + ' KB', '· model:', AI_MODEL, '· maxTokens:', maxTokens);
+
+    const tryFetch = async (label, url, init) => {
+        const t0 = performance.now();
+        try {
+            const r = await fetch(url, init);
+            console.log(`[tax] ${label} response`, r.status, 'in', Math.round(performance.now()-t0)+'ms');
+            return { ok: true, res: r };
+        } catch(e) {
+            console.warn(`[tax] ${label} fetch threw after ${Math.round(performance.now()-t0)}ms:`, e.name, e.message);
+            return { ok: false, err: e };
+        }
+    };
+
+    let res = null;
+    let lastErr = null;
+    if (psProxyUrl) {
+        const r1 = await tryFetch('proxy', psProxyUrl, {
             method:'POST',
             headers:{ 'Content-Type':'application/json' },
-            body: JSON.stringify({ ...payload, apiKey: psApiKey })
+            body: bodyStr
         });
-    } catch(e) {
-        console.error('Tax extract fetch error:', e);
-        throw new Error('Proxy unreachable: ' + (e.message || e.name || 'network failure') + '. The PDF may be too large for the proxy or the proxy may have timed out.');
+        if (r1.ok) res = r1.res; else lastErr = r1.err;
+    }
+    if (!res) {
+        console.log('[tax] falling back to direct api.anthropic.com call');
+        const directBody = JSON.stringify(payload);
+        const r2 = await tryFetch('direct', 'https://api.anthropic.com/v1/messages', {
+            method:'POST', mode:'cors',
+            headers:{
+                'Content-Type':'application/json',
+                'x-api-key': psApiKey,
+                'anthropic-version': '2023-06-01',
+                'anthropic-dangerous-direct-browser-calls': 'true'
+            },
+            body: directBody
+        });
+        if (r2.ok) res = r2.res; else lastErr = r2.err;
+    }
+    if (!res) {
+        const m = lastErr?.message || lastErr?.name || 'unknown';
+        throw new Error(`Both proxy and direct API call failed (${m}). Check the browser console for details.`);
     }
     if (!res.ok) {
         let msg = `API error ${res.status}`;
@@ -1673,9 +1705,9 @@ async function callClaudeRawRE(content, maxTokens) {
             try { msg = (await res.text()).slice(0,200) || msg; } catch(e2){}
         }
         if (res.status === 401) msg = 'Invalid API key.';
-        if (res.status === 413) msg = 'PDF too large for proxy (413). Try a smaller file or a higher-limit proxy.';
+        if (res.status === 413) msg = 'Payload too large (413).';
         if (res.status === 429) msg = 'Rate limit — try again shortly.';
-        if (res.status === 504 || res.status === 524) msg = 'Proxy timeout — PDF took too long to process.';
+        if (res.status === 504 || res.status === 524) msg = 'Proxy/API timeout.';
         throw new Error(msg);
     }
     const data = await res.json();

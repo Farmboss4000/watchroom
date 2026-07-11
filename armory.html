@@ -2367,6 +2367,18 @@ function removePhoto(slot) {
     if (slot==='form4')     document.getElementById('btn-form4').disabled     = true;
 }
 
+// Turn a raw Anthropic API error into a clear, actionable message.
+// The out-of-credits/billing case is the most common gotcha, so we spell out the fix.
+function humanizeAiError(status, rawMsg) {
+    const msg = (rawMsg || '').toString();
+    if (/credit balance is too low|insufficient.*credit|billing/i.test(msg)) {
+        return 'Your Anthropic account is out of API credits. Add credits at console.anthropic.com → Settings → Billing, then try again. (API credits are separate from any Claude.ai subscription.)';
+    }
+    if (status === 401) return 'Invalid API key — re-enter your key in Settings.';
+    if (status === 429) return 'Rate limit reached — please wait a moment and try again.';
+    return msg || `API error ${status}`;
+}
+
 async function callClaude(base64OrMedia, mimeType, prompt, { retries = 2, maxTokens = 512 } = {}) {
     if (!apiKey) { toast('Set your Anthropic API key in Settings first.','error'); return null; }
     // Accept either a single base64 string + mimeType, an array of {base64, mimeType} media descriptors,
@@ -2413,14 +2425,9 @@ async function callClaude(base64OrMedia, mimeType, prompt, { retries = 2, maxTok
             throw new Error('API is temporarily overloaded — please try again in a minute.');
         }
         if (!res.ok) {
-            let errMsg = `API error ${res.status}`;
-            try {
-                const d = await res.json();
-                errMsg = d.error?.message || errMsg;
-                if (res.status===401) errMsg = 'Invalid API key — re-enter your key in Settings.';
-                if (res.status===429) errMsg = 'Rate limit reached — please wait a moment.';
-            } catch(e) {}
-            throw new Error(errMsg);
+            let raw = null;
+            try { raw = (await res.json()).error?.message; } catch(e) {}
+            throw new Error(humanizeAiError(res.status, raw));
         }
         const data = await res.json();
         return data.content[0].text;
@@ -2861,7 +2868,10 @@ Use the exact id values from the host list. Base compatibility on: thread type m
                 body: JSON.stringify(msgPayload)
             });
         }
-        if (!res.ok) throw new Error(`API error ${res.status}`);
+        if (!res.ok) {
+            const d = await res.json().catch(()=>({}));
+            throw new Error(humanizeAiError(res.status, d.error?.message));
+        }
         const data = await res.json();
         const text = data.content[0].text;
         const jsonMatch = text.match(/\[[\s\S]*\]/);
@@ -2948,7 +2958,7 @@ Return ONLY the JSON array, no other text.`;
         }
         if (!res.ok) {
             const errData = await res.json().catch(()=>({}));
-            throw new Error(errData.error?.message || `API error ${res.status}`);
+            throw new Error(humanizeAiError(res.status, errData.error?.message));
         }
         const data = await res.json();
         const text = data.content?.[0]?.text || '';
@@ -4363,7 +4373,10 @@ ${it.purchaseDate ? 'Purchase Date: ' + it.purchaseDate  : ''}`;
                     'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-calls': 'true' },
                 body: JSON.stringify(msgPayload) });
         }
-        if (!res.ok) throw new Error('API error ' + res.status);
+        if (!res.ok) {
+            const d = await res.json().catch(()=>({}));
+            throw new Error(humanizeAiError(res.status, d.error?.message));
+        }
         const data = await res.json();
         const raw  = data.content[0].text.trim().replace(/[^0-9]/g, '');
         const val  = parseInt(raw, 10);
@@ -4688,7 +4701,7 @@ async function testApiKey() {
         else {
             const d = await res.json().catch(()=>({}));
             el.className='api-status err';
-            el.textContent=`❌ HTTP ${res.status}: ${d.error?.message||d.error?.type||res.statusText}`;
+            el.textContent = '❌ ' + humanizeAiError(res.status, d.error?.message || d.error?.type);
         }
     } catch(err) {
         el.className='api-status err';
@@ -5272,7 +5285,10 @@ Summary:`;
                     'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-calls': 'true' },
                 body: JSON.stringify(msgPayload) });
         }
-        if (!res.ok) throw new Error('API error ' + res.status);
+        if (!res.ok) {
+            const d = await res.json().catch(()=>({}));
+            throw new Error(humanizeAiError(res.status, d.error?.message));
+        }
         const data = await res.json();
         const summary = data.content[0].text.trim();
 

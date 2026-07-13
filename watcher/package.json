@@ -1,0 +1,17 @@
+{
+  "name": "bills-paperwork-watcher",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Watches a local Paperwork folder and ingests bills into the Farmboss Bills app",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node watch-paperwork.mjs",
+    "test": "node test.mjs"
+  },
+  "dependencies": {
+    "chokidar": "^3.6.0",
+    "dotenv": "^16.4.5",
+    "firebase": "^10.12.0"
+  }
+}

@@ -2504,17 +2504,80 @@ async function summarizePaperwork() {
     btn.disabled = true; btn.classList.add('scanning'); btn.textContent = '⏳ Reading...';
     status.textContent = 'Analyzing purchase paperwork...';
     try {
-        const prompt = `This is a purchase document, receipt, or transfer form for a firearm or equipment.
-Summarize the key details in 2-4 concise sentences: seller name, buyer name, price/amount, date, item description, and any important notes or transfer information.
-Return plain text only, no headers or bullet points.`;
-        const result = await callClaude(p.base64, p.mimeType, prompt);
-        if (!result) return;
-        const summary = result.trim();
-        const notesEl  = document.getElementById('f-notes');
-        const existing = notesEl.value.trim();
-        notesEl.value  = `📄 Paperwork: ${summary}${existing ? '\n\n' + existing : ''}`;
-        status.textContent = '✅ Paperwork summarized and added to Notes.';
-        status.style.color  = 'var(--success)';
+        const catList = categories.join(',');
+        const prompt = `This is a purchase document, receipt, invoice, or transfer form for a firearm or equipment.
+Return ONLY valid JSON (no markdown fences, no other text) with these fields:
+{
+  "summary":"2-4 sentence plain-text summary covering seller, buyer, price, date, item description, and any important transfer notes",
+  "manufacturer":"brand/manufacturer name or empty",
+  "model":"model name or empty",
+  "category":"one of: ${catList} or empty",
+  "caliber":"caliber or gauge or empty",
+  "price":"total purchase price as a plain number, no currency symbol or commas, or empty",
+  "purchaseDate":"purchase/order date as YYYY-MM-DD or empty",
+  "vendor":"seller / dealer / store name or empty",
+  "quantity":"quantity as an integer or empty"
+}
+Only include values you can read with reasonable confidence; use an empty string when unsure.`;
+        const raw = await callClaude(p.base64, p.mimeType, prompt, { maxTokens: 700 });
+        if (!raw) return;
+        const jsonMatch = raw.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error('Could not parse AI response');
+        const d = JSON.parse(jsonMatch[0]);
+
+        // 1) Summary → Notes (prepend, keep any existing notes; avoid duplicating).
+        const summary = (d.summary || '').trim();
+        if (summary) {
+            const notesEl  = document.getElementById('f-notes');
+            const existing = notesEl.value.trim();
+            if (!existing.includes(summary)) {
+                notesEl.value = `📄 Paperwork: ${summary}${existing ? '\n\n' + existing : ''}`;
+            }
+        }
+
+        // 2) Structured fields → fill BLANK fields only, never overwrite typed input.
+        const filled = [];
+        const setIfEmpty = (id, val, label) => {
+            if (val === undefined || val === null || String(val).trim() === '') return;
+            const elx = document.getElementById(id);
+            if (!elx || elx.value.trim() !== '') return;
+            elx.value = String(val).trim();
+            filled.push(label);
+        };
+        if (d.category) {
+            populateCatSelect();
+            const sel = document.getElementById('f-category');
+            const match = [...sel.options].find(o => o.value.toLowerCase() === String(d.category).trim().toLowerCase());
+            if (match && !sel.value) { sel.value = match.value; updateMagSection(); filled.push('Category'); }
+        }
+        setIfEmpty('f-manufacturer', d.manufacturer, 'Manufacturer');
+        setIfEmpty('f-model',        d.model,        'Model');
+        setIfEmpty('f-caliber',      d.caliber,      'Caliber');
+        setIfEmpty('f-vendor',       d.vendor,       'Vendor');
+        if (String(d.price ?? '').trim() !== '') {
+            const num = String(d.price).replace(/[^0-9.]/g, '');
+            if (num) setIfEmpty('f-price', num, 'Price');
+        }
+        if (/^\d{4}-\d{2}-\d{2}$/.test(String(d.purchaseDate ?? '').trim())) {
+            setIfEmpty('f-purchase-date', String(d.purchaseDate).trim(), 'Purchase Date');
+        }
+        if (String(d.quantity ?? '').trim() !== '') {
+            const q = parseInt(String(d.quantity).replace(/[^0-9]/g, ''), 10);
+            const qEl = document.getElementById('f-quantity');
+            // Quantity defaults to "1"; only replace the default (or a blank) and note it when it actually differs.
+            if (q >= 1 && qEl && (qEl.value.trim() === '' || qEl.value.trim() === '1')) {
+                qEl.value = q;
+                if (q !== 1) filled.push('Quantity');
+            }
+        }
+
+        const bits = [];
+        if (summary) bits.push('summary added to Notes');
+        if (filled.length) bits.push('filled ' + filled.join(', '));
+        status.textContent = bits.length
+            ? `✅ Paperwork read — ${bits.join('; ')}. Review and adjust as needed.`
+            : '⚠️ Could not read usable details from this document.';
+        status.style.color  = bits.length ? 'var(--success)' : 'var(--text-secondary)';
     } catch(err) {
         status.textContent = '❌ Error: '+err.message;
         status.style.color  = 'var(--danger)';

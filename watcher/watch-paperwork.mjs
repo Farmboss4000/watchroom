@@ -1,25 +1,35 @@
 // ─────────────────────────────────────────────────────────────────────────
-//  Farmboss Bills — Paperwork folder watcher
+//  Farmboss Bills — Paperwork folder uploader
 //
-//  Watches a local folder (default ~/Desktop/Paperwork) for new bills
-//  (PDF / image files), reads each one with Claude, uploads it to Firebase
-//  Storage, and creates a bill in the same `bills` collection the Bills web
-//  app uses. Processed files move to Paperwork/_processed; failures move to
-//  Paperwork/_failed with a .error.txt note.
+//  Looks at a local folder (default ~/Desktop/Paperwork), figures out which
+//  files have NOT been uploaded yet, and uploads only those. Each new bill is
+//  read by Claude, its file stored in Firebase Storage, and a record created
+//  in the same `bills` collection the Bills web app uses (Unpaid & Unfiled).
 //
-//  Setup and auto-start instructions: see README.md.
+//  Files are NOT moved. A hidden ledger (.bills-watcher-ledger.json in the
+//  watched folder) records which files have already been uploaded — keyed by
+//  file *content*, so renaming a file won't cause a duplicate upload.
+//
+//  Modes:
+//    node watch-paperwork.mjs            one-shot: upload new files, then exit
+//                                        (this is what the nightly schedule runs)
+//    node watch-paperwork.mjs --watch    stay running and upload files as they
+//                                        are added
+//
+//  Setup, nightly scheduling, and auto-start: see README.md.
 // ─────────────────────────────────────────────────────────────────────────
 import 'dotenv/config';
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs/promises';
+import crypto from 'node:crypto';
 import { existsSync } from 'node:fs';
 import chokidar from 'chokidar';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, collection, addDoc, doc, getDoc, runTransaction } from 'firebase/firestore';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { CATEGORIES, MIME, buildPrompt, normalizeBill, parseJsonObject } from './lib.mjs';
+import { CATEGORIES, buildPrompt, normalizeBill, parseJsonObject, classifyFile } from './lib.mjs';
 
 // Same Firebase project as the Farmboss web apps (this config is public by design).
 const firebaseConfig = {
@@ -31,14 +41,28 @@ const firebaseConfig = {
     appId: '1:911514107783:web:20e8a729fd66577c28dd22',
 };
 
+const WATCH_MODE = process.argv.includes('--watch');
+const LEDGER_NAME = '.bills-watcher-ledger.json';
+
 const log  = (...a) => console.log(new Date().toISOString(), ...a);
 const warn = (...a) => console.warn(new Date().toISOString(), 'WARN', ...a);
+const nowIso = () => new Date().toISOString();
+const sha256 = (buf) => crypto.createHash('sha256').update(buf).digest('hex');
 
 function defaultWatchDir() {
     return process.env.WATCH_DIR && process.env.WATCH_DIR.trim()
         ? process.env.WATCH_DIR.trim().replace(/^~(?=$|\/)/, os.homedir())
         : path.join(os.homedir(), 'Desktop', 'Paperwork');
 }
+
+async function loadLedger(p) {
+    try {
+        const l = JSON.parse(await fs.readFile(p, 'utf8'));
+        if (!l.entries) l.entries = {};
+        return l;
+    } catch { return { entries: {} }; }
+}
+async function saveLedger(p, l) { await fs.writeFile(p, JSON.stringify(l, null, 2)); }
 
 // Ask Claude to read the bill. Mirrors bills.html's callClaude/extractBill.
 async function extractBill(ai, base64, mimeType, categories) {
@@ -71,30 +95,17 @@ async function extractBill(ai, base64, mimeType, categories) {
     return parseJsonObject(data.content[0].text);
 }
 
-async function ensureDir(dir) { if (!existsSync(dir)) await fs.mkdir(dir, { recursive: true }); }
-
-async function moveFile(fp, destDir, note) {
-    await ensureDir(destDir);
-    const base = path.basename(fp);
-    let dest = path.join(destDir, base);
-    if (existsSync(dest)) dest = path.join(destDir, `${Date.now()}_${base}`);
-    await fs.rename(fp, dest);
-    if (note) await fs.writeFile(`${dest}.error.txt`, note + '\n');
-    return dest;
-}
-
 async function main() {
     const email    = (process.env.BILLS_EMAIL || '').trim();
     const password =  process.env.BILLS_PASSWORD || '';
     const watchDir = defaultWatchDir();
-    const processedDir = path.join(watchDir, '_processed');
-    const failedDir    = path.join(watchDir, '_failed');
+    const ledgerPath = path.join(watchDir, LEDGER_NAME);
 
     if (!email || !password) {
         console.error('Missing BILLS_EMAIL / BILLS_PASSWORD. Copy .env.example to .env and fill them in.');
         process.exit(1);
     }
-    await ensureDir(watchDir);
+    if (!existsSync(watchDir)) await fs.mkdir(watchDir, { recursive: true });
 
     // ── Firebase sign-in ──
     const app  = initializeApp(firebaseConfig);
@@ -127,7 +138,9 @@ async function main() {
     }
     log(`AI model: ${ai.model}${ai.proxyUrl ? ' (via proxy)' : ''}`);
 
-    // ── Allocate a bill id atomically (shared counter with the web app) ──
+    const ledger = await loadLedger(ledgerPath);
+
+    // Allocate a bill id atomically (shared counter with the web app).
     async function nextBillId() {
         const cfgRef = doc(db, 'bills_config', 'data');
         return runTransaction(db, async (tx) => {
@@ -138,57 +151,83 @@ async function main() {
         });
     }
 
-    async function processFile(fp) {
-        const ext = path.extname(fp).toLowerCase();
+    // Upload one already-read file and create its bill. Returns the bill id.
+    async function uploadBill(buf, ext, mimeType) {
+        const base64 = buf.toString('base64');
+        const bill = normalizeBill(await extractBill(ai, base64, mimeType, categories), categories);
+
+        const storeName = `bills_docs/${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`;
+        const sref = storageRef(storage, storeName);
+        await uploadBytes(sref, new Uint8Array(buf), { contentType: mimeType });
+        const fileUrl = await getDownloadURL(sref);
+
+        const id = await nextBillId();
+        await addDoc(collection(db, 'bills'), {
+            id, addedAt: nowIso(),
+            paid: false, filed: false, deleted: false,
+            ...bill,
+            fileUrl, fileType: mimeType === 'application/pdf' ? 'pdf' : 'image',
+            source: 'paperwork-watcher',
+        });
+        return { id, bill };
+    }
+
+    // Look at one file and, if it hasn't been uploaded yet, upload it.
+    // Records the result in the ledger (keyed by content hash) so it is never
+    // uploaded twice. Returns 'new' | 'skip' | 'unsupported' | 'fail'.
+    async function handleFile(fp) {
         const name = path.basename(fp);
-        const mimeType = MIME[ext];
-        if (!mimeType) {
+        if (name.startsWith('.') || name === LEDGER_NAME) return 'skip';
+        const ext = path.extname(name).toLowerCase();
+        let buf;
+        try { buf = await fs.readFile(fp); } catch (e) { warn(`cannot read ${name}: ${e.message}`); return 'fail'; }
+        const hash = sha256(buf);
+        const c = classifyFile(ext, hash, ledger.entries);
+
+        if (c.action === 'skip') return 'skip';
+        if (c.action === 'unsupported') {
             warn(`Skipping unsupported file: ${name}`);
-            await moveFile(fp, failedDir, `Unsupported file type "${ext}". Supported: ${Object.keys(MIME).join(', ')}`);
-            return;
+            ledger.entries[hash] = { file: name, status: 'unsupported', at: nowIso() };
+            await saveLedger(ledgerPath, ledger);
+            return 'unsupported';
         }
         log(`Reading ${name} ...`);
         try {
-            const buf = await fs.readFile(fp);
-            const base64 = buf.toString('base64');
-            const bill = normalizeBill(await extractBill(ai, base64, mimeType, categories), categories);
-
-            // Upload the original file to Storage.
-            const storeName = `bills_docs/${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`;
-            const sref = storageRef(storage, storeName);
-            await uploadBytes(sref, new Uint8Array(buf), { contentType: mimeType });
-            const fileUrl = await getDownloadURL(sref);
-
-            const id = await nextBillId();
-            await addDoc(collection(db, 'bills'), {
-                id, addedAt: new Date().toISOString(),
-                paid: false, filed: false, deleted: false,
-                ...bill,
-                fileUrl, fileType: mimeType === 'application/pdf' ? 'pdf' : 'image',
-                source: 'paperwork-watcher',
-            });
-
-            await moveFile(fp, processedDir);
-            log(`✓ Added #${id}: ${bill.vendor || '(no vendor)'}${bill.amount ? ' · $' + bill.amount.toFixed(2) : ''} → moved to _processed/`);
+            const { id, bill } = await uploadBill(buf, ext, c.mimeType);
+            ledger.entries[hash] = { file: name, status: 'uploaded', billId: id, at: nowIso() };
+            await saveLedger(ledgerPath, ledger);
+            log(`✓ Added #${id}: ${bill.vendor || '(no vendor)'}${bill.amount ? ' · $' + bill.amount.toFixed(2) : ''}`);
+            return 'new';
         } catch (err) {
+            // Not recorded in the ledger, so it will be retried on the next run.
             warn(`✗ ${name}: ${err.message}`);
-            try { await moveFile(fp, failedDir, err.message); } catch (e) { warn(`could not move ${name} to _failed:`, e.message); }
+            return 'fail';
         }
     }
 
-    // ── Serialize processing so we don't race the id counter or hammer the API ──
-    let chain = Promise.resolve();
-    const enqueue = (fp) => { chain = chain.then(() => processFile(fp)).catch((e) => warn('unexpected:', e.message)); };
-
-    const watcher = chokidar.watch(watchDir, {
-        depth: 0,                    // only the top level of Paperwork; _processed/_failed are subfolders and ignored
-        ignoreInitial: false,        // also pick up files already sitting in the folder at startup
-        ignored: /(^|[\/\\])\../,    // dotfiles (e.g. .DS_Store)
-        awaitWriteFinish: { stabilityThreshold: 2000, pollInterval: 200 },
-    });
-    watcher.on('add', enqueue);
-    watcher.on('error', (err) => warn('watcher error:', err.message));
-    watcher.on('ready', () => log(`Watching ${watchDir} — drop bills in and they'll be added automatically. (Ctrl+C to stop.)`));
+    if (WATCH_MODE) {
+        // Continuous: process the current backlog, then keep watching.
+        const watcher = chokidar.watch(watchDir, {
+            depth: 0,
+            ignoreInitial: false,
+            ignored: /(^|[\/\\])\../,   // dotfiles (incl. the ledger)
+            awaitWriteFinish: { stabilityThreshold: 2000, pollInterval: 200 },
+        });
+        let chain = Promise.resolve();
+        const enqueue = (fp) => { chain = chain.then(() => handleFile(fp)).catch((e) => warn('unexpected:', e.message)); };
+        watcher.on('add', enqueue);
+        watcher.on('error', (err) => warn('watcher error:', err.message));
+        watcher.on('ready', () => log(`Watching ${watchDir} — new files upload automatically. (Ctrl+C to stop.)`));
+    } else {
+        // One-shot batch: scan the folder, upload everything new, then exit.
+        log(`Scanning ${watchDir} for new files ...`);
+        const dirents = await fs.readdir(watchDir, { withFileTypes: true });
+        const files = dirents.filter((d) => d.isFile() && !d.name.startsWith('.')).map((d) => d.name).sort();
+        const tally = { new: 0, skip: 0, unsupported: 0, fail: 0 };
+        for (const f of files) tally[await handleFile(path.join(watchDir, f))]++;
+        log(`Done — ${tally.new} uploaded, ${tally.skip} already uploaded, ${tally.unsupported} unsupported, ${tally.fail} failed.`);
+        process.exit(tally.fail > 0 ? 1 : 0);
+    }
 }
 
 async function getDocSafe(db, col, id) {

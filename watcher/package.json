@@ -7,6 +7,7 @@
   "engines": { "node": ">=18" },
   "scripts": {
     "start": "node watch-paperwork.mjs",
+    "watch": "node watch-paperwork.mjs --watch",
     "test": "node test.mjs"
   },
   "dependencies": {

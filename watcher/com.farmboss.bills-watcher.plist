@@ -1,14 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  launchd template for auto-starting the Bills watcher at login on macOS.
+  launchd job that runs the Bills uploader once every night at 23:50 (11:50 PM).
+  It scans the Paperwork folder and uploads any files that haven't been
+  uploaded yet, then exits.
 
-  Before using: replace the two /ABSOLUTE/PATH/TO/... paths and the node
-  path, then follow the "Auto-start on login" steps in README.md.
+  Before using: replace the node path and both /ABSOLUTE/PATH/TO/... paths,
+  then follow the "Run automatically every night" steps in README.md.
 
   Find your node path with:   which node
     Apple Silicon (Homebrew):  /opt/homebrew/bin/node
     Intel (Homebrew):          /usr/local/bin/node
+    Installed from nodejs.org: /usr/local/bin/node
 -->
 <plist version="1.0">
 <dict>
@@ -17,21 +20,26 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>/opt/homebrew/bin/node</string>
-        <string>/ABSOLUTE/PATH/TO/watchroom/watcher/watch-paperwork.mjs</string>
+        <string>/usr/local/bin/node</string>
+        <string>/ABSOLUTE/PATH/TO/watchroom-app/watcher/watch-paperwork.mjs</string>
     </array>
 
     <key>WorkingDirectory</key>
-    <string>/ABSOLUTE/PATH/TO/watchroom/watcher</string>
+    <string>/ABSOLUTE/PATH/TO/watchroom-app/watcher</string>
 
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <true/>
+    <!-- Run every day at 23:50 (11:50 PM). If the Mac is asleep at that time,
+         launchd runs the job the next time it wakes. -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>23</integer>
+        <key>Minute</key>
+        <integer>50</integer>
+    </dict>
 
     <key>StandardOutPath</key>
-    <string>/ABSOLUTE/PATH/TO/watchroom/watcher/watcher.log</string>
+    <string>/ABSOLUTE/PATH/TO/watchroom-app/watcher/watcher.log</string>
     <key>StandardErrorPath</key>
-    <string>/ABSOLUTE/PATH/TO/watchroom/watcher/watcher.err.log</string>
+    <string>/ABSOLUTE/PATH/TO/watchroom-app/watcher/watcher.err.log</string>
 </dict>
 </plist>

@@ -1,0 +1,1115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Farmboss Bills</title>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg-primary:    #f4f5f7;
+            --bg-secondary:  #ffffff;
+            --bg-card:       #f0f2f5;
+            --accent:        #2f9e44;
+            --accent-hover:  #268239;
+            --accent-dim:    rgba(47,158,68,0.12);
+            --text-primary:  #1a1a2e;
+            --text-secondary:#6b7280;
+            --border:        #e2e8f0;
+            --success:       #16a34a;
+            --danger:        #dc2626;
+            --warn:          #d97706;
+            --info:          #2563eb;
+            --hdr-bg:        #1a1a2e;
+        }
+
+        body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; background:var(--bg-primary); color:var(--text-primary); min-height:100vh; overflow-x:hidden; max-width:100%; }
+
+        /* ── SITE SWITCHER ── */
+        .site-switcher {
+            background:#111827; display:flex; align-items:center; padding:5px 18px;
+            gap:4px; font-size:0.77rem; border-bottom:1px solid rgba(255,255,255,0.07);
+            overflow-x:auto; -webkit-overflow-scrolling:touch; flex-wrap:nowrap; scrollbar-width:none;
+        }
+        .site-switcher::-webkit-scrollbar { display:none; }
+        .site-switcher-label { color:#4b5563; font-size:0.69rem; font-weight:600;
+            text-transform:uppercase; letter-spacing:0.6px; margin-right:8px; }
+        .site-link { text-decoration:none; color:#9ca3af; padding:4px 12px; border-radius:4px;
+            display:flex; align-items:center; gap:6px; font-weight:500; transition:all 0.15s; white-space:nowrap; }
+        .site-link:hover { background:rgba(255,255,255,0.1); color:#e5e7eb; }
+        .site-link.active { background:rgba(255,255,255,0.13); color:#fff; font-weight:600; }
+
+        /* ── LOGIN ── */
+        #login-screen { position:fixed; inset:0; background:linear-gradient(135deg,#1a1a2e 0%,#2d2d44 100%);
+            display:flex; align-items:center; justify-content:center; z-index:9000; flex-direction:column; gap:12px; }
+        .login-site-links { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; max-width:520px; }
+        .login-site-links a { color:rgba(255,255,255,0.5); font-size:0.78rem; text-decoration:none;
+            padding:4px 12px; border:1px solid rgba(255,255,255,0.2); border-radius:4px; transition:all 0.15s; }
+        .login-site-links a:hover { color:#fff; border-color:rgba(255,255,255,0.5); }
+        .login-site-links a.active { color:var(--accent); border-color:var(--accent); }
+        .login-box { background:#fff; border-radius:14px; padding:44px 40px; width:100%; max-width:400px;
+            box-shadow:0 24px 64px rgba(0,0,0,0.4); }
+        .login-logo { width:56px; height:56px; background:var(--accent); border-radius:12px;
+            display:flex; align-items:center; justify-content:center; font-size:28px; margin:0 auto 16px; color:#fff; }
+        .login-box h2 { text-align:center; font-size:1.5rem; color:#1a1a2e; margin-bottom:4px; }
+        .login-sub { text-align:center; font-size:0.85rem; color:#6b7280; margin-bottom:28px; }
+        .login-error { color:var(--danger); font-size:0.82rem; margin-bottom:12px; min-height:18px; text-align:center; }
+        .login-full { width:100%; justify-content:center; }
+        .form-group { margin-bottom:14px; }
+        .form-group label { display:block; font-size:0.8rem; font-weight:600; color:#374151; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.4px; }
+        .form-group input, .form-group select, .form-group textarea {
+            width:100%; padding:9px 12px; border:1px solid var(--border); border-radius:7px;
+            font-size:0.9rem; font-family:inherit; color:var(--text-primary); background:var(--bg-secondary); transition:border-color 0.15s; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline:none; border-color:var(--accent); }
+
+        /* ── LOADING ── */
+        #loading-screen { display:none; position:fixed; inset:0; background:var(--bg-primary);
+            flex-direction:column; align-items:center; justify-content:center; gap:16px; z-index:8000; }
+        .spinner { width:44px; height:44px; border:4px solid var(--border); border-top-color:var(--accent);
+            border-radius:50%; animation:spin 0.8s linear infinite; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        #loading-screen p { color:var(--text-secondary); font-size:0.9rem; }
+
+        /* ── APP / HEADER ── */
+        #app { display:none; min-height:100vh; flex-direction:column; }
+        header { background:var(--hdr-bg); padding:0 20px; display:flex; align-items:center;
+            gap:16px; min-height:56px; position:sticky; top:0; z-index:100;
+            box-shadow:0 2px 12px rgba(0,0,0,0.25); flex-wrap:wrap; }
+        .logo-area { display:flex; align-items:center; gap:10px; flex-shrink:0; }
+        .logo-icon { width:32px; height:32px; background:var(--accent); border-radius:7px;
+            display:flex; align-items:center; justify-content:center; font-size:17px; color:#fff; flex-shrink:0; }
+        header h1 { font-size:1.15rem; font-weight:700; color:#fff; white-space:nowrap; }
+        header h1 span { color:var(--accent); }
+        nav { display:flex; gap:2px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; flex-shrink:0; max-width:100%; }
+        nav::-webkit-scrollbar { display:none; }
+        nav button { background:transparent; border:none; color:#9ca3af; padding:8px 13px;
+            border-radius:6px; cursor:pointer; font-size:0.83rem; transition:all 0.15s; white-space:nowrap; }
+        nav button:hover { background:rgba(47,158,68,0.2); color:#fff; }
+        nav button.active { background:var(--accent); color:#fff; font-weight:600; }
+        .header-right { display:flex; align-items:center; gap:10px; margin-left:auto; }
+        .user-badge { font-size:0.78rem; color:#9ca3af; background:rgba(255,255,255,0.08); padding:4px 10px; border-radius:5px; }
+        .btn-signout { background:transparent; border:1px solid rgba(255,255,255,0.2); color:#9ca3af;
+            padding:5px 12px; border-radius:5px; cursor:pointer; font-size:0.78rem; transition:all 0.15s; }
+        .btn-signout:hover { border-color:var(--danger); color:var(--danger); }
+
+        main { padding:20px; max-width:1400px; margin:0 auto; flex:1; width:100%; }
+
+        /* ── STATS ── */
+        .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-bottom:20px; }
+        .stat-card { background:var(--bg-secondary); border:1px solid var(--border); border-radius:10px; padding:18px 16px; text-align:center; }
+        .stat-value { font-size:1.9rem; font-weight:800; color:var(--accent); line-height:1; margin-bottom:4px; }
+        .stat-value.danger { color:var(--danger); }
+        .stat-value.warn   { color:var(--warn); }
+        .stat-label { font-size:0.75rem; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; font-weight:600; }
+
+        /* ── CARDS ── */
+        .card { background:var(--bg-secondary); border:1px solid var(--border); border-radius:12px; padding:22px; margin-bottom:20px; }
+        .card-title { display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; gap:10px; flex-wrap:wrap; }
+        .card-title-left { font-size:1rem; font-weight:700; color:var(--text-primary); }
+        .card-hint { font-size:0.8rem; color:var(--text-secondary); font-weight:400; }
+
+        /* ── VIEWS ── */
+        .view { display:none; }
+        .view.active { display:block; }
+
+        /* ── BUTTONS ── */
+        .btn { display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:7px;
+            font-size:0.85rem; font-weight:600; cursor:pointer; border:none; transition:all 0.15s; font-family:inherit; }
+        .btn-primary { background:var(--accent); color:#fff; }
+        .btn-primary:hover { background:var(--accent-hover); }
+        .btn-ghost { background:transparent; border:1px solid var(--border); color:var(--text-primary); }
+        .btn-ghost:hover { background:var(--bg-card); }
+        .btn-danger { background:var(--danger); color:#fff; }
+        .btn-danger:hover { opacity:0.85; }
+        .btn-sm { padding:5px 10px; font-size:0.78rem; }
+        .btn-ai { width:100%; justify-content:center; padding:10px 12px; border-radius:8px; font-size:0.86rem;
+            font-weight:600; cursor:pointer; border:none; font-family:inherit; transition:all 0.15s;
+            background:linear-gradient(135deg,#1a1a2e,#2d2d44); color:#fff; }
+        .btn-ai:hover { opacity:0.9; }
+        .btn-ai:disabled { opacity:0.4; cursor:not-allowed; }
+        .btn-ai.scanning { animation:pulse 1s ease-in-out infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+
+        /* ── FORM ── */
+        .form-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+        .form-group.full-width { grid-column:1/-1; }
+        .form-group.span2 { grid-column:span 2; }
+        .form-actions { display:flex; gap:10px; margin-top:20px; flex-wrap:wrap; }
+
+        /* ── UPLOAD / PREVIEW ── */
+        .upload-row { display:grid; grid-template-columns:220px 1fr; gap:20px; align-items:start; }
+        .doc-preview { width:100%; aspect-ratio:4/3; border:2px dashed var(--border); border-radius:10px;
+            display:flex; align-items:center; justify-content:center; background:var(--bg-card); overflow:hidden; position:relative; }
+        .doc-preview img { width:100%; height:100%; object-fit:contain; }
+        .doc-preview .pdf-badge { font-size:2.6rem; }
+        .file-input { font-size:0.8rem; color:var(--text-secondary); width:100%; margin-top:8px; }
+        .ai-status { font-size:0.83rem; margin-top:8px; min-height:20px; color:var(--text-secondary); }
+
+        /* ── BULK ── */
+        .bulk-progress { margin-top:14px; display:flex; flex-direction:column; gap:6px; }
+        .bulk-row { display:flex; align-items:center; gap:10px; font-size:0.83rem; padding:7px 10px;
+            background:var(--bg-card); border-radius:6px; }
+        .bulk-row .bulk-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .bulk-row .bulk-state { font-weight:600; white-space:nowrap; }
+        .bulk-row.done  .bulk-state { color:var(--success); }
+        .bulk-row.err   .bulk-state { color:var(--danger); }
+        .bulk-row.work  .bulk-state { color:var(--info); }
+
+        /* ── TOOLBAR / TABLE ── */
+        .toolbar { display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; align-items:center; }
+        .toolbar input[type="text"] { flex:1; min-width:200px; padding:8px 12px; border:1px solid var(--border);
+            border-radius:7px; font-size:0.87rem; font-family:inherit; background:var(--bg-secondary); color:var(--text-primary); }
+        .toolbar input:focus, .toolbar select:focus { outline:none; border-color:var(--accent); }
+        .toolbar select { padding:8px 12px; border:1px solid var(--border); border-radius:7px;
+            font-size:0.87rem; font-family:inherit; background:var(--bg-secondary); color:var(--text-primary); cursor:pointer; }
+        .table-wrapper { overflow-x:auto; -webkit-overflow-scrolling:touch; max-width:100%; }
+        table { width:100%; border-collapse:collapse; font-size:0.85rem; }
+        thead th { background:var(--bg-card); padding:10px 12px; text-align:left; font-size:0.74rem;
+            font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-secondary);
+            border-bottom:2px solid var(--border); white-space:nowrap; }
+        tbody tr { border-bottom:1px solid var(--border); transition:background 0.1s; }
+        tbody tr:hover { background:var(--accent-dim); }
+        tbody td { padding:10px 12px; vertical-align:middle; }
+        td.amount { font-weight:700; white-space:nowrap; }
+        td.overdue { color:var(--danger); font-weight:700; }
+        .empty { text-align:center; padding:40px 20px; color:var(--text-secondary); }
+        .empty-icon { font-size:3rem; margin-bottom:12px; }
+        .chk { width:18px; height:18px; cursor:pointer; accent-color:var(--accent); }
+        .chk-cell { text-align:center; }
+
+        /* ── BADGES ── */
+        .badge { display:inline-block; padding:3px 9px; border-radius:5px; font-size:0.72rem; font-weight:700;
+            text-transform:uppercase; letter-spacing:0.4px; white-space:nowrap; }
+        .badge-cat { background:var(--bg-card); color:var(--text-secondary); }
+        .badge-paid   { background:#dcfce7; color:#15803d; }
+        .badge-unpaid { background:#fee2e2; color:#b91c1c; }
+        .badge-filed  { background:#dbeafe; color:#1d4ed8; }
+
+        /* ── VENDOR REPORT ── */
+        .vendor-row { display:grid; grid-template-columns:180px 1fr 110px; gap:12px; align-items:center; padding:7px 0; }
+        .vendor-name { font-size:0.86rem; font-weight:600; color:var(--text-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .vendor-bar { height:10px; background:var(--border); border-radius:5px; overflow:hidden; }
+        .vendor-bar-fill { height:100%; background:var(--accent); border-radius:5px; transition:width 0.3s; }
+        .vendor-amt { font-size:0.86rem; font-weight:700; color:var(--text-primary); text-align:right; }
+        .vendor-sub { font-size:0.72rem; color:var(--text-secondary); }
+
+        /* ── SETTINGS ── */
+        .api-key-row { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; }
+        .api-key-row .form-group { flex:1; min-width:260px; margin-bottom:0; }
+        .api-status { font-size:0.82rem; margin-top:8px; padding:8px 12px; border-radius:6px; display:none; }
+        .api-status.ok  { background:#dcfce7; color:#15803d; display:block; }
+        .api-status.err { background:#fee2e2; color:#b91c1c; display:block; }
+
+        /* ── TOAST ── */
+        .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(80px);
+            background:#1a1a2e; color:#fff; padding:10px 20px; border-radius:8px; font-size:0.87rem;
+            font-weight:500; opacity:0; transition:all 0.3s; z-index:9999; pointer-events:none; white-space:nowrap; max-width:90vw; }
+        .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+        .toast.success { background:var(--success); }
+        .toast.error   { background:var(--danger); }
+
+        /* ── RESPONSIVE ── */
+        @media (max-width:720px) {
+            header { flex-wrap:wrap; padding:10px 14px; gap:6px; }
+            .logo-area { flex:1; min-width:0; overflow:hidden; }
+            header h1 { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; }
+            .header-right { flex-shrink:0; margin-left:auto; }
+            .user-badge { display:none; }
+            nav { order:3; width:100%; overflow-x:auto; border-top:1px solid rgba(255,255,255,0.1); padding-top:6px; margin-top:2px; }
+            main { padding:12px; }
+            .stats-grid { grid-template-columns:1fr 1fr; }
+            .form-grid { grid-template-columns:1fr 1fr; }
+            .form-group.span2 { grid-column:span 1; }
+            .upload-row { grid-template-columns:1fr; }
+            .vendor-row { grid-template-columns:120px 1fr 90px; }
+            input, select, textarea { font-size:16px; }
+        }
+        @media (max-width:480px) {
+            .stats-grid { grid-template-columns:1fr 1fr; }
+            .form-grid { grid-template-columns:1fr; }
+            .card { padding:16px; }
+        }
+    </style>
+    <link rel="stylesheet" href="apple-skin.css">
+</head>
+<body>
+
+<!-- ══ SITE SWITCHER ══ -->
+<div class="site-switcher">
+    <a href="index.html" class="site-link">🏠 HQ</a>
+    <a href="armory.html" class="site-link">🔫 Armory</a>
+    <a href="machinery.html" class="site-link">🚜 Machinery</a>
+    <a href="automotive.html" class="site-link">🚗 Automotive</a>
+    <a href="livestock.html" class="site-link">🐄 Livestock</a>
+    <a href="timepieces.html" class="site-link">⌚ Timepieces</a>
+    <a href="knives.html" class="site-link">🔪 Knives</a>
+    <a href="realestate.html" class="site-link">🏡 Real Estate</a>
+    <a href="bills.html" class="site-link active">🧾 Bills</a>
+    <a href="globetrotting.html" class="site-link">✈️ Globetrotting</a>
+    <a href="vendors.html" class="site-link">💼 Vendors</a>
+    <a href="contacts.html" class="site-link">👥 Enterprise Contacts</a>
+    <a href="estateplanning.html" class="site-link">📜 Estate Planning</a>
+    <a href="teaparty.html" class="site-link">🫖 Tea Party</a>
+    <a href="dontpush.html" class="site-link">🚫 Don't Push</a>
+    <a href="family.html" class="site-link">👨‍👩‍👧 Family</a>
+    <a href="admin.html" class="site-link">🔧 Admin</a>
+</div>
+
+<!-- ══ LOGIN ══ -->
+<div id="login-screen">
+    <div class="login-site-links">
+        <a href="index.html">🏠 Headquarters</a>
+        <a href="armory.html">🔫 Armory</a>
+        <a href="machinery.html">🚜 Machinery</a>
+        <a href="automotive.html">🚗 Automotive</a>
+        <a href="livestock.html">🐄 Livestock</a>
+        <a href="timepieces.html">⌚ Timepieces</a>
+        <a href="knives.html">🔪 Knives</a>
+        <a href="pharmacy.html">💊 Pharmacy</a>
+        <a href="insurance.html">🛡 Insurance</a>
+        <a href="realestate.html">🏡 Real Estate</a>
+        <a href="bills.html" class="active">🧾 Bills</a>
+        <a href="agents.html">🤖 Agents</a>
+        <a href="vendors.html">💼 Vendors</a>
+        <a href="estateplanning.html">📜 Estate Planning</a>
+        <a href="teaparty.html">🫖 Tea Party</a>
+    </div>
+    <div class="login-box">
+        <div class="login-logo">🧾</div>
+        <h2>Farmboss Bills</h2>
+        <p class="login-sub">Sign in to manage your bills</p>
+        <form id="login-form">
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" id="login-email" placeholder="your@email.com" required autocomplete="username">
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="login-password" placeholder="••••••••" required autocomplete="current-password">
+            </div>
+            <div class="login-error" id="login-error"></div>
+            <button type="submit" class="btn btn-primary login-full" id="login-btn">Sign In</button>
+        </form>
+    </div>
+</div>
+
+<!-- ══ LOADING ══ -->
+<div id="loading-screen">
+    <div class="spinner"></div>
+    <p>Loading your bills...</p>
+</div>
+
+<!-- ══ APP ══ -->
+<div id="app">
+<header>
+    <div class="logo-area">
+        <div class="logo-icon">🧾</div>
+        <h1>Farmboss <span>Bills</span></h1>
+    </div>
+    <nav>
+        <button class="active" onclick="showView('dashboard')">Dashboard</button>
+        <button onclick="showView('add')">Add Bill</button>
+        <button onclick="showView('bills')">All Bills</button>
+        <button onclick="showView('unpaid')">Unpaid</button>
+        <button onclick="showView('unfiled')">Unfiled</button>
+        <button onclick="showView('settings')">⚙ Settings</button>
+        <button onclick="showView('recycle')">🗑 Recycle Bin</button>
+    </nav>
+    <div class="header-right">
+        <span class="user-badge" id="user-email"></span>
+        <button class="btn-signout" onclick="doSignOut()">Sign Out</button>
+    </div>
+</header>
+
+<main>
+
+<!-- ══ DASHBOARD ══ -->
+<div id="view-dashboard" class="view active">
+    <div class="stats-grid" id="stats-grid"></div>
+
+    <div class="card">
+        <div class="card-title">
+            <div class="card-title-left">💵 Spend by Vendor</div>
+            <div class="card-hint" id="vendor-report-hint"></div>
+        </div>
+        <div id="vendor-report"></div>
+    </div>
+
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">🕐 Recently Added</div></div>
+        <div class="table-wrapper">
+            <table>
+                <thead><tr>
+                    <th>Bill Date</th><th>Vendor</th><th>Category</th><th>Amount</th><th>Due</th><th>Status</th>
+                </tr></thead>
+                <tbody id="recent-tbody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ══ ADD BILL ══ -->
+<div id="view-add" class="view">
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">📷 Scan a Bill</div>
+            <div class="card-hint">Snap a photo or upload a PDF, then let AI read the details.</div></div>
+        <div class="upload-row">
+            <div>
+                <div class="doc-preview" id="bill-preview"><span style="color:var(--text-secondary);font-size:0.8rem;">No file selected</span></div>
+                <input class="file-input" type="file" id="bill-file" accept="image/*,application/pdf" capture="environment" onchange="onAddFileSelected(this)">
+                <button type="button" class="btn-ai" id="btn-scan" style="margin-top:10px;" onclick="scanBill()" disabled>🔍 Scan with AI</button>
+                <div class="ai-status" id="ai-status"></div>
+            </div>
+            <div>
+                <form id="bill-form" onsubmit="return false;">
+                    <div class="form-grid">
+                        <div class="form-group span2">
+                            <label>Vendor / Biller</label>
+                            <input type="text" id="f-vendor" list="vendor-list" placeholder="e.g. Xcel Energy" autocomplete="off">
+                            <datalist id="vendor-list"></datalist>
+                        </div>
+                        <div class="form-group">
+                            <label>Amount ($)</label>
+                            <input type="number" id="f-amount" placeholder="0.00" min="0" step="0.01">
+                        </div>
+                        <div class="form-group">
+                            <label>Bill Date</label>
+                            <input type="date" id="f-billdate">
+                        </div>
+                        <div class="form-group">
+                            <label>Due Date</label>
+                            <input type="date" id="f-duedate">
+                        </div>
+                        <div class="form-group">
+                            <label>Category</label>
+                            <select id="f-category"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Account #</label>
+                            <input type="text" id="f-account" placeholder="Account number">
+                        </div>
+                        <div class="form-group">
+                            <label>Invoice / Bill #</label>
+                            <input type="text" id="f-invoice" placeholder="Invoice number">
+                        </div>
+                        <div class="form-group full-width">
+                            <label>Notes</label>
+                            <textarea id="f-notes" rows="2" placeholder="Anything worth remembering..."></textarea>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-primary" onclick="saveBill()">💾 Save Bill</button>
+                        <button type="button" class="btn btn-ghost" onclick="clearAddForm()">Clear</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">⚡ Bulk Upload</div>
+            <div class="card-hint">Select many bills at once — each is scanned and added automatically.</div></div>
+        <input class="file-input" type="file" id="bulk-files" accept="image/*,application/pdf" multiple onchange="onBulkSelected(this)">
+        <button type="button" class="btn-ai" id="btn-bulk" style="margin-top:12px;" onclick="processBulk()" disabled>⚡ Scan &amp; Add All</button>
+        <div class="bulk-progress" id="bulk-progress"></div>
+    </div>
+</div>
+
+<!-- ══ ALL BILLS ══ -->
+<div id="view-bills" class="view">
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">📋 All Bills</div></div>
+        <div class="toolbar">
+            <input type="text" id="bills-search" placeholder="Search vendor, category, notes..." oninput="renderAll()">
+            <select id="bills-cat" onchange="renderAll()"><option value="">All categories</option></select>
+            <select id="bills-status" onchange="renderAll()">
+                <option value="">All statuses</option>
+                <option value="unpaid">Unpaid</option>
+                <option value="paid">Paid</option>
+                <option value="unfiled">Unfiled</option>
+                <option value="filed">Filed</option>
+            </select>
+        </div>
+        <div class="table-wrapper"><div id="bills-table"></div></div>
+    </div>
+</div>
+
+<!-- ══ UNPAID ══ -->
+<div id="view-unpaid" class="view">
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">🔴 Unpaid Bills</div>
+            <div class="card-hint">Sorted by due date — soonest first. Check <strong>Paid</strong> once you've paid on the biller's site.</div></div>
+        <div class="table-wrapper"><div id="unpaid-table"></div></div>
+    </div>
+</div>
+
+<!-- ══ UNFILED ══ -->
+<div id="view-unfiled" class="view">
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">🗂 Unfiled Bills</div>
+            <div class="card-hint">Check <strong>Filed</strong> once you've filed the bill in your external system.</div></div>
+        <div class="table-wrapper"><div id="unfiled-table"></div></div>
+    </div>
+</div>
+
+<!-- ══ SETTINGS ══ -->
+<div id="view-settings" class="view">
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">🤖 AI — Anthropic API Key</div>
+            <div class="card-hint">Shared with the other Farmboss apps.</div></div>
+        <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:14px;">
+            Bill scanning uses Claude (by Anthropic). Your key is stored securely in your Firebase account and shared across the Farmboss sites.</p>
+        <div class="api-key-row">
+            <div class="form-group">
+                <label>Anthropic API Key</label>
+                <input type="password" id="api-key-input" placeholder="sk-ant-...">
+            </div>
+            <button type="button" class="btn btn-primary" onclick="saveApiKey()">Save Key</button>
+            <button type="button" class="btn btn-ghost" onclick="testApiKey()">Test Connection</button>
+        </div>
+        <div class="api-status" id="api-status"></div>
+        <p style="font-size:0.78rem;color:var(--text-secondary);margin-top:10px;">Get your API key at <strong>console.anthropic.com → API Keys → Create Key</strong>.</p>
+    </div>
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">⚙ Advanced</div></div>
+        <div class="form-grid">
+            <div class="form-group span2">
+                <label>Proxy URL (optional — fixes browser CORS)</label>
+                <input type="text" id="api-proxy-input" placeholder="https://your-proxy.example.com/anthropic">
+            </div>
+            <div class="form-group">
+                <label>Model</label>
+                <input type="text" id="model-input" placeholder="claude-sonnet-4-6">
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="button" class="btn btn-ghost" onclick="saveProxyUrl()">Save Proxy</button>
+            <button type="button" class="btn btn-ghost" onclick="saveModel()">Save Model</button>
+        </div>
+    </div>
+</div>
+
+<!-- ══ RECYCLE BIN ══ -->
+<div id="view-recycle" class="view">
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">🗑 Recycle Bin</div>
+            <div class="card-hint">Deleted bills can be restored or permanently removed.</div></div>
+        <div class="table-wrapper"><div id="recycle-table"></div></div>
+    </div>
+</div>
+
+</main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════
+//  FIREBASE
+// ═══════════════════════════════════════
+firebase.initializeApp({
+    apiKey: "AIzaSyB7c4urD9tJO80S7nADItxjwhSYVqlrkEU",
+    authDomain: "watchroom-714a0.firebaseapp.com",
+    projectId: "watchroom-714a0",
+    storageBucket: "watchroom-714a0.firebasestorage.app",
+    messagingSenderId: "911514107783",
+    appId: "1:911514107783:web:20e8a729fd66577c28dd22"
+});
+const auth    = firebase.auth();
+const db      = firebase.firestore();
+const storage = firebase.storage();
+
+// ═══════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════
+let bills = [];
+let categories = [
+    'Utilities','Electric','Gas','Water','Internet/Phone','Insurance',
+    'Rent/Mortgage','Loan','Fuel','Feed','Supplies','Equipment',
+    'Taxes','Subscription','Medical','Other'
+];
+let nextId    = 1;
+let unsubBills = null;
+let apiKey    = '';
+let proxyUrl  = '';
+let aiModel   = 'claude-sonnet-4-6';
+
+let addFile   = { file:null, base64:null, mimeType:null };
+let bulkFiles = [];
+
+const VIEWS = ['dashboard','add','bills','unpaid','unfiled','settings','recycle'];
+
+// ═══════════════════════════════════════
+//  AUTH
+// ═══════════════════════════════════════
+auth.onAuthStateChanged(user => {
+    if (user) {
+        document.getElementById('login-screen').style.display   = 'none';
+        document.getElementById('loading-screen').style.display = 'flex';
+        document.getElementById('app').style.display            = 'none';
+        document.getElementById('user-email').textContent       = user.email;
+        initApp();
+    } else {
+        document.getElementById('login-screen').style.display   = 'flex';
+        document.getElementById('loading-screen').style.display = 'none';
+        document.getElementById('app').style.display            = 'none';
+        if (unsubBills) { unsubBills(); unsubBills = null; }
+        bills = [];
+    }
+});
+
+document.getElementById('login-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const email = document.getElementById('login-email').value.trim();
+    const pass  = document.getElementById('login-password').value;
+    const errEl = document.getElementById('login-error');
+    const btn   = document.getElementById('login-btn');
+    errEl.textContent = ''; btn.textContent = 'Signing in...'; btn.disabled = true;
+    try {
+        await auth.signInWithEmailAndPassword(email, pass);
+    } catch(err) {
+        errEl.textContent = 'Invalid email or password.';
+        btn.textContent = 'Sign In'; btn.disabled = false;
+    }
+});
+
+async function doSignOut() {
+    if (!confirm('Sign out?')) return;
+    await auth.signOut();
+}
+
+// ═══════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════
+async function initApp() {
+    try {
+        const cfgDoc = await db.collection('bills_config').doc('data').get();
+        if (cfgDoc.exists) {
+            const d = cfgDoc.data();
+            if (d.categories && d.categories.length) categories = d.categories;
+            if (d.nextId) nextId = d.nextId;
+        }
+        const keyDoc = await db.collection('settings').doc('apikey').get();
+        if (keyDoc.exists && keyDoc.data().key) { apiKey = keyDoc.data().key; document.getElementById('api-key-input').value = apiKey; }
+        const proxyDoc = await db.collection('settings').doc('proxy').get();
+        if (proxyDoc.exists && proxyDoc.data().url) { proxyUrl = proxyDoc.data().url; document.getElementById('api-proxy-input').value = proxyUrl; }
+        const modelDoc = await db.collection('settings').doc('model').get();
+        if (modelDoc.exists && modelDoc.data().model) aiModel = modelDoc.data().model;
+        document.getElementById('model-input').value = aiModel;
+
+        populateCatControls();
+
+        unsubBills = db.collection('bills').onSnapshot(snap => {
+            bills = snap.docs.map(doc => ({ _docId:doc.id, ...doc.data() }));
+            renderCurrentViews();
+        }, err => { console.warn('bills snapshot error', err); toast('Could not load bills: ' + err.message, 'error'); });
+
+        document.getElementById('loading-screen').style.display = 'none';
+        document.getElementById('app').style.display            = 'flex';
+        showView('dashboard');
+    } catch(err) {
+        document.getElementById('loading-screen').innerHTML =
+            `<p style="color:var(--danger);padding:20px;text-align:center;">Error: ${esc(err.message)}<br><br>
+             <button class="btn btn-ghost" onclick="doSignOut()">Sign Out</button></p>`;
+    }
+}
+
+// ═══════════════════════════════════════
+//  FIRESTORE / STORAGE
+// ═══════════════════════════════════════
+async function saveConfig() {
+    await db.collection('bills_config').doc('data').set({ categories, nextId });
+}
+
+async function uploadDoc(file) {
+    const ext  = file.name ? file.name.split('.').pop()
+               : file.type === 'application/pdf' ? 'pdf' : 'jpg';
+    const path = `bills_docs/${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
+    const ref  = storage.ref().child(path);
+    await ref.put(file);
+    return await ref.getDownloadURL();
+}
+
+async function dbAddBill(data) {
+    const bill = {
+        id: nextId++, addedAt: new Date().toISOString(),
+        paid:false, filed:false, deleted:false,
+        vendor:'', amount:0, billDate:'', dueDate:'', account:'', invoice:'', category:'', notes:'', fileUrl:'', fileType:'',
+        ...data
+    };
+    const ref = await db.collection('bills').add(bill);
+    await saveConfig();
+    return { ...bill, _docId: ref.id };
+}
+async function dbUpdateBill(docId, patch) {
+    await db.collection('bills').doc(docId).update(patch);
+}
+
+async function togglePaid(docId, checked) {
+    try { await dbUpdateBill(docId, { paid: checked }); toast(checked ? 'Marked paid' : 'Marked unpaid', 'success'); }
+    catch(err) { toast('Update failed: ' + err.message, 'error'); }
+}
+async function toggleFiled(docId, checked) {
+    try { await dbUpdateBill(docId, { filed: checked }); toast(checked ? 'Marked filed' : 'Marked unfiled', 'success'); }
+    catch(err) { toast('Update failed: ' + err.message, 'error'); }
+}
+async function softDelete(docId) {
+    if (!confirm('Move this bill to the Recycle Bin?')) return;
+    try { await dbUpdateBill(docId, { deleted: true }); toast('Moved to Recycle Bin', 'success'); }
+    catch(err) { toast('Delete failed: ' + err.message, 'error'); }
+}
+async function restoreBill(docId) {
+    try { await dbUpdateBill(docId, { deleted: false }); toast('Restored', 'success'); }
+    catch(err) { toast('Restore failed: ' + err.message, 'error'); }
+}
+async function hardDelete(docId) {
+    if (!confirm('Permanently delete this bill? This cannot be undone.')) return;
+    try { await db.collection('bills').doc(docId).delete(); toast('Deleted permanently', 'success'); }
+    catch(err) { toast('Delete failed: ' + err.message, 'error'); }
+}
+
+// ═══════════════════════════════════════
+//  NAVIGATION
+// ═══════════════════════════════════════
+function showView(v) {
+    VIEWS.forEach(id => document.getElementById('view-'+id).classList.remove('active'));
+    document.getElementById('view-'+v).classList.add('active');
+    document.querySelectorAll('nav button').forEach((btn,i) => btn.classList.toggle('active', VIEWS[i]===v));
+    renderCurrentViews();
+}
+
+function renderCurrentViews() {
+    renderDashboard();
+    renderAll();
+    renderUnpaid();
+    renderUnfiled();
+    renderRecycle();
+}
+
+// ═══════════════════════════════════════
+//  AI (shared helpers — identical to the other Farmboss apps)
+// ═══════════════════════════════════════
+function humanizeAiError(status, rawMsg) {
+    const msg = (rawMsg || '').toString();
+    if (/credit balance is too low|insufficient.*credit|billing/i.test(msg)) {
+        return 'Your Anthropic account is out of API credits. Add credits at console.anthropic.com → Settings → Billing, then try again. (API credits are separate from any Claude.ai subscription.)';
+    }
+    if (status === 401) return 'Invalid API key — re-enter your key in Settings.';
+    if (status === 429) return 'Rate limit reached — please wait a moment and try again.';
+    return msg || `API error ${status}`;
+}
+
+async function callClaude(base64OrMedia, mimeType, prompt, { retries = 2, maxTokens = 512 } = {}) {
+    if (!apiKey) { toast('Set your Anthropic API key in Settings first.','error'); return null; }
+    const toBlock = (b64, mt) => mt === 'application/pdf'
+        ? { type:'document', source:{ type:'base64', media_type:'application/pdf', data:b64 } }
+        : { type:'image',    source:{ type:'base64', media_type:mt,                data:b64 } };
+    let mediaBlocks;
+    if (!base64OrMedia) mediaBlocks = [];
+    else if (Array.isArray(base64OrMedia)) mediaBlocks = base64OrMedia.map(m => toBlock(m.base64, m.mimeType));
+    else mediaBlocks = [ toBlock(base64OrMedia, mimeType) ];
+    const msgPayload = { model: aiModel, max_tokens: maxTokens,
+        messages:[{ role:'user', content:[ ...mediaBlocks, { type:'text', text:prompt } ]}] };
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        let res;
+        try {
+            if (proxyUrl) {
+                res = await fetch(proxyUrl, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ ...msgPayload, apiKey }) });
+            } else {
+                res = await fetch('https://api.anthropic.com/v1/messages', {
+                    method:'POST', mode:'cors',
+                    headers:{ 'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true' },
+                    body: JSON.stringify(msgPayload) });
+            }
+        } catch(networkErr) { throw new Error('Network error — set up a Proxy URL in Settings to fix CORS issues.'); }
+        if (res.status === 529 || res.status === 503) {
+            if (attempt < retries) { await new Promise(r => setTimeout(r, (attempt+1)*4000)); continue; }
+            throw new Error('API is temporarily overloaded — please try again in a minute.');
+        }
+        if (!res.ok) {
+            let raw = null;
+            try { raw = (await res.json()).error?.message; } catch(e) {}
+            throw new Error(humanizeAiError(res.status, raw));
+        }
+        const data = await res.json();
+        return data.content[0].text;
+    }
+}
+
+// Extract structured bill fields from a scanned document. Returns an object or throws.
+async function extractBill(base64, mimeType) {
+    const catList = categories.join(', ');
+    const prompt = `This is a bill, invoice, utility statement, or receipt. Read it and return ONLY valid JSON (no markdown fences, no other text) with these fields:
+{
+  "vendor":"the company/biller name or empty",
+  "amount":"total amount due as a plain number, no currency symbol or commas, or empty",
+  "billDate":"the statement/invoice date as YYYY-MM-DD or empty",
+  "dueDate":"the payment due date as YYYY-MM-DD or empty",
+  "account":"account number or empty",
+  "invoice":"invoice or bill number or empty",
+  "category":"one of: ${catList} or empty",
+  "notes":"one short sentence with anything else notable, or empty"
+}
+Only include values you can read with reasonable confidence; use an empty string when unsure.`;
+    const raw = await callClaude(base64, mimeType, prompt, { maxTokens: 700 });
+    if (!raw) throw new Error('No response — is your API key set in Settings?');
+    const m = raw.match(/\{[\s\S]*\}/);
+    if (!m) throw new Error('Could not parse AI response');
+    return JSON.parse(m[0]);
+}
+
+function normalizeBill(d) {
+    const out = {};
+    out.vendor  = (d.vendor  || '').toString().trim();
+    out.account = (d.account || '').toString().trim();
+    out.invoice = (d.invoice || '').toString().trim();
+    out.notes   = (d.notes   || '').toString().trim();
+    const amt = parseFloat(String(d.amount ?? '').replace(/[^0-9.]/g, ''));
+    out.amount = Number.isFinite(amt) ? amt : 0;
+    out.billDate = /^\d{4}-\d{2}-\d{2}$/.test(String(d.billDate ?? '').trim()) ? String(d.billDate).trim() : '';
+    out.dueDate  = /^\d{4}-\d{2}-\d{2}$/.test(String(d.dueDate  ?? '').trim()) ? String(d.dueDate).trim()  : '';
+    const cat = (d.category || '').toString().trim();
+    out.category = categories.find(c => c.toLowerCase() === cat.toLowerCase()) || (cat ? 'Other' : '');
+    return out;
+}
+
+// ═══════════════════════════════════════
+//  ADD (single)
+// ═══════════════════════════════════════
+function fileToBase64(file) {
+    return new Promise((res, rej) => {
+        const fr = new FileReader();
+        fr.onload = e => res(e.target.result.split(',')[1]);
+        fr.onerror = rej;
+        fr.readAsDataURL(file);
+    });
+}
+function fileToDataUrl(file) {
+    return new Promise((res, rej) => {
+        const fr = new FileReader();
+        fr.onload = e => res(e.target.result);
+        fr.onerror = rej;
+        fr.readAsDataURL(file);
+    });
+}
+
+async function onAddFileSelected(input) {
+    const file = input.files && input.files[0];
+    const prev = document.getElementById('bill-preview');
+    const btn  = document.getElementById('btn-scan');
+    if (!file) { addFile = { file:null, base64:null, mimeType:null }; prev.innerHTML = '<span style="color:var(--text-secondary);font-size:0.8rem;">No file selected</span>'; btn.disabled = true; return; }
+    addFile = { file, base64: await fileToBase64(file), mimeType: file.type || 'image/jpeg' };
+    if (file.type === 'application/pdf') {
+        prev.innerHTML = `<span class="pdf-badge">📄</span>`;
+    } else {
+        const url = await fileToDataUrl(file);
+        prev.innerHTML = `<img src="${url}" alt="bill preview">`;
+    }
+    btn.disabled = false;
+}
+
+async function scanBill() {
+    if (!addFile.base64) { toast('Choose a file first.', 'error'); return; }
+    const btn = document.getElementById('btn-scan');
+    const status = document.getElementById('ai-status');
+    btn.disabled = true; btn.classList.add('scanning'); btn.textContent = '⏳ Reading...';
+    status.textContent = 'Reading the bill with AI...'; status.style.color = 'var(--text-secondary)';
+    try {
+        const d = normalizeBill(await extractBill(addFile.base64, addFile.mimeType));
+        const filled = [];
+        const set = (id, val, label) => { if (val !== '' && val != null) { document.getElementById(id).value = val; filled.push(label); } };
+        set('f-vendor',   d.vendor,   'Vendor');
+        set('f-amount',   d.amount ? d.amount : '', 'Amount');
+        set('f-billdate', d.billDate, 'Bill Date');
+        set('f-duedate',  d.dueDate,  'Due Date');
+        set('f-account',  d.account,  'Account');
+        set('f-invoice',  d.invoice,  'Invoice');
+        set('f-notes',    d.notes,    'Notes');
+        if (d.category) { document.getElementById('f-category').value = d.category; filled.push('Category'); }
+        status.textContent = filled.length ? `✅ Read: ${filled.join(', ')}. Review, then Save Bill.` : '⚠️ Could not read details — enter them manually.';
+        status.style.color = filled.length ? 'var(--success)' : 'var(--text-secondary)';
+    } catch(err) {
+        status.textContent = '❌ ' + err.message; status.style.color = 'var(--danger)';
+    } finally {
+        btn.disabled = false; btn.classList.remove('scanning'); btn.textContent = '🔍 Scan with AI';
+    }
+}
+
+async function saveBill() {
+    const vendor = document.getElementById('f-vendor').value.trim();
+    const amount = parseFloat(document.getElementById('f-amount').value);
+    if (!vendor && !Number.isFinite(amount)) { toast('Enter at least a vendor or amount.', 'error'); return; }
+    const data = {
+        vendor,
+        amount: Number.isFinite(amount) ? amount : 0,
+        billDate: document.getElementById('f-billdate').value,
+        dueDate:  document.getElementById('f-duedate').value,
+        account:  document.getElementById('f-account').value.trim(),
+        invoice:  document.getElementById('f-invoice').value.trim(),
+        category: document.getElementById('f-category').value,
+        notes:    document.getElementById('f-notes').value.trim(),
+    };
+    try {
+        toast('Saving...');
+        if (addFile.file) {
+            data.fileUrl  = await uploadDoc(addFile.file);
+            data.fileType = addFile.mimeType === 'application/pdf' ? 'pdf' : 'image';
+        }
+        await dbAddBill(data);
+        toast('Bill saved', 'success');
+        clearAddForm();
+    } catch(err) {
+        toast('Save failed: ' + err.message, 'error');
+    }
+}
+
+function clearAddForm() {
+    ['f-vendor','f-amount','f-billdate','f-duedate','f-account','f-invoice','f-notes'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('f-category').value = '';
+    document.getElementById('bill-file').value = '';
+    addFile = { file:null, base64:null, mimeType:null };
+    document.getElementById('bill-preview').innerHTML = '<span style="color:var(--text-secondary);font-size:0.8rem;">No file selected</span>';
+    document.getElementById('btn-scan').disabled = true;
+    document.getElementById('ai-status').textContent = '';
+}
+
+// ═══════════════════════════════════════
+//  BULK
+// ═══════════════════════════════════════
+function onBulkSelected(input) {
+    bulkFiles = Array.from(input.files || []);
+    const btn = document.getElementById('btn-bulk');
+    btn.disabled = bulkFiles.length === 0;
+    btn.textContent = bulkFiles.length ? `⚡ Scan & Add All (${bulkFiles.length})` : '⚡ Scan & Add All';
+    const prog = document.getElementById('bulk-progress');
+    prog.innerHTML = bulkFiles.map((f,i) => `<div class="bulk-row" id="bulk-${i}"><div class="bulk-name">${esc(f.name)}</div><div class="bulk-state">Queued</div></div>`).join('');
+}
+
+async function processBulk() {
+    if (!bulkFiles.length) return;
+    if (!apiKey) { toast('Set your Anthropic API key in Settings first.', 'error'); showView('settings'); return; }
+    const btn = document.getElementById('btn-bulk');
+    btn.disabled = true; btn.classList.add('scanning');
+    let ok = 0, fail = 0;
+    for (let i = 0; i < bulkFiles.length; i++) {
+        const file = bulkFiles[i];
+        const row  = document.getElementById('bulk-'+i);
+        const state = row.querySelector('.bulk-state');
+        row.className = 'bulk-row work'; state.textContent = 'Scanning...';
+        try {
+            const base64 = await fileToBase64(file);
+            const mimeType = file.type || 'image/jpeg';
+            const d = normalizeBill(await extractBill(base64, mimeType));
+            state.textContent = 'Uploading...';
+            const fileUrl = await uploadDoc(file);
+            await dbAddBill({ ...d, fileUrl, fileType: mimeType === 'application/pdf' ? 'pdf' : 'image' });
+            row.className = 'bulk-row done';
+            state.textContent = `✓ ${d.vendor || 'Added'}${d.amount ? ' · ' + fmtMoney(d.amount) : ''}`;
+            ok++;
+        } catch(err) {
+            row.className = 'bulk-row err';
+            state.textContent = '✗ ' + err.message;
+            fail++;
+        }
+    }
+    btn.classList.remove('scanning'); btn.disabled = false;
+    btn.textContent = '⚡ Scan & Add All';
+    toast(`Bulk done — ${ok} added${fail ? `, ${fail} failed` : ''}`, fail ? 'error' : 'success');
+    bulkFiles = [];
+    document.getElementById('bulk-files').value = '';
+}
+
+// ═══════════════════════════════════════
+//  RENDER
+// ═══════════════════════════════════════
+function active() { return bills.filter(b => !b.deleted); }
+function todayStr() { return new Date().toISOString().slice(0,10); }
+
+function renderDashboard() {
+    const list = active();
+    const outstanding = list.filter(b => !b.paid).reduce((s,b) => s + (Number(b.amount)||0), 0);
+    const unpaid = list.filter(b => !b.paid).length;
+    const unfiled = list.filter(b => !b.filed).length;
+    const yr = todayStr().slice(0,4);
+    const yearSpend = list.filter(b => (b.billDate||'').startsWith(yr)).reduce((s,b) => s + (Number(b.amount)||0), 0);
+
+    document.getElementById('stats-grid').innerHTML = `
+        <div class="stat-card"><div class="stat-value danger">${fmtMoney(outstanding)}</div><div class="stat-label">Outstanding</div></div>
+        <div class="stat-card"><div class="stat-value ${unpaid?'danger':''}">${unpaid}</div><div class="stat-label">Unpaid</div></div>
+        <div class="stat-card"><div class="stat-value ${unfiled?'warn':''}">${unfiled}</div><div class="stat-label">Unfiled</div></div>
+        <div class="stat-card"><div class="stat-value">${fmtMoney(yearSpend)}</div><div class="stat-label">Spent in ${yr}</div></div>`;
+
+    // Spend by vendor (by bill date, all-time)
+    const byVendor = {};
+    list.forEach(b => { const v = (b.vendor||'Unknown').trim() || 'Unknown'; byVendor[v] = (byVendor[v]||0) + (Number(b.amount)||0); });
+    const rows = Object.entries(byVendor).sort((a,b) => b[1]-a[1]);
+    const max = rows.length ? rows[0][1] : 0;
+    const total = rows.reduce((s,r) => s+r[1], 0);
+    document.getElementById('vendor-report-hint').textContent = rows.length ? `${rows.length} vendors · ${fmtMoney(total)} total` : '';
+    document.getElementById('vendor-report').innerHTML = rows.length
+        ? rows.map(([v,amt]) => `
+            <div class="vendor-row">
+                <div class="vendor-name" title="${esc(v)}">${esc(v)}</div>
+                <div class="vendor-bar"><div class="vendor-bar-fill" style="width:${max?Math.max(3,Math.round(amt/max*100)):0}%"></div></div>
+                <div class="vendor-amt">${fmtMoney(amt)}</div>
+            </div>`).join('')
+        : `<div class="empty"><div class="empty-icon">💵</div>No bills yet. Add one to see spend by vendor.</div>`;
+
+    // Recent
+    const recent = [...list].sort((a,b) => (b.addedAt||'').localeCompare(a.addedAt||'')).slice(0,8);
+    document.getElementById('recent-tbody').innerHTML = recent.length
+        ? recent.map(b => `<tr>
+            <td>${fmtDate(b.billDate)}</td>
+            <td>${esc(b.vendor)||'—'}</td>
+            <td>${b.category?`<span class="badge badge-cat">${esc(b.category)}</span>`:'—'}</td>
+            <td class="amount">${fmtMoney(b.amount)}</td>
+            <td>${fmtDate(b.dueDate)}</td>
+            <td>${statusBadges(b)}</td>
+        </tr>`).join('')
+        : `<tr><td colspan="6" class="empty">No bills yet.</td></tr>`;
+}
+
+function billRow(b, opts={}) {
+    const overdue = !b.paid && b.dueDate && b.dueDate < todayStr();
+    return `<tr>
+        <td>${fmtDate(b.billDate)}</td>
+        <td>${esc(b.vendor)||'—'}${b.invoice?`<div class="vendor-sub">#${esc(b.invoice)}</div>`:''}</td>
+        <td>${b.category?`<span class="badge badge-cat">${esc(b.category)}</span>`:'—'}</td>
+        <td class="amount">${fmtMoney(b.amount)}</td>
+        <td class="${overdue?'overdue':''}">${fmtDate(b.dueDate)}${overdue?' ⚠️':''}</td>
+        <td class="chk-cell"><input type="checkbox" class="chk" ${b.paid?'checked':''} onchange="togglePaid('${b._docId}', this.checked)" title="Paid"></td>
+        <td class="chk-cell"><input type="checkbox" class="chk" ${b.filed?'checked':''} onchange="toggleFiled('${b._docId}', this.checked)" title="Filed"></td>
+        <td>${b.fileUrl?`<a href="${esc(b.fileUrl)}" target="_blank" rel="noopener">${b.fileType==='pdf'?'📄 PDF':'🖼 View'}</a>`:'—'}</td>
+        <td><button class="btn btn-sm btn-ghost" onclick="softDelete('${b._docId}')" title="Delete">🗑</button></td>
+    </tr>`;
+}
+
+function billsTable(rows, emptyMsg) {
+    if (!rows.length) return `<div class="empty"><div class="empty-icon">🧾</div>${emptyMsg}</div>`;
+    return `<table><thead><tr>
+        <th>Bill Date</th><th>Vendor</th><th>Category</th><th>Amount</th><th>Due</th><th>Paid</th><th>Filed</th><th>File</th><th></th>
+    </tr></thead><tbody>${rows.map(b => billRow(b)).join('')}</tbody></table>`;
+}
+
+function renderAll() {
+    const q   = (document.getElementById('bills-search').value || '').toLowerCase().trim();
+    const cat = document.getElementById('bills-cat').value;
+    const st  = document.getElementById('bills-status').value;
+    let list = active();
+    if (cat) list = list.filter(b => b.category === cat);
+    if (st === 'unpaid')  list = list.filter(b => !b.paid);
+    if (st === 'paid')    list = list.filter(b => b.paid);
+    if (st === 'unfiled') list = list.filter(b => !b.filed);
+    if (st === 'filed')   list = list.filter(b => b.filed);
+    if (q) list = list.filter(b => [b.vendor,b.category,b.notes,b.account,b.invoice].some(f => (f||'').toString().toLowerCase().includes(q)));
+    list.sort((a,b) => (b.billDate||'').localeCompare(a.billDate||'') || (b.addedAt||'').localeCompare(a.addedAt||''));
+    document.getElementById('bills-table').innerHTML = billsTable(list, 'No bills match your filters.');
+}
+
+function renderUnpaid() {
+    const list = active().filter(b => !b.paid)
+        .sort((a,b) => (a.dueDate||'9999').localeCompare(b.dueDate||'9999'));
+    document.getElementById('unpaid-table').innerHTML = billsTable(list, 'Nothing outstanding — all bills are paid. 🎉');
+}
+
+function renderUnfiled() {
+    const list = active().filter(b => !b.filed)
+        .sort((a,b) => (b.billDate||'').localeCompare(a.billDate||''));
+    document.getElementById('unfiled-table').innerHTML = billsTable(list, 'Everything is filed. 🗂');
+}
+
+function renderRecycle() {
+    const list = bills.filter(b => b.deleted).sort((a,b) => (b.addedAt||'').localeCompare(a.addedAt||''));
+    document.getElementById('recycle-table').innerHTML = list.length
+        ? `<table><thead><tr><th>Bill Date</th><th>Vendor</th><th>Amount</th><th></th></tr></thead><tbody>${
+            list.map(b => `<tr>
+                <td>${fmtDate(b.billDate)}</td><td>${esc(b.vendor)||'—'}</td><td class="amount">${fmtMoney(b.amount)}</td>
+                <td style="display:flex;gap:6px;">
+                    <button class="btn btn-sm btn-ghost" onclick="restoreBill('${b._docId}')">↩ Restore</button>
+                    <button class="btn btn-sm btn-danger" onclick="hardDelete('${b._docId}')">Delete</button>
+                </td></tr>`).join('')
+        }</tbody></table>`
+        : `<div class="empty"><div class="empty-icon">🗑</div>Recycle Bin is empty.</div>`;
+}
+
+// ═══════════════════════════════════════
+//  SETTINGS
+// ═══════════════════════════════════════
+async function saveApiKey() {
+    const key = document.getElementById('api-key-input').value.trim();
+    if (!key) { toast('Enter an API key first.', 'error'); return; }
+    try { await db.collection('settings').doc('apikey').set({ key }); apiKey = key; toast('API key saved', 'success'); }
+    catch(err) { toast('Save failed: ' + err.message, 'error'); }
+}
+async function saveProxyUrl() {
+    const url = document.getElementById('api-proxy-input').value.trim();
+    try { await db.collection('settings').doc('proxy').set({ url }); proxyUrl = url; toast('Proxy saved', 'success'); }
+    catch(err) { toast('Save failed: ' + err.message, 'error'); }
+}
+async function saveModel() {
+    const model = document.getElementById('model-input').value.trim() || 'claude-sonnet-4-6';
+    try { await db.collection('settings').doc('model').set({ model }); aiModel = model; toast('Model saved', 'success'); }
+    catch(err) { toast('Save failed: ' + err.message, 'error'); }
+}
+async function testApiKey() {
+    const key = document.getElementById('api-key-input').value.trim();
+    const proxy = document.getElementById('api-proxy-input').value.trim();
+    if (!key) { toast('Enter an API key first.', 'error'); return; }
+    const el = document.getElementById('api-status');
+    el.className = 'api-status'; el.style.display = 'block'; el.textContent = 'Testing…';
+    try {
+        const payload = { model: aiModel, max_tokens: 10, messages:[{ role:'user', content:'Hi' }] };
+        let res;
+        if (proxy) res = await fetch(proxy, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ...payload, apiKey: key }) });
+        else res = await fetch('https://api.anthropic.com/v1/messages', { method:'POST', mode:'cors',
+            headers:{ 'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true' },
+            body: JSON.stringify(payload) });
+        if (res.ok) { el.className = 'api-status ok'; el.textContent = `✅ Connection successful${proxy?' (via proxy)':''}! AI is ready.`; }
+        else { const d = await res.json().catch(()=>({})); el.className = 'api-status err'; el.textContent = '❌ ' + humanizeAiError(res.status, d.error?.message || d.error?.type); }
+    } catch(err) {
+        el.className = 'api-status err';
+        el.textContent = `❌ Network error: ${err.message}${proxy?'':' — add a Proxy URL below to fix CORS.'}`;
+    }
+}
+
+// ═══════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════
+function populateCatControls() {
+    const opts = `<option value="">Uncategorized</option>` + categories.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+    document.getElementById('f-category').innerHTML = opts;
+    document.getElementById('bills-cat').innerHTML = `<option value="">All categories</option>` + categories.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+}
+function statusBadges(b) {
+    return `<span class="badge ${b.paid?'badge-paid':'badge-unpaid'}">${b.paid?'Paid':'Unpaid'}</span>`
+         + (b.filed?' <span class="badge badge-filed">Filed</span>':'');
+}
+function fmtMoney(n) {
+    const v = Number(n) || 0;
+    return '$' + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmtDate(s) {
+    if (!s) return '—';
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+    if (!m) return s;
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${months[+m[2]-1]} ${+m[3]}, ${m[1]}`;
+}
+function esc(s) { return s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;') : ''; }
+
+let _toastT = null;
+function toast(msg, type='') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = `toast show${type?' '+type:''}`;
+    clearTimeout(_toastT);
+    _toastT = setTimeout(() => el.classList.remove('show'), 3500);
+}
+</script>
+</body>
+</html>

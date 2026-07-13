@@ -57,3 +57,16 @@ export function parseJsonObject(text) {
     if (!m) throw new Error('Could not parse AI response (no JSON found)');
     return JSON.parse(m[0]);
 }
+
+// Decide what to do with one file, given the ledger of already-seen files
+// (keyed by content hash). This is how the watcher knows what has and hasn't
+// been uploaded, so re-running only handles new files.
+//   -> { action: 'skip' }        already in the ledger (uploaded or unsupported)
+//   -> { action: 'unsupported' } a type Claude can't read
+//   -> { action: 'process', mimeType } a new file to upload
+export function classifyFile(ext, hash, ledgerEntries = {}) {
+    if (ledgerEntries[hash]) return { action: 'skip', reason: ledgerEntries[hash].status };
+    const mimeType = MIME[ext.toLowerCase()];
+    if (!mimeType) return { action: 'unsupported' };
+    return { action: 'process', mimeType };
+}

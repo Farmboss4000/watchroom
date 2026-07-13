@@ -1,7 +1,7 @@
 // Unit tests for the pure logic in lib.mjs. Run with: node test.mjs
 // (No dependencies required — this does not touch Firebase or the network.)
 import assert from 'node:assert/strict';
-import { normalizeBill, parseJsonObject, buildPrompt, CATEGORIES } from './lib.mjs';
+import { normalizeBill, parseJsonObject, buildPrompt, classifyFile, CATEGORIES } from './lib.mjs';
 
 let passed = 0;
 const check = (name, fn) => { fn(); passed++; console.log('  ✓', name); };
@@ -35,6 +35,27 @@ check('parseJsonObject throws when no JSON', () => {
 });
 check('buildPrompt includes the category list', () => {
     assert.ok(buildPrompt(CATEGORIES).includes('Electric'));
+});
+
+// classifyFile: how the watcher decides what to upload vs skip.
+check('classifyFile: new supported file → process', () => {
+    const c = classifyFile('.pdf', 'hashA', {});
+    assert.equal(c.action, 'process');
+    assert.equal(c.mimeType, 'application/pdf');
+});
+check('classifyFile: hash already in ledger → skip', () => {
+    const ledger = { hashA: { status: 'uploaded' } };
+    assert.equal(classifyFile('.pdf', 'hashA', ledger).action, 'skip');
+});
+check('classifyFile: unsupported type → unsupported', () => {
+    assert.equal(classifyFile('.heic', 'hashB', {}).action, 'unsupported');
+});
+check('classifyFile: previously-marked unsupported hash → skip (no re-log)', () => {
+    const ledger = { hashB: { status: 'unsupported' } };
+    assert.equal(classifyFile('.heic', 'hashB', ledger).action, 'skip');
+});
+check('classifyFile: extension case-insensitive', () => {
+    assert.equal(classifyFile('.PDF', 'hashC', {}).action, 'process');
 });
 
 console.log(`\n${passed} tests passed.`);

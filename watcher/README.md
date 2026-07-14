@@ -86,47 +86,44 @@ npm test
 
 ## Run automatically every night at 11:50 PM
 
-macOS `launchd` can run the uploader on a schedule. This runs it once each night
-at **23:50** and uploads anything added that day.
-
-**1.** Find your node path and this folder's absolute path:
+One command sets up a macOS `launchd` schedule that runs the uploader every
+night at **23:50**:
 
 ```bash
-which node          # e.g. /opt/homebrew/bin/node  (Apple Silicon)
-pwd                 # e.g. /Users/you/watchroom-app/watcher
+cd watchroom-app/watcher
+bash install-schedule.sh
 ```
 
-**2.** Edit `com.farmboss.bills-watcher.plist` and replace the node path and both
-`/ABSOLUTE/PATH/TO/watchroom-app/watcher` placeholders with your real paths.
+The script fills in your node path and this folder automatically, loads the
+schedule, and runs it once so you can see it work. Output goes to `watcher.log`
+/ `watcher.err.log` in this folder.
 
-**3.** Install and start the schedule:
+**To run it on demand any time:**
 
 ```bash
-cp com.farmboss.bills-watcher.plist ~/Library/LaunchAgents/
-launchctl load ~/Library/LaunchAgents/com.farmboss.bills-watcher.plist
+launchctl kickstart -p gui/$(id -u)/com.farmboss.bills-watcher
 ```
 
-It now runs every night at 23:50. Output is written to `watcher.log` /
-`watcher.err.log` in this folder. To run it immediately as a test:
+**To change the time:** edit `Hour` / `Minute` in
+`~/Library/LaunchAgents/com.farmboss.bills-watcher.plist`, then re-run
+`bash install-schedule.sh`.
+
+**To remove the schedule:**
 
 ```bash
-launchctl start com.farmboss.bills-watcher
+bash install-schedule.sh --uninstall
 ```
-
-**To change the time / stop / remove it:**
-
-```bash
-# stop & remove
-launchctl unload ~/Library/LaunchAgents/com.farmboss.bills-watcher.plist
-rm ~/Library/LaunchAgents/com.farmboss.bills-watcher.plist
-```
-
-To change the time, edit the `Hour`/`Minute` in the plist, then unload and load
-it again.
 
 > **Note:** the Mac must be **awake** at 23:50 for the job to run on time. If it's
 > asleep, launchd runs the job the next time the Mac wakes — so nothing is
 > skipped, it just runs a bit later.
+>
+> The first scheduled run may trigger a macOS prompt asking to let the tool
+> access your Desktop folder — click **Allow**.
+
+*(The `com.farmboss.bills-watcher.plist` file in this folder is a manual
+template if you'd rather set it up by hand — but `install-schedule.sh` is the
+easy path.)*
 
 ---
 

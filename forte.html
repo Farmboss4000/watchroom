@@ -3,6 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://securetoken.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://firebasestorage.googleapis.com" crossorigin>
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
     <title>FORTÉ — Intelligence &amp; Reporting</title>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -724,6 +731,7 @@ firebase.initializeApp({
     appId:"1:123456789:web:abcdef"
 });
 const auth=firebase.auth(), db=firebase.firestore();
+try { db.enablePersistence({ synchronizeTabs: true }).catch(function(){}); } catch (e) {}
 
 // ── STATE ──
 let researchItems=[], reports=[], companyProfile={}, teamMembers=[];

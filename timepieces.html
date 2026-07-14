@@ -3,6 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://securetoken.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://firebasestorage.googleapis.com" crossorigin>
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
     <title>Farmboss Timepieces</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js" defer></script>
@@ -831,6 +838,7 @@ firebase.initializeApp({
     appId:"1:911514107783:web:20e8a729fd66577c28dd22"
 });
 const auth=firebase.auth(), db=firebase.firestore(), storage=firebase.storage();
+try { db.enablePersistence({ synchronizeTabs: true }).catch(function(){}); } catch (e) {}
 
 let items=[], categories=[
     'Automatic Watch','Chronograph','Digital Watch','Dive Watch','Dress Watch',
@@ -986,7 +994,7 @@ function renderDashboard(){
     document.getElementById('recent-tbody').innerHTML=rec.length
         ?rec.map(it=>{
             const mainUrl=it.photos?.find(p=>p.slot==='main')?.url;
-            const thumb=mainUrl?`<img src="${mainUrl}" class="thumb" alt="" style="cursor:pointer" onclick="window.open('${mainUrl}','_blank')" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb-placeholder',innerHTML:'⌚'}))">`:`<div class="thumb-placeholder">⌚</div>`;
+            const thumb=mainUrl?`<img loading="lazy" decoding="async" src="${mainUrl}" class="thumb" alt="" style="cursor:pointer" onclick="window.open('${mainUrl}','_blank')" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb-placeholder',innerHTML:'⌚'}))">`:`<div class="thumb-placeholder">⌚</div>`;
             return `<tr style="cursor:pointer" onclick="editItem('${it._docId}')"><td>${thumb}</td><td class="mono">#${it.id}</td><td><span class="badge ${catClass(it.category)}">${it.category||'—'}</span></td><td>${esc(it.brand)||'—'}</td><td>${esc(it.model)||'—'}</td><td>${esc(it.movement)||'—'}</td><td style="color:var(--text-secondary)">${it.addedAt?new Date(it.addedAt).toLocaleDateString():'—'}</td></tr>`;
         }).join('')
         :'<tr><td colspan="7" style="text-align:center;color:var(--text-secondary);padding:30px;">No timepieces yet.</td></tr>';
@@ -1547,7 +1555,7 @@ function renderInventory(){
     empty.style.display='none';
     tbody.innerHTML=data.map(it=>{
         const mainUrl=it.photos?.find(p=>p.slot==='main')?.url;
-        const thumb=mainUrl?`<img src="${mainUrl}" class="thumb" alt="" style="cursor:pointer" onclick="window.open('${mainUrl}','_blank')">`:`<div class="thumb-placeholder">⌚</div>`;
+        const thumb=mainUrl?`<img loading="lazy" decoding="async" src="${mainUrl}" class="thumb" alt="" style="cursor:pointer" onclick="window.open('${mainUrl}','_blank')">`:`<div class="thumb-placeholder">⌚</div>`;
         return`<tr>
             <td>${thumb}</td>
             <td><span class="badge ${catClass(it.category)}">${it.category||'—'}</span></td>

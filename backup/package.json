@@ -1,0 +1,16 @@
+{
+  "name": "farmboss-backup",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Global backup & archive for all Farmboss files and data",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node backup.mjs",
+    "full": "node backup.mjs --full"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "firebase": "^10.12.0"
+  }
+}

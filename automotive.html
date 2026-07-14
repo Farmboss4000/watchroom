@@ -3,6 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://securetoken.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://firebasestorage.googleapis.com" crossorigin>
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
     <title>Farmboss Automotive</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js" defer></script>
@@ -1332,6 +1339,7 @@ firebase.initializeApp({
 });
 const auth    = firebase.auth();
 const db      = firebase.firestore();
+try { db.enablePersistence({ synchronizeTabs: true }).catch(function(){}); } catch (e) {}
 const storage = firebase.storage();
 
 // ═══════════════════════════════════════
@@ -1649,7 +1657,7 @@ function renderDashboard() {
         ? rec.map(it => {
             const mainUrl = it.photos?.find(p=>p.slot==='main')?.url;
             const thumb = mainUrl
-                ? `<img src="${mainUrl}" class="thumb" alt="" style="cursor:pointer" onclick="window.open('${mainUrl}','_blank')" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb-placeholder',innerHTML:'🚗'}))">`
+                ? `<img loading="lazy" decoding="async" src="${mainUrl}" class="thumb" alt="" style="cursor:pointer" onclick="window.open('${mainUrl}','_blank')" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb-placeholder',innerHTML:'🚗'}))">`
                 : `<div class="thumb-placeholder">🚗</div>`;
             return `<tr style="cursor:pointer" title="Click to edit" onclick="editItem('${it._docId}')">
                 <td>${thumb}</td>
@@ -2952,7 +2960,7 @@ function renderInventory() {
     tbody.innerHTML = data.map(it => {
         const mainUrl = it.photos?.find(p=>p.slot==='main')?.url;
         const thumb = mainUrl
-            ? `<img src="${mainUrl}" class="thumb" alt="" style="cursor:pointer" onclick="window.open('${mainUrl}','_blank')" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb-placeholder',innerHTML:'🚗'}))">`
+            ? `<img loading="lazy" decoding="async" src="${mainUrl}" class="thumb" alt="" style="cursor:pointer" onclick="window.open('${mainUrl}','_blank')" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb-placeholder',innerHTML:'🚗'}))">`
             : `<div class="thumb-placeholder">🚗</div>`;
         const condBadge = it.condition ? `<span style="font-size:0.72rem;font-weight:600;color:${
             it.condition==='Excellent'?'#15803d':it.condition==='Good'?'#1d4ed8':it.condition==='Fair'?'#92400e':'#dc2626'}">${it.condition}</span>` : '—';

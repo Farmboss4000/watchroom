@@ -181,6 +181,9 @@
         tbody td { padding:10px 12px; vertical-align:middle; }
         td.amount { font-weight:700; white-space:nowrap; }
         td.overdue { color:var(--danger); font-weight:700; }
+        .due-alert { display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:#fff7ed; border:1px solid #fed7aa;
+            color:#9a3412; border-radius:12px; padding:12px 16px; margin-bottom:16px; font-size:0.9rem; }
+        .due-alert--overdue { background:#fef2f2; border-color:#fecaca; color:#b91c1c; }
         .dup-badge { display:none; background:var(--danger); color:#fff; border-radius:999px; font-size:0.7rem; font-weight:700; padding:1px 7px; margin-left:2px; }
         .dup-group { border:1px solid #f6caca; }
         .dup-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:9px 0; border-top:1px solid var(--border); flex-wrap:wrap; }
@@ -248,6 +251,7 @@
         }
     </style>
     <link rel="stylesheet" href="apple-skin.css">
+    <script src="site-nav.js" defer></script>
 </head>
 <body>
 
@@ -343,6 +347,7 @@
 
 <!-- ══ DASHBOARD ══ -->
 <div id="view-dashboard" class="view active">
+    <div id="due-banner"></div>
     <div class="stats-grid" id="stats-grid"></div>
 
     <div class="card">
@@ -1038,6 +1043,27 @@ function renderDashboard() {
     const unfiled = list.filter(b => !b.filed).length;
     const yr = todayStr().slice(0,4);
     const yearSpend = list.filter(b => (b.billDate||'').startsWith(yr)).reduce((s,b) => s + (Number(b.amount)||0), 0);
+
+    // Due-soon / overdue reminder banner
+    const banner = document.getElementById('due-banner');
+    if (banner) {
+        const today = todayStr();
+        const soonCut = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
+        const unpaidList = list.filter(b => !b.paid && b.dueDate);
+        const overdue = unpaidList.filter(b => b.dueDate < today);
+        const dueSoon = unpaidList.filter(b => b.dueDate >= today && b.dueDate <= soonCut);
+        if (overdue.length || dueSoon.length) {
+            const bits = [];
+            if (overdue.length) bits.push(`<strong>${overdue.length} overdue</strong> (${fmtMoney(overdue.reduce((s,b)=>s+(Number(b.amount)||0),0))})`);
+            if (dueSoon.length) bits.push(`<strong>${dueSoon.length} due within 3 days</strong> (${fmtMoney(dueSoon.reduce((s,b)=>s+(Number(b.amount)||0),0))})`);
+            banner.innerHTML = `<div class="due-alert ${overdue.length ? 'due-alert--overdue' : ''}">
+                ⏰ ${bits.join(' · ')}
+                <button class="btn btn-sm ${overdue.length ? 'btn-danger' : 'btn-primary'}" onclick="showView('unpaid')" style="margin-left:auto;">View Unpaid</button>
+            </div>`;
+        } else {
+            banner.innerHTML = '';
+        }
+    }
 
     document.getElementById('stats-grid').innerHTML = `
         <div class="stat-card"><div class="stat-value danger">${fmtMoney(outstanding)}</div><div class="stat-label">Outstanding</div></div>

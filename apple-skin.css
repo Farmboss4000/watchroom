@@ -217,6 +217,56 @@ header nav button.active {
     font-weight: 600;
 }
 
+/* Allow the switcher to wrap (instead of hidden horizontal scroll)
+   so the "More" dropdown below is never clipped. */
+.site-switcher {
+    flex-wrap: wrap !important;
+    overflow: visible !important;
+    row-gap: 4px;
+}
+
+/* "More" dropdown in the switcher (built by site-nav.js) */
+.site-more { position: relative; display: inline-flex; }
+.site-more summary { list-style: none; cursor: pointer; user-select: none; }
+.site-more summary::-webkit-details-marker { display: none; }
+.site-more[open] summary {
+    background: rgba(255,255,255,0.16) !important;
+    color: #ffffff !important;
+}
+.site-more-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 210px;
+    padding: 6px;
+    background: rgba(22,24,30,0.96);
+    -webkit-backdrop-filter: saturate(180%) blur(24px);
+    backdrop-filter: saturate(180%) blur(24px);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 14px;
+    box-shadow: 0 20px 48px rgba(0,0,0,0.45);
+    z-index: 400;
+}
+.site-more-menu .site-link {
+    display: flex;
+    padding: 8px 12px !important;
+    border-radius: 9px !important;
+}
+
+/* Shared-settings note (injected by site-nav.js on AI settings cards) */
+.shared-settings-note {
+    font-size: 0.8rem;
+    color: #6e6e73;
+    background: rgba(0,113,227,0.07);
+    border: 1px solid rgba(0,113,227,0.18);
+    border-radius: 10px;
+    padding: 8px 12px;
+    margin: 0 0 14px;
+}
+
 /* ── Cards / surfaces — hairline border + feather shadow ── */
 .card,
 .modal,

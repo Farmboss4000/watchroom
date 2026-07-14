@@ -172,6 +172,10 @@
         thead th { background:var(--bg-card); padding:10px 12px; text-align:left; font-size:0.74rem;
             font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-secondary);
             border-bottom:2px solid var(--border); white-space:nowrap; }
+        thead th.sortable { cursor:pointer; user-select:none; }
+        thead th.sortable:hover { color:var(--accent); }
+        thead th.sort-asc::after  { content:' ↑'; font-size:0.92em; }
+        thead th.sort-desc::after { content:' ↓'; font-size:0.92em; }
         tbody tr { border-bottom:1px solid var(--border); transition:background 0.1s; }
         tbody tr:hover { background:var(--accent-dim); }
         tbody td { padding:10px 12px; vertical-align:middle; }
@@ -989,11 +993,69 @@ function billRow(b, opts={}) {
     </tr>`;
 }
 
-function billsTable(rows, emptyMsg) {
+// ── Column sorting ──
+const SORT_COLS = [
+    { key: 'billDate', label: 'Bill Date' },
+    { key: 'vendor',   label: 'Vendor' },
+    { key: 'category', label: 'Category' },
+    { key: 'amount',   label: 'Amount' },
+    { key: 'dueDate',  label: 'Due' },
+    { key: 'paid',     label: 'Paid' },
+    { key: 'filed',    label: 'Filed' },
+];
+// Each table view keeps its own sort, so Unpaid can default to due-date etc.
+const sortBy = {
+    bills:   { field: 'billDate', dir: 'desc' },
+    unpaid:  { field: 'dueDate',  dir: 'asc'  },
+    unfiled: { field: 'billDate', dir: 'desc' },
+};
+
+function sortValue(b, field) {
+    switch (field) {
+        case 'amount':   return Number(b.amount) || 0;
+        case 'paid':     return b.paid  ? 1 : 0;
+        case 'filed':    return b.filed ? 1 : 0;
+        case 'vendor':   return (b.vendor   || '').toLowerCase();
+        case 'category': return (b.category || '').toLowerCase();
+        case 'billDate': return b.billDate || '9999-99-99';  // blanks sort last
+        case 'dueDate':  return b.dueDate  || '9999-99-99';
+        default:         return '';
+    }
+}
+
+function sortBillsList(list, field, dir) {
+    const mul = dir === 'desc' ? -1 : 1;
+    return [...list].sort((a, b) => {
+        const va = sortValue(a, field), vb = sortValue(b, field);
+        if (va < vb) return -1 * mul;
+        if (va > vb) return  1 * mul;
+        return (b.addedAt || '').localeCompare(a.addedAt || '');  // stable tiebreak
+    });
+}
+
+function sortBillsBy(viewKey, field) {
+    const s = sortBy[viewKey];
+    if (s.field === field) {
+        s.dir = s.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+        s.field = field;
+        // Numbers/dates/checkboxes default to biggest-first; text to A→Z.
+        s.dir = ['amount', 'billDate', 'dueDate', 'paid', 'filed'].includes(field) ? 'desc' : 'asc';
+    }
+    if (viewKey === 'bills')        renderAll();
+    else if (viewKey === 'unpaid')  renderUnpaid();
+    else if (viewKey === 'unfiled') renderUnfiled();
+}
+
+function billsTable(rows, emptyMsg, viewKey) {
     if (!rows.length) return `<div class="empty"><div class="empty-icon">🧾</div>${emptyMsg}</div>`;
-    return `<table><thead><tr>
-        <th>Bill Date</th><th>Vendor</th><th>Category</th><th>Amount</th><th>Due</th><th>Paid</th><th>Filed</th><th>File</th><th></th>
-    </tr></thead><tbody>${rows.map(b => billRow(b)).join('')}</tbody></table>`;
+    const s = sortBy[viewKey] || { field: 'billDate', dir: 'desc' };
+    const sorted = sortBillsList(rows, s.field, s.dir);
+    const head = SORT_COLS.map(c => {
+        const cls = 'sortable' + (s.field === c.key ? ' sort-' + s.dir : '');
+        return `<th class="${cls}" onclick="sortBillsBy('${viewKey}','${c.key}')">${c.label}</th>`;
+    }).join('') + '<th>File</th><th></th>';
+    return `<table><thead><tr>${head}</tr></thead><tbody>${sorted.map(b => billRow(b)).join('')}</tbody></table>`;
 }
 
 function renderAll() {
@@ -1007,20 +1069,17 @@ function renderAll() {
     if (st === 'unfiled') list = list.filter(b => !b.filed);
     if (st === 'filed')   list = list.filter(b => b.filed);
     if (q) list = list.filter(b => [b.vendor,b.category,b.notes,b.account,b.invoice].some(f => (f||'').toString().toLowerCase().includes(q)));
-    list.sort((a,b) => (b.billDate||'').localeCompare(a.billDate||'') || (b.addedAt||'').localeCompare(a.addedAt||''));
-    document.getElementById('bills-table').innerHTML = billsTable(list, 'No bills match your filters.');
+    document.getElementById('bills-table').innerHTML = billsTable(list, 'No bills match your filters.', 'bills');
 }
 
 function renderUnpaid() {
-    const list = active().filter(b => !b.paid)
-        .sort((a,b) => (a.dueDate||'9999').localeCompare(b.dueDate||'9999'));
-    document.getElementById('unpaid-table').innerHTML = billsTable(list, 'Nothing outstanding — all bills are paid. 🎉');
+    const list = active().filter(b => !b.paid);
+    document.getElementById('unpaid-table').innerHTML = billsTable(list, 'Nothing outstanding — all bills are paid. 🎉', 'unpaid');
 }
 
 function renderUnfiled() {
-    const list = active().filter(b => !b.filed)
-        .sort((a,b) => (b.billDate||'').localeCompare(a.billDate||''));
-    document.getElementById('unfiled-table').innerHTML = billsTable(list, 'Everything is filed. 🗂');
+    const list = active().filter(b => !b.filed);
+    document.getElementById('unfiled-table').innerHTML = billsTable(list, 'Everything is filed. 🗂', 'unfiled');
 }
 
 function renderRecycle() {

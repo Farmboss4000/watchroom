@@ -1,97 +1,101 @@
 /* ============================================================
-   APPLE SKIN — sitewide reskin.
+   APPLE SKIN v2 — sitewide reskin.
    This file is loaded AFTER each page's inline <style> block,
    so it wins the cascade. It redefines the common CSS variables
    every page uses (--bg-primary, --accent, --text-primary, etc.)
-   to Apple values, then layers on universal Apple typography
+   to a clean modern system, then layers on universal typography
    and component polish.
 
+   Design language: calm light canvas (#f5f5f7), white surfaces
+   with hairline borders + feather shadows, one accent blue,
+   pill-shaped controls, frosted chrome, visible focus rings.
+
    Per-page accent identity (gold, red, green, purple, etc.) is
-   intentionally unified to Apple-blue here — the goal is
-   uniform Apple feel across all 22 pages.
+   intentionally unified to accent-blue here — the goal is one
+   coherent look across all pages.
    ============================================================ */
 
-/* ── Variable overrides ─────────────────────────────────────
-   Forces Apple values on every common variable name we've
-   seen across pages. Inline :root blocks lose because we're
-   later in the cascade and we use !important. */
+/* ── Design tokens / variable overrides ─────────────────────
+   Forces clean values on every common variable name used
+   across pages. Inline :root blocks lose because we're later
+   in the cascade and we use !important. */
 :root {
     /* Standard names */
-    --bg-primary:    #fbfbfd !important;
+    --bg-primary:    #f5f5f7 !important;
     --bg-secondary:  #ffffff !important;
-    --bg-card:       #f5f5f7 !important;
+    --bg-card:       #f6f6f8 !important;
     --bg-raised:     #ffffff !important;
-    --bg:            #fbfbfd !important;
+    --bg:            #f5f5f7 !important;
     --bg2:           #ffffff !important;
-    --bg3:           #f5f5f7 !important;
+    --bg3:           #f6f6f8 !important;
     --card:          #ffffff !important;
-    --surface:       #ffffff !important;
-    --surface-2:     #f5f5f7 !important;
+    --surface:      #ffffff !important;
+    --surface-2:    #f6f6f8 !important;
 
     --text-primary:    #1d1d1f !important;
     --text-secondary:  #6e6e73 !important;
-    --text-tertiary:   #86868b !important;
+    --text-tertiary:   #98989d !important;
     --text:            #1d1d1f !important;
     --text2:           #6e6e73 !important;
-    --text3:           #86868b !important;
+    --text3:           #98989d !important;
 
-    --border:        rgba(0,0,0,0.08) !important;
-    --border2:       rgba(0,0,0,0.14) !important;
-    --border-strong: rgba(0,0,0,0.14) !important;
+    --border:        rgba(0,0,0,0.07) !important;
+    --border2:       rgba(0,0,0,0.12) !important;
+    --border-strong: rgba(0,0,0,0.12) !important;
 
     --accent:         #0071e3 !important;
     --accent-hover:   #0077ed !important;
     --accent-pressed: #0063c1 !important;
-    --accent-dim:     rgba(0,113,227,0.10) !important;
-    --accent-soft:    rgba(0,113,227,0.10) !important;
+    --accent-dim:     rgba(0,113,227,0.09) !important;
+    --accent-soft:    rgba(0,113,227,0.09) !important;
     --accent2:        #0077ed !important;
-    --dim:            rgba(0,113,227,0.10) !important;
+    --dim:            rgba(0,113,227,0.09) !important;
 
-    --success:  #34c759 !important;
-    --danger:   #ff3b30 !important;
-    --warn:     #ff9500 !important;
-    --warning:  #ff9500 !important;
+    --success:  #248a3d !important;
+    --danger:   #e02d2d !important;
+    --warn:     #c96a00 !important;
+    --warning:  #c96a00 !important;
     --info:     #0071e3 !important;
-    --green:    #34c759 !important;
-    --red:      #ff3b30 !important;
-    --yellow:   #ff9500 !important;
+    --green:    #248a3d !important;
+    --red:      #e02d2d !important;
+    --yellow:   #c96a00 !important;
 
-    /* Page-specific brand vars repointed to Apple-blue */
+    /* Page-specific brand vars repointed to accent-blue */
     --gold:     #0071e3 !important;
     --gold2:    #0077ed !important;
-    --gold-dim: rgba(0,113,227,0.10) !important;
+    --gold-dim: rgba(0,113,227,0.09) !important;
     --purple:   #0071e3 !important;
 
-    /* Headers / nav background — keep dark but unified */
-    --hdr-bg:   #1d1d1f !important;
-    --navy:     #1d1d1f !important;
-    --navy2:    #2d3748 !important;
+    /* Headers / nav background — unified near-black */
+    --hdr-bg:   #16181d !important;
+    --navy:     #16181d !important;
+    --navy2:    #23262e !important;
     --navy3:    #1a4d7a !important;
 
-    /* Apple-style shadow + radius tokens (override / add) */
-    --shadow-sm: 0 1px 2px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.06) !important;
-    --shadow-md: 0 4px 16px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04) !important;
-    --shadow-lg: 0 16px 32px rgba(0,0,0,0.08), 0 4px 8px rgba(0,0,0,0.05) !important;
-    --shadow:    0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06) !important;
+    /* Shadow + radius tokens */
+    --shadow-sm: 0 1px 2px rgba(16,20,28,0.04) !important;
+    --shadow-md: 0 1px 2px rgba(16,20,28,0.04), 0 8px 24px rgba(16,20,28,0.06) !important;
+    --shadow-lg: 0 2px 6px rgba(16,20,28,0.05), 0 20px 48px rgba(16,20,28,0.10) !important;
+    --shadow:    0 1px 2px rgba(16,20,28,0.04), 0 8px 24px rgba(16,20,28,0.06) !important;
     --radius:    16px !important;
-    --radius-sm: 12px !important;
+    --radius-sm: 10px !important;
     --radius-md: 16px !important;
-    --radius-lg: 22px !important;
+    --radius-lg: 20px !important;
     --radius-pill: 980px !important;
 }
 
-/* ── Page canvas ────────────────────────────────────────── */
+/* ── Page canvas & typography ───────────────────────────── */
 html, body {
-    background: #fbfbfd !important;
+    background: #f5f5f7 !important;
     color: #1d1d1f !important;
     font-family:
         "SF Pro Display","SF Pro Text",
         -apple-system, BlinkMacSystemFont,
-        "Helvetica Neue","Segoe UI",Roboto,Arial,sans-serif !important;
+        "Inter","Helvetica Neue","Segoe UI",Roboto,Arial,sans-serif !important;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    letter-spacing: -0.01em;
-    font-feature-settings: "kern","liga","calt";
+    letter-spacing: -0.011em;
+    font-feature-settings: "kern","liga","calt","tnum";
     text-rendering: optimizeLegibility;
 }
 
@@ -104,8 +108,14 @@ h1, h2, h3, h4, h5, h6,
 .veh-title, .veh-sub,
 .ins-card-title,
 .page-name, .ann-title,
+.card-title-left, .stat-value,
 header h1, header h2 {
     letter-spacing: -0.022em;
+}
+
+/* Numbers align in tables & stats */
+td, .stat-value, .amount, .vendor-amt {
+    font-variant-numeric: tabular-nums;
 }
 
 /* Mono */
@@ -115,26 +125,36 @@ header h1, header h2 {
     font-feature-settings: "ss01","ss02","calt";
 }
 
-/* ── Selection ───────────────────────────────────────────── */
-::selection      { background: rgba(0,113,227,0.22); color: inherit; }
-::-moz-selection { background: rgba(0,113,227,0.22); color: inherit; }
+/* ── Selection & focus ──────────────────────────────────── */
+::selection      { background: rgba(0,113,227,0.20); color: inherit; }
+::-moz-selection { background: rgba(0,113,227,0.20); color: inherit; }
 
-/* ── Header (per-page top app-bar) → Apple frosted white ── */
+/* Visible, consistent keyboard-focus ring everywhere */
+:focus { outline: none; }
+:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 4px rgba(0,113,227,0.28) !important;
+    border-radius: 8px;
+}
+
+/* ── Header (per-page top app-bar) → frosted white ──────── */
 body > header,
 #app > header,
 header.app-header,
 header[id]:not(.site-switcher) {
-    background: rgba(255,255,255,0.85) !important;
+    background: rgba(255,255,255,0.78) !important;
     color: #1d1d1f !important;
-    border-bottom: 1px solid rgba(0,0,0,0.08) !important;
-    -webkit-backdrop-filter: saturate(180%) blur(20px);
-    backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: 1px solid rgba(0,0,0,0.07) !important;
+    box-shadow: none !important;
+    -webkit-backdrop-filter: saturate(180%) blur(24px);
+    backdrop-filter: saturate(180%) blur(24px);
 }
 body > header *,
 #app > header *,
 header.app-header * {
     /* Pull text colors back to dark on the now-light header.
-       Don't recolor links or accent-bearing pills — they keep their existing rule via inheritance/specificity. */
+       Don't recolor links or accent-bearing pills — they keep
+       their existing rule via inheritance/specificity. */
     color: #1d1d1f;
 }
 body > header a,
@@ -142,23 +162,62 @@ body > header a,
     color: #0071e3;
 }
 
-/* Generic <header> not inside special containers (most pages have <header> directly) */
-body > header {
-    background: rgba(255,255,255,0.85) !important;
+/* Page tabs inside the header → quiet pills */
+header nav button {
+    border-radius: 980px !important;
+    font-weight: 500;
+}
+header nav button:hover {
+    background: rgba(0,0,0,0.05) !important;
+    color: #1d1d1f !important;
+}
+header nav button.active {
+    background: #0071e3 !important;
+    color: #ffffff !important;
+    font-weight: 600;
 }
 
-/* ── Site-switcher (the colored top bar with HQ/Armory/etc.) ── */
+/* Sign-out & user badge → subtle neutral chips */
+.btn-signout {
+    border: 1px solid rgba(0,0,0,0.12) !important;
+    color: #6e6e73 !important;
+    border-radius: 980px !important;
+}
+.btn-signout:hover { color: #e02d2d !important; border-color: rgba(224,45,45,0.45) !important; }
+.user-badge {
+    background: rgba(0,0,0,0.045) !important;
+    color: #6e6e73 !important;
+    border-radius: 980px !important;
+}
+
+/* ── Site-switcher (cross-app bar) → dark glass, pill links ── */
 .site-switcher {
     position: sticky;
     top: 0;
     z-index: 100;
-    background: rgba(11, 15, 26, 0.78) !important;
-    -webkit-backdrop-filter: saturate(180%) blur(22px);
-    backdrop-filter: saturate(180%) blur(22px);
+    background: rgba(15,17,23,0.82) !important;
+    -webkit-backdrop-filter: saturate(180%) blur(24px);
+    backdrop-filter: saturate(180%) blur(24px);
     border-bottom: 1px solid rgba(255,255,255,0.06);
+    padding-top: 6px !important;
+    padding-bottom: 6px !important;
+}
+.site-switcher .site-link {
+    border-radius: 980px !important;
+    color: rgba(255,255,255,0.62) !important;
+    font-weight: 500;
+}
+.site-switcher .site-link:hover {
+    background: rgba(255,255,255,0.10) !important;
+    color: #ffffff !important;
+}
+.site-switcher .site-link.active {
+    background: rgba(255,255,255,0.16) !important;
+    color: #ffffff !important;
+    font-weight: 600;
 }
 
-/* ── Cards / surfaces ────────────────────────────────────── */
+/* ── Cards / surfaces — hairline border + feather shadow ── */
 .card,
 .modal,
 .login-box,
@@ -170,35 +229,39 @@ body > header {
 .section-card,
 .form-card {
     background: #ffffff !important;
-    border-radius: 18px !important;
-    border: none !important;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06) !important;
-    transition: box-shadow 0.3s ease, transform 0.3s ease;
+    border-radius: 16px !important;
+    border: 1px solid rgba(0,0,0,0.06) !important;
+    box-shadow: 0 1px 2px rgba(16,20,28,0.04), 0 8px 24px rgba(16,20,28,0.05) !important;
+    transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
 }
 .card:hover,
 .veh-card:hover,
 .ins-card:hover,
 .page-row:hover {
-    box-shadow: 0 4px 16px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05) !important;
-    transform: translateY(-1px);
+    border-color: rgba(0,0,0,0.10) !important;
+    box-shadow: 0 2px 4px rgba(16,20,28,0.05), 0 14px 36px rgba(16,20,28,0.08) !important;
 }
+
+/* Stat tiles: quieter labels, strong numerals */
+.stat-card { text-align: center; }
+.stat-label { font-weight: 600 !important; color: #98989d !important; }
 
 /* ── Buttons ─────────────────────────────────────────────── */
 button, .btn, .signout-btn, .login-btn {
     transition:
-        background-color 0.18s ease,
-        color 0.18s ease,
-        border-color 0.18s ease,
-        box-shadow 0.18s ease,
-        transform 0.12s ease,
-        opacity 0.18s ease !important;
+        background-color 0.16s ease,
+        color 0.16s ease,
+        border-color 0.16s ease,
+        box-shadow 0.16s ease,
+        transform 0.1s ease,
+        opacity 0.16s ease !important;
     font-family: inherit !important;
 }
 button:active, .btn:active, .login-btn:active, .signout-btn:active {
-    transform: scale(0.985);
+    transform: scale(0.98);
 }
 
-/* Primary buttons → solid Apple blue, pill-shaped */
+/* Primary buttons → solid accent, pill-shaped */
 .btn-primary,
 button.btn-primary,
 .login-btn,
@@ -208,33 +271,36 @@ button.btn-primary,
     border: none !important;
     border-radius: 980px !important;
     box-shadow: none !important;
+    font-weight: 600 !important;
 }
 .btn-primary:hover,
 .login-btn:hover,
 .btn-ai:hover {
     background: #0077ed !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(0,113,227,0.30) !important;
 }
 
-/* Ghost buttons → subtle Apple style */
+/* Ghost buttons → hairline neutral */
 .btn-ghost {
     background: transparent !important;
     color: #1d1d1f !important;
-    border: 1px solid rgba(0,0,0,0.10) !important;
+    border: 1px solid rgba(0,0,0,0.12) !important;
     border-radius: 980px !important;
 }
 .btn-ghost:hover {
-    background: #f5f5f7 !important;
-    border-color: rgba(0,0,0,0.14) !important;
+    background: rgba(0,0,0,0.045) !important;
+    border-color: rgba(0,0,0,0.18) !important;
 }
 
 /* Danger buttons */
 .btn-danger {
-    background: #ff3b30 !important;
+    background: #e02d2d !important;
     color: #ffffff !important;
     border: none !important;
     border-radius: 980px !important;
 }
-.btn-danger:hover { background: #ff5147 !important; }
+.btn-danger:hover { background: #f04438 !important; }
 
 /* Info buttons */
 .btn-info {
@@ -251,52 +317,61 @@ button.btn-primary,
 input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
 textarea,
 select {
-    background: #f5f5f7 !important;
-    border: 1px solid transparent !important;
-    border-radius: 12px !important;
+    background: #ffffff !important;
+    border: 1px solid rgba(0,0,0,0.12) !important;
+    border-radius: 10px !important;
     color: #1d1d1f !important;
     font-family: inherit !important;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
+input::placeholder, textarea::placeholder { color: #98989d !important; }
 input:focus, textarea:focus, select:focus {
     outline: none !important;
     background: #ffffff !important;
     border-color: #0071e3 !important;
-    box-shadow: 0 0 0 4px rgba(0,113,227,0.12) !important;
+    box-shadow: 0 0 0 4px rgba(0,113,227,0.14) !important;
 }
+input[type="checkbox"], input[type="radio"] { accent-color: #0071e3; }
 
 /* ── Modals ──────────────────────────────────────────────── */
 .modal-overlay {
-    background: rgba(0,0,0,0.45) !important;
-    -webkit-backdrop-filter: blur(8px);
-    backdrop-filter: blur(8px);
+    background: rgba(12,14,18,0.40) !important;
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+}
+.modal {
+    border-radius: 20px !important;
+    box-shadow: 0 2px 6px rgba(16,20,28,0.06), 0 32px 72px rgba(16,20,28,0.22) !important;
 }
 
-/* ── Toast: pill chip ───────────────────────────────────── */
+/* ── Toast: dark glass pill ─────────────────────────────── */
 .toast {
     border-radius: 980px !important;
-    background: rgba(29,29,31,0.92) !important;
+    background: rgba(24,26,32,0.90) !important;
     color: #f5f5f7 !important;
+    box-shadow: 0 8px 28px rgba(16,20,28,0.28) !important;
     -webkit-backdrop-filter: saturate(180%) blur(20px);
     backdrop-filter: saturate(180%) blur(20px);
 }
 
-/* ── Tables (used in many pages' inventory views) ────────── */
+/* ── Tables ──────────────────────────────────────────────── */
 table {
     background: #ffffff;
-    border-radius: 16px;
+    border-radius: 12px;
     overflow: hidden;
 }
 thead th {
-    background: #f5f5f7 !important;
-    color: #6e6e73 !important;
-    font-weight: 500 !important;
+    background: #fafafc !important;
+    color: #98989d !important;
+    font-weight: 600 !important;
     font-size: 0.72rem !important;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.07em;
     border: none !important;
+    border-bottom: 1px solid rgba(0,0,0,0.07) !important;
 }
-tbody tr { border-top: 1px solid rgba(0,0,0,0.06); }
-tbody tr:hover { background: #fafafd !important; }
+tbody tr { border-top: 1px solid rgba(0,0,0,0.05); transition: background 0.12s ease; }
+tbody tr:hover { background: #f5f7fb !important; }
 tbody td {
     border: none !important;
     color: #1d1d1f !important;
@@ -304,25 +379,26 @@ tbody td {
 
 /* ── Badges / chips ──────────────────────────────────────── */
 .badge, .chip {
-    font-weight: 500 !important;
-    letter-spacing: -0.01em;
+    font-weight: 600 !important;
+    letter-spacing: 0.02em;
+    border-radius: 6px !important;
 }
 
 /* ── Links ──────────────────────────────────────────────── */
 a { color: #0071e3; transition: color 0.15s ease, opacity 0.15s ease; }
 a:hover { color: #0077ed; }
 
-/* ── Spinner: refined Apple style ──────────────────────── */
+/* ── Spinner ────────────────────────────────────────────── */
 .spinner {
-    border-color: rgba(0,113,227,0.15) !important;
+    border-color: rgba(0,113,227,0.14) !important;
     border-top-color: #0071e3 !important;
 }
 
-/* ── Scrollbars ─────────────────────────────────────────── */
-::-webkit-scrollbar         { width: 12px; height: 12px; }
+/* ── Scrollbars — slim & quiet ──────────────────────────── */
+::-webkit-scrollbar         { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track   { background: transparent; }
 ::-webkit-scrollbar-thumb {
-    background: rgba(0,0,0,0.15);
+    background: rgba(0,0,0,0.16);
     border-radius: 980px;
     border: 3px solid transparent;
     background-clip: padding-box;
@@ -333,34 +409,31 @@ a:hover { color: #0077ed; }
     border: 3px solid transparent;
     background-clip: padding-box;
 }
+* { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.22) transparent; }
 
 /* ── Specific dark-page rescue: force them light ────────── */
-/* Pages that originally had #08080e or #0f0f1a or #0f172a backgrounds
-   declared on body directly (without using --bg-primary) get
-   overridden by the html/body !important rule above. Their
-   dark-on-dark text needs to be repaired so it reads on white. */
-body, body * {
-    /* Don't blanket-recolor — that would erase intentional accents.
-       Specific element-level fixes below if needed. */
-}
+/* Pages that originally had #08080e / #0f0f1a / #0f172a
+   backgrounds declared on body directly get overridden by the
+   html/body !important rule above. */
 
 /* Photo / image containers stay neutral */
 img { background: transparent; }
 
-/* ── Login screens — force Apple light theme ─────────────── */
+/* ── Login screens — clean light gate ───────────────────── */
 #login-screen,
 .login-screen,
 [id$="-login-screen"] {
-    background: #fbfbfd !important;
-    background-image: none !important;
+    background: #f5f5f7 !important;
+    background-image:
+        radial-gradient(1200px 500px at 50% -10%, rgba(0,113,227,0.06), transparent) !important;
     color: #1d1d1f !important;
 }
 .login-box {
     background: #ffffff !important;
     color: #1d1d1f !important;
-    border: none !important;
-    box-shadow: 0 16px 32px rgba(0,0,0,0.08), 0 4px 8px rgba(0,0,0,0.05) !important;
-    border-radius: 22px !important;
+    border: 1px solid rgba(0,0,0,0.06) !important;
+    box-shadow: 0 2px 6px rgba(16,20,28,0.05), 0 24px 64px rgba(16,20,28,0.12) !important;
+    border-radius: 20px !important;
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
 }
@@ -371,31 +444,49 @@ img { background: transparent; }
     color: #6e6e73 !important;
 }
 .login-input {
-    background: #f5f5f7 !important;
-    border: 1px solid transparent !important;
+    background: #ffffff !important;
+    border: 1px solid rgba(0,0,0,0.12) !important;
     color: #1d1d1f !important;
-    border-radius: 12px !important;
+    border-radius: 10px !important;
 }
-.login-input::placeholder { color: #86868b !important; }
+.login-input::placeholder { color: #98989d !important; }
 .login-input:focus {
     background: #ffffff !important;
     border-color: #0071e3 !important;
-    box-shadow: 0 0 0 4px rgba(0,113,227,0.12) !important;
+    box-shadow: 0 0 0 4px rgba(0,113,227,0.14) !important;
     outline: none !important;
 }
-.login-error { color: #ff3b30 !important; }
+.login-error { color: #e02d2d !important; }
 .login-reset { color: #0071e3 !important; }
 .login-links a, .login-site-links a {
     color: rgba(29,29,31,0.55) !important;
     border-color: rgba(0,0,0,0.10) !important;
+    border-radius: 980px !important;
+    background: rgba(255,255,255,0.65) !important;
 }
 .login-links a:hover, .login-site-links a:hover {
     color: #0071e3 !important;
+    border-color: rgba(0,113,227,0.55) !important;
+    background: #ffffff !important;
+}
+.login-links a.active, .login-site-links a.active {
+    color: #0071e3 !important;
     border-color: #0071e3 !important;
+    background: #ffffff !important;
 }
 
 /* ── Loading screens — light too ─────────────────────────── */
 #loading-screen, .loading-screen {
-    background: #fbfbfd !important;
+    background: #f5f5f7 !important;
     color: #6e6e73 !important;
+}
+
+/* ── Motion: honor users who prefer less of it ──────────── */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
 }

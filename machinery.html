@@ -387,6 +387,7 @@
         .view-menu input[type=checkbox] { margin:0; cursor:pointer; }
     </style>
     <link rel="stylesheet" href="apple-skin.css">
+    <script src="site-nav.js" defer></script>
 </head>
 <body>
 
@@ -1311,7 +1312,7 @@ function renderDashboard() {
                 <div class="cbi-count">${c}</div>
                 <div class="cbi-bar"><div class="cbi-bar-fill" style="width:${(c/maxC*100).toFixed(1)}%"></div></div>
             </div>`).join('')
-        : '<p style="color:var(--text-secondary);padding:16px 0;">No equipment yet.</p>';
+        : '<p style="color:var(--text-secondary);padding:16px 0;">No equipment yet — <a href="#" onclick="showView(\'add-item\');return false;">+ Add Equipment</a> to get started.</p>';
     // Attach click handlers directly to each category bar
     document.querySelectorAll('.cat-breakdown-item').forEach((el, i) => {
         el.addEventListener('click', () => toggleCatDetail(sortedCats[i][0]));
@@ -1337,7 +1338,7 @@ function renderDashboard() {
                 <td>${it.hours ? Number(it.hours).toLocaleString()+' hrs' : '—'}</td>
                 <td style="color:var(--text-secondary)">${it.addedAt?new Date(it.addedAt).toLocaleDateString():'—'}</td>
             </tr>`;}).join('')
-        : '<tr><td colspan="8" style="text-align:center;color:var(--text-secondary);padding:30px;">No equipment yet.</td></tr>';
+        : '<tr><td colspan="8" style="text-align:center;color:var(--text-secondary);padding:30px;">Nothing here yet.<br><button class="btn btn-primary btn-sm" style="margin-top:10px;" onclick="showView(\'add-item\')">+ Add Equipment</button></td></tr>';
 }
 
 let activeCatDetail = null;

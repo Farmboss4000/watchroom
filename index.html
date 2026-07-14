@@ -1143,6 +1143,7 @@
         .site-link[href="dontpush.html"].active { animation: dp-pulse 3.5s ease-in-out infinite; }
     </style>
     <link rel="stylesheet" href="apple-skin.css">
+    <script src="site-nav.js" defer></script>
 </head>
 <body>
 
@@ -1255,6 +1256,38 @@
         <!-- DASHBOARD QUOTE -->
         <div class="dashboard-quote">
             "Only you can prevent communism — Jeff Stoebner — 1971"
+        </div>
+
+        <!-- GLOBAL SEARCH + NEEDS ATTENTION (command center) -->
+        <style>
+            .hq-search-wrap { position:relative; margin:18px 0 6px; }
+            #hq-search { width:100%; padding:13px 18px; font-size:1rem; border-radius:14px; }
+            .hq-search-results { position:absolute; top:calc(100% + 6px); left:0; right:0; z-index:500;
+                background:#fff; border:1px solid rgba(0,0,0,0.08); border-radius:14px;
+                box-shadow:0 20px 48px rgba(16,20,28,0.18); max-height:420px; overflow-y:auto; padding:6px; }
+            .hq-sr-item { display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:9px;
+                text-decoration:none; color:var(--text-primary); font-size:0.9rem; }
+            .hq-sr-item:hover { background:var(--accent-dim); }
+            .hq-sr-sub { color:var(--text-secondary); font-size:0.78rem; margin-left:auto; white-space:nowrap; }
+            .hq-sr-none { padding:14px; color:var(--text-secondary); font-size:0.88rem; text-align:center; }
+            .attention-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:14px; margin-bottom:6px; }
+            .attention-tile { display:block; text-decoration:none; background:#fff; border-radius:16px; padding:16px 18px; }
+            .attention-num { font-size:1.7rem; font-weight:800; line-height:1.1; }
+            .attention-label { font-size:0.78rem; font-weight:600; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.05em; margin-top:4px; }
+            .attention-sub { font-size:0.78rem; color:var(--text-secondary); margin-top:4px; }
+            .att-danger .attention-num { color:var(--danger); }
+            .att-warn   .attention-num { color:var(--warn); }
+            .att-ok     .attention-num { color:var(--success); }
+            .att-info   .attention-num { color:var(--accent); }
+        </style>
+        <div class="hq-search-wrap">
+            <input type="text" id="hq-search" placeholder="🔍 Search everything — bills, machinery, firearms, vehicles, livestock, properties…" autocomplete="off">
+            <div id="hq-search-results" class="hq-search-results" style="display:none;"></div>
+        </div>
+
+        <div class="section-title">Needs Attention</div>
+        <div class="attention-grid" id="attention-grid">
+            <div class="attention-tile"><div class="attention-sub">Loading…</div></div>
         </div>
 
         <!-- SUITE OVERVIEW STATS -->
@@ -1727,6 +1760,8 @@
         // hero renders before ~20 realtime subscriptions + a weather fetch kick off.
         const startDeferred = () => {
             initLiveCounts();
+            initCommandCenter();
+            initGlobalSearch();
             initRecentActivity();
             initWeather();
             initQuotes();
@@ -1738,6 +1773,156 @@
         } else {
             requestAnimationFrame(() => setTimeout(startDeferred, 0));
         }
+    }
+
+    // ── COMMAND CENTER: what needs attention across all sites ──
+    function esc(s) { return s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;') : ''; }
+    function hqMoney(n) {
+        return '$' + (Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    async function initCommandCenter() {
+        const grid = document.getElementById('attention-grid');
+        if (!grid) return;
+        try {
+            const [billsSnap, machSnap] = await Promise.all([
+                db.collection('bills').get(),
+                db.collection('machinery_items').get()
+            ]);
+            const bills = billsSnap.docs.map(d => d.data()).filter(b => !b.deleted);
+            const today = new Date().toISOString().slice(0, 10);
+            const soonCut = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
+
+            const unpaid = bills.filter(b => !b.paid);
+            const unpaidTotal = unpaid.reduce((s, b) => s + (Number(b.amount) || 0), 0);
+            const overdue = unpaid.filter(b => b.dueDate && b.dueDate < today);
+            const dueSoon = unpaid.filter(b => b.dueDate && b.dueDate >= today && b.dueDate <= soonCut);
+            const unfiled = bills.filter(b => !b.filed).length;
+
+            // Duplicate groups — same matching rules as the Bills app.
+            const map = {};
+            for (const b of bills) {
+                const vendor = (b.vendor || '').toLowerCase().replace(/\s+/g, ' ').trim();
+                const inv    = (b.invoice || '').toLowerCase().replace(/\s+/g, '').trim();
+                let k;
+                if (!vendor && !inv) continue;
+                else if (inv) k = 'inv|' + vendor + '|' + inv;
+                else k = 'vad|' + vendor + '|' + (Number(b.amount) || 0).toFixed(2) + '|' + (b.billDate || '');
+                (map[k] = map[k] || []).push(b);
+            }
+            const dupGroups = Object.values(map).filter(g => g.length > 1).length;
+
+            // Most recent maintenance entry across the fleet.
+            let lastMaint = null;
+            machSnap.docs.forEach(doc => {
+                const it = doc.data();
+                (it.maintenance || []).forEach(m => {
+                    const when = m.date || (m.addedAt || '').slice(0, 10);
+                    if (!lastMaint || when > lastMaint.when) {
+                        lastMaint = { when, type: m.type || 'Maintenance', label: [it.make, it.model].filter(Boolean).join(' ') };
+                    }
+                });
+            });
+
+            const dueClass = overdue.length ? 'att-danger' : (dueSoon.length ? 'att-warn' : 'att-ok');
+            const dueNum   = overdue.length + dueSoon.length;
+            const dueSub   = overdue.length
+                ? `${overdue.length} overdue${dueSoon.length ? `, ${dueSoon.length} due ≤ 3 days` : ''}`
+                : (dueSoon.length ? 'due in the next 3 days' : 'nothing due in 3 days');
+
+            grid.innerHTML = `
+                <a class="attention-tile ${unpaid.length ? 'att-danger' : 'att-ok'}" href="bills.html">
+                    <div class="attention-num">${hqMoney(unpaidTotal)}</div>
+                    <div class="attention-label">🧾 Unpaid Bills</div>
+                    <div class="attention-sub">${unpaid.length} bill${unpaid.length === 1 ? '' : 's'} outstanding</div>
+                </a>
+                <a class="attention-tile ${dueClass}" href="bills.html">
+                    <div class="attention-num">${dueNum}</div>
+                    <div class="attention-label">⏰ Due / Overdue</div>
+                    <div class="attention-sub">${dueSub}</div>
+                </a>
+                <a class="attention-tile ${dupGroups ? 'att-warn' : 'att-ok'}" href="bills.html">
+                    <div class="attention-num">${dupGroups}</div>
+                    <div class="attention-label">🔁 Duplicate Groups</div>
+                    <div class="attention-sub">${dupGroups ? 'review in Bills → Duplicates' : 'no duplicates found'}</div>
+                </a>
+                <a class="attention-tile att-info" href="bills.html">
+                    <div class="attention-num">${unfiled}</div>
+                    <div class="attention-label">🗂 Unfiled Bills</div>
+                    <div class="attention-sub">${unfiled ? 'waiting to be filed' : 'all filed'}</div>
+                </a>
+                <a class="attention-tile att-info" href="machinery.html">
+                    <div class="attention-num" style="font-size:1.05rem;padding-top:8px;">${lastMaint ? esc(lastMaint.type) : '—'}</div>
+                    <div class="attention-label">🔧 Last Maintenance</div>
+                    <div class="attention-sub">${lastMaint ? esc(lastMaint.label) + (lastMaint.when ? ' · ' + lastMaint.when : '') : 'no records yet'}</div>
+                </a>`;
+        } catch (err) {
+            grid.innerHTML = `<div class="attention-tile"><div class="attention-sub">Could not load: ${esc(err.message)}</div></div>`;
+        }
+    }
+
+    // ── GLOBAL SEARCH across all sections ──
+    let hqIndex = null;
+    async function buildHqIndex() {
+        const SRC = [
+            { col: 'bills',            url: 'bills.html',      icon: '🧾' },
+            { col: 'items',            url: 'armory.html',     icon: '🔫' },
+            { col: 'machinery_items',  url: 'machinery.html',  icon: '🚜' },
+            { col: 'automotive_items', url: 'automotive.html', icon: '🚗' },
+            { col: 'livestock_items',  url: 'livestock.html',  icon: '🐄' },
+            { col: 'realestate_items', url: 'realestate.html', icon: '🏡' },
+        ];
+        const snaps = await Promise.all(SRC.map(x => db.collection(x.col).get().catch(() => null)));
+        const idx = [];
+        snaps.forEach((snap, i) => {
+            if (!snap) return;
+            const src = SRC[i];
+            snap.docs.forEach(doc => {
+                const d = doc.data();
+                if (d.deleted) return;
+                const title = [d.make || d.manufacturer, d.model].filter(Boolean).join(' ')
+                    || d.vendor || d.name || d.title || d.label || d.address || ('#' + (d.id || doc.id));
+                const subBits = [d.serialNumber, d.vin, d.caliber, d.category,
+                    d.amount != null && d.amount !== '' ? hqMoney(d.amount) : null,
+                    d.billDate || d.year].filter(Boolean);
+                let hay = '';
+                for (const v of Object.values(d)) {
+                    if (typeof v === 'string' || typeof v === 'number') hay += ' ' + v;
+                }
+                idx.push({ icon: src.icon, url: src.url, title: String(title), sub: subBits.slice(0, 3).join(' · '), hay: hay.toLowerCase() });
+            });
+        });
+        return idx;
+    }
+
+    function initGlobalSearch() {
+        const input = document.getElementById('hq-search');
+        const box = document.getElementById('hq-search-results');
+        if (!input || !box) return;
+        let t = null;
+        input.addEventListener('input', () => {
+            clearTimeout(t);
+            t = setTimeout(async () => {
+                const q = input.value.trim().toLowerCase();
+                if (!q) { box.style.display = 'none'; return; }
+                if (!hqIndex) {
+                    box.style.display = 'block';
+                    box.innerHTML = '<div class="hq-sr-none">Indexing…</div>';
+                    try { hqIndex = await buildHqIndex(); }
+                    catch (err) { box.innerHTML = `<div class="hq-sr-none">Search unavailable: ${esc(err.message)}</div>`; return; }
+                }
+                const tokens = q.split(/\s+/).filter(Boolean);
+                const hits = hqIndex.filter(r => tokens.every(tk => r.hay.includes(tk))).slice(0, 20);
+                box.style.display = 'block';
+                box.innerHTML = hits.length
+                    ? hits.map(r => `<a class="hq-sr-item" href="${r.url}">${r.icon} <span>${esc(r.title)}</span><span class="hq-sr-sub">${esc(r.sub)}</span></a>`).join('')
+                    : '<div class="hq-sr-none">No matches.</div>';
+            }, 160);
+        });
+        input.addEventListener('keydown', e => { if (e.key === 'Escape') { box.style.display = 'none'; input.blur(); } });
+        document.addEventListener('click', e => {
+            if (!box.contains(e.target) && e.target !== input) box.style.display = 'none';
+        });
     }
 
     // ── SARCASTIC QUOTE OF THE DAY ──

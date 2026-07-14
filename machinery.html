@@ -1028,6 +1028,14 @@ service firebase.storage {
           <input type="number" id="maint-hours" placeholder="e.g. 4250" min="0">
         </div>
       </div>
+      <input type="file" id="maint-doc-input" accept="image/*,application/pdf" style="display:none" onchange="scanMaintenanceDoc(this)">
+      <input type="file" id="maint-attach-input" accept="image/*,application/pdf" style="display:none" onchange="attachMaintenanceDoc(this)">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+        <button type="button" class="btn-ai" id="btn-maint-scan" style="margin:0;flex:1;min-width:190px;" onclick="document.getElementById('maint-doc-input').click()">📷 Scan Record with AI <span style="font-weight:400;opacity:0.85;">— photo or PDF</span></button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('maint-attach-input').click()" title="Attach a document without AI scanning">📎 Attach Only</button>
+      </div>
+      <div id="maint-doc-chip" style="display:none;font-size:0.8rem;background:var(--accent-dim);color:var(--accent);padding:6px 10px;border-radius:6px;margin-bottom:10px;align-items:center;gap:8px;"></div>
+      <div id="maint-scan-status" style="font-size:0.82rem;min-height:1em;margin-bottom:10px;"></div>
       <button class="btn btn-primary" onclick="addMaintenanceEntry()">Save Entry</button>
     </div>
     <div style="font-size:0.85rem;font-weight:600;color:var(--text-primary);margin-bottom:10px;">📋 Maintenance History</div>
@@ -2345,6 +2353,125 @@ function doToastUndo() {
 //  MAINTENANCE
 // ═══════════════════════════════════════
 let activeMaintDocId = null;
+let pendingMaintDoc = null;  // { file, fileName, mimeType } — uploaded when the entry is saved
+
+function readMaintFileB64(file) {
+    return new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload  = e => resolve(e.target.result.split(',')[1]);
+        fr.onerror = reject;
+        fr.readAsDataURL(file);
+    });
+}
+
+async function uploadMaintDoc(file) {
+    const ext  = file.name && file.name.includes('.') ? file.name.split('.').pop()
+               : (file.type === 'application/pdf' ? 'pdf' : 'jpg');
+    const path = `machinery_maint_docs/${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
+    const ref  = storage.ref().child(path);
+    await ref.put(file);
+    return await ref.getDownloadURL();
+}
+
+function renderMaintDocChip() {
+    const chip = document.getElementById('maint-doc-chip');
+    if (!pendingMaintDoc) { chip.style.display = 'none'; chip.innerHTML = ''; return; }
+    chip.style.display = 'flex';
+    chip.innerHTML = `<span>📎 ${esc(pendingMaintDoc.fileName)}</span>
+        <button type="button" onclick="clearPendingMaintDoc()" style="margin-left:auto;background:none;border:none;color:inherit;cursor:pointer;font-size:1rem;line-height:1;">✕</button>`;
+}
+
+function clearPendingMaintDoc() {
+    pendingMaintDoc = null;
+    const di = document.getElementById('maint-doc-input');    if (di) di.value = '';
+    const ai = document.getElementById('maint-attach-input'); if (ai) ai.value = '';
+    renderMaintDocChip();
+}
+
+// Attach a document to the pending entry without AI scanning.
+function attachMaintenanceDoc(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    pendingMaintDoc = { file, fileName: file.name || 'document', mimeType: file.type || '' };
+    renderMaintDocChip();
+    const status = document.getElementById('maint-scan-status');
+    status.textContent = '📎 Attached — it will be saved with this entry.';
+    status.style.color = 'var(--text-secondary)';
+}
+
+// Scan a maintenance document with Claude and fill the entry form.
+async function scanMaintenanceDoc(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    pendingMaintDoc = { file, fileName: file.name || 'document', mimeType: file.type || '' };
+    renderMaintDocChip();
+    const btn = document.getElementById('btn-maint-scan');
+    const status = document.getElementById('maint-scan-status');
+    const orig = btn.innerHTML;
+    btn.disabled = true; btn.textContent = '⏳ Reading...';
+    status.textContent = 'Reading the record with AI...'; status.style.color = 'var(--text-secondary)';
+    try {
+        const isPdf = file.type === 'application/pdf' || (file.name || '').toLowerCase().endsWith('.pdf');
+        const base64 = await readMaintFileB64(file);
+        const mimeType = isPdf ? 'application/pdf' : (file.type || 'image/jpeg');
+        const typeList = [...document.getElementById('maint-type').options].map(o => o.value).filter(Boolean).join(', ');
+        const prompt = `This is a maintenance / service record, invoice, or receipt for a piece of farm or heavy equipment. Return ONLY valid JSON (no markdown, no code fences) with these fields:
+{"date":"service date as YYYY-MM-DD","type":"one of: ${typeList} — pick the closest","description":"1-2 sentence summary of the work performed","cost":"total charged as a plain number, no $ or commas","hours":"engine / hour-meter reading at service as an integer"}
+Omit any field you cannot determine with reasonable confidence. Return only the JSON object.`;
+        const raw = await callClaude(base64, mimeType, prompt);
+        if (!raw) return;
+        const m = raw.match(/\{[\s\S]*\}/);
+        if (!m) throw new Error('Could not parse AI response');
+        const d = JSON.parse(m[0]);
+        const filled = [];
+        if (d.date) { document.getElementById('maint-date').value = d.date; filled.push('Date'); }
+        if (d.type) {
+            const sel = document.getElementById('maint-type');
+            const opt = [...sel.options].find(o => o.value && o.value.toLowerCase() === String(d.type).trim().toLowerCase());
+            sel.value = opt ? opt.value : 'Other';
+            filled.push('Type');
+        }
+        if (d.description) { document.getElementById('maint-desc').value = d.description; filled.push('Description'); }
+        if (d.cost != null && String(d.cost).trim() !== '') {
+            const c = String(d.cost).replace(/[^0-9.]/g, ''); if (c) { document.getElementById('maint-cost').value = c; filled.push('Cost'); }
+        }
+        if (d.hours != null && String(d.hours).trim() !== '') {
+            const h = String(d.hours).replace(/[^0-9]/g, ''); if (h) { document.getElementById('maint-hours').value = h; filled.push('Hours'); }
+        }
+        status.textContent = filled.length
+            ? `✅ AI filled in: ${filled.join(', ')}. Review, then Save Entry.`
+            : '⚠️ Could not read details — enter them manually.';
+        status.style.color = filled.length ? 'var(--success)' : 'var(--text-secondary)';
+    } catch (err) {
+        status.textContent = '❌ ' + err.message; status.style.color = 'var(--danger)';
+    } finally {
+        btn.disabled = false; btn.innerHTML = orig;
+    }
+}
+
+// Attach or replace the document on an already-saved entry (by its original index).
+async function attachDocToEntry(idx) {
+    if (!activeMaintDocId) return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*,application/pdf';
+    input.onchange = async () => {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        const it = items.find(i => i._docId === activeMaintDocId); if (!it) return;
+        try {
+            toast('Uploading document...');
+            const url = await uploadMaintDoc(file);
+            const maintenance = (it.maintenance || []).map((rec, i) => i === idx
+                ? { ...rec, receipt: { url, fileName: file.name || 'document', mimeType: file.type || '' } }
+                : rec);
+            await db.collection('machinery_items').doc(activeMaintDocId).update({ maintenance });
+            toast('Document attached!', 'success');
+            renderMaintenanceHistory({ ...it, maintenance });
+        } catch (err) { toast('Upload failed: ' + err.message, 'error'); }
+    };
+    input.click();
+}
 
 function openMaintenance(docId) {
     const it = items.find(i => i._docId === docId); if (!it) return;
@@ -2357,6 +2484,8 @@ function openMaintenance(docId) {
     document.getElementById('maint-desc').value = '';
     document.getElementById('maint-cost').value = '';
     document.getElementById('maint-hours').value = it.hours || '';
+    document.getElementById('maint-scan-status').textContent = '';
+    clearPendingMaintDoc();
     renderMaintenanceHistory(it);
     document.getElementById('maint-modal').classList.add('show');
 }
@@ -2368,25 +2497,36 @@ function closeMaintModal() {
 
 function renderMaintenanceHistory(it) {
     const list = document.getElementById('maint-history-list');
-    const entries = (it.maintenance || []).sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
+    // Keep each record's original array index so delete/attach act on the right one.
+    const entries = (it.maintenance || []).map((r, idx) => ({ r, idx }))
+        .sort((a, b) => new Date(b.r.date || 0) - new Date(a.r.date || 0));
     if (!entries.length) {
         list.innerHTML = '<p style="color:var(--text-secondary);padding:8px 0;">No maintenance records yet.</p>';
         return;
     }
-    list.innerHTML = entries.map((e,i) => `
+    list.innerHTML = entries.map(({ r: e, idx }) => {
+        const hasDoc = !!(e.receipt && e.receipt.url);
+        return `
         <div style="border-left:3px solid var(--accent);padding:10px 14px;margin-bottom:10px;background:var(--bg-card);border-radius:0 8px 8px 0;">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                <div>
-                    <div style="font-size:0.82rem;font-weight:600;color:var(--accent);">${esc(e.type||'Maintenance')} — ${e.date?new Date(e.date+'T00:00:00').toLocaleDateString():''}</div>
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+                <div style="min-width:0;">
+                    <div style="font-size:0.82rem;font-weight:600;color:var(--accent);">${esc(e.type||'Maintenance')}${hasDoc?' 📎':''} — ${e.date?new Date(e.date+'T00:00:00').toLocaleDateString():''}</div>
                     <div style="font-size:0.88rem;color:var(--text-primary);margin-top:4px;">${esc(e.desc||'')}</div>
                     <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:3px;">
                         ${e.hours ? `<span>Hours: ${Number(e.hours).toLocaleString()}</span>  ` : ''}
                         ${e.cost ? `<span>Cost: $${Number(e.cost).toFixed(2)}</span>` : ''}
                     </div>
+                    <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">
+                        ${hasDoc
+                            ? `<a href="${esc(e.receipt.url)}" target="_blank" rel="noopener" class="btn btn-info btn-sm">👁 View Document</a>
+                               <button class="btn btn-ghost btn-sm" onclick="attachDocToEntry(${idx})">↻ Replace</button>`
+                            : `<button class="btn btn-ghost btn-sm" onclick="attachDocToEntry(${idx})">📎 Attach Document</button>`}
+                    </div>
                 </div>
-                <button class="btn btn-danger btn-sm" onclick="deleteMaintenanceEntry(${i})" style="flex-shrink:0;margin-left:8px;">✗</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteMaintenanceEntry(${idx})" style="flex-shrink:0;">✗</button>
             </div>
-        </div>`).join('');
+        </div>`;
+    }).join('');
 }
 
 async function addMaintenanceEntry() {
@@ -2401,14 +2541,20 @@ async function addMaintenanceEntry() {
         addedAt: new Date().toISOString()
     };
     if (!entry.date && !entry.desc) { toast('Enter at least a date or description.','error'); return; }
-    const maintenance = [...(it.maintenance||[]), entry];
     try {
+        if (pendingMaintDoc) {
+            const url = await uploadMaintDoc(pendingMaintDoc.file);
+            entry.receipt = { url, fileName: pendingMaintDoc.fileName, mimeType: pendingMaintDoc.mimeType };
+        }
+        const maintenance = [...(it.maintenance||[]), entry];
         await db.collection('machinery_items').doc(activeMaintDocId).update({ maintenance });
         toast('Maintenance entry saved!','success');
         document.getElementById('maint-type').value = '';
         document.getElementById('maint-desc').value = '';
         document.getElementById('maint-cost').value = '';
         document.getElementById('maint-hours').value = '';
+        document.getElementById('maint-scan-status').textContent = '';
+        clearPendingMaintDoc();
         renderMaintenanceHistory({...it, maintenance});
     } catch(err) { toast('Error saving: '+err.message,'error'); }
 }

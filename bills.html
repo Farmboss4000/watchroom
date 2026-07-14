@@ -181,6 +181,14 @@
         tbody td { padding:10px 12px; vertical-align:middle; }
         td.amount { font-weight:700; white-space:nowrap; }
         td.overdue { color:var(--danger); font-weight:700; }
+        .dup-badge { display:none; background:var(--danger); color:#fff; border-radius:999px; font-size:0.7rem; font-weight:700; padding:1px 7px; margin-left:2px; }
+        .dup-group { border:1px solid #f6caca; }
+        .dup-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:9px 0; border-top:1px solid var(--border); flex-wrap:wrap; }
+        .dup-row:first-of-type { border-top:none; }
+        .dup-row-main { display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:0.85rem; }
+        .dup-tag { font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.4px; padding:2px 7px; border-radius:5px; white-space:nowrap; }
+        .dup-tag.keep { background:#dcfce7; color:#15803d; }
+        .dup-tag.dupe { background:#fee2e2; color:#b91c1c; }
         .empty { text-align:center; padding:40px 20px; color:var(--text-secondary); }
         .empty-icon { font-size:3rem; margin-bottom:12px; }
         .chk { width:18px; height:18px; cursor:pointer; accent-color:var(--accent); }
@@ -321,6 +329,7 @@
         <button onclick="showView('bills')">All Bills</button>
         <button onclick="showView('unpaid')">Unpaid</button>
         <button onclick="showView('unfiled')">Unfiled</button>
+        <button onclick="showView('duplicates')">🔁 Duplicates <span id="dup-badge" class="dup-badge"></span></button>
         <button onclick="showView('settings')">⚙ Settings</button>
         <button onclick="showView('recycle')">🗑 Recycle Bin</button>
     </nav>
@@ -461,6 +470,16 @@
     </div>
 </div>
 
+<!-- ══ DUPLICATES ══ -->
+<div id="view-duplicates" class="view">
+    <div class="card">
+        <div class="card-title"><div class="card-title-left">🔁 Possible Duplicates</div>
+            <div class="card-hint" id="dup-summary"></div></div>
+        <p style="font-size:0.85rem;color:var(--text-secondary);margin:0;">Bills that look like copies — same vendor + amount + date, or the same invoice #. Detected automatically as bills come in. Deleting moves them to the Recycle Bin, so nothing is lost.</p>
+    </div>
+    <div id="duplicates-list"></div>
+</div>
+
 <!-- ══ SETTINGS ══ -->
 <div id="view-settings" class="view">
     <div class="card">
@@ -546,7 +565,7 @@ let aiModel   = 'claude-sonnet-4-6';
 let addFile   = { file:null, base64:null, mimeType:null };
 let bulkFiles = [];
 
-const VIEWS = ['dashboard','add','bills','unpaid','unfiled','settings','recycle'];
+const VIEWS = ['dashboard','add','bills','unpaid','unfiled','duplicates','settings','recycle'];
 
 // ═══════════════════════════════════════
 //  AUTH
@@ -688,11 +707,89 @@ function showView(v) {
 }
 
 function renderCurrentViews() {
+    computeDuplicates();   // refresh duplicate detection first so tables can mark rows
     renderDashboard();
     renderAll();
     renderUnpaid();
     renderUnfiled();
+    renderDuplicates();
     renderRecycle();
+}
+
+// ── Duplicate detection ──
+// Two bills are considered copies when they share the same invoice # (with a
+// vendor), or the same vendor + amount + bill date. Recomputed on every
+// Firestore snapshot, so detection is live as bills come in.
+let _dupGroups = [];
+let _dupIds = new Set();
+
+function dupKey(b) {
+    const vendor = (b.vendor || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    const inv    = (b.invoice || '').toLowerCase().replace(/\s+/g, '').trim();
+    if (!vendor && !inv) return 'uniq|' + b._docId;      // not enough to match on — never a dup
+    if (inv) return 'inv|' + vendor + '|' + inv;
+    const amount = (Number(b.amount) || 0).toFixed(2);
+    return 'vad|' + vendor + '|' + amount + '|' + (b.billDate || '');
+}
+
+function computeDuplicates() {
+    const map = {};
+    for (const b of active()) { const k = dupKey(b); (map[k] = map[k] || []).push(b); }
+    _dupGroups = Object.values(map).filter(g => g.length > 1).sort((a, b) => b.length - a.length);
+    _dupIds = new Set();
+    for (const g of _dupGroups) for (const b of g) _dupIds.add(b._docId);
+}
+
+function renderDuplicates() {
+    const groups = _dupGroups;
+    const badge = document.getElementById('dup-badge');
+    if (badge) {
+        if (groups.length) { badge.textContent = groups.length; badge.style.display = 'inline-block'; }
+        else badge.style.display = 'none';
+    }
+    const extra = groups.reduce((s, g) => s + (g.length - 1), 0);
+    const summary = document.getElementById('dup-summary');
+    if (summary) summary.textContent = groups.length ? `${groups.length} group${groups.length > 1 ? 's' : ''} · ${extra} extra cop${extra > 1 ? 'ies' : 'y'}` : '';
+
+    const el = document.getElementById('duplicates-list');
+    if (!el) return;
+    if (!groups.length) {
+        el.innerHTML = `<div class="card"><div class="empty"><div class="empty-icon">✅</div>No duplicates found — your bills look clean.</div></div>`;
+        return;
+    }
+    el.innerHTML = groups.map(g => {
+        const sorted = [...g].sort((a, b) => (a.addedAt || '').localeCompare(b.addedAt || ''));
+        const head = `${esc(sorted[0].vendor) || '(no vendor)'} · ${fmtMoney(sorted[0].amount)}${sorted[0].billDate ? ' · ' + fmtDate(sorted[0].billDate) : ''}`;
+        const rows = sorted.map((b, i) => `
+            <div class="dup-row">
+                <div class="dup-row-main">
+                    <span class="dup-tag ${i === 0 ? 'keep' : 'dupe'}">${i === 0 ? 'Keep' : 'Duplicate'}</span>
+                    <span>${fmtDate(b.billDate)}</span>
+                    ${b.invoice ? `<span class="vendor-sub">#${esc(b.invoice)}</span>` : ''}
+                    ${b.category ? `<span class="badge badge-cat">${esc(b.category)}</span>` : ''}
+                    ${statusBadges(b)}
+                    ${b.fileUrl ? `<a href="${esc(b.fileUrl)}" target="_blank" rel="noopener">${b.fileType === 'pdf' ? '📄 PDF' : '🖼 View'}</a>` : ''}
+                    <span class="vendor-sub">added ${fmtDate(b.addedAt)}</span>
+                </div>
+                <button class="btn btn-sm btn-danger" onclick="softDelete('${b._docId}')" title="Move to Recycle Bin">🗑 Delete</button>
+            </div>`).join('');
+        const extraIds = sorted.slice(1).map(b => b._docId).join(',');
+        const conv = extraIds ? `<div style="margin-top:10px;"><button class="btn btn-sm btn-ghost" onclick="deleteDuplicateExtras('${extraIds}')">Delete extras, keep oldest</button></div>` : '';
+        return `<div class="card dup-group">
+            <div class="card-title"><div class="card-title-left">🔁 ${head}</div><div class="card-hint">${g.length} copies</div></div>
+            ${rows}${conv}
+        </div>`;
+    }).join('');
+}
+
+async function deleteDuplicateExtras(csv) {
+    const ids = (csv || '').split(',').filter(Boolean);
+    if (!ids.length) return;
+    if (!confirm(`Move ${ids.length} duplicate bill${ids.length > 1 ? 's' : ''} to the Recycle Bin?`)) return;
+    try {
+        await Promise.all(ids.map(id => dbUpdateBill(id, { deleted: true })));
+        toast(`Moved ${ids.length} duplicate${ids.length > 1 ? 's' : ''} to Recycle Bin`, 'success');
+    } catch (err) { toast('Delete failed: ' + err.message, 'error'); }
 }
 
 // ═══════════════════════════════════════
@@ -982,7 +1079,7 @@ function billRow(b, opts={}) {
     const overdue = !b.paid && b.dueDate && b.dueDate < todayStr();
     return `<tr>
         <td>${fmtDate(b.billDate)}</td>
-        <td>${esc(b.vendor)||'—'}${b.invoice?`<div class="vendor-sub">#${esc(b.invoice)}</div>`:''}</td>
+        <td>${esc(b.vendor)||'—'}${_dupIds.has(b._docId)?` <span title="Has a duplicate — see the Duplicates tab" style="cursor:default;">🔁</span>`:''}${b.invoice?`<div class="vendor-sub">#${esc(b.invoice)}</div>`:''}</td>
         <td>${b.category?`<span class="badge badge-cat">${esc(b.category)}</span>`:'—'}</td>
         <td class="amount">${fmtMoney(b.amount)}</td>
         <td class="${overdue?'overdue':''}">${fmtDate(b.dueDate)}${overdue?' ⚠️':''}</td>

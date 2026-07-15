@@ -12,7 +12,7 @@ in the shared `bills` collection, defaulting to **Unpaid & Unfiled**.
 
 ### How it knows what's already uploaded
 
-Files are **never moved or renamed** — they stay in your Paperwork folder. The
+Files stay in your Paperwork folder untouched (until a bill is fully paid & filed — see below). The
 uploader keeps a hidden ledger, `.bills-watcher-ledger.json`, inside that folder
 recording every file it has uploaded, keyed by the file's **contents**. So:
 
@@ -20,6 +20,14 @@ recording every file it has uploaded, keyed by the file's **contents**. So:
 - Renaming a file won't cause a duplicate upload.
 - A file that fails (e.g. a network hiccup) is **not** recorded, so it's retried
   on the next run.
+
+### Automatic archiving to PROCESSED/
+
+Once a bill is checked **Paid** *and* **Filed** in the Bills app, the next
+run moves its source file from the Paperwork folder into
+**`Paperwork/PROCESSED/`** — so the folder itself shows what still needs
+action. Files are matched by content (renaming doesn't confuse it), and a
+file you've already moved or removed by hand is simply skipped.
 
 Supported file types: **PDF, PNG, JPG/JPEG, GIF, WEBP** (others like `.heic` are
 skipped — convert them to PDF/JPEG first). It looks at the **top level** of the

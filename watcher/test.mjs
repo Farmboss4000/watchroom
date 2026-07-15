@@ -1,7 +1,7 @@
 // Unit tests for the pure logic in lib.mjs. Run with: node test.mjs
 // (No dependencies required — this does not touch Firebase or the network.)
 import assert from 'node:assert/strict';
-import { normalizeBill, parseJsonObject, buildPrompt, classifyFile, CATEGORIES } from './lib.mjs';
+import { normalizeBill, parseJsonObject, buildPrompt, classifyFile, shouldArchive, CATEGORIES } from './lib.mjs';
 
 let passed = 0;
 const check = (name, fn) => { fn(); passed++; console.log('  ✓', name); };
@@ -56,6 +56,27 @@ check('classifyFile: previously-marked unsupported hash → skip (no re-log)', (
 });
 check('classifyFile: extension case-insensitive', () => {
     assert.equal(classifyFile('.PDF', 'hashC', {}).action, 'process');
+});
+
+// shouldArchive: when a source file may move to PROCESSED/.
+check('shouldArchive: paid + filed bill → true', () => {
+    assert.equal(shouldArchive({ status:'uploaded', billId: 7 }, { id:7, paid:true, filed:true }), true);
+});
+check('shouldArchive: paid only → false', () => {
+    assert.equal(shouldArchive({ status:'uploaded', billId: 7 }, { id:7, paid:true, filed:false }), false);
+});
+check('shouldArchive: filed only → false', () => {
+    assert.equal(shouldArchive({ status:'uploaded', billId: 7 }, { id:7, paid:false, filed:true }), false);
+});
+check('shouldArchive: deleted bill → false', () => {
+    assert.equal(shouldArchive({ status:'uploaded', billId: 7 }, { id:7, paid:true, filed:true, deleted:true }), false);
+});
+check('shouldArchive: already archived entry → false', () => {
+    assert.equal(shouldArchive({ status:'uploaded', billId: 7, processedAt:'x' }, { id:7, paid:true, filed:true }), false);
+});
+check('shouldArchive: missing bill or non-uploaded entry → false', () => {
+    assert.equal(shouldArchive({ status:'uploaded', billId: 7 }, undefined), false);
+    assert.equal(shouldArchive({ status:'unsupported' }, { paid:true, filed:true }), false);
 });
 
 console.log(`\n${passed} tests passed.`);

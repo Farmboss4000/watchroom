@@ -29,7 +29,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, collection, addDoc, doc, getDoc, getDocs, runTransaction } from 'firebase/firestore';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { CATEGORIES, buildPrompt, normalizeBill, parseJsonObject, classifyFile } from './lib.mjs';
+import { CATEGORIES, buildPrompt, normalizeBill, parseJsonObject, classifyFile, shouldArchive } from './lib.mjs';
 
 // Same Firebase project as the Farmboss web apps (this config is public by design).
 const firebaseConfig = {
@@ -175,13 +175,14 @@ async function main() {
     // Look at one file and, if it hasn't been uploaded yet, upload it.
     // Records the result in the ledger (keyed by content hash) so it is never
     // uploaded twice. Returns 'new' | 'skip' | 'unsupported' | 'fail'.
-    async function handleFile(fp) {
+    async function handleFile(fp, hashIndex) {
         const name = path.basename(fp);
         if (name.startsWith('.') || name === LEDGER_NAME) return 'skip';
         const ext = path.extname(name).toLowerCase();
         let buf;
         try { buf = await fs.readFile(fp); } catch (e) { warn(`cannot read ${name}: ${e.message}`); return 'fail'; }
         const hash = sha256(buf);
+        if (hashIndex) hashIndex.set(hash, fp);   // remember where this content lives now
         const c = classifyFile(ext, hash, ledger.entries);
 
         if (c.action === 'skip') return 'skip';
@@ -224,15 +225,46 @@ async function main() {
         const dirents = await fs.readdir(watchDir, { withFileTypes: true });
         const files = dirents.filter((d) => d.isFile() && !d.name.startsWith('.')).map((d) => d.name).sort();
         const tally = { new: 0, skip: 0, unsupported: 0, fail: 0 };
-        for (const f of files) tally[await handleFile(path.join(watchDir, f))]++;
+        const hashIndex = new Map();   // content hash -> current path in the folder
+        for (const f of files) tally[await handleFile(path.join(watchDir, f), hashIndex)]++;
         log(`Done — ${tally.new} uploaded, ${tally.skip} already uploaded, ${tally.unsupported} unsupported, ${tally.fail} failed.`);
+
+        // Fetch bills once — used for both the PROCESSED sweep and the reminder.
+        let billDocs = null;
+        try { billDocs = (await getDocs(collection(db, 'bills'))).docs.map(d => d.data()); }
+        catch (err) { warn('Could not read bills:', err.message); }
+
+        // Archive: bills marked BOTH Paid and Filed get their source file
+        // moved from the Paperwork folder into Paperwork/PROCESSED/.
+        if (billDocs) {
+            const byId = new Map(billDocs.map(b => [b.id, b]));
+            const processedDir = path.join(watchDir, 'PROCESSED');
+            let moved = 0;
+            for (const [hash, entry] of Object.entries(ledger.entries)) {
+                if (!shouldArchive(entry, byId.get(entry.billId))) continue;
+                const fp = hashIndex.get(hash);
+                if (!fp) continue;   // file not in the folder (renamed away or already moved by hand)
+                try {
+                    if (!existsSync(processedDir)) await fs.mkdir(processedDir, { recursive: true });
+                    let dest = path.join(processedDir, path.basename(fp));
+                    if (existsSync(dest)) dest = path.join(processedDir, `${Date.now()}_${path.basename(fp)}`);
+                    await fs.rename(fp, dest);
+                    entry.processedAt = nowIso();
+                    entry.movedTo = path.relative(watchDir, dest);
+                    moved++;
+                    log(`📦 ${path.basename(fp)} → PROCESSED/ (bill #${entry.billId} paid & filed)`);
+                } catch (err) { warn(`could not move ${path.basename(fp)}: ${err.message}`); }
+            }
+            if (moved) await saveLedger(ledgerPath, ledger);
+            log(moved ? `Archived ${moved} paid & filed bill${moved > 1 ? 's' : ''} to PROCESSED/.` : 'No newly paid & filed bills to archive.');
+        }
 
         // Nightly reminder: unpaid bills that are overdue or due within 3 days.
         try {
-            const snap = await getDocs(collection(db, 'bills'));
+            if (!billDocs) throw new Error('bills unavailable');
             const today = new Date().toISOString().slice(0, 10);
             const soonCut = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
-            const unpaid = snap.docs.map(d => d.data()).filter(b => !b.deleted && !b.paid && b.dueDate);
+            const unpaid = billDocs.filter(b => !b.deleted && !b.paid && b.dueDate);
             const overdue = unpaid.filter(b => b.dueDate < today);
             const dueSoon = unpaid.filter(b => b.dueDate >= today && b.dueDate <= soonCut);
             const fmt = (b) => `${b.vendor || '(no vendor)'} $${(Number(b.amount) || 0).toFixed(2)} due ${b.dueDate}`;

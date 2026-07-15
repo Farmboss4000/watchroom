@@ -2424,7 +2424,22 @@ async function callClaude(base64OrMedia, mimeType, prompt, { retries = 2, maxTok
                     body: JSON.stringify(msgPayload)
                 });
             }
-        } catch(networkErr) { throw new Error('Network error — set up a Proxy URL in Settings to fix CORS issues.'); }
+        } catch(networkErr) {
+        if (proxyUrl) {
+            // Proxy unreachable — fall back to calling Anthropic directly.
+            try {
+                res = await fetch('https://api.anthropic.com/v1/messages', {
+                    method:'POST', mode:'cors',
+                    headers:{ 'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true' },
+                    body: JSON.stringify(msgPayload)
+                });
+            } catch (directErr) {
+                throw new Error('Could not reach the AI service — the Proxy URL in Settings appears to be down, and a direct call also failed. Check your internet connection, or clear the Proxy URL in Settings.');
+            }
+        } else {
+            throw new Error('Could not reach the AI service — check your internet connection.');
+        }
+    }
         if (res.status === 529 || res.status === 503) {
             if (attempt < retries) {
                 const delay = (attempt + 1) * 4000;

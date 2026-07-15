@@ -1693,7 +1693,6 @@
     });
     const auth = firebase.auth();
     const db   = firebase.firestore();
-    try { db.enablePersistence({ synchronizeTabs: true }).catch(function(){}); } catch (e) {}
 
     // ── SCREENS ──
     function showScreen(name) {

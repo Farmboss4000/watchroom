@@ -488,7 +488,6 @@ const FIREBASE_CONFIG = {
 firebase.initializeApp(FIREBASE_CONFIG);
 const auth = firebase.auth();
 const db   = firebase.firestore();
-try { db.enablePersistence({ synchronizeTabs: true }).catch(function(){}); } catch (e) {}
 
 function showScreen(name) {
     document.getElementById('loading-screen').style.display = 'none';

@@ -358,7 +358,6 @@ firebase.initializeApp({
     appId:"1:911514107783:web:20e8a729fd66577c28dd22"
 });
 const auth = firebase.auth(), db = firebase.firestore();
-try { db.enablePersistence({ synchronizeTabs: true }).catch(function(){}); } catch (e) {}
 
 let agents = [], reports = [], apiKey = '', proxyUrl = '';
 let runningAgent = null, abortCtrl = null, viewingReportId = null;

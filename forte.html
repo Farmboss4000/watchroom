@@ -731,7 +731,6 @@ firebase.initializeApp({
     appId:"1:123456789:web:abcdef"
 });
 const auth=firebase.auth(), db=firebase.firestore();
-try { db.enablePersistence({ synchronizeTabs: true }).catch(function(){}); } catch (e) {}
 
 // ── STATE ──
 let researchItems=[], reports=[], companyProfile={}, teamMembers=[];

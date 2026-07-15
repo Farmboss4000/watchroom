@@ -70,3 +70,13 @@ export function classifyFile(ext, hash, ledgerEntries = {}) {
     if (!mimeType) return { action: 'unsupported' };
     return { action: 'process', mimeType };
 }
+
+// Decide whether an uploaded file's source can be archived to PROCESSED/:
+// its bill must exist and be marked BOTH paid and filed (and not deleted),
+// and the ledger entry must not already be archived.
+export function shouldArchive(entry, bill) {
+    if (!entry || entry.status !== 'uploaded' || entry.billId == null) return false;
+    if (entry.processedAt) return false;
+    if (!bill || bill.deleted) return false;
+    return !!(bill.paid && bill.filed);
+}

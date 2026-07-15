@@ -320,7 +320,6 @@ const FIREBASE_CONFIG = {
 firebase.initializeApp(FIREBASE_CONFIG);
 const auth    = firebase.auth();
 const db      = firebase.firestore();
-try { db.enablePersistence({ synchronizeTabs: true }).catch(function(){}); } catch (e) {}
 const storage = firebase.storage();
 
 const FALLBACK_ADMINS = ['jeff@stoebner.com'];

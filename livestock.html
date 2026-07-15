@@ -1339,10 +1339,10 @@ async function callClaude(base64, mimeType, prompt) {
                     body: JSON.stringify(msgPayload)
                 });
             } catch (directErr) {
-                throw new Error('Could not reach the AI service — the Proxy URL in Settings appears to be down, and a direct call also failed. Check your internet connection, or clear the Proxy URL in Settings.');
+                throw new Error('Could not reach the AI service — the Proxy URL in Settings appears to be down (' + (networkErr.message || networkErr) + '), and a direct call also failed (' + (directErr.message || directErr) + '). A browser content blocker or DNS filter may be blocking these hosts.');
             }
         } else {
-            throw new Error('Could not reach the AI service — check your internet connection.');
+            throw new Error('Could not reach the AI service directly (' + (networkErr.message || networkErr) + '). A browser content blocker, VPN, or DNS filter may be blocking api.anthropic.com.');
         }
     }
     if (!res.ok) {

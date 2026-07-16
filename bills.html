@@ -542,6 +542,27 @@
 </main>
 </div>
 
+<!-- ══ EDIT BILL MODAL ══ -->
+<div class="modal-overlay" id="edit-modal" style="position:fixed;inset:0;background:rgba(0,0,0,0.45);display:none;align-items:center;justify-content:center;z-index:1000;">
+  <div class="modal" style="background:#fff;border-radius:16px;padding:24px;width:100%;max-width:560px;margin:16px;max-height:90vh;overflow-y:auto;">
+    <div style="font-size:1.05rem;font-weight:700;margin-bottom:14px;">✎ Edit Bill</div>
+    <div class="form-grid">
+        <div class="form-group span2"><label>Vendor / Biller</label><input type="text" id="e-vendor"></div>
+        <div class="form-group"><label>Amount ($)</label><input type="number" id="e-amount" min="0" step="0.01"></div>
+        <div class="form-group"><label>Bill Date</label><input type="date" id="e-billdate"></div>
+        <div class="form-group"><label>Due Date</label><input type="date" id="e-duedate"></div>
+        <div class="form-group"><label>Category</label><select id="e-category"></select></div>
+        <div class="form-group"><label>Account #</label><input type="text" id="e-account"></div>
+        <div class="form-group"><label>Invoice / Bill #</label><input type="text" id="e-invoice"></div>
+        <div class="form-group full-width"><label>Notes</label><textarea id="e-notes" rows="2"></textarea></div>
+    </div>
+    <div class="form-actions">
+        <button class="btn btn-primary" onclick="saveEditBill()">💾 Save Changes</button>
+        <button class="btn btn-ghost" onclick="closeEditModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -649,7 +670,8 @@ async function initApp() {
 
         document.getElementById('loading-screen').style.display = 'none';
         document.getElementById('app').style.display            = 'flex';
-        showView('dashboard');
+        const hashView = (location.hash || '').slice(1);
+        showView(VIEWS.includes(hashView) ? hashView : 'dashboard');
     } catch(err) {
         document.getElementById('loading-screen').innerHTML =
             `<p style="color:var(--danger);padding:20px;text-align:center;">Error: ${esc(err.message)}<br><br>
@@ -715,6 +737,7 @@ async function hardDelete(docId) {
 //  NAVIGATION
 // ═══════════════════════════════════════
 function showView(v) {
+    try { history.replaceState(null, '', '#' + v); } catch (e) {}
     VIEWS.forEach(id => document.getElementById('view-'+id).classList.remove('active'));
     document.getElementById('view-'+v).classList.add('active');
     document.querySelectorAll('nav button').forEach((btn,i) => btn.classList.toggle('active', VIEWS[i]===v));
@@ -738,8 +761,26 @@ function renderCurrentViews() {
 let _dupGroups = [];
 let _dupIds = new Set();
 
+// Canonical vendor key — case/punctuation-insensitive with common company
+// suffixes dropped, so "Lano Equipment, Inc." and "Lano Equipment Inc" are
+// treated as the same vendor in reports, duplicate detection, and matching.
+function canonVendor(name) {
+    let v = (name || '').toLowerCase().replace(/[.,'\u2019&]/g, ' ').replace(/\s+/g, ' ').trim();
+    for (let i = 0; i < 2; i++) v = v.replace(/\s+(incorporated|inc|llc|llp|ltd|corp|corporation|co|company|pllc|pa)$/g, '').trim();
+    return v;
+}
+
+// If a scanned vendor matches an existing bill's vendor (canonically), reuse
+// the existing spelling so vendor names stay consistent over time.
+function matchExistingVendor(name) {
+    const key = canonVendor(name);
+    if (!key) return name;
+    const hit = active().find(b => b.vendor && canonVendor(b.vendor) === key);
+    return hit ? hit.vendor : name;
+}
+
 function dupKey(b) {
-    const vendor = (b.vendor || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    const vendor = canonVendor(b.vendor);
     const inv    = (b.invoice || '').toLowerCase().replace(/\s+/g, '').trim();
     if (!vendor && !inv) return 'uniq|' + b._docId;      // not enough to match on — never a dup
     if (inv) return 'inv|' + vendor + '|' + inv;
@@ -952,6 +993,7 @@ async function scanBill() {
     status.textContent = 'Reading the bill with AI...'; status.style.color = 'var(--text-secondary)';
     try {
         const d = normalizeBill(await extractBill(addFile.base64, addFile.mimeType));
+        d.vendor = matchExistingVendor(d.vendor);
         const filled = [];
         const set = (id, val, label) => { if (val !== '' && val != null) { document.getElementById(id).value = val; filled.push(label); } };
         set('f-vendor',   d.vendor,   'Vendor');
@@ -1036,6 +1078,7 @@ async function processBulk() {
             const base64 = await fileToBase64(file);
             const mimeType = file.type || 'image/jpeg';
             const d = normalizeBill(await extractBill(base64, mimeType));
+            d.vendor = matchExistingVendor(d.vendor);
             state.textContent = 'Uploading...';
             const fileUrl = await uploadDoc(file);
             await dbAddBill({ ...d, fileUrl, fileType: mimeType === 'application/pdf' ? 'pdf' : 'image' });
@@ -1097,9 +1140,15 @@ function renderDashboard() {
         <div class="stat-card"><div class="stat-value">${fmtMoney(yearSpend)}</div><div class="stat-label">Spent in ${yr}</div></div>`;
 
     // Spend by vendor (by bill date, all-time)
-    const byVendor = {};
-    list.forEach(b => { const v = (b.vendor||'Unknown').trim() || 'Unknown'; byVendor[v] = (byVendor[v]||0) + (Number(b.amount)||0); });
-    const rows = Object.entries(byVendor).sort((a,b) => b[1]-a[1]);
+    const byVendor = {};   // canonical key -> { name (best spelling), amt }
+    list.forEach(b => {
+        const raw = (b.vendor || 'Unknown').trim() || 'Unknown';
+        const key = canonVendor(raw) || 'unknown';
+        const g = byVendor[key] = byVendor[key] || { name: raw, amt: 0 };
+        if (raw.length > g.name.length) g.name = raw;   // prefer the fullest spelling
+        g.amt += Number(b.amount) || 0;
+    });
+    const rows = Object.values(byVendor).map(g => [g.name, g.amt]).sort((a,b) => b[1]-a[1]);
     const max = rows.length ? rows[0][1] : 0;
     const total = rows.reduce((s,r) => s+r[1], 0);
     document.getElementById('vendor-report-hint').textContent = rows.length ? `${rows.length} vendors · ${fmtMoney(total)} total` : '';
@@ -1177,7 +1226,7 @@ function billRow(b, opts={}) {
         <td class="chk-cell"><input type="checkbox" class="chk" ${b.paid?'checked':''} onchange="togglePaid('${b._docId}', this.checked)" title="Paid"></td>
         <td class="chk-cell"><input type="checkbox" class="chk" ${b.filed?'checked':''} onchange="toggleFiled('${b._docId}', this.checked)" title="Filed"></td>
         <td>${b.fileUrl?`<a href="${esc(b.fileUrl)}" target="_blank" rel="noopener">${b.fileType==='pdf'?'📄 PDF':'🖼 View'}</a>`:'—'}</td>
-        <td><button class="btn btn-sm btn-ghost" onclick="softDelete('${b._docId}')" title="Delete">🗑</button></td>
+        <td style="white-space:nowrap;"><button class="btn btn-sm btn-ghost" onclick="editBill('${b._docId}')" title="Edit">✎</button> <button class="btn btn-sm btn-ghost" onclick="softDelete('${b._docId}')" title="Delete">🗑</button></td>
     </tr>`;
 }
 
@@ -1327,9 +1376,56 @@ async function testApiKey() {
 // ═══════════════════════════════════════
 //  HELPERS
 // ═══════════════════════════════════════
+// ── Edit bill ──
+let editingBillId = null;
+
+function editBill(docId) {
+    const b = bills.find(x => x._docId === docId); if (!b) return;
+    editingBillId = docId;
+    document.getElementById('e-vendor').value   = b.vendor || '';
+    document.getElementById('e-amount').value   = b.amount != null && b.amount !== '' ? b.amount : '';
+    document.getElementById('e-billdate').value = b.billDate || '';
+    document.getElementById('e-duedate').value  = b.dueDate || '';
+    document.getElementById('e-category').value = b.category || '';
+    document.getElementById('e-account').value  = b.account || '';
+    document.getElementById('e-invoice').value  = b.invoice || '';
+    document.getElementById('e-notes').value    = b.notes || '';
+    document.getElementById('edit-modal').style.display = 'flex';
+}
+
+function closeEditModal() {
+    document.getElementById('edit-modal').style.display = 'none';
+    editingBillId = null;
+}
+
+async function saveEditBill() {
+    if (!editingBillId) return;
+    const amount = parseFloat(document.getElementById('e-amount').value);
+    const patch = {
+        vendor:   document.getElementById('e-vendor').value.trim(),
+        amount:   Number.isFinite(amount) ? amount : 0,
+        billDate: document.getElementById('e-billdate').value,
+        dueDate:  document.getElementById('e-duedate').value,
+        category: document.getElementById('e-category').value,
+        account:  document.getElementById('e-account').value.trim(),
+        invoice:  document.getElementById('e-invoice').value.trim(),
+        notes:    document.getElementById('e-notes').value.trim(),
+    };
+    try {
+        await dbUpdateBill(editingBillId, patch);
+        toast('Bill updated', 'success');
+        closeEditModal();
+    } catch (err) { toast('Save failed: ' + err.message, 'error'); }
+}
+
+document.getElementById('edit-modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('edit-modal')) closeEditModal();
+});
+
 function populateCatControls() {
     const opts = `<option value="">Uncategorized</option>` + categories.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
     document.getElementById('f-category').innerHTML = opts;
+    document.getElementById('e-category').innerHTML = opts;
     document.getElementById('bills-cat').innerHTML = `<option value="">All categories</option>` + categories.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
 }
 function statusBadges(b) {

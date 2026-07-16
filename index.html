@@ -1838,22 +1838,22 @@
                 : (dueSoon.length ? 'due in the next 3 days' : 'nothing due in 3 days');
 
             grid.innerHTML = `
-                <a class="attention-tile ${unpaid.length ? 'att-danger' : 'att-ok'}" href="bills.html">
+                <a class="attention-tile ${unpaid.length ? 'att-danger' : 'att-ok'}" href="bills.html#unpaid">
                     <div class="attention-num">${hqMoney(unpaidTotal)}</div>
                     <div class="attention-label">🧾 Unpaid Bills</div>
                     <div class="attention-sub">${unpaid.length} bill${unpaid.length === 1 ? '' : 's'} outstanding</div>
                 </a>
-                <a class="attention-tile ${dueClass}" href="bills.html">
+                <a class="attention-tile ${dueClass}" href="bills.html#unpaid">
                     <div class="attention-num">${dueNum}</div>
                     <div class="attention-label">⏰ Due / Overdue</div>
                     <div class="attention-sub">${dueSub}</div>
                 </a>
-                <a class="attention-tile ${dupGroups ? 'att-warn' : 'att-ok'}" href="bills.html">
+                <a class="attention-tile ${dupGroups ? 'att-warn' : 'att-ok'}" href="bills.html#duplicates">
                     <div class="attention-num">${dupGroups}</div>
                     <div class="attention-label">🔁 Duplicate Groups</div>
                     <div class="attention-sub">${dupGroups ? 'review in Bills → Duplicates' : 'no duplicates found'}</div>
                 </a>
-                <a class="attention-tile att-info" href="bills.html">
+                <a class="attention-tile att-info" href="bills.html#unfiled">
                     <div class="attention-num">${unfiled}</div>
                     <div class="attention-label">🗂 Unfiled Bills</div>
                     <div class="attention-sub">${unfiled ? 'waiting to be filed' : 'all filed'}</div>
@@ -1872,7 +1872,7 @@
     let hqIndex = null;
     async function buildHqIndex() {
         const SRC = [
-            { col: 'bills',            url: 'bills.html',      icon: '🧾' },
+            { col: 'bills',            url: 'bills.html#bills', icon: '🧾' },
             { col: 'items',            url: 'armory.html',     icon: '🔫' },
             { col: 'machinery_items',  url: 'machinery.html',  icon: '🚜' },
             { col: 'automotive_items', url: 'automotive.html', icon: '🚗' },

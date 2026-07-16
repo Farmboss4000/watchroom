@@ -66,6 +66,11 @@ already saved in **Bills → Settings**. `.env` stays on your machine (gitignore
 
 ## Running it
 
+**One-click run (no Terminal):** double-click **`Clean Up Paperwork.command`**
+in this folder from Finder — it uploads new bills AND archives Paid & Filed
+sources to `PROCESSED/`, then waits for a keypress. (First time, macOS may ask
+permission — right-click → Open if Gatekeeper complains.)
+
 **Upload new files now, once (recommended for testing):**
 
 ```bash

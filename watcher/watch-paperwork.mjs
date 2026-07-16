@@ -27,7 +27,7 @@ import { existsSync } from 'node:fs';
 import chokidar from 'chokidar';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
-import { getFirestore, collection, addDoc, doc, getDoc, getDocs, runTransaction } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, doc, getDoc, getDocs, updateDoc, setDoc, runTransaction } from 'firebase/firestore';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { CATEGORIES, buildPrompt, normalizeBill, parseJsonObject, classifyFile, shouldArchive } from './lib.mjs';
 
@@ -231,7 +231,7 @@ async function main() {
 
         // Fetch bills once — used for both the PROCESSED sweep and the reminder.
         let billDocs = null;
-        try { billDocs = (await getDocs(collection(db, 'bills'))).docs.map(d => d.data()); }
+        try { billDocs = (await getDocs(collection(db, 'bills'))).docs.map(d => ({ _ref: d.ref, ...d.data() })); }
         catch (err) { warn('Could not read bills:', err.message); }
 
         // Archive: bills marked BOTH Paid and Filed get their source file
@@ -253,9 +253,23 @@ async function main() {
                     entry.movedTo = path.relative(watchDir, dest);
                     moved++;
                     log(`📦 ${path.basename(fp)} → PROCESSED/ (bill #${entry.billId} paid & filed)`);
+                    // Tell the Bills app this bill's source file is archived.
+                    const billRef = byId.get(entry.billId)?._ref;
+                    if (billRef) { try { await updateDoc(billRef, { sourceArchived: true }); } catch (e) { warn('flag update:', e.message); } }
                 } catch (err) { warn(`could not move ${path.basename(fp)}: ${err.message}`); }
             }
+            // Retro-fill: entries archived by earlier runs, before the flag existed.
+            for (const entry of Object.values(ledger.entries)) {
+                if (!entry.processedAt || entry.billId == null) continue;
+                const bill = byId.get(entry.billId);
+                if (bill && bill._ref && !bill.sourceArchived) {
+                    try { await updateDoc(bill._ref, { sourceArchived: true }); } catch (e) { warn('flag backfill:', e.message); }
+                }
+            }
             if (moved) await saveLedger(ledgerPath, ledger);
+            // Publish a cleanup summary the Bills dashboard can show.
+            try { await setDoc(doc(db, 'bills_config', 'data'), { lastCleanup: { at: nowIso(), moved } }, { merge: true }); }
+            catch (e) { warn('cleanup summary:', e.message); }
             log(moved ? `Archived ${moved} paid & filed bill${moved > 1 ? 's' : ''} to PROCESSED/.` : 'No newly paid & filed bills to archive.');
         }
 

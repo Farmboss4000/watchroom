@@ -356,6 +356,7 @@
 <div id="view-dashboard" class="view active">
     <div id="due-banner"></div>
     <div class="stats-grid" id="stats-grid"></div>
+    <div id="cleanup-card"></div>
 
     <div class="card">
         <div class="card-title">
@@ -574,6 +575,7 @@ let apiKey    = '';
 let proxyUrl  = '';
 let aiModel   = 'claude-sonnet-4-6';
 
+let lastCleanup = null;
 let addFile   = { file:null, base64:null, mimeType:null };
 let bulkFiles = [];
 
@@ -628,6 +630,7 @@ async function initApp() {
             const d = cfgDoc.data();
             if (d.categories && d.categories.length) categories = d.categories;
             if (d.nextId) nextId = d.nextId;
+            if (d.lastCleanup) lastCleanup = d.lastCleanup;
         }
         const keyDoc = await db.collection('settings').doc('apikey').get();
         if (keyDoc.exists && keyDoc.data().key) { apiKey = keyDoc.data().key; document.getElementById('api-key-input').value = apiKey; }
@@ -1121,13 +1124,53 @@ function renderDashboard() {
             <td>${statusBadges(b)}</td>
         </tr>`).join('')
         : `<tr><td colspan="6" class="empty">No bills yet.</td></tr>`;
+
+    renderCleanupCard(list);
+}
+
+// ── Paperwork folder cleanup panel ──
+// Bills that came in via the watcher, are Paid + Filed, and whose source
+// file hasn't been archived to PROCESSED/ yet.
+function cleanupEligible(list) {
+    return list.filter(b => b.paid && b.filed && b.source === 'paperwork-watcher' && !b.sourceArchived);
+}
+
+function renderCleanupCard(list) {
+    const el = document.getElementById('cleanup-card');
+    if (!el) return;
+    const eligible = cleanupEligible(list);
+    const last = lastCleanup && lastCleanup.at
+        ? `Last cleanup: ${fmtDate(lastCleanup.at.slice(0,10))} — ${lastCleanup.moved} file${lastCleanup.moved === 1 ? '' : 's'} archived.`
+        : '';
+    if (!eligible.length) {
+        el.innerHTML = `<div class="card" style="padding:14px 18px;">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:0.88rem;color:var(--text-secondary);">
+                🧹 <strong style="color:var(--text-primary);">Paperwork folder is clean</strong> — no paid &amp; filed bills awaiting archive. ${last}
+            </div></div>`;
+        return;
+    }
+    el.innerHTML = `<div class="card" style="padding:14px 18px;">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:0.88rem;">
+            🧹 <strong>${eligible.length} paid &amp; filed bill${eligible.length === 1 ? '' : 's'}</strong>
+            <span style="color:var(--text-secondary);">— source file${eligible.length === 1 ? '' : 's'} ready to move to Paperwork/PROCESSED. Runs automatically tonight at 23:50, or run it now on your Mac.</span>
+            <button class="btn btn-sm btn-primary" style="margin-left:auto;" onclick="copyCleanupCmd()">🧹 Clean Up Now — copy command</button>
+        </div>
+        <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:6px;">${last} Tip: double-click <strong>Clean Up Paperwork.command</strong> in watchroom-app/watcher instead — same thing, no Terminal typing.</div>
+    </div>`;
+}
+
+function copyCleanupCmd() {
+    const cmd = 'cd ~/watchroom-app/watcher && npm start';
+    (navigator.clipboard ? navigator.clipboard.writeText(cmd) : Promise.reject())
+        .then(() => toast('Command copied — paste it into Terminal on your Mac', 'success'))
+        .catch(() => { prompt('Copy this command, then paste it into Terminal on your Mac:', cmd); });
 }
 
 function billRow(b, opts={}) {
     const overdue = !b.paid && b.dueDate && b.dueDate < todayStr();
     return `<tr>
         <td>${fmtDate(b.billDate)}</td>
-        <td>${esc(b.vendor)||'—'}${_dupIds.has(b._docId)?` <span title="Has a duplicate — see the Duplicates tab" style="cursor:default;">🔁</span>`:''}${b.invoice?`<div class="vendor-sub">#${esc(b.invoice)}</div>`:''}</td>
+        <td>${esc(b.vendor)||'—'}${_dupIds.has(b._docId)?` <span title="Has a duplicate — see the Duplicates tab" style="cursor:default;">🔁</span>`:''}${b.sourceArchived?` <span title="Source file archived to Paperwork/PROCESSED" style="cursor:default;">📦</span>`:''}${b.invoice?`<div class="vendor-sub">#${esc(b.invoice)}</div>`:''}</td>
         <td>${b.category?`<span class="badge badge-cat">${esc(b.category)}</span>`:'—'}</td>
         <td class="amount">${fmtMoney(b.amount)}</td>
         <td class="${overdue?'overdue':''}">${fmtDate(b.dueDate)}${overdue?' ⚠️':''}</td>

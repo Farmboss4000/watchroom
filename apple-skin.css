@@ -217,12 +217,27 @@ header nav button.active {
     font-weight: 600;
 }
 
-/* Allow the switcher to wrap (instead of hidden horizontal scroll)
-   so the "More" dropdown below is never clipped. */
+/* Base geometry (matches the per-page inline styles, so pages that lack
+   them — e.g. family.html — still render a proper bar), plus wrapping so
+   the "More" dropdown below is never clipped. */
 .site-switcher {
+    display: flex;
+    align-items: center;
+    padding-left: 18px;
+    padding-right: 18px;
+    gap: 4px;
+    font-size: 0.77rem;
     flex-wrap: wrap !important;
     overflow: visible !important;
     row-gap: 4px;
+}
+.site-switcher .site-link {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    text-decoration: none;
+    white-space: nowrap;
 }
 
 /* "More" dropdown in the switcher (built by site-nav.js) */

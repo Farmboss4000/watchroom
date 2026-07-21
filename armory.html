@@ -5505,10 +5505,14 @@ function brochureIsStale(latestIso, nowMs) {
 function brochureItemBlurb(it) {
     if (it.brochureBlurb) return it.brochureBlurb;
     if (it.notes) return it.notes;
-    const bits = [];
-    if (it.condition) bits.push(it.condition.toLowerCase());
-    if (it.caliber) bits.push(it.caliber);
-    return `A ${bits.join(' ')} ${(it.category || 'item').toLowerCase()} from ${it.manufacturer || 'the collection'}.`;
+    const name = it.model || (it.category || 'piece').toLowerCase();
+    const parts = [];
+    parts.push(it.manufacturer ? `${it.manufacturer}\u2019s ${name}` : `The ${name}`);
+    if (it.caliber) parts.push(`chambered in ${it.caliber}`);
+    let line = parts.join(', ');
+    if (it.condition) line += ` — kept in ${it.condition.toLowerCase()} condition`;
+    if (it.purchaseDate) line += `${it.condition ? ' since' : ' — acquired in'} ${it.purchaseDate.slice(0, 4)}`;
+    return line + '.';
 }
 
 function romanNum(n) {
@@ -5526,7 +5530,8 @@ const BRO = {
 
 function buildBrochureDom() {
     const active = items.filter(i => !i.deleted);
-    const totalValue = active.reduce((s, i) => s + estValue(i) * (Number(i.quantity) || 1), 0);
+    const priceOf = it => Number(it.price) || 0;
+    const totalValue = active.reduce((s, i) => s + priceOf(i), 0);
     const byCat = {};
     active.forEach(i => { const c = i.category || 'Other'; (byCat[c] = byCat[c] || []).push(i); });
     const cats = Object.keys(byCat).sort((a, b) => byCat[b].length - byCat[a].length);
@@ -5573,7 +5578,7 @@ function buildBrochureDom() {
             </div>
             <div style="width:100%;">
                 <div style="display:flex;justify-content:center;gap:0;border-top:1px solid rgba(201,169,98,0.3);padding-top:30px;">
-                    ${[[active.length, 'PIECES'], [cats.length, 'CATEGORIES'], [moneyFmt(totalValue), 'ESTIMATED VALUE']].map(([v, l], i) => `
+                    ${[[active.length, 'PIECES'], [cats.length, 'CATEGORIES'], [moneyFmt(totalValue), 'TOTAL INVESTED']].map(([v, l], i) => `
                         <div style="padding:0 40px;${i ? 'border-left:1px solid rgba(201,169,98,0.25);' : ''}">
                             <div style="font-family:${T.serif};font-weight:700;font-size:30px;color:${T.gold};">${v}</div>
                             <div style="font-size:9.5px;letter-spacing:3.5px;color:rgba(255,255,255,0.5);margin-top:6px;">${l}</div>
@@ -5596,7 +5601,7 @@ function buildBrochureDom() {
                 <span style="font-family:${T.serif};font-size:15px;color:${T.bronze};min-width:44px;">${romanNum(i + 1)}</span>
                 <span style="font-family:${T.serif};font-size:19px;font-weight:700;color:${T.ink};">${esc2(c)}</span>
                 <span style="flex:1;border-bottom:1px dotted #cfc8b8;margin:0 6px 4px;"></span>
-                <span style="font-size:11.5px;color:${T.muted};">${byCat[c].length} piece${byCat[c].length === 1 ? '' : 's'} &nbsp;·&nbsp; ${moneyFmt(byCat[c].reduce((s, x) => s + estValue(x), 0))}</span>
+                <span style="font-size:11.5px;color:${T.muted};">${byCat[c].length} piece${byCat[c].length === 1 ? '' : 's'} &nbsp;·&nbsp; ${moneyFmt(byCat[c].reduce((s, x) => s + priceOf(x), 0))}</span>
             </div>`).join('')}
         <div style="display:flex;align-items:baseline;gap:16px;padding:15px 0;">
             <span style="font-family:${T.serif};font-size:15px;color:${T.bronze};min-width:44px;">${romanNum(cats.length + 1)}</span>
@@ -5642,16 +5647,16 @@ function buildBrochureDom() {
         const group = {};
         byCat[cat].forEach(i => { const m = i.manufacturer || 'Unattributed'; (group[m] = group[m] || []).push(i); });
         const mfrs = Object.keys(group).sort();
-        const catVal = byCat[cat].reduce((s, x) => s + estValue(x), 0);
+        const catVal = byCat[cat].reduce((s, x) => s + priceOf(x), 0);
         const catPhotos = byCat[cat].map(photoOf).filter(Boolean);
         B.push(chapterOpener(ci + 1, cat,
             `${byCat[cat].length === 1 ? 'A single piece' : byCat[cat].length + ' pieces'} across ${mfrs.length} maker${mfrs.length === 1 ? '' : 's'} — from ${mfrs[0]}${mfrs.length > 1 ? ' to ' + mfrs[mfrs.length - 1] : ''}.`,
-            catPhotos, `ESTIMATED CHAPTER VALUE &nbsp;·&nbsp; ${moneyFmt(catVal)}`));
+            catPhotos, `CHAPTER INVESTMENT &nbsp;·&nbsp; ${moneyFmt(catVal)}`));
 
         B.push(`<div style="padding:64px 64px 20px;box-sizing:border-box;background:${T.paper};">`);
         mfrs.forEach(m => {
             const acc = brandAccent(m);
-            const pieces = [...group[m]].sort((x, y) => estValue(y) - estValue(x));
+            const pieces = [...group[m]].sort((x, y) => priceOf(y) - priceOf(x));
             const feature = pieces.find(photoOf);
             const rest = pieces.filter(p => p !== feature);
             B.push(`
@@ -5674,8 +5679,8 @@ function buildBrochureDom() {
                         ${specRow('CALIBER', it.caliber)}${specRow('CONDITION', it.condition)}${specRow('ACQUIRED', it.purchaseDate ? it.purchaseDate.slice(0, 4) : '')}${specRow('SERIAL', it.serialNumber)}
                         <div style="font-family:${T.serif};font-style:italic;font-size:13.5px;line-height:1.65;color:#4c4840;margin:14px 0;flex:1;">${esc2(brochureItemBlurb(it)).slice(0, 300)}</div>
                         <div style="display:flex;align-items:baseline;justify-content:space-between;border-top:2px solid ${T.gold};padding-top:12px;">
-                            <span style="font-size:9.5px;letter-spacing:3px;color:${T.faint};">ESTIMATED VALUE</span>
-                            <span style="font-family:${T.serif};font-weight:700;font-size:23px;color:${T.bronze};">${estValue(it) ? moneyFmt(estValue(it)) : '—'}</span>
+                            <span style="font-size:9.5px;letter-spacing:3px;color:${T.faint};">PURCHASE PRICE</span>
+                            <span style="font-family:${T.serif};font-weight:700;font-size:23px;color:${T.bronze};">${priceOf(it) ? moneyFmt(priceOf(it)) : '—'}</span>
                         </div>
                     </div>
                 </div>`);
@@ -5694,7 +5699,7 @@ function buildBrochureDom() {
                             <div style="font-size:11px;color:${T.muted};margin:6px 0 10px;">${[it.caliber, it.condition, it.purchaseDate ? it.purchaseDate.slice(0, 4) : null].filter(Boolean).map(esc2).join(' &nbsp;·&nbsp; ')}</div>
                             <div style="display:flex;align-items:baseline;justify-content:space-between;border-top:1px solid ${T.hair};padding-top:8px;">
                                 <span style="font-size:8.5px;letter-spacing:2px;color:${T.faint};">${it.serialNumber ? 'S/N ' + esc2(it.serialNumber) : ''}</span>
-                                <span style="font-family:${T.serif};font-weight:700;font-size:16px;color:${T.bronze};">${estValue(it) ? moneyFmt(estValue(it)) : ''}</span>
+                                <span style="font-family:${T.serif};font-weight:700;font-size:16px;color:${T.bronze};">${priceOf(it) ? moneyFmt(priceOf(it)) : ''}</span>
                             </div>
                         </div>
                     </div>`);
@@ -5709,7 +5714,7 @@ function buildBrochureDom() {
     const monthsSpan = (() => { const ds = active.filter(i => i.purchaseDate).map(i => i.purchaseDate.slice(0, 7)); return new Set(ds).size || 1; })();
     B.push(chapterOpener(cats.length + 1, 'The Numbers',
         'The collection in figures — its market value over time, the calibers it favors, and the pace of its growth.',
-        [], `${active.length} PIECES &nbsp;·&nbsp; ${moneyFmt(totalValue)} ESTIMATED`));
+        [], `${active.length} PIECES &nbsp;·&nbsp; ${moneyFmt(totalValue)} INVESTED`));
     const chartCard = (id, title, sub, h) => `
         <div style="background:${T.card};border:1px solid ${T.hair};border-radius:14px;padding:24px 26px;margin-bottom:22px;page-break-inside:avoid;">
             <div style="font-family:${T.serif};font-weight:700;font-size:22px;color:${T.ink};">${title}</div>
@@ -5719,7 +5724,7 @@ function buildBrochureDom() {
     B.push(`
     <div style="padding:64px;box-sizing:border-box;background:${T.paper};">
         <div style="display:flex;gap:14px;margin-bottom:22px;">
-            ${[[moneyFmt(totalValue), 'ESTIMATED VALUE'], [String(active.length), 'PIECES'], [(active.length / monthsSpan).toFixed(1), 'AVG PER ACTIVE MONTH']].map(([v, l]) => `
+            ${[[moneyFmt(totalValue), 'TOTAL INVESTED'], [String(active.length), 'PIECES'], [(active.length / monthsSpan).toFixed(1), 'AVG PER ACTIVE MONTH']].map(([v, l]) => `
                 <div style="flex:1;background:${T.card};border:1px solid ${T.hair};border-radius:12px;padding:18px 20px;text-align:center;">
                     <div style="font-family:${T.serif};font-weight:700;font-size:24px;color:${T.bronze};">${v}</div>
                     <div style="font-size:9px;letter-spacing:2.5px;color:${T.faint};margin-top:5px;">${l}</div>

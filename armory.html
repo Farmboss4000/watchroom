@@ -5601,9 +5601,11 @@ function buildBrochureDom() {
     const now = new Date();
     const edition = now.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }).toUpperCase();
     const T = BRO, esc2 = esc;
-    const photoOf = it => (it.stockPhoto && it.stockPhoto.url) || it.photos?.find(p => p.slot === 'main')?.url;
+    // Your own uploaded photo always wins; Commons imagery fills the gaps.
+    const ownPhoto = it => it.photos?.find(p => p.slot === 'main')?.url;
+    const photoOf = it => ownPhoto(it) || (it.stockPhoto && it.stockPhoto.url);
     const usedCredits = [];
-    active.forEach(it => { if (it.stockPhoto && it.stockPhoto.url && it.stockPhoto.license) usedCredits.push(it.stockPhoto); });
+    active.forEach(it => { if (!ownPhoto(it) && it.stockPhoto && it.stockPhoto.url && it.stockPhoto.license) usedCredits.push(it.stockPhoto); });
 
     const root = document.createElement('div');
     root.id = 'brochure-root';

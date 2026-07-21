@@ -13,6 +13,9 @@
     <title>Farmboss Armory</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js" defer></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
@@ -5508,126 +5511,239 @@ function brochureItemBlurb(it) {
     return `A ${bits.join(' ')} ${(it.category || 'item').toLowerCase()} from ${it.manufacturer || 'the collection'}.`;
 }
 
+function romanNum(n) {
+    const R = [[1000,'M'],[900,'CM'],[500,'D'],[400,'CD'],[100,'C'],[90,'XC'],[50,'L'],[40,'XL'],[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']];
+    let out = ''; for (const [v, sym] of R) { while (n >= v) { out += sym; n -= v; } } return out;
+}
+
+// Design tokens for the brochure
+const BRO = {
+    ink: '#101319', ink2: '#171b23', gold: '#c9a962', bronze: '#8a6d2f',
+    paper: '#faf8f3', card: '#ffffff', hair: '#e7e1d6', muted: '#6b675f', faint: '#a49f93',
+    serif: "'Playfair Display',Georgia,'Times New Roman',serif",
+    sans: "'Inter',-apple-system,'Helvetica Neue',Arial,sans-serif"
+};
+
 function buildBrochureDom() {
     const active = items.filter(i => !i.deleted);
     const totalValue = active.reduce((s, i) => s + estValue(i) * (Number(i.quantity) || 1), 0);
     const byCat = {};
     active.forEach(i => { const c = i.category || 'Other'; (byCat[c] = byCat[c] || []).push(i); });
     const cats = Object.keys(byCat).sort((a, b) => byCat[b].length - byCat[a].length);
-    const dateStr = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+    const now = new Date();
+    const edition = now.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }).toUpperCase();
+    const T = BRO, esc2 = esc;
+    const photoOf = it => it.photos?.find(p => p.slot === 'main')?.url;
 
     const root = document.createElement('div');
     root.id = 'brochure-root';
-    root.style.cssText = 'width:816px;background:#fff;margin:0 auto;box-shadow:0 8px 40px rgba(0,0,0,0.25);';
+    root.style.cssText = `width:816px;background:${T.paper};margin:0 auto;box-shadow:0 8px 40px rgba(0,0,0,0.25);font-family:${T.sans};`;
     const B = [];
-    const esc2 = esc;
 
-    // ── Cover ──
+    const frame = `
+        <div style="position:absolute;inset:24px;border:1px solid rgba(201,169,98,0.5);pointer-events:none;"></div>
+        <div style="position:absolute;inset:31px;border:1px solid rgba(201,169,98,0.22);pointer-events:none;"></div>`;
+    const monogram = (size, ring) => `
+        <div style="width:${size}px;height:${size}px;border:1px solid ${ring};border-radius:50%;display:flex;align-items:center;justify-content:center;">
+            <span style="font-family:${T.serif};font-weight:700;font-size:${Math.round(size*0.38)}px;color:${T.gold};letter-spacing:2px;">FA</span>
+        </div>`;
+
+    // ═════════ COVER ═════════
     B.push(`
-    <div style="height:1020px;background:linear-gradient(160deg,#12141c 0%,#1d2233 55%,#2a2416 100%);color:#fff;
-                display:flex;flex-direction:column;justify-content:space-between;padding:70px 60px;box-sizing:border-box;">
-        <div>
-            <div style="font-size:13px;letter-spacing:6px;color:#c8a96e;font-weight:600;">FARMBOSS COLLECTION SERIES</div>
-            <div style="width:64px;height:3px;background:#c8a96e;margin:18px 0 46px;"></div>
-            <div style="font-family:Georgia,'Times New Roman',serif;font-size:64px;line-height:1.05;font-weight:700;">The<br>Armory</div>
-            <div style="font-family:Georgia,serif;font-size:20px;color:rgba(255,255,255,0.75);margin-top:18px;font-style:italic;">Firearms &amp; Equipment — A Collector's Catalog</div>
-        </div>
-        <div>
-            <div style="display:flex;gap:44px;border-top:1px solid rgba(200,169,110,0.35);padding-top:26px;">
-                <div><div style="font-size:34px;font-weight:700;color:#c8a96e;">${active.length}</div><div style="font-size:11px;letter-spacing:2px;color:rgba(255,255,255,0.6);">PIECES</div></div>
-                <div><div style="font-size:34px;font-weight:700;color:#c8a96e;">${cats.length}</div><div style="font-size:11px;letter-spacing:2px;color:rgba(255,255,255,0.6);">CATEGORIES</div></div>
-                <div><div style="font-size:34px;font-weight:700;color:#c8a96e;">${moneyFmt(totalValue)}</div><div style="font-size:11px;letter-spacing:2px;color:rgba(255,255,255,0.6);">ESTIMATED VALUE</div></div>
+    <div style="position:relative;height:1056px;box-sizing:border-box;color:#fff;overflow:hidden;
+                background:
+                    radial-gradient(700px 500px at 82% 12%, rgba(201,169,98,0.13), transparent 60%),
+                    radial-gradient(900px 700px at 50% 115%, rgba(201,169,98,0.07), transparent 60%),
+                    repeating-linear-gradient(115deg, rgba(255,255,255,0.014) 0 2px, transparent 2px 9px),
+                    linear-gradient(168deg, ${T.ink} 0%, ${T.ink2} 60%, #1d1a12 100%);">
+        ${frame}
+        <div style="position:relative;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:84px 70px;box-sizing:border-box;text-align:center;">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:26px;">
+                ${monogram(78, 'rgba(201,169,98,0.65)')}
+                <div style="font-size:11.5px;letter-spacing:8px;color:${T.gold};font-weight:500;">FARMBOSS &nbsp;·&nbsp; COLLECTION SERIES</div>
             </div>
-            <div style="font-size:12px;color:rgba(255,255,255,0.45);margin-top:22px;">${dateStr} Edition · Private catalog</div>
+            <div>
+                <div style="font-family:${T.serif};font-weight:900;font-size:96px;line-height:1.02;letter-spacing:1px;">The<br>Armory</div>
+                <div style="display:flex;align-items:center;gap:14px;justify-content:center;margin:30px 0 18px;">
+                    <div style="width:110px;height:1px;background:rgba(201,169,98,0.55);"></div>
+                    <div style="color:${T.gold};font-size:12px;">✦</div>
+                    <div style="width:110px;height:1px;background:rgba(201,169,98,0.55);"></div>
+                </div>
+                <div style="font-family:${T.serif};font-style:italic;font-size:19px;color:rgba(255,255,255,0.72);">A Private Catalog of Firearms &amp; Fine Equipment</div>
+            </div>
+            <div style="width:100%;">
+                <div style="display:flex;justify-content:center;gap:0;border-top:1px solid rgba(201,169,98,0.3);padding-top:30px;">
+                    ${[[active.length, 'PIECES'], [cats.length, 'CATEGORIES'], [moneyFmt(totalValue), 'ESTIMATED VALUE']].map(([v, l], i) => `
+                        <div style="padding:0 40px;${i ? 'border-left:1px solid rgba(201,169,98,0.25);' : ''}">
+                            <div style="font-family:${T.serif};font-weight:700;font-size:30px;color:${T.gold};">${v}</div>
+                            <div style="font-size:9.5px;letter-spacing:3.5px;color:rgba(255,255,255,0.5);margin-top:6px;">${l}</div>
+                        </div>`).join('')}
+                </div>
+                <div style="font-size:10px;letter-spacing:4px;color:rgba(255,255,255,0.38);margin-top:30px;">${edition} EDITION &nbsp;·&nbsp; PRIVATE &amp; CONFIDENTIAL</div>
+            </div>
         </div>
     </div>
     <div class="html2pdf__page-break"></div>`);
 
-    // ── Table of contents ──
+    // ═════════ CONTENTS ═════════
     B.push(`
-    <div style="padding:60px;box-sizing:border-box;">
-        <div style="font-size:12px;letter-spacing:5px;color:#c8a96e;font-weight:600;">CONTENTS</div>
-        <div style="font-family:Georgia,serif;font-size:34px;font-weight:700;color:#16181d;margin:10px 0 34px;">In this edition</div>
+    <div style="height:1056px;box-sizing:border-box;padding:90px 86px;background:${T.paper};">
+        <div style="font-size:11px;letter-spacing:6px;color:${T.bronze};font-weight:500;">CONTENTS</div>
+        <div style="font-family:${T.serif};font-weight:700;font-size:46px;color:${T.ink};margin:12px 0 8px;">In this edition</div>
+        <div style="width:64px;height:2px;background:${T.gold};margin-bottom:44px;"></div>
         ${cats.map((c, i) => `
-            <div style="display:flex;align-items:baseline;gap:14px;padding:11px 0;border-bottom:1px solid #ececf0;">
-                <span style="font-family:Georgia,serif;font-size:15px;color:#c8a96e;min-width:36px;">${String(i + 1).padStart(2, '0')}</span>
-                <span style="font-size:16px;font-weight:600;color:#16181d;">${esc2(c)}</span>
-                <span style="margin-left:auto;font-size:12px;color:#98989d;">${byCat[c].length} piece${byCat[c].length === 1 ? '' : 's'} · ${moneyFmt(byCat[c].reduce((s, i2) => s + estValue(i2), 0))}</span>
+            <div style="display:flex;align-items:baseline;gap:16px;padding:15px 0;">
+                <span style="font-family:${T.serif};font-size:15px;color:${T.bronze};min-width:44px;">${romanNum(i + 1)}</span>
+                <span style="font-family:${T.serif};font-size:19px;font-weight:700;color:${T.ink};">${esc2(c)}</span>
+                <span style="flex:1;border-bottom:1px dotted #cfc8b8;margin:0 6px 4px;"></span>
+                <span style="font-size:11.5px;color:${T.muted};">${byCat[c].length} piece${byCat[c].length === 1 ? '' : 's'} &nbsp;·&nbsp; ${moneyFmt(byCat[c].reduce((s, x) => s + estValue(x), 0))}</span>
             </div>`).join('')}
-        <div style="display:flex;align-items:baseline;gap:14px;padding:11px 0;border-bottom:1px solid #ececf0;">
-            <span style="font-family:Georgia,serif;font-size:15px;color:#c8a96e;min-width:36px;">${String(cats.length + 1).padStart(2, '0')}</span>
-            <span style="font-size:16px;font-weight:600;color:#16181d;">The Numbers</span>
-            <span style="margin-left:auto;font-size:12px;color:#98989d;">value history · calibers · acquisitions</span>
+        <div style="display:flex;align-items:baseline;gap:16px;padding:15px 0;">
+            <span style="font-family:${T.serif};font-size:15px;color:${T.bronze};min-width:44px;">${romanNum(cats.length + 1)}</span>
+            <span style="font-family:${T.serif};font-size:19px;font-weight:700;color:${T.ink};">The Numbers</span>
+            <span style="flex:1;border-bottom:1px dotted #cfc8b8;margin:0 6px 4px;"></span>
+            <span style="font-size:11.5px;color:${T.muted};">value history · calibers · acquisitions</span>
         </div>
     </div>
     <div class="html2pdf__page-break"></div>`);
 
-    // ── Chapters ──
+    // ═════════ CHAPTERS ═════════
+    const chapterOpener = (num, title, tagline, photos, statLine) => `
+    <div style="position:relative;height:1056px;box-sizing:border-box;color:#fff;overflow:hidden;
+                background:
+                    radial-gradient(640px 480px at 18% 20%, rgba(201,169,98,0.10), transparent 60%),
+                    linear-gradient(160deg, ${T.ink} 0%, ${T.ink2} 70%, #16130c 100%);">
+        ${frame}
+        <div style="position:absolute;right:-30px;bottom:-95px;font-family:${T.serif};font-weight:900;font-size:430px;line-height:1;color:rgba(201,169,98,0.065);">${romanNum(num)}</div>
+        <div style="position:relative;height:100%;display:flex;flex-direction:column;justify-content:center;padding:0 92px;box-sizing:border-box;">
+            <div style="font-size:11px;letter-spacing:7px;color:${T.gold};font-weight:500;">CHAPTER ${romanNum(num)}</div>
+            <div style="font-family:${T.serif};font-weight:900;font-size:74px;line-height:1.05;margin:20px 0 24px;">${esc2(title)}</div>
+            <div style="width:76px;height:2px;background:${T.gold};"></div>
+            <div style="font-family:${T.serif};font-style:italic;font-size:17px;color:rgba(255,255,255,0.68);margin-top:24px;max-width:480px;">${tagline}</div>
+            ${photos.length ? `
+            <div style="display:flex;gap:14px;margin-top:52px;">
+                ${photos.slice(0, 4).map(u => `
+                    <div style="width:96px;height:96px;background:rgba(255,255,255,0.07);border:1px solid rgba(201,169,98,0.3);border-radius:10px;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+                        <img src="${u}" crossorigin="anonymous" style="max-width:88%;max-height:88%;object-fit:contain;" onerror="this.remove()">
+                    </div>`).join('')}
+            </div>` : ''}
+            <div style="font-size:10.5px;letter-spacing:3px;color:rgba(255,255,255,0.45);margin-top:44px;">${statLine}</div>
+        </div>
+    </div>
+    <div class="html2pdf__page-break"></div>`;
+
+    const specRow = (label, val) => val ? `
+        <div style="display:flex;gap:12px;padding:5.5px 0;border-bottom:1px solid ${T.hair};">
+            <span style="font-size:9.5px;letter-spacing:2.5px;color:${T.faint};min-width:96px;padding-top:2px;">${label}</span>
+            <span style="font-size:12.5px;color:${T.ink};font-weight:500;">${esc2(String(val))}</span>
+        </div>` : '';
+
     cats.forEach((cat, ci) => {
         const group = {};
         byCat[cat].forEach(i => { const m = i.manufacturer || 'Unattributed'; (group[m] = group[m] || []).push(i); });
         const mfrs = Object.keys(group).sort();
-        B.push(`
-        <div style="padding:56px 60px 8px;box-sizing:border-box;">
-            <div style="background:#16181d;color:#fff;border-radius:14px;padding:34px 38px;">
-                <div style="font-size:11px;letter-spacing:5px;color:#c8a96e;">CHAPTER ${String(ci + 1).padStart(2, '0')}</div>
-                <div style="font-family:Georgia,serif;font-size:38px;font-weight:700;margin-top:8px;">${esc2(cat)}</div>
-                <div style="font-size:13px;color:rgba(255,255,255,0.65);margin-top:6px;">${byCat[cat].length} piece${byCat[cat].length === 1 ? '' : 's'} across ${mfrs.length} maker${mfrs.length === 1 ? '' : 's'} · est. ${moneyFmt(byCat[cat].reduce((s, i2) => s + estValue(i2), 0))}</div>
-            </div>
-        </div>`);
+        const catVal = byCat[cat].reduce((s, x) => s + estValue(x), 0);
+        const catPhotos = byCat[cat].map(photoOf).filter(Boolean);
+        B.push(chapterOpener(ci + 1, cat,
+            `${byCat[cat].length === 1 ? 'A single piece' : byCat[cat].length + ' pieces'} across ${mfrs.length} maker${mfrs.length === 1 ? '' : 's'} — from ${mfrs[0]}${mfrs.length > 1 ? ' to ' + mfrs[mfrs.length - 1] : ''}.`,
+            catPhotos, `ESTIMATED CHAPTER VALUE &nbsp;·&nbsp; ${moneyFmt(catVal)}`));
+
+        B.push(`<div style="padding:64px 64px 20px;box-sizing:border-box;background:${T.paper};">`);
         mfrs.forEach(m => {
             const acc = brandAccent(m);
+            const pieces = [...group[m]].sort((x, y) => estValue(y) - estValue(x));
+            const feature = pieces.find(photoOf);
+            const rest = pieces.filter(p => p !== feature);
             B.push(`
-            <div style="padding:16px 60px 0;box-sizing:border-box;">
-                <div style="display:flex;align-items:center;gap:12px;margin:14px 0 4px;">
-                    <div style="width:5px;height:26px;background:${acc};border-radius:3px;"></div>
-                    <div style="font-family:Georgia,serif;font-size:21px;font-weight:700;color:#16181d;">${esc2(m)}</div>
-                    <div style="flex:1;height:1px;background:#e6e6ea;"></div>
-                    <div style="font-size:11px;color:#98989d;">${group[m].length} piece${group[m].length === 1 ? '' : 's'}</div>
-                </div>
-            </div>`);
-            group[m].forEach(it => {
-                const url = it.photos?.find(p => p.slot === 'main')?.url;
-                const chips = [it.caliber, it.condition, (Number(it.quantity) || 1) > 1 ? `Qty ${it.quantity}` : null,
-                               it.purchaseDate ? 'Acquired ' + it.purchaseDate.slice(0, 4) : null]
-                    .filter(Boolean).map(c => `<span style="font-size:10.5px;border:1px solid #ddd;color:#6e6e73;border-radius:99px;padding:2px 9px;">${esc2(String(c))}</span>`).join(' ');
+                <div style="display:flex;align-items:center;gap:14px;margin:26px 0 18px;page-break-inside:avoid;">
+                    <div style="width:6px;height:30px;background:${acc};border-radius:2px;"></div>
+                    <div style="font-family:${T.serif};font-weight:700;font-size:25px;color:${T.ink};">${esc2(m)}</div>
+                    <div style="flex:1;height:1px;background:${T.hair};"></div>
+                    <div style="font-size:10px;letter-spacing:2.5px;color:${T.faint};">${group[m].length} PIECE${group[m].length === 1 ? '' : 'S'}</div>
+                </div>`);
+            if (feature) {
+                const it = feature;
                 B.push(`
-                <div style="padding:8px 60px;box-sizing:border-box;page-break-inside:avoid;">
-                    <div style="display:flex;gap:18px;border:1px solid #e9e9ee;border-left:4px solid ${acc};border-radius:12px;padding:16px;align-items:center;">
-                        <div style="width:150px;height:104px;flex-shrink:0;background:#f2f2f5;border-radius:9px;display:flex;align-items:center;justify-content:center;overflow:hidden;">
-                            ${url ? `<img src="${url}" crossorigin="anonymous" style="max-width:100%;max-height:100%;object-fit:contain;" onerror="this.replaceWith(Object.assign(document.createElement('div'),{textContent:'🔫',style:'font-size:34px'}))">` : `<div style="font-size:34px;">🔫</div>`}
-                        </div>
-                        <div style="flex:1;min-width:0;">
-                            <div style="display:flex;align-items:baseline;gap:10px;">
-                                <div style="font-size:16.5px;font-weight:700;color:#16181d;">${esc2([it.manufacturer, it.model].filter(Boolean).join(' ') || 'Item #' + it.id)}</div>
-                                <div style="margin-left:auto;font-family:Georgia,serif;font-size:17px;font-weight:700;color:#8a6d2f;white-space:nowrap;">${estValue(it) ? moneyFmt(estValue(it)) : ''}</div>
-                            </div>
-                            <div style="margin:7px 0;">${chips}</div>
-                            <div style="font-size:12px;line-height:1.55;color:#4b4b52;">${esc2(brochureItemBlurb(it)).slice(0, 340)}</div>
-                            ${it.serialNumber ? `<div style="font-size:10px;color:#a0a0a6;margin-top:6px;font-family:ui-monospace,Menlo,monospace;">S/N ${esc2(it.serialNumber)}</div>` : ''}
+                <div class="bro-feature" style="display:flex;background:${T.card};border:1px solid ${T.hair};border-radius:14px;overflow:hidden;margin-bottom:16px;page-break-inside:avoid;">
+                    <div style="width:46%;min-height:296px;background:linear-gradient(180deg,#f6f3ec,#efeadf);display:flex;align-items:center;justify-content:center;padding:22px;box-sizing:border-box;">
+                        <img src="${photoOf(it)}" crossorigin="anonymous" style="max-width:100%;max-height:260px;object-fit:contain;filter:drop-shadow(0 10px 18px rgba(16,19,25,0.18));" onerror="this.replaceWith(Object.assign(document.createElement('div'),{textContent:'🔫',style:'font-size:44px'}))">
+                    </div>
+                    <div style="flex:1;padding:26px 30px;box-sizing:border-box;display:flex;flex-direction:column;">
+                        <div style="font-size:9.5px;letter-spacing:3px;color:${T.bronze};">${esc2((it.category || '').toUpperCase())}</div>
+                        <div style="font-family:${T.serif};font-weight:700;font-size:26px;color:${T.ink};line-height:1.15;margin:8px 0 14px;">${esc2([it.manufacturer, it.model].filter(Boolean).join(' ') || 'Item #' + it.id)}</div>
+                        ${specRow('CALIBER', it.caliber)}${specRow('CONDITION', it.condition)}${specRow('ACQUIRED', it.purchaseDate ? it.purchaseDate.slice(0, 4) : '')}${specRow('SERIAL', it.serialNumber)}
+                        <div style="font-family:${T.serif};font-style:italic;font-size:13.5px;line-height:1.65;color:#4c4840;margin:14px 0;flex:1;">${esc2(brochureItemBlurb(it)).slice(0, 300)}</div>
+                        <div style="display:flex;align-items:baseline;justify-content:space-between;border-top:2px solid ${T.gold};padding-top:12px;">
+                            <span style="font-size:9.5px;letter-spacing:3px;color:${T.faint};">ESTIMATED VALUE</span>
+                            <span style="font-family:${T.serif};font-weight:700;font-size:23px;color:${T.bronze};">${estValue(it) ? moneyFmt(estValue(it)) : '—'}</span>
                         </div>
                     </div>
                 </div>`);
-            });
+            }
+            if (rest.length) {
+                B.push(`<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">`);
+                rest.forEach(it => {
+                    const u = photoOf(it);
+                    B.push(`
+                    <div class="bro-grid-card" style="background:${T.card};border:1px solid ${T.hair};border-radius:12px;overflow:hidden;page-break-inside:avoid;">
+                        <div style="height:150px;background:linear-gradient(180deg,#f6f3ec,#efeadf);display:flex;align-items:center;justify-content:center;padding:14px;box-sizing:border-box;">
+                            ${u ? `<img src="${u}" crossorigin="anonymous" style="max-width:100%;max-height:122px;object-fit:contain;filter:drop-shadow(0 6px 12px rgba(16,19,25,0.15));" onerror="this.replaceWith(Object.assign(document.createElement('div'),{textContent:'🔫',style:'font-size:34px'}))">` : `<div style="font-size:34px;opacity:0.6;">🔫</div>`}
+                        </div>
+                        <div style="padding:14px 16px;">
+                            <div style="font-family:${T.serif};font-weight:700;font-size:15.5px;color:${T.ink};line-height:1.2;">${esc2([it.manufacturer, it.model].filter(Boolean).join(' ') || 'Item #' + it.id)}</div>
+                            <div style="font-size:11px;color:${T.muted};margin:6px 0 10px;">${[it.caliber, it.condition, it.purchaseDate ? it.purchaseDate.slice(0, 4) : null].filter(Boolean).map(esc2).join(' &nbsp;·&nbsp; ')}</div>
+                            <div style="display:flex;align-items:baseline;justify-content:space-between;border-top:1px solid ${T.hair};padding-top:8px;">
+                                <span style="font-size:8.5px;letter-spacing:2px;color:${T.faint};">${it.serialNumber ? 'S/N ' + esc2(it.serialNumber) : ''}</span>
+                                <span style="font-family:${T.serif};font-weight:700;font-size:16px;color:${T.bronze};">${estValue(it) ? moneyFmt(estValue(it)) : ''}</span>
+                            </div>
+                        </div>
+                    </div>`);
+                });
+                B.push(`</div>`);
+            }
         });
-        B.push('<div class="html2pdf__page-break"></div>');
+        B.push(`</div><div class="html2pdf__page-break"></div>`);
     });
 
-    // ── The Numbers (charts filled in after DOM attach) ──
+    // ═════════ THE NUMBERS ═════════
+    const monthsSpan = (() => { const ds = active.filter(i => i.purchaseDate).map(i => i.purchaseDate.slice(0, 7)); return new Set(ds).size || 1; })();
+    B.push(chapterOpener(cats.length + 1, 'The Numbers',
+        'The collection in figures — its market value over time, the calibers it favors, and the pace of its growth.',
+        [], `${active.length} PIECES &nbsp;·&nbsp; ${moneyFmt(totalValue)} ESTIMATED`));
+    const chartCard = (id, title, sub, h) => `
+        <div style="background:${T.card};border:1px solid ${T.hair};border-radius:14px;padding:24px 26px;margin-bottom:22px;page-break-inside:avoid;">
+            <div style="font-family:${T.serif};font-weight:700;font-size:22px;color:${T.ink};">${title}</div>
+            <div style="font-size:11px;color:${T.muted};margin:4px 0 16px;">${sub}</div>
+            <canvas id="${id}" width="640" height="${h}"></canvas>
+        </div>`;
     B.push(`
-    <div style="padding:56px 60px;box-sizing:border-box;">
-        <div style="background:#16181d;color:#fff;border-radius:14px;padding:34px 38px;">
-            <div style="font-size:11px;letter-spacing:5px;color:#c8a96e;">CHAPTER ${String(cats.length + 1).padStart(2, '0')}</div>
-            <div style="font-family:Georgia,serif;font-size:38px;font-weight:700;margin-top:8px;">The Numbers</div>
+    <div style="padding:64px;box-sizing:border-box;background:${T.paper};">
+        <div style="display:flex;gap:14px;margin-bottom:22px;">
+            ${[[moneyFmt(totalValue), 'ESTIMATED VALUE'], [String(active.length), 'PIECES'], [(active.length / monthsSpan).toFixed(1), 'AVG PER ACTIVE MONTH']].map(([v, l]) => `
+                <div style="flex:1;background:${T.card};border:1px solid ${T.hair};border-radius:12px;padding:18px 20px;text-align:center;">
+                    <div style="font-family:${T.serif};font-weight:700;font-size:24px;color:${T.bronze};">${v}</div>
+                    <div style="font-size:9px;letter-spacing:2.5px;color:${T.faint};margin-top:5px;">${l}</div>
+                </div>`).join('')}
         </div>
-        <div style="font-family:Georgia,serif;font-size:21px;font-weight:700;color:#16181d;margin:34px 0 12px;">Market Value Over Time</div>
-        <div style="border:1px solid #e9e9ee;border-radius:12px;padding:14px;"><canvas id="bro-chart-value" width="660" height="260"></canvas></div>
-        <div style="font-family:Georgia,serif;font-size:21px;font-weight:700;color:#16181d;margin:30px 0 12px;">Inventory by Caliber</div>
-        <div style="border:1px solid #e9e9ee;border-radius:12px;padding:14px;"><canvas id="bro-chart-caliber" width="660" height="300"></canvas></div>
+        ${chartCard('bro-chart-value', 'Market Value Over Time', 'Portfolio snapshots, oldest to newest', 250)}
+        ${chartCard('bro-chart-caliber', 'Inventory by Caliber', 'Top calibers by quantity held', 300)}
         <div class="html2pdf__page-break"></div>
-        <div style="font-family:Georgia,serif;font-size:21px;font-weight:700;color:#16181d;margin:30px 0 12px;">Purchases Over Time</div>
-        <div style="border:1px solid #e9e9ee;border-radius:12px;padding:14px;"><canvas id="bro-chart-purchases" width="660" height="280"></canvas></div>
-        <div style="text-align:center;color:#98989d;font-size:11px;margin-top:44px;letter-spacing:2px;">FARMBOSS ARMORY · ${dateStr} EDITION</div>
+        ${chartCard('bro-chart-purchases', 'Purchases Over Time', 'Pieces acquired per month', 260)}
+    </div>
+    <div class="html2pdf__page-break"></div>`);
+
+    // ═════════ BACK COVER ═════════
+    B.push(`
+    <div style="position:relative;height:1056px;box-sizing:border-box;color:#fff;overflow:hidden;
+                background:radial-gradient(700px 520px at 50% 42%, rgba(201,169,98,0.09), transparent 62%),
+                           linear-gradient(168deg, ${T.ink} 0%, ${T.ink2} 100%);">
+        ${frame}
+        <div style="position:relative;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;text-align:center;">
+            ${monogram(88, 'rgba(201,169,98,0.6)')}
+            <div style="font-size:13px;letter-spacing:9px;color:rgba(255,255,255,0.85);font-weight:500;">FARMBOSS &nbsp;ARMORY</div>
+            <div style="width:70px;height:1px;background:rgba(201,169,98,0.5);"></div>
+            <div style="font-size:10px;letter-spacing:4px;color:rgba(255,255,255,0.4);">PRIVATE CATALOG &nbsp;·&nbsp; ${edition} EDITION</div>
+        </div>
     </div>`);
 
     root.innerHTML = B.join('');
@@ -5636,20 +5752,39 @@ function buildBrochureDom() {
 
 async function fillBrochureCharts(root) {
     if (typeof Chart === 'undefined') return;
-    const mk = (id, cfg) => { const c = root.querySelector('#' + id); if (c) new Chart(c, { ...cfg, options: { ...cfg.options, animation: false, responsive: false, plugins: { legend: { display: false } } } }); };
+    const axis = { ticks: { color: '#8a857a', font: { family: 'Inter', size: 10 } }, grid: { color: 'rgba(16,19,25,0.06)' }, border: { display: false } };
+    const mk = (id, cfg) => {
+        const c = root.querySelector('#' + id);
+        if (c) new Chart(c, { ...cfg, options: { animation: false, responsive: false, plugins: { legend: { display: false } }, ...cfg.options } });
+    };
     try {
         const snap = await db.collection('portfolio_value_snapshots').orderBy('date', 'asc').get();
         const rows = snap.docs.map(d => d.data());
-        if (rows.length) mk('bro-chart-value', { type: 'line', data: { labels: rows.map(r => r.date), datasets: [{ data: rows.map(r => r.totalValue || 0), borderColor: '#c8a96e', backgroundColor: 'rgba(200,169,110,0.15)', fill: true, tension: 0.3, pointRadius: 2 }] } });
+        if (rows.length) {
+            const pts = rows.map(() => 0); pts[pts.length - 1] = 3.5;   // mark only the latest point
+            mk('bro-chart-value', {
+                type: 'line',
+                data: { labels: rows.map(r => r.date), datasets: [{ data: rows.map(r => r.totalValue || 0), borderColor: '#8a6d2f', borderWidth: 2, backgroundColor: 'rgba(201,169,98,0.13)', fill: true, tension: 0.35, pointRadius: pts, pointBackgroundColor: '#8a6d2f' }] },
+                options: { scales: { x: { ...axis, ticks: { ...axis.ticks, maxTicksLimit: 6 } }, y: { ...axis, ticks: { ...axis.ticks, maxTicksLimit: 5, callback: v => '$' + Number(v).toLocaleString() } } } }
+            });
+        }
     } catch (e) {}
     const cals = {};
     items.filter(i => !i.deleted).forEach(i => { const c = (i.caliber || '').trim() || '(none)'; cals[c] = (cals[c] || 0) + (Number(i.quantity) || 1); });
     const top = Object.entries(cals).sort((a, b) => b[1] - a[1]).slice(0, 12);
-    if (top.length) mk('bro-chart-caliber', { type: 'bar', data: { labels: top.map(t => t[0]), datasets: [{ data: top.map(t => t[1]), backgroundColor: '#16181d' }] }, options: { indexAxis: 'y' } });
+    if (top.length) mk('bro-chart-caliber', {
+        type: 'bar',
+        data: { labels: top.map(t => t[0]), datasets: [{ data: top.map(t => t[1]), backgroundColor: '#1c212b', borderRadius: 3, barThickness: 11 }] },
+        options: { indexAxis: 'y', scales: { x: { ...axis, ticks: { ...axis.ticks, precision: 0 } }, y: { ...axis, grid: { display: false } } } }
+    });
     const buckets = {};
     items.filter(i => i.purchaseDate).forEach(i => { const k = i.purchaseDate.slice(0, 7); buckets[k] = (buckets[k] || 0) + (Number(i.quantity) || 1); });
     const keys = Object.keys(buckets).sort();
-    if (keys.length) mk('bro-chart-purchases', { type: 'bar', data: { labels: keys, datasets: [{ data: keys.map(k => buckets[k]), backgroundColor: '#c8a96e' }] } });
+    if (keys.length) mk('bro-chart-purchases', {
+        type: 'bar',
+        data: { labels: keys, datasets: [{ data: keys.map(k => buckets[k]), backgroundColor: '#1c212b', borderRadius: { topLeft: 3, topRight: 3 }, barPercentage: 0.65 }] },
+        options: { scales: { x: { ...axis, grid: { display: false }, ticks: { ...axis.ticks, maxTicksLimit: 12 } }, y: { ...axis, ticks: { ...axis.ticks, precision: 0 } } } }
+    });
     await new Promise(r => setTimeout(r, 250));
 }
 
@@ -5673,6 +5808,7 @@ async function generateBrochure(auto) {
     document.body.appendChild(overlay);
     document.body.appendChild(veil);
     try {
+        try { if (document.fonts && document.fonts.ready) await document.fonts.ready; } catch (e) {}
         await fillBrochureCharts(root);
         await new Promise(r => setTimeout(r, 900));   // let photos settle
         const blob = await html2pdf().set({

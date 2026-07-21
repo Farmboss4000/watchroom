@@ -5591,6 +5591,82 @@ async function ensureStockPhotos(statusEl) {
     }
 }
 
+// ── Collector's Notes: closing narrative about the collection ──
+let brochureNarrative = null;
+
+function computeCollectionFacts() {
+    const active = items.filter(i => !i.deleted);
+    const cats = {}, makers = {}, cals = {}, conds = {};
+    let priced = 0, totalPaid = 0, priceMax = 0, priceMaxItem = null, years = {};
+    active.forEach(i => {
+        cats[i.category || 'Other'] = (cats[i.category || 'Other'] || 0) + 1;
+        if (i.manufacturer) makers[i.manufacturer] = (makers[i.manufacturer] || 0) + 1;
+        if (i.caliber) cals[i.caliber] = (cals[i.caliber] || 0) + 1;
+        if (i.condition) conds[i.condition] = (conds[i.condition] || 0) + 1;
+        const p = Number(i.price) || 0;
+        if (p) { priced++; totalPaid += p; if (p > priceMax) { priceMax = p; priceMaxItem = [i.manufacturer, i.model].filter(Boolean).join(' '); } }
+        if (i.purchaseDate) years[i.purchaseDate.slice(0, 4)] = (years[i.purchaseDate.slice(0, 4)] || 0) + 1;
+    });
+    const top = o => Object.entries(o).sort((a, b) => b[1] - a[1]);
+    return {
+        count: active.length, categories: top(cats), makers: top(makers), calibers: top(cals),
+        conditions: top(conds), totalPaid, avgPaid: priced ? totalPaid / priced : 0,
+        priceMax, priceMaxItem, years: Object.entries(years).sort(),
+        hash: active.length + '|' + Math.round(totalPaid) + '|' + top(cats).map(c => c[0] + c[1]).join(',')
+    };
+}
+
+function fallbackNarrative(f) {
+    const catLead = f.categories[0] || ['pieces', 0];
+    const makerLead = f.makers[0] || ['a range of makers', 0];
+    const calLead = f.calibers[0] || [null];
+    const span = f.years.length ? `${f.years[0][0]}–${f.years[f.years.length - 1][0]}` : 'recent years';
+    return {
+        overview: `Assembled across ${span}, this collection now numbers ${f.count} pieces spanning ${f.categories.length} categories. Its center of gravity is the ${String(catLead[0]).toLowerCase()} group (${catLead[1]} pieces), with ${makerLead[0]} the most represented maker. ${calLead[0] ? 'Ammunition commonality runs strongest in ' + calLead[0] + '.' : ''}`,
+        strengths: [
+            `Breadth across ${f.categories.length} categories gives the collection genuine working range rather than a single-purpose focus.`,
+            f.makers.length > 3 ? `Maker diversity (${f.makers.length} manufacturers) spreads both risk and character.` : `A focused maker roster keeps the collection coherent.`,
+            f.conditions[0] ? `Condition discipline: ${f.conditions[0][1]} pieces rated ${String(f.conditions[0][0]).toLowerCase()}.` : `Condition is tracked piece by piece.`,
+        ],
+        considerations: [
+            f.calibers.length > 6 ? `Caliber count (${f.calibers.length}) is broad — consolidation would simplify ammunition logistics.` : `A tight caliber set aids logistics but concentrates dependence on fewer loads.`,
+            catLead[1] > f.count / 2 ? `Concentration: over half the collection sits in one category; adjacent categories are comparatively thin.` : `No single category dominates; depth within favorites is the trade-off of breadth.`,
+            `Keeping photographs, valuations, and service records current remains the difference between a safe full of guns and a documented collection.`,
+        ],
+        closing: `Taken together, a collection built with intent — practical first, collectible where it counts, and documented like it matters.`
+    };
+}
+
+async function ensureNarrative(statusEl) {
+    const facts = computeCollectionFacts();
+    try {
+        const doc0 = await db.collection('config').doc('brochure_narrative').get();
+        if (doc0.exists && doc0.data().hash === facts.hash && doc0.data().narrative) {
+            brochureNarrative = doc0.data().narrative;
+            return;
+        }
+    } catch (e) {}
+    let nar = null;
+    if (apiKey) {
+        try {
+            if (statusEl) statusEl.textContent = 'writing collector’s notes…';
+            const prompt = `You are writing the closing essay of a premium private firearms-collection catalog, in the voice of a seasoned collection appraiser: candid, warm, specific. Based on the data below, return ONLY valid JSON:
+{"overview":"120-170 word narrative about the collection's character and how it has been built","strengths":["4 concise, specific strengths, 15-30 words each"],"considerations":["3-4 candid weaknesses or gaps, 15-30 words each, constructive not harsh"],"closing":"one elegant closing sentence"}
+
+DATA: ${JSON.stringify({ pieces: facts.count, categories: facts.categories, topMakers: facts.makers.slice(0, 8), calibers: facts.calibers.slice(0, 12), conditions: facts.conditions, totalInvested: Math.round(facts.totalPaid), averagePaid: Math.round(facts.avgPaid), mostExpensive: facts.priceMaxItem, acquisitionsByYear: facts.years })}`;
+            const raw = await callClaude(null, null, prompt, { maxTokens: 900 });
+            const m = raw && raw.match(/\{[\s\S]*\}/);
+            if (m) {
+                const j = JSON.parse(m[0]);
+                if (j.overview && Array.isArray(j.strengths) && Array.isArray(j.considerations)) nar = j;
+            }
+        } catch (e) { console.warn('narrative AI:', e.message); }
+    }
+    if (!nar) nar = fallbackNarrative(facts);
+    brochureNarrative = nar;
+    try { await db.collection('config').doc('brochure_narrative').set({ hash: facts.hash, narrative: nar, generatedAt: new Date().toISOString() }); } catch (e) {}
+}
+
 function buildBrochureDom() {
     const active = items.filter(i => !i.deleted);
     const priceOf = it => Number(it.price) || 0;
@@ -5674,6 +5750,12 @@ function buildBrochureDom() {
             <span style="font-family:${T.serif};font-size:19px;font-weight:700;color:${T.ink};">The Numbers</span>
             <span style="flex:1;border-bottom:1px dotted #cfc8b8;margin:0 6px 4px;"></span>
             <span style="font-size:11.5px;color:${T.muted};">value history · calibers · acquisitions</span>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:16px;padding:15px 0;">
+            <span style="font-family:${T.serif};font-size:15px;color:${T.bronze};min-width:44px;">${romanNum(cats.length + 2)}</span>
+            <span style="font-family:${T.serif};font-size:19px;font-weight:700;color:${T.ink};">Collector’s Notes</span>
+            <span style="flex:1;border-bottom:1px dotted #cfc8b8;margin:0 6px 4px;"></span>
+            <span style="font-size:11.5px;color:${T.muted};">character · strengths · considerations</span>
         </div>
     </div>`);
 
@@ -5801,6 +5883,34 @@ function buildBrochureDom() {
     </div>
     <div class="html2pdf__page-break"></div>`);
 
+    // ═════════ COLLECTOR'S NOTES ═════════
+    const nar = brochureNarrative || fallbackNarrative(computeCollectionFacts());
+    B.push(chapterOpener(cats.length + 2, 'Collector\u2019s Notes',
+        'An appraisal of the collection as it stands \u2014 its character, its strengths, and where it could grow.',
+        [], 'PRIVATE ASSESSMENT'));
+    const noteList = (title, rows, mark) => `
+        <div style="margin-top:34px;">
+            <div style="font-family:${T.serif};font-weight:700;font-size:22px;color:${T.ink};margin-bottom:14px;">${title}</div>
+            ${rows.map(r => `<div style="display:flex;gap:12px;margin-bottom:11px;page-break-inside:avoid;">
+                <span style="color:${mark};font-size:13px;line-height:1.6;">\u2726</span>
+                <span style="font-size:13px;line-height:1.7;color:#3f3c35;">${esc2(String(r))}</span>
+            </div>`).join('')}
+        </div>`;
+    B.push(`
+    <div style="box-sizing:border-box;padding:72px 86px;background:${T.paper};">
+        <div style="font-family:${T.serif};font-size:15.5px;line-height:1.95;color:#33302a;">
+            <span style="float:left;font-family:${T.serif};font-weight:900;font-size:64px;line-height:0.85;color:${T.bronze};padding:6px 12px 0 0;">${esc2((nar.overview || 'T').charAt(0))}</span>${esc2((nar.overview || '').slice(1))}
+        </div>
+        <div style="clear:both;"></div>
+        ${noteList('Strengths', nar.strengths || [], T.bronze)}
+        ${noteList('Considerations', nar.considerations || [], '#9a8046')}
+        <div style="margin-top:40px;border-top:1px solid ${T.hair};padding-top:24px;">
+            <div style="font-family:${T.serif};font-style:italic;font-size:16.5px;line-height:1.7;color:${T.ink};">\u201C${esc2(nar.closing || '')}\u201D</div>
+            <div style="font-size:10px;letter-spacing:3px;color:${T.faint};margin-top:12px;">\u2014 THE FARMBOSS ARMORY, ${edition}</div>
+        </div>
+    </div>
+    <div class="html2pdf__page-break"></div>`);
+
     // ═════════ IMAGE CREDITS ═════════
     if (usedCredits.length) {
         const seen = new Set();
@@ -5920,6 +6030,7 @@ async function generateBrochure(auto) {
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Building…'; }
     if (status) { status.textContent = (auto ? 'Weekly edition: ' : '') + 'sourcing catalog imagery…'; status.style.color = 'var(--text-secondary)'; }
     try { await ensureStockPhotos(status); } catch (e) {}
+    try { await ensureNarrative(status); } catch (e) { brochureNarrative = null; }
     if (status) { status.textContent = (auto ? 'Weekly edition: ' : '') + 'building the brochure — this can take a minute with many photos…'; }
     const { root, meta } = buildBrochureDom();
     // html2canvas rasterizes off-screen elements as blank — so the brochure

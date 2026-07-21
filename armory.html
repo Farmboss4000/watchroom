@@ -5528,6 +5528,69 @@ const BRO = {
     sans: "'Inter',-apple-system,'Helvetica Neue',Arial,sans-serif"
 };
 
+// ── Stock imagery from Wikimedia Commons ──
+// Free-license reference photos for each piece (public domain / CC0 / CC BY /
+// CC BY-SA — never NC or ND). The pick is cached on the item doc as
+// stockPhoto, so lookups happen once per item; attribution is compiled onto
+// the brochure's Image Credits page automatically.
+function stockLicenseOk(name) {
+    const n = (name || '').toLowerCase();
+    if (!n) return false;
+    if (n.includes('nc') || n.includes('nd')) return false;
+    return n.includes('public domain') || n.includes('cc0') || n === 'pd' || n.includes('cc by');
+}
+
+async function fetchCommonsImage(term) {
+    const u = 'https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*'
+        + '&generator=search&gsrnamespace=6&gsrlimit=6'
+        + '&gsrsearch=' + encodeURIComponent('filetype:bitmap ' + term)
+        + '&prop=imageinfo&iiprop=url|size|mime|extmetadata&iiurlwidth=900';
+    const res = await fetch(u);
+    if (!res.ok) throw new Error('Commons ' + res.status);
+    const data = await res.json();
+    const pages = Object.values(data?.query?.pages || {}).sort((a, b) => (a.index || 0) - (b.index || 0));
+    for (const p of pages) {
+        const ii = p.imageinfo && p.imageinfo[0];
+        if (!ii) continue;
+        if (!/image\/(jpeg|png)/.test(ii.mime || '')) continue;
+        if ((ii.width || 0) < 320 || (ii.height || 0) < 220) continue;
+        if (/logo|diagram|patent|drawing|cartridge|ammo box/i.test(p.title || '')) continue;
+        const md = ii.extmetadata || {};
+        const license = (md.LicenseShortName && md.LicenseShortName.value) || '';
+        if (!stockLicenseOk(license)) continue;
+        const author = String((md.Artist && md.Artist.value) || '').replace(/<[^>]*>/g, '').trim().slice(0, 90);
+        return {
+            url: ii.thumburl || ii.url,
+            title: (p.title || '').replace(/^File:/, ''),
+            author, license,
+            page: ii.descriptionshorturl || '',
+            fetchedAt: new Date().toISOString()
+        };
+    }
+    return null;
+}
+
+// Find + cache a stock photo for every item that doesn't have one yet.
+async function ensureStockPhotos(statusEl) {
+    const todo = items.filter(i => !i.deleted && !i.stockPhoto && (i.manufacturer || i.model));
+    if (!todo.length) return;
+    let done = 0;
+    const CONC = 4;
+    for (let i = 0; i < todo.length; i += CONC) {
+        const batch = todo.slice(i, i + CONC);
+        await Promise.all(batch.map(async it => {
+            const term = [it.manufacturer, it.model].filter(Boolean).join(' ');
+            let found = null;
+            try { found = await fetchCommonsImage(term); } catch (e) {}
+            const val = found || { none: true, fetchedAt: new Date().toISOString() };
+            it.stockPhoto = val;
+            try { await db.collection('items').doc(it._docId).update({ stockPhoto: val }); } catch (e) {}
+            done++;
+        }));
+        if (statusEl) statusEl.textContent = `Sourcing catalog imagery… ${Math.min(done, todo.length)}/${todo.length}`;
+    }
+}
+
 function buildBrochureDom() {
     const active = items.filter(i => !i.deleted);
     const priceOf = it => Number(it.price) || 0;
@@ -5538,7 +5601,9 @@ function buildBrochureDom() {
     const now = new Date();
     const edition = now.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }).toUpperCase();
     const T = BRO, esc2 = esc;
-    const photoOf = it => it.photos?.find(p => p.slot === 'main')?.url;
+    const photoOf = it => (it.stockPhoto && it.stockPhoto.url) || it.photos?.find(p => p.slot === 'main')?.url;
+    const usedCredits = [];
+    active.forEach(it => { if (it.stockPhoto && it.stockPhoto.url && it.stockPhoto.license) usedCredits.push(it.stockPhoto); });
 
     const root = document.createElement('div');
     root.id = 'brochure-root';
@@ -5578,7 +5643,7 @@ function buildBrochureDom() {
             </div>
             <div style="width:100%;">
                 <div style="display:flex;justify-content:center;gap:0;border-top:1px solid rgba(201,169,98,0.3);padding-top:30px;">
-                    ${[[active.length, 'PIECES'], [cats.length, 'CATEGORIES'], [moneyFmt(totalValue), 'TOTAL INVESTED']].map(([v, l], i) => `
+                    ${[[active.length, 'PIECES'], [cats.length, 'CATEGORIES']].map(([v, l], i) => `
                         <div style="padding:0 40px;${i ? 'border-left:1px solid rgba(201,169,98,0.25);' : ''}">
                             <div style="font-family:${T.serif};font-weight:700;font-size:30px;color:${T.gold};">${v}</div>
                             <div style="font-size:9.5px;letter-spacing:3.5px;color:rgba(255,255,255,0.5);margin-top:6px;">${l}</div>
@@ -5628,14 +5693,18 @@ function buildBrochureDom() {
             ${photos.length ? `
             <div style="display:flex;gap:14px;margin-top:52px;">
                 ${photos.slice(0, 4).map(u => `
-                    <div style="width:96px;height:96px;background:rgba(255,255,255,0.07);border:1px solid rgba(201,169,98,0.3);border-radius:10px;display:flex;align-items:center;justify-content:center;overflow:hidden;">
-                        <img src="${u}" crossorigin="anonymous" style="max-width:88%;max-height:88%;object-fit:contain;" onerror="this.remove()">
+                    <div style="position:relative;width:96px;height:96px;background:rgba(255,255,255,0.07);border:1px solid rgba(201,169,98,0.3);border-radius:10px;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+                        <img src="${u}" crossorigin="anonymous" style="max-width:88%;max-height:88%;object-fit:contain;border-radius:6px;" onerror="this.parentElement.remove()">
+                        <div style="position:absolute;inset:0;background:radial-gradient(ellipse at center, transparent 50%, rgba(20,24,32,0.85) 100%);pointer-events:none;"></div>
                     </div>`).join('')}
             </div>` : ''}
             <div style="font-size:10.5px;letter-spacing:3px;color:rgba(255,255,255,0.45);margin-top:44px;">${statLine}</div>
         </div>
     </div>
     <div class="html2pdf__page-break"></div>`;
+
+    // Soft feathered edge: a radial gradient overlay blending the photo into its panel.
+    const vignette = (edge) => `<div style="position:absolute;inset:0;background:radial-gradient(ellipse at center, transparent 52%, ${edge} 99%);pointer-events:none;"></div>`;
 
     const specRow = (label, val) => val ? `
         <div style="display:flex;gap:12px;padding:5.5px 0;border-bottom:1px solid ${T.hair};">
@@ -5670,8 +5739,9 @@ function buildBrochureDom() {
                 const it = feature;
                 B.push(`
                 <div class="bro-feature" style="display:flex;background:${T.card};border:1px solid ${T.hair};border-radius:14px;overflow:hidden;margin-bottom:16px;page-break-inside:avoid;">
-                    <div style="width:46%;min-height:296px;background:linear-gradient(180deg,#f6f3ec,#efeadf);display:flex;align-items:center;justify-content:center;padding:22px;box-sizing:border-box;">
-                        <img src="${photoOf(it)}" crossorigin="anonymous" style="max-width:100%;max-height:260px;object-fit:contain;filter:drop-shadow(0 10px 18px rgba(16,19,25,0.18));" onerror="this.replaceWith(Object.assign(document.createElement('div'),{textContent:'🔫',style:'font-size:44px'}))">
+                    <div style="position:relative;width:46%;min-height:296px;background:linear-gradient(180deg,#f6f3ec,#efeadf);display:flex;align-items:center;justify-content:center;padding:22px;box-sizing:border-box;overflow:hidden;">
+                        <img src="${photoOf(it)}" crossorigin="anonymous" style="max-width:100%;max-height:260px;object-fit:contain;border-radius:10px;filter:drop-shadow(0 10px 18px rgba(16,19,25,0.18));" onerror="this.replaceWith(Object.assign(document.createElement('div'),{textContent:'🔫',style:'font-size:44px'}))">
+                        ${vignette('#f2eee3')}
                     </div>
                     <div style="flex:1;padding:26px 30px;box-sizing:border-box;display:flex;flex-direction:column;">
                         <div style="font-size:9.5px;letter-spacing:3px;color:${T.bronze};">${esc2((it.category || '').toUpperCase())}</div>
@@ -5691,8 +5761,9 @@ function buildBrochureDom() {
                     const u = photoOf(it);
                     B.push(`
                     <div class="bro-grid-card" style="background:${T.card};border:1px solid ${T.hair};border-radius:12px;overflow:hidden;page-break-inside:avoid;">
-                        <div style="height:150px;background:linear-gradient(180deg,#f6f3ec,#efeadf);display:flex;align-items:center;justify-content:center;padding:14px;box-sizing:border-box;">
-                            ${u ? `<img src="${u}" crossorigin="anonymous" style="max-width:100%;max-height:122px;object-fit:contain;filter:drop-shadow(0 6px 12px rgba(16,19,25,0.15));" onerror="this.replaceWith(Object.assign(document.createElement('div'),{textContent:'🔫',style:'font-size:34px'}))">` : `<div style="font-size:34px;opacity:0.6;">🔫</div>`}
+                        <div style="position:relative;height:150px;background:linear-gradient(180deg,#f6f3ec,#efeadf);display:flex;align-items:center;justify-content:center;padding:14px;box-sizing:border-box;overflow:hidden;">
+                            ${u ? `<img src="${u}" crossorigin="anonymous" style="max-width:100%;max-height:122px;object-fit:contain;border-radius:8px;filter:drop-shadow(0 6px 12px rgba(16,19,25,0.15));" onerror="this.replaceWith(Object.assign(document.createElement('div'),{textContent:'🔫',style:'font-size:34px'}))">` : `<div style="font-size:34px;opacity:0.6;">🔫</div>`}
+                            ${u ? `<div style="position:absolute;inset:0;background:radial-gradient(ellipse at center, transparent 52%, #f2eee3 99%);pointer-events:none;"></div>` : ''}
                         </div>
                         <div style="padding:14px 16px;">
                             <div style="font-family:${T.serif};font-weight:700;font-size:15.5px;color:${T.ink};line-height:1.2;">${esc2([it.manufacturer, it.model].filter(Boolean).join(' ') || 'Item #' + it.id)}</div>
@@ -5736,6 +5807,23 @@ function buildBrochureDom() {
         ${chartCard('bro-chart-purchases', 'Purchases Over Time', 'Pieces acquired per month', 260)}
     </div>
     <div class="html2pdf__page-break"></div>`);
+
+    // ═════════ IMAGE CREDITS ═════════
+    if (usedCredits.length) {
+        const seen = new Set();
+        const rows = usedCredits.filter(c => { const k = c.title || c.url; if (seen.has(k)) return false; seen.add(k); return true; });
+        B.push(`
+        <div style="box-sizing:border-box;padding:80px 86px;background:${T.paper};min-height:600px;">
+            <div style="font-size:11px;letter-spacing:6px;color:${T.bronze};font-weight:500;">APPENDIX</div>
+            <div style="font-family:${T.serif};font-weight:700;font-size:36px;color:${T.ink};margin:12px 0 8px;">Image Credits</div>
+            <div style="width:64px;height:2px;background:${T.gold};margin-bottom:20px;"></div>
+            <div style="font-size:11px;color:${T.muted};margin-bottom:24px;">Reference imagery courtesy of Wikimedia Commons contributors, used under the licenses noted. All other photographs are from the Farmboss archive.</div>
+            <div style="column-count:2;column-gap:34px;">
+                ${rows.map(c => `<div style="font-size:10px;line-height:1.6;color:${T.muted};margin-bottom:9px;break-inside:avoid;"><span style="color:${T.ink};font-weight:500;">${esc2((c.title || '').replace(/\.(jpe?g|png)$/i, ''))}</span><br>${esc2(c.author || 'Unknown author')} · ${esc2(c.license)} · Wikimedia Commons</div>`).join('')}
+            </div>
+        </div>
+        <div class="html2pdf__page-break"></div>`);
+    }
 
     // ═════════ BACK COVER ═════════
     B.push(`
@@ -5799,7 +5887,9 @@ async function generateBrochure(auto) {
     if (typeof html2pdf === 'undefined') { if (status) { status.textContent = '❌ PDF library not loaded — check your connection and refresh.'; status.style.color = 'var(--danger)'; } return; }
     if (!items.filter(i => !i.deleted).length) { toast('No items to include yet.', 'error'); return; }
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Building…'; }
-    if (status) { status.textContent = (auto ? 'Weekly edition: ' : '') + 'building the brochure — this can take a minute with many photos…'; status.style.color = 'var(--text-secondary)'; }
+    if (status) { status.textContent = (auto ? 'Weekly edition: ' : '') + 'sourcing catalog imagery…'; status.style.color = 'var(--text-secondary)'; }
+    try { await ensureStockPhotos(status); } catch (e) {}
+    if (status) { status.textContent = (auto ? 'Weekly edition: ' : '') + 'building the brochure — this can take a minute with many photos…'; }
     const { root, meta } = buildBrochureDom();
     // html2canvas rasterizes off-screen elements as blank — so the brochure
     // is shown in a full-screen overlay while it's captured.

@@ -5518,7 +5518,7 @@ function buildBrochureDom() {
 
     const root = document.createElement('div');
     root.id = 'brochure-root';
-    root.style.cssText = 'position:absolute;left:-10000px;top:0;width:816px;background:#fff;';
+    root.style.cssText = 'width:816px;background:#fff;margin:0 auto;box-shadow:0 8px 40px rgba(0,0,0,0.25);';
     const B = [];
     const esc2 = esc;
 
@@ -5661,17 +5661,28 @@ async function generateBrochure(auto) {
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Building…'; }
     if (status) { status.textContent = (auto ? 'Weekly edition: ' : '') + 'building the brochure — this can take a minute with many photos…'; status.style.color = 'var(--text-secondary)'; }
     const { root, meta } = buildBrochureDom();
-    document.body.appendChild(root);
+    // html2canvas rasterizes off-screen elements as blank — so the brochure
+    // is shown in a full-screen overlay while it's captured.
+    const overlay = document.createElement('div');
+    overlay.id = 'brochure-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(240,240,244,0.99);overflow:auto;padding:54px 0 30px;';
+    const veil = document.createElement('div');
+    veil.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:100000;background:#16181d;color:#fff;padding:12px 18px;font-size:0.9rem;display:flex;align-items:center;gap:10px;';
+    veil.innerHTML = '🖨 <strong>Building the brochure PDF…</strong> <span style="opacity:0.7;">photos and charts are being captured — this takes a minute. Don\'t close the tab.</span>';
+    overlay.appendChild(root);
+    document.body.appendChild(overlay);
+    document.body.appendChild(veil);
     try {
         await fillBrochureCharts(root);
-        await new Promise(r => setTimeout(r, 400));   // let photos settle
+        await new Promise(r => setTimeout(r, 900));   // let photos settle
         const blob = await html2pdf().set({
             margin: 0,
             image: { type: 'jpeg', quality: 0.9 },
-            html2canvas: { scale: 2, useCORS: true, imageTimeout: 10000, logging: false },
+            html2canvas: { scale: 2, useCORS: true, imageTimeout: 10000, logging: false, scrollX: 0, scrollY: 0 },
             jsPDF: { unit: 'px', format: [816, 1056], hotfixes: ['px_scaling'] },
             pagebreak: { mode: ['css', 'legacy'] }
         }).from(root).toPdf().output('blob');
+        if (!blob || blob.size < 30000) throw new Error('the generated PDF came out empty — photos may not have loaded; please try again.');
         const path = `armory_brochures/${Date.now()}_brochure.pdf`;
         const ref = storage.ref().child(path);
         await ref.put(blob, { contentType: 'application/pdf' });
@@ -5688,7 +5699,8 @@ async function generateBrochure(auto) {
         if (status) { status.textContent = '❌ ' + err.message; status.style.color = 'var(--danger)'; }
         if (!auto) toast('Brochure failed: ' + err.message, 'error');
     } finally {
-        document.getElementById('brochure-root')?.remove();
+        document.getElementById('brochure-overlay')?.remove();
+        veil.remove();
         if (btn) { btn.disabled = false; btn.textContent = '🖨 Generate New Brochure'; }
     }
 }

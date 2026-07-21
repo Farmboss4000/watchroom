@@ -5654,8 +5654,7 @@ function buildBrochureDom() {
                 <div style="font-size:10px;letter-spacing:4px;color:rgba(255,255,255,0.38);margin-top:30px;">${edition} EDITION &nbsp;·&nbsp; PRIVATE &amp; CONFIDENTIAL</div>
             </div>
         </div>
-    </div>
-    <div class="html2pdf__page-break"></div>`);
+    </div>`);
 
     // ═════════ CONTENTS ═════════
     B.push(`
@@ -5676,8 +5675,7 @@ function buildBrochureDom() {
             <span style="flex:1;border-bottom:1px dotted #cfc8b8;margin:0 6px 4px;"></span>
             <span style="font-size:11.5px;color:${T.muted};">value history · calibers · acquisitions</span>
         </div>
-    </div>
-    <div class="html2pdf__page-break"></div>`);
+    </div>`);
 
     // ═════════ CHAPTERS ═════════
     const chapterOpener = (num, title, tagline, photos, statLine) => `
@@ -5696,17 +5694,12 @@ function buildBrochureDom() {
             <div style="display:flex;gap:14px;margin-top:52px;">
                 ${photos.slice(0, 4).map(u => `
                     <div style="position:relative;width:96px;height:96px;background:rgba(255,255,255,0.07);border:1px solid rgba(201,169,98,0.3);border-radius:10px;display:flex;align-items:center;justify-content:center;overflow:hidden;">
-                        <img src="${u}" crossorigin="anonymous" style="max-width:88%;max-height:88%;object-fit:contain;border-radius:6px;" onerror="this.parentElement.remove()">
-                        <div style="position:absolute;inset:0;background:radial-gradient(ellipse at center, transparent 50%, rgba(20,24,32,0.85) 100%);pointer-events:none;"></div>
+                        <img src="${u}" data-fe="#171b23" crossorigin="anonymous" style="max-width:88%;max-height:88%;object-fit:contain;border-radius:6px;" onerror="this.parentElement.remove()">
                     </div>`).join('')}
             </div>` : ''}
             <div style="font-size:10.5px;letter-spacing:3px;color:rgba(255,255,255,0.45);margin-top:44px;">${statLine}</div>
         </div>
-    </div>
-    <div class="html2pdf__page-break"></div>`;
-
-    // Soft feathered edge: a radial gradient overlay blending the photo into its panel.
-    const vignette = (edge) => `<div style="position:absolute;inset:0;background:radial-gradient(ellipse at center, transparent 52%, ${edge} 99%);pointer-events:none;"></div>`;
+    </div>`;
 
     const specRow = (label, val) => val ? `
         <div style="display:flex;gap:12px;padding:5.5px 0;border-bottom:1px solid ${T.hair};">
@@ -5742,8 +5735,7 @@ function buildBrochureDom() {
                 B.push(`
                 <div class="bro-feature" style="display:flex;background:${T.card};border:1px solid ${T.hair};border-radius:14px;overflow:hidden;margin-bottom:16px;page-break-inside:avoid;">
                     <div style="position:relative;width:46%;min-height:296px;background:linear-gradient(180deg,#f6f3ec,#efeadf);display:flex;align-items:center;justify-content:center;padding:22px;box-sizing:border-box;overflow:hidden;">
-                        <img src="${photoOf(it)}" crossorigin="anonymous" style="max-width:100%;max-height:260px;object-fit:contain;border-radius:10px;filter:drop-shadow(0 10px 18px rgba(16,19,25,0.18));" onerror="this.replaceWith(Object.assign(document.createElement('div'),{textContent:'🔫',style:'font-size:44px'}))">
-                        ${vignette('#f2eee3')}
+                        <img src="${photoOf(it)}" data-fe="#f2eee3" crossorigin="anonymous" style="max-width:100%;max-height:260px;object-fit:contain;border-radius:10px;" onerror="this.replaceWith(Object.assign(document.createElement('div'),{textContent:'🔫',style:'font-size:44px'}))">
                     </div>
                     <div style="flex:1;padding:26px 30px;box-sizing:border-box;display:flex;flex-direction:column;">
                         <div style="font-size:9.5px;letter-spacing:3px;color:${T.bronze};">${esc2((it.category || '').toUpperCase())}</div>
@@ -5764,8 +5756,7 @@ function buildBrochureDom() {
                     B.push(`
                     <div class="bro-grid-card" style="background:${T.card};border:1px solid ${T.hair};border-radius:12px;overflow:hidden;page-break-inside:avoid;">
                         <div style="position:relative;height:150px;background:linear-gradient(180deg,#f6f3ec,#efeadf);display:flex;align-items:center;justify-content:center;padding:14px;box-sizing:border-box;overflow:hidden;">
-                            ${u ? `<img src="${u}" crossorigin="anonymous" style="max-width:100%;max-height:122px;object-fit:contain;border-radius:8px;filter:drop-shadow(0 6px 12px rgba(16,19,25,0.15));" onerror="this.replaceWith(Object.assign(document.createElement('div'),{textContent:'🔫',style:'font-size:34px'}))">` : `<div style="font-size:34px;opacity:0.6;">🔫</div>`}
-                            ${u ? `<div style="position:absolute;inset:0;background:radial-gradient(ellipse at center, transparent 52%, #f2eee3 99%);pointer-events:none;"></div>` : ''}
+                            ${u ? `<img src="${u}" data-fe="#f2eee3" crossorigin="anonymous" style="max-width:100%;max-height:122px;object-fit:contain;border-radius:8px;" onerror="this.replaceWith(Object.assign(document.createElement('div'),{textContent:'🔫',style:'font-size:34px'}))">` : `<div style="font-size:34px;opacity:0.6;">🔫</div>`}
                         </div>
                         <div style="padding:14px 16px;">
                             <div style="font-family:${T.serif};font-weight:700;font-size:15.5px;color:${T.ink};line-height:1.2;">${esc2([it.manufacturer, it.model].filter(Boolean).join(' ') || 'Item #' + it.id)}</div>
@@ -5883,6 +5874,44 @@ async function fillBrochureCharts(root) {
     await new Promise(r => setTimeout(r, 250));
 }
 
+// Fetch every brochure image and bake a feathered edge into its pixels on a
+// canvas, then swap the <img> to a same-origin data URL. This sidesteps the
+// PDF engine's unreliable gradient/CORS handling entirely: it just draws a
+// plain, pre-blended image. Images that can't be fetched keep their original
+// src (they may still capture if the host allows it).
+async function prepareBrochureImages(root) {
+    const imgs = [...root.querySelectorAll('img[data-fe]')];
+    const CONC = 5;
+    for (let i = 0; i < imgs.length; i += CONC) {
+        await Promise.all(imgs.slice(i, i + CONC).map(async img => {
+            try {
+                const res = await fetch(img.src, { mode: 'cors' });
+                if (!res.ok) return;
+                const blob = await res.blob();
+                const bmp = await createImageBitmap(blob);
+                const maxW = 1100;
+                const scale = Math.min(1, maxW / bmp.width);
+                const w = Math.max(1, Math.round(bmp.width * scale));
+                const h = Math.max(1, Math.round(bmp.height * scale));
+                const cv = document.createElement('canvas');
+                cv.width = w; cv.height = h;
+                const ctx = cv.getContext('2d');
+                ctx.fillStyle = img.dataset.fe;         // panel color behind the photo
+                ctx.fillRect(0, 0, w, h);
+                ctx.drawImage(bmp, 0, 0, w, h);
+                // Feather: blend the edges back into the panel color.
+                const g = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.42, w / 2, h / 2, Math.max(w, h) * 0.62);
+                g.addColorStop(0, img.dataset.fe + '00');
+                g.addColorStop(1, img.dataset.fe);
+                ctx.fillStyle = g;
+                ctx.fillRect(0, 0, w, h);
+                img.src = cv.toDataURL('image/jpeg', 0.9);
+                img.removeAttribute('crossorigin');
+            } catch (e) { /* keep original src */ }
+        }));
+    }
+}
+
 async function generateBrochure(auto) {
     const status = document.getElementById('brochure-status');
     const btn = document.getElementById('btn-brochure');
@@ -5907,7 +5936,9 @@ async function generateBrochure(auto) {
     try {
         try { if (document.fonts && document.fonts.ready) await document.fonts.ready; } catch (e) {}
         await fillBrochureCharts(root);
-        await new Promise(r => setTimeout(r, 900));   // let photos settle
+        if (status) status.textContent = 'preparing photos…';
+        await prepareBrochureImages(root);
+        await new Promise(r => setTimeout(r, 400));
         const blob = await html2pdf().set({
             margin: 0,
             image: { type: 'jpeg', quality: 0.9 },

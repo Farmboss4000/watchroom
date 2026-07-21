@@ -12,6 +12,7 @@
     <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
     <title>Farmboss Armory</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
@@ -958,6 +959,23 @@
 <!-- ══ REPORTS ══ -->
 <div id="view-reports" class="view">
 
+    <!-- ── COLLECTION BROCHURE ── -->
+    <div class="card" style="margin-bottom:18px;">
+        <div class="card-title" style="flex-wrap:wrap;gap:10px;">
+            <div class="card-title-left">📖 Collection Brochure</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="btn btn-ghost btn-sm" onclick="writeBrochureBlurbs()" id="btn-blurbs" title="Write a short marketing blurb for items that don't have one (cached per item)">✨ AI blurbs</button>
+                <button class="btn btn-primary btn-sm" onclick="generateBrochure(false)" id="btn-brochure">🖨 Generate New Brochure</button>
+            </div>
+        </div>
+        <p style="font-size:0.82rem;color:var(--text-secondary);margin:0 0 12px;">
+            A magazine-style PDF of the whole collection — chapters by category, grouped by manufacturer, with photos,
+            descriptions, and estimated values, closing with the market-value, caliber, and purchase charts.
+            A fresh edition is generated automatically about once a week; every past edition is kept below.</p>
+        <div id="brochure-status" style="font-size:0.82rem;min-height:1.1em;margin-bottom:8px;"></div>
+        <div id="brochure-list"><p style="color:var(--text-secondary);font-size:0.82rem;">Loading past editions…</p></div>
+    </div>
+
     <!-- ── PURCHASES OVER TIME CHART ── -->
     <div class="card" style="margin-bottom:18px;">
         <div class="card-title" style="flex-wrap:wrap;gap:10px;">
@@ -1689,6 +1707,7 @@ async function initApp() {
         document.getElementById('app').style.display            = 'flex';
         populateCatSelect(); populateMfrList(); populateCalList(); syncCatFilters();
         showView('dashboard');
+        setTimeout(checkWeeklyBrochure, 8000);   // auto-refresh the brochure ~weekly
     } catch(err) {
         document.getElementById('loading-screen').innerHTML =
             `<p style="color:var(--danger);padding:20px;text-align:center;">
@@ -1737,7 +1756,7 @@ function showView(v) {
     document.querySelectorAll('nav button').forEach((btn,i) => btn.classList.toggle('active', VIEWS[i]===v));
     if (v==='dashboard')    renderDashboard();
     if (v==='inventory')    { syncCatFilters(); renderInventory(); }
-    if (v==='reports')      { syncCatFilters(); renderReport(); renderPurchaseChart(); renderCaliberReport(); renderCompatibilityReport(); loadPortfolioSnapshots().then(() => { checkAndCaptureDaily(); renderMarketValueChart(); }); }
+    if (v==='reports')      { syncCatFilters(); renderReport(); renderPurchaseChart(); renderCaliberReport(); renderCompatibilityReport(); renderBrochureList(); loadPortfolioSnapshots().then(() => { checkAndCaptureDaily(); renderMarketValueChart(); }); }
     if (v==='categories')   renderCatTags();
     if (v==='add-item')     { populateCatSelect(); updateMagSection(); }
     if (v==='recycle-bin')  loadRecycleBin();
@@ -5446,6 +5465,314 @@ document.addEventListener('click', e => {
     if (!e.target.closest('.view-picker-wrap')) menu.classList.remove('open');
 });
 applyInvColumnVisibility();
+
+// ═══════════════════════════════════════
+//  COLLECTION BROCHURE
+//  Magazine-style PDF: chapters by category, grouped by manufacturer,
+//  photos/descriptions/values, closing with the three report charts.
+//  Editions are saved to Storage + the armory_brochures collection; a
+//  fresh edition is generated automatically about once a week.
+// ═══════════════════════════════════════
+
+// Brand accent cues for well-known manufacturers (design nod without
+// scraping anyone's site; unknown makers get a steady hash-based tone).
+const BRAND_ACCENTS = {
+    'glock':'#65686c','sig sauer':'#b5121b','smith & wesson':'#1b3a6b','ruger':'#c00000',
+    'colt':'#b8860b','springfield armory':'#5b7c99','remington':'#2e5339','mossberg':'#8b0000',
+    'winchester':'#7a1f1f','benelli':'#0f4c81','beretta':'#003da5','browning':'#c8a96e',
+    'barrett':'#4a4f57','daniel defense':'#222831','fn america':'#1f2d50','h&k':'#3c3f44',
+    'kimber':'#6b4f2a','savage':'#374d3a','taurus':'#8c6d1f','tikka':'#365e7d','cmmg':'#585f45',
+    'bushmaster':'#44464a','henry':'#a67c00','leupold':'#e0a526','vortex':'#c65911','nightforce':'#2f2f2f'
+};
+function brandAccent(mfr) {
+    const k = (mfr || '').toLowerCase().trim();
+    if (BRAND_ACCENTS[k]) return BRAND_ACCENTS[k];
+    let h = 0; for (const c of k) h = (h * 31 + c.charCodeAt(0)) % 360;
+    return `hsl(${h}, 32%, 38%)`;
+}
+function estValue(it) { return Number(it.marketValue) || Number(it.price) || 0; }
+function moneyFmt(n) { return '$' + (Number(n) || 0).toLocaleString(undefined, { maximumFractionDigits: 0 }); }
+
+// Pure: does a new weekly edition need generating?
+function brochureIsStale(latestIso, nowMs) {
+    if (!latestIso) return true;
+    return (nowMs - new Date(latestIso).getTime()) > 7 * 86400000;
+}
+
+function brochureItemBlurb(it) {
+    if (it.brochureBlurb) return it.brochureBlurb;
+    if (it.notes) return it.notes;
+    const bits = [];
+    if (it.condition) bits.push(it.condition.toLowerCase());
+    if (it.caliber) bits.push(it.caliber);
+    return `A ${bits.join(' ')} ${(it.category || 'item').toLowerCase()} from ${it.manufacturer || 'the collection'}.`;
+}
+
+function buildBrochureDom() {
+    const active = items.filter(i => !i.deleted);
+    const totalValue = active.reduce((s, i) => s + estValue(i) * (Number(i.quantity) || 1), 0);
+    const byCat = {};
+    active.forEach(i => { const c = i.category || 'Other'; (byCat[c] = byCat[c] || []).push(i); });
+    const cats = Object.keys(byCat).sort((a, b) => byCat[b].length - byCat[a].length);
+    const dateStr = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+
+    const root = document.createElement('div');
+    root.id = 'brochure-root';
+    root.style.cssText = 'position:absolute;left:-10000px;top:0;width:816px;background:#fff;';
+    const B = [];
+    const esc2 = esc;
+
+    // ── Cover ──
+    B.push(`
+    <div style="height:1020px;background:linear-gradient(160deg,#12141c 0%,#1d2233 55%,#2a2416 100%);color:#fff;
+                display:flex;flex-direction:column;justify-content:space-between;padding:70px 60px;box-sizing:border-box;">
+        <div>
+            <div style="font-size:13px;letter-spacing:6px;color:#c8a96e;font-weight:600;">FARMBOSS COLLECTION SERIES</div>
+            <div style="width:64px;height:3px;background:#c8a96e;margin:18px 0 46px;"></div>
+            <div style="font-family:Georgia,'Times New Roman',serif;font-size:64px;line-height:1.05;font-weight:700;">The<br>Armory</div>
+            <div style="font-family:Georgia,serif;font-size:20px;color:rgba(255,255,255,0.75);margin-top:18px;font-style:italic;">Firearms &amp; Equipment — A Collector's Catalog</div>
+        </div>
+        <div>
+            <div style="display:flex;gap:44px;border-top:1px solid rgba(200,169,110,0.35);padding-top:26px;">
+                <div><div style="font-size:34px;font-weight:700;color:#c8a96e;">${active.length}</div><div style="font-size:11px;letter-spacing:2px;color:rgba(255,255,255,0.6);">PIECES</div></div>
+                <div><div style="font-size:34px;font-weight:700;color:#c8a96e;">${cats.length}</div><div style="font-size:11px;letter-spacing:2px;color:rgba(255,255,255,0.6);">CATEGORIES</div></div>
+                <div><div style="font-size:34px;font-weight:700;color:#c8a96e;">${moneyFmt(totalValue)}</div><div style="font-size:11px;letter-spacing:2px;color:rgba(255,255,255,0.6);">ESTIMATED VALUE</div></div>
+            </div>
+            <div style="font-size:12px;color:rgba(255,255,255,0.45);margin-top:22px;">${dateStr} Edition · Private catalog</div>
+        </div>
+    </div>
+    <div class="html2pdf__page-break"></div>`);
+
+    // ── Table of contents ──
+    B.push(`
+    <div style="padding:60px;box-sizing:border-box;">
+        <div style="font-size:12px;letter-spacing:5px;color:#c8a96e;font-weight:600;">CONTENTS</div>
+        <div style="font-family:Georgia,serif;font-size:34px;font-weight:700;color:#16181d;margin:10px 0 34px;">In this edition</div>
+        ${cats.map((c, i) => `
+            <div style="display:flex;align-items:baseline;gap:14px;padding:11px 0;border-bottom:1px solid #ececf0;">
+                <span style="font-family:Georgia,serif;font-size:15px;color:#c8a96e;min-width:36px;">${String(i + 1).padStart(2, '0')}</span>
+                <span style="font-size:16px;font-weight:600;color:#16181d;">${esc2(c)}</span>
+                <span style="margin-left:auto;font-size:12px;color:#98989d;">${byCat[c].length} piece${byCat[c].length === 1 ? '' : 's'} · ${moneyFmt(byCat[c].reduce((s, i2) => s + estValue(i2), 0))}</span>
+            </div>`).join('')}
+        <div style="display:flex;align-items:baseline;gap:14px;padding:11px 0;border-bottom:1px solid #ececf0;">
+            <span style="font-family:Georgia,serif;font-size:15px;color:#c8a96e;min-width:36px;">${String(cats.length + 1).padStart(2, '0')}</span>
+            <span style="font-size:16px;font-weight:600;color:#16181d;">The Numbers</span>
+            <span style="margin-left:auto;font-size:12px;color:#98989d;">value history · calibers · acquisitions</span>
+        </div>
+    </div>
+    <div class="html2pdf__page-break"></div>`);
+
+    // ── Chapters ──
+    cats.forEach((cat, ci) => {
+        const group = {};
+        byCat[cat].forEach(i => { const m = i.manufacturer || 'Unattributed'; (group[m] = group[m] || []).push(i); });
+        const mfrs = Object.keys(group).sort();
+        B.push(`
+        <div style="padding:56px 60px 8px;box-sizing:border-box;">
+            <div style="background:#16181d;color:#fff;border-radius:14px;padding:34px 38px;">
+                <div style="font-size:11px;letter-spacing:5px;color:#c8a96e;">CHAPTER ${String(ci + 1).padStart(2, '0')}</div>
+                <div style="font-family:Georgia,serif;font-size:38px;font-weight:700;margin-top:8px;">${esc2(cat)}</div>
+                <div style="font-size:13px;color:rgba(255,255,255,0.65);margin-top:6px;">${byCat[cat].length} piece${byCat[cat].length === 1 ? '' : 's'} across ${mfrs.length} maker${mfrs.length === 1 ? '' : 's'} · est. ${moneyFmt(byCat[cat].reduce((s, i2) => s + estValue(i2), 0))}</div>
+            </div>
+        </div>`);
+        mfrs.forEach(m => {
+            const acc = brandAccent(m);
+            B.push(`
+            <div style="padding:16px 60px 0;box-sizing:border-box;">
+                <div style="display:flex;align-items:center;gap:12px;margin:14px 0 4px;">
+                    <div style="width:5px;height:26px;background:${acc};border-radius:3px;"></div>
+                    <div style="font-family:Georgia,serif;font-size:21px;font-weight:700;color:#16181d;">${esc2(m)}</div>
+                    <div style="flex:1;height:1px;background:#e6e6ea;"></div>
+                    <div style="font-size:11px;color:#98989d;">${group[m].length} piece${group[m].length === 1 ? '' : 's'}</div>
+                </div>
+            </div>`);
+            group[m].forEach(it => {
+                const url = it.photos?.find(p => p.slot === 'main')?.url;
+                const chips = [it.caliber, it.condition, (Number(it.quantity) || 1) > 1 ? `Qty ${it.quantity}` : null,
+                               it.purchaseDate ? 'Acquired ' + it.purchaseDate.slice(0, 4) : null]
+                    .filter(Boolean).map(c => `<span style="font-size:10.5px;border:1px solid #ddd;color:#6e6e73;border-radius:99px;padding:2px 9px;">${esc2(String(c))}</span>`).join(' ');
+                B.push(`
+                <div style="padding:8px 60px;box-sizing:border-box;page-break-inside:avoid;">
+                    <div style="display:flex;gap:18px;border:1px solid #e9e9ee;border-left:4px solid ${acc};border-radius:12px;padding:16px;align-items:center;">
+                        <div style="width:150px;height:104px;flex-shrink:0;background:#f2f2f5;border-radius:9px;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+                            ${url ? `<img src="${url}" crossorigin="anonymous" style="max-width:100%;max-height:100%;object-fit:contain;" onerror="this.replaceWith(Object.assign(document.createElement('div'),{textContent:'🔫',style:'font-size:34px'}))">` : `<div style="font-size:34px;">🔫</div>`}
+                        </div>
+                        <div style="flex:1;min-width:0;">
+                            <div style="display:flex;align-items:baseline;gap:10px;">
+                                <div style="font-size:16.5px;font-weight:700;color:#16181d;">${esc2([it.manufacturer, it.model].filter(Boolean).join(' ') || 'Item #' + it.id)}</div>
+                                <div style="margin-left:auto;font-family:Georgia,serif;font-size:17px;font-weight:700;color:#8a6d2f;white-space:nowrap;">${estValue(it) ? moneyFmt(estValue(it)) : ''}</div>
+                            </div>
+                            <div style="margin:7px 0;">${chips}</div>
+                            <div style="font-size:12px;line-height:1.55;color:#4b4b52;">${esc2(brochureItemBlurb(it)).slice(0, 340)}</div>
+                            ${it.serialNumber ? `<div style="font-size:10px;color:#a0a0a6;margin-top:6px;font-family:ui-monospace,Menlo,monospace;">S/N ${esc2(it.serialNumber)}</div>` : ''}
+                        </div>
+                    </div>
+                </div>`);
+            });
+        });
+        B.push('<div class="html2pdf__page-break"></div>');
+    });
+
+    // ── The Numbers (charts filled in after DOM attach) ──
+    B.push(`
+    <div style="padding:56px 60px;box-sizing:border-box;">
+        <div style="background:#16181d;color:#fff;border-radius:14px;padding:34px 38px;">
+            <div style="font-size:11px;letter-spacing:5px;color:#c8a96e;">CHAPTER ${String(cats.length + 1).padStart(2, '0')}</div>
+            <div style="font-family:Georgia,serif;font-size:38px;font-weight:700;margin-top:8px;">The Numbers</div>
+        </div>
+        <div style="font-family:Georgia,serif;font-size:21px;font-weight:700;color:#16181d;margin:34px 0 12px;">Market Value Over Time</div>
+        <div style="border:1px solid #e9e9ee;border-radius:12px;padding:14px;"><canvas id="bro-chart-value" width="660" height="260"></canvas></div>
+        <div style="font-family:Georgia,serif;font-size:21px;font-weight:700;color:#16181d;margin:30px 0 12px;">Inventory by Caliber</div>
+        <div style="border:1px solid #e9e9ee;border-radius:12px;padding:14px;"><canvas id="bro-chart-caliber" width="660" height="300"></canvas></div>
+        <div class="html2pdf__page-break"></div>
+        <div style="font-family:Georgia,serif;font-size:21px;font-weight:700;color:#16181d;margin:30px 0 12px;">Purchases Over Time</div>
+        <div style="border:1px solid #e9e9ee;border-radius:12px;padding:14px;"><canvas id="bro-chart-purchases" width="660" height="280"></canvas></div>
+        <div style="text-align:center;color:#98989d;font-size:11px;margin-top:44px;letter-spacing:2px;">FARMBOSS ARMORY · ${dateStr} EDITION</div>
+    </div>`);
+
+    root.innerHTML = B.join('');
+    return { root, meta: { itemCount: active.length, totalValue } };
+}
+
+async function fillBrochureCharts(root) {
+    if (typeof Chart === 'undefined') return;
+    const mk = (id, cfg) => { const c = root.querySelector('#' + id); if (c) new Chart(c, { ...cfg, options: { ...cfg.options, animation: false, responsive: false, plugins: { legend: { display: false } } } }); };
+    try {
+        const snap = await db.collection('portfolio_value_snapshots').orderBy('date', 'asc').get();
+        const rows = snap.docs.map(d => d.data());
+        if (rows.length) mk('bro-chart-value', { type: 'line', data: { labels: rows.map(r => r.date), datasets: [{ data: rows.map(r => r.totalValue || 0), borderColor: '#c8a96e', backgroundColor: 'rgba(200,169,110,0.15)', fill: true, tension: 0.3, pointRadius: 2 }] } });
+    } catch (e) {}
+    const cals = {};
+    items.filter(i => !i.deleted).forEach(i => { const c = (i.caliber || '').trim() || '(none)'; cals[c] = (cals[c] || 0) + (Number(i.quantity) || 1); });
+    const top = Object.entries(cals).sort((a, b) => b[1] - a[1]).slice(0, 12);
+    if (top.length) mk('bro-chart-caliber', { type: 'bar', data: { labels: top.map(t => t[0]), datasets: [{ data: top.map(t => t[1]), backgroundColor: '#16181d' }] }, options: { indexAxis: 'y' } });
+    const buckets = {};
+    items.filter(i => i.purchaseDate).forEach(i => { const k = i.purchaseDate.slice(0, 7); buckets[k] = (buckets[k] || 0) + (Number(i.quantity) || 1); });
+    const keys = Object.keys(buckets).sort();
+    if (keys.length) mk('bro-chart-purchases', { type: 'bar', data: { labels: keys, datasets: [{ data: keys.map(k => buckets[k]), backgroundColor: '#c8a96e' }] } });
+    await new Promise(r => setTimeout(r, 250));
+}
+
+async function generateBrochure(auto) {
+    const status = document.getElementById('brochure-status');
+    const btn = document.getElementById('btn-brochure');
+    if (typeof html2pdf === 'undefined') { if (status) { status.textContent = '❌ PDF library not loaded — check your connection and refresh.'; status.style.color = 'var(--danger)'; } return; }
+    if (!items.filter(i => !i.deleted).length) { toast('No items to include yet.', 'error'); return; }
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Building…'; }
+    if (status) { status.textContent = (auto ? 'Weekly edition: ' : '') + 'building the brochure — this can take a minute with many photos…'; status.style.color = 'var(--text-secondary)'; }
+    const { root, meta } = buildBrochureDom();
+    document.body.appendChild(root);
+    try {
+        await fillBrochureCharts(root);
+        await new Promise(r => setTimeout(r, 400));   // let photos settle
+        const blob = await html2pdf().set({
+            margin: 0,
+            image: { type: 'jpeg', quality: 0.9 },
+            html2canvas: { scale: 2, useCORS: true, imageTimeout: 10000, logging: false },
+            jsPDF: { unit: 'px', format: [816, 1056], hotfixes: ['px_scaling'] },
+            pagebreak: { mode: ['css', 'legacy'] }
+        }).from(root).toPdf().output('blob');
+        const path = `armory_brochures/${Date.now()}_brochure.pdf`;
+        const ref = storage.ref().child(path);
+        await ref.put(blob, { contentType: 'application/pdf' });
+        const url = await ref.getDownloadURL();
+        await db.collection('armory_brochures').add({
+            createdAt: new Date().toISOString(), url, path,
+            itemCount: meta.itemCount, totalValue: meta.totalValue,
+            auto: !!auto, sizeBytes: blob.size
+        });
+        if (status) { status.textContent = `✅ ${auto ? 'Weekly edition' : 'Brochure'} saved (${(blob.size / 1048576).toFixed(1)} MB).`; status.style.color = 'var(--success)'; }
+        toast('Brochure saved 📖', 'success');
+        renderBrochureList();
+    } catch (err) {
+        if (status) { status.textContent = '❌ ' + err.message; status.style.color = 'var(--danger)'; }
+        if (!auto) toast('Brochure failed: ' + err.message, 'error');
+    } finally {
+        document.getElementById('brochure-root')?.remove();
+        if (btn) { btn.disabled = false; btn.textContent = '🖨 Generate New Brochure'; }
+    }
+}
+
+async function renderBrochureList() {
+    const el = document.getElementById('brochure-list');
+    if (!el) return;
+    try {
+        const snap = await db.collection('armory_brochures').orderBy('createdAt', 'desc').limit(24).get();
+        if (snap.empty) { el.innerHTML = '<p style="color:var(--text-secondary);font-size:0.82rem;">No editions yet — generate the first one.</p>'; return; }
+        el.innerHTML = snap.docs.map(d => {
+            const b = d.data();
+            const when = new Date(b.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+            return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--border);font-size:0.85rem;flex-wrap:wrap;">
+                <span>📖 <strong>${when}</strong>${b.auto ? ' <span style="font-size:0.7rem;color:var(--text-secondary);">(auto)</span>' : ''}</span>
+                <span style="color:var(--text-secondary);">${b.itemCount} items · ${moneyFmt(b.totalValue)}${b.sizeBytes ? ' · ' + (b.sizeBytes / 1048576).toFixed(1) + ' MB' : ''}</span>
+                <span style="margin-left:auto;display:flex;gap:6px;">
+                    <a class="btn btn-sm btn-primary" href="${b.url}" target="_blank" rel="noopener">⬇ PDF</a>
+                    <button class="btn btn-sm btn-ghost" onclick="deleteBrochure('${d.id}', '${b.path || ''}')">🗑</button>
+                </span>
+            </div>`;
+        }).join('');
+    } catch (err) {
+        el.innerHTML = `<p style="color:var(--danger);font-size:0.82rem;">Could not load editions: ${esc(err.message)}</p>`;
+    }
+}
+
+async function deleteBrochure(docId, path) {
+    if (!confirm('Delete this brochure edition?')) return;
+    try {
+        await db.collection('armory_brochures').doc(docId).delete();
+        if (path) { try { await storage.ref().child(path).delete(); } catch (e) {} }
+        toast('Edition deleted');
+        renderBrochureList();
+    } catch (err) { toast('Delete failed: ' + err.message, 'error'); }
+}
+
+// Weekly auto-generation: runs after sign-in; at most one attempt per day
+// per browser, and only when the newest edition is over a week old.
+async function checkWeeklyBrochure() {
+    try {
+        if (Date.now() - Number(localStorage.getItem('brochureAutoAttempt') || 0) < 86400000) return;
+        const snap = await db.collection('armory_brochures').orderBy('createdAt', 'desc').limit(1).get();
+        const latest = snap.empty ? null : snap.docs[0].data().createdAt;
+        if (!brochureIsStale(latest, Date.now())) return;
+        localStorage.setItem('brochureAutoAttempt', String(Date.now()));
+        await generateBrochure(true);
+    } catch (e) { console.warn('weekly brochure check:', e.message); }
+}
+
+// ── AI marketing blurbs (cached per item; only items missing one) ──
+async function writeBrochureBlurbs() {
+    const btn = document.getElementById('btn-blurbs');
+    const todo = items.filter(i => !i.deleted && !i.brochureBlurb && (i.manufacturer || i.model));
+    if (!todo.length) { toast('All items already have blurbs ✨', 'success'); return; }
+    if (!apiKey) { toast('Set your Anthropic API key in Settings first.', 'error'); return; }
+    if (btn) { btn.disabled = true; }
+    let done = 0;
+    try {
+        for (let i = 0; i < todo.length; i += 10) {
+            const batch = todo.slice(i, i + 10);
+            if (btn) btn.textContent = `✨ Writing… ${done}/${todo.length}`;
+            const listTxt = batch.map(it => `${it._docId}: ${[it.manufacturer, it.model, it.caliber, it.category, it.condition].filter(Boolean).join(', ')}${it.notes ? ' — ' + it.notes.slice(0, 120) : ''}`).join('\n');
+            const prompt = `Write a short, tasteful marketing-catalog blurb (1-2 sentences, max 40 words each) for each firearm/equipment item below, in the voice of a premium collector's catalog. No prices, no safety disclaimers. Return ONLY valid JSON mapping each id to its blurb: {"<id>":"<blurb>", ...}\n\n${listTxt}`;
+            const raw = await callClaude(null, null, prompt, { maxTokens: 1500 });
+            if (!raw) break;
+            const m = raw.match(/\{[\s\S]*\}/);
+            if (!m) continue;
+            const map = JSON.parse(m[0]);
+            for (const it of batch) {
+                if (map[it._docId]) {
+                    await db.collection('items').doc(it._docId).update({ brochureBlurb: String(map[it._docId]).slice(0, 400) });
+                    done++;
+                }
+            }
+        }
+        toast(`Blurbs written for ${done} item${done === 1 ? '' : 's'} ✨`, 'success');
+    } catch (err) {
+        toast('Blurbs: ' + err.message, 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '✨ AI blurbs'; }
+    }
+}
+
 </script>
 </body>
 </html>

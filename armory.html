@@ -5273,10 +5273,19 @@ function openAmmoModal(docId) {
     delete document.getElementById('am-total-rounds').dataset.manual;
     const link = document.getElementById('ammo-receipt-link');
     if (p && p.receiptUrl) { link.href = p.receiptUrl; link.style.display = 'inline-flex'; } else { link.style.display = 'none'; }
-    document.getElementById('ammo-modal').style.display = 'flex';
+    const mo = document.getElementById('ammo-modal');
+    mo.style.display = 'flex';
+    // Force reflow so the opacity transition actually animates, then trigger show
+    void mo.offsetWidth;
+    mo.classList.add('show');
 }
 
-function closeAmmoModal() { document.getElementById('ammo-modal').style.display = 'none'; }
+function closeAmmoModal() {
+    const mo = document.getElementById('ammo-modal');
+    mo.classList.remove('show');
+    mo.style.display = 'none';
+}
+document.getElementById('ammo-modal').addEventListener('click', e => { if (e.target === document.getElementById('ammo-modal')) closeAmmoModal(); });
 
 async function saveAmmoPurchase() {
     const brand = document.getElementById('am-brand').value.trim();

@@ -570,6 +570,7 @@
         <button class="active" onclick="showView('dashboard')">Dashboard</button>
         <button onclick="showView('add-item')">Add Item</button>
         <button onclick="showView('inventory')">Inventory</button>
+        <button onclick="showView('ammo')">🎯 Ammo</button>
         <button onclick="showView('reports')">Reports</button>
         <button onclick="showView('categories')">Categories</button>
         <button onclick="showView('packing-list')">Packing List</button>
@@ -955,6 +956,98 @@
         <div id="inv-empty" class="empty" style="display:none;">
             <div class="empty-icon">🔫</div>
             <p>No items found. <a href="#" onclick="showView('add-item');resetForm();return false;" style="color:var(--accent);">Add your first item</a>.</p>
+        </div>
+    </div>
+</div>
+
+<!-- ══ AMMO ══ -->
+<div id="view-ammo" class="view">
+    <div class="toolbar">
+        <div class="toolbar-left">
+            <h2 style="font-size:1.1rem;font-weight:700;">🎯 Ammunition Purchases</h2>
+            <span style="font-size:0.82rem;color:var(--text-secondary);">Track ammo buys — packages, rounds, calibers, and spend</span>
+        </div>
+        <div style="display:flex;gap:8px;">
+            <button class="btn btn-primary btn-sm" onclick="openAmmoModal()">+ Log Purchase</button>
+        </div>
+    </div>
+
+    <div class="stats-grid" id="ammo-stats"></div>
+
+    <!-- Receipt intake -->
+    <div class="card" style="margin-bottom:16px;">
+        <div class="card-title"><div class="card-title-left">🧾 Add from Receipts</div></div>
+        <p style="font-size:0.84rem;color:var(--text-secondary);margin-bottom:10px;">
+            Drop in receipts as <strong>photos, PDFs, or saved emails</strong> (.eml/.txt) — AI reads each one and logs every ammo line item it finds:
+            retailer, brand, caliber, grain weight, packages &amp; rounds per package, and price. One receipt can contain several purchases.
+        </p>
+        <div id="ammo-dropzone" style="border:2px dashed var(--border);border-radius:10px;padding:22px;text-align:center;cursor:pointer;transition:border-color 0.15s, background 0.15s;"
+             onclick="document.getElementById('ammo-receipt-input').click()"
+             ondragover="event.preventDefault();this.style.borderColor='var(--accent)';this.style.background='rgba(59,130,246,0.05)';"
+             ondragleave="this.style.borderColor='var(--border)';this.style.background='';"
+             ondrop="event.preventDefault();this.style.borderColor='var(--border)';this.style.background='';onAmmoReceiptsSelected(event.dataTransfer);">
+            <div style="font-size:1.6rem;">🧾</div>
+            <div style="font-size:0.9rem;font-weight:600;margin-top:4px;">Drop receipts here or click to browse</div>
+            <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:2px;">JPG · PNG · PDF · EML · TXT — multiple files OK</div>
+        </div>
+        <input type="file" id="ammo-receipt-input" accept="image/*,application/pdf,.eml,.txt,message/rfc822,text/plain" multiple style="display:none;" onchange="onAmmoReceiptsSelected(this);this.value='';">
+        <div id="ammo-intake-status" style="margin-top:10px;"></div>
+    </div>
+
+    <!-- Rounds on hand by caliber -->
+    <div class="card" style="margin-bottom:16px;">
+        <div class="card-title"><div class="card-title-left">📦 Purchased by Caliber</div></div>
+        <div class="table-wrapper">
+            <table><thead><tr>
+                <th>Caliber</th><th>Packages</th><th>Rounds</th><th>Spend</th><th>Avg $/Round</th>
+            </tr></thead><tbody id="ammo-caliber-tbody"></tbody></table>
+        </div>
+        <div id="ammo-caliber-empty" class="empty" style="display:none;"><div class="empty-icon">📦</div><p>No ammo logged yet.</p></div>
+    </div>
+
+    <!-- Purchase log -->
+    <div class="card">
+        <div class="toolbar" style="margin-bottom:12px;">
+            <input type="text" id="ammo-search" placeholder="🔍 Search retailer, brand, caliber..." oninput="renderAmmo()" style="flex:1;min-width:220px;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:0.88rem;">
+        </div>
+        <div class="table-wrapper">
+            <table><thead><tr>
+                <th>Date</th><th>Retailer</th><th>Brand</th><th>Caliber</th><th>Grain</th><th>Type</th>
+                <th>Pkgs</th><th>Rds/Pkg</th><th>Rounds</th><th>Price</th><th>$/Rd</th><th class="no-sort">Receipt</th><th class="no-sort">Actions</th>
+            </tr></thead><tbody id="ammo-tbody"></tbody><tfoot id="ammo-tfoot"></tfoot></table>
+        </div>
+        <div id="ammo-empty" class="empty" style="display:none;">
+            <div class="empty-icon">🎯</div>
+            <p>No purchases yet. Drop a receipt above or <a href="#" onclick="openAmmoModal();return false;" style="color:var(--accent);">log one manually</a>.</p>
+        </div>
+    </div>
+</div>
+
+<!-- ══ AMMO MODAL ══ -->
+<div class="modal-overlay" id="ammo-modal" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;align-items:flex-start;justify-content:center;z-index:9500;padding:20px;overflow-y:auto;">
+    <div class="modal" style="background:#fff;border-radius:10px;padding:24px;width:100%;max-width:640px;margin:20px auto;max-height:none;">
+        <div class="modal-title" id="ammo-modal-title" style="font-size:1.15rem;font-weight:700;margin-bottom:4px;">Log Ammo Purchase</div>
+        <div class="modal-sub" style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:16px;">Rounds total is computed from packages × rounds per package — override it if a receipt says otherwise.</div>
+        <input type="hidden" id="ammo-edit-doc-id">
+        <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+            <div class="form-group"><label>Purchase Date</label><input type="date" id="am-date"></div>
+            <div class="form-group"><label>Retailer</label><input type="text" id="am-retailer" placeholder="e.g. Scheels, Palmetto State"></div>
+            <div class="form-group"><label>Brand *</label><input type="text" id="am-brand" placeholder="e.g. Federal, CCI, Hornady"></div>
+            <div class="form-group"><label>Caliber *</label><input type="text" id="am-caliber" list="cal-list" placeholder="e.g. 9mm Luger, .223 Rem"></div>
+            <div class="form-group"><label>Grain Weight</label><input type="text" id="am-grain" placeholder="e.g. 115 gr"></div>
+            <div class="form-group"><label>Bullet Type</label><input type="text" id="am-bullet-type" placeholder="e.g. FMJ, JHP, SP"></div>
+            <div class="form-group"><label>Case Material</label><input type="text" id="am-case" placeholder="e.g. Brass, Steel"></div>
+            <div class="form-group"><label>Lot Number</label><input type="text" id="am-lot" placeholder="From the box, if noted"></div>
+            <div class="form-group"><label>Packages *</label><input type="number" id="am-packages" min="0" step="1" value="1" oninput="ammoRecalcRounds()"></div>
+            <div class="form-group"><label>Rounds per Package *</label><input type="number" id="am-rpp" min="0" step="1" placeholder="e.g. 50, 100" oninput="ammoRecalcRounds()"></div>
+            <div class="form-group"><label>Total Rounds</label><input type="number" id="am-total-rounds" min="0" step="1" oninput="document.getElementById('am-total-rounds').dataset.manual='1'"></div>
+            <div class="form-group"><label>Total Price ($)</label><input type="number" id="am-price" min="0" step="0.01" placeholder="Line total for this ammo"></div>
+            <div class="form-group" style="grid-column:1/-1;"><label>Notes</label><textarea id="am-notes" rows="2" placeholder="Anything worth remembering — sale price, performance, etc."></textarea></div>
+        </div>
+        <div class="modal-actions" style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;">
+            <button type="button" class="btn btn-primary" onclick="saveAmmoPurchase()">💾 Save Purchase</button>
+            <button type="button" class="btn btn-ghost" onclick="closeAmmoModal()">Cancel</button>
+            <a id="ammo-receipt-link" href="" target="_blank" class="btn btn-ghost" style="display:none;margin-left:auto;">🧾 Open Receipt</a>
         </div>
     </div>
 </div>
@@ -1613,7 +1706,7 @@ let formPhotos = {
     form4:     { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false }
 };
 
-const VIEWS = ['dashboard','add-item','inventory','reports','categories','packing-list','gun-trusts','settings','recycle-bin','diary'];
+const VIEWS = ['dashboard','add-item','inventory','ammo','reports','categories','packing-list','gun-trusts','settings','recycle-bin','diary'];
 
 // Gun Trusts state
 let trusts = [];
@@ -1639,7 +1732,8 @@ auth.onAuthStateChanged(user => {
         document.getElementById('app').style.display            = 'none';
         if (unsubItems) { unsubItems(); unsubItems = null; }
         if (unsubTrusts) { unsubTrusts(); unsubTrusts = null; }
-        items = []; trusts = [];
+        if (unsubAmmo) { unsubAmmo(); unsubAmmo = null; }
+        items = []; trusts = []; ammo = [];
     }
 });
 
@@ -1706,6 +1800,10 @@ async function initApp() {
             trusts = snap.docs.map(doc => ({ _docId:doc.id, ...doc.data() }));
             renderTrustsList();
         }, err => console.warn('trusts snap err', err));
+        unsubAmmo = db.collection('armory_ammo').onSnapshot(snap => {
+            ammo = snap.docs.map(doc => ({ _docId:doc.id, ...doc.data() }));
+            renderAmmo();
+        }, err => console.warn('ammo snap err', err));
         document.getElementById('loading-screen').style.display = 'none';
         document.getElementById('app').style.display            = 'flex';
         populateCatSelect(); populateMfrList(); populateCalList(); syncCatFilters();
@@ -1766,6 +1864,7 @@ function showView(v) {
     if (v === 'diary') initDiary();
     if (v === 'packing-list') { syncCatFilters(); renderPackingPicker(); }
     if (v === 'gun-trusts') renderTrustsList();
+    if (v === 'ammo') renderAmmo();
 }
 
 // ═══════════════════════════════════════
@@ -5069,6 +5168,286 @@ function esc(s) { return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').
 function escHtml(s) { return esc(s); }
 
 let _toastUndoFn = null;
+// ═══════════════════════════════════════
+//  AMMUNITION PURCHASES
+// ═══════════════════════════════════════
+let ammo = [];
+let unsubAmmo = null;
+
+function ammoNum(v) { const n = parseFloat(String(v ?? '').replace(/[^0-9.\-]/g, '')); return isFinite(n) ? n : 0; }
+function ammoInt(v) { return Math.max(0, Math.round(ammoNum(v))); }
+
+function ammoRecalcRounds() {
+    const totalEl = document.getElementById('am-total-rounds');
+    if (totalEl.dataset.manual === '1' && totalEl.value.trim() !== '') return;
+    const pkgs = ammoInt(document.getElementById('am-packages').value);
+    const rpp  = ammoInt(document.getElementById('am-rpp').value);
+    totalEl.value = pkgs && rpp ? pkgs * rpp : '';
+    delete totalEl.dataset.manual;
+}
+
+function renderAmmo() {
+    const statsEl = document.getElementById('ammo-stats'); if (!statsEl) return;
+    const sorted = ammo.slice().sort((a, b) =>
+        String(b.purchaseDate || '').localeCompare(String(a.purchaseDate || '')) ||
+        String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+
+    // ── Stat tiles (always over the full log) ──
+    const tPkgs   = sorted.reduce((s, p) => s + ammoInt(p.packages), 0);
+    const tRounds = sorted.reduce((s, p) => s + ammoInt(p.totalRounds), 0);
+    const tSpend  = sorted.reduce((s, p) => s + ammoNum(p.price), 0);
+    const calKeys = new Set(sorted.map(p => String(p.caliber || '').trim().toLowerCase()).filter(Boolean));
+    statsEl.innerHTML = `
+        <div class="stat-card"><div class="stat-value">${tRounds.toLocaleString()}</div><div class="stat-label">Rounds Purchased</div></div>
+        <div class="stat-card"><div class="stat-value">${tPkgs.toLocaleString()}</div><div class="stat-label">Packages</div></div>
+        <div class="stat-card"><div class="stat-value">${calKeys.size}</div><div class="stat-label">Calibers</div></div>
+        <div class="stat-card"><div class="stat-value">${moneyFmt(tSpend)}</div><div class="stat-label">Total Spend</div></div>
+        <div class="stat-card"><div class="stat-value">${tRounds ? '$' + (tSpend / tRounds).toFixed(2) : '—'}</div><div class="stat-label">Avg Cost / Round</div></div>`;
+
+    // ── Purchased by caliber ──
+    const byCal = {};
+    sorted.forEach(p => {
+        const raw = String(p.caliber || '').trim() || 'Unknown';
+        const key = raw.toLowerCase();
+        if (!byCal[key]) byCal[key] = { label: raw, pkgs: 0, rounds: 0, spend: 0 };
+        byCal[key].pkgs += ammoInt(p.packages); byCal[key].rounds += ammoInt(p.totalRounds); byCal[key].spend += ammoNum(p.price);
+    });
+    const calRows = Object.values(byCal).sort((a, b) => b.rounds - a.rounds);
+    document.getElementById('ammo-caliber-tbody').innerHTML = calRows.map(c => `
+        <tr><td><strong>${escHtml(c.label)}</strong></td>
+            <td>${c.pkgs.toLocaleString()}</td>
+            <td>${c.rounds.toLocaleString()}</td>
+            <td>${moneyFmt(c.spend)}</td>
+            <td>${c.rounds ? '$' + (c.spend / c.rounds).toFixed(2) : '—'}</td></tr>`).join('');
+    document.getElementById('ammo-caliber-empty').style.display = calRows.length ? 'none' : 'block';
+
+    // ── Purchase log (search filters this table only) ──
+    const q = (document.getElementById('ammo-search').value || '').toLowerCase().trim();
+    const shown = q ? sorted.filter(p =>
+        [p.retailer, p.brand, p.caliber, p.bulletType, p.grainWeight, p.notes]
+            .some(v => String(v || '').toLowerCase().includes(q))) : sorted;
+    document.getElementById('ammo-tbody').innerHTML = shown.map(p => {
+        const rounds = ammoInt(p.totalRounds), price = ammoNum(p.price);
+        return `
+        <tr><td style="white-space:nowrap;">${escHtml(p.purchaseDate || '—')}</td>
+            <td>${escHtml(p.retailer || '—')}</td>
+            <td>${escHtml(p.brand || '—')}</td>
+            <td><strong>${escHtml(p.caliber || '—')}</strong></td>
+            <td>${escHtml(p.grainWeight || '—')}</td>
+            <td>${escHtml(p.bulletType || '—')}</td>
+            <td>${ammoInt(p.packages).toLocaleString()}</td>
+            <td>${ammoInt(p.roundsPerPackage).toLocaleString()}</td>
+            <td><strong>${rounds.toLocaleString()}</strong></td>
+            <td>${price ? '$' + price.toFixed(2) : '—'}</td>
+            <td>${rounds && price ? '$' + (price / rounds).toFixed(2) : '—'}</td>
+            <td>${p.receiptUrl ? `<a href="${escHtml(p.receiptUrl)}" target="_blank" title="${escHtml(p.receiptName || 'Receipt')}">🧾</a>` : '—'}</td>
+            <td style="white-space:nowrap;">
+                <button class="btn btn-ghost btn-sm" onclick="openAmmoModal('${p._docId}')" title="Edit">✏️</button>
+                <button class="btn btn-ghost btn-sm" style="color:#b91c1c;" onclick="deleteAmmoPurchase('${p._docId}')" title="Delete">🗑</button>
+            </td></tr>`;
+    }).join('');
+    const sPkgs   = shown.reduce((s, p) => s + ammoInt(p.packages), 0);
+    const sRounds = shown.reduce((s, p) => s + ammoInt(p.totalRounds), 0);
+    const sSpend  = shown.reduce((s, p) => s + ammoNum(p.price), 0);
+    document.getElementById('ammo-tfoot').innerHTML = shown.length ? `
+        <tr style="font-weight:700;border-top:2px solid var(--border);">
+            <td colspan="6">Total${q ? ' (filtered)' : ''}</td>
+            <td>${sPkgs.toLocaleString()}</td><td></td>
+            <td>${sRounds.toLocaleString()}</td>
+            <td>${'$' + sSpend.toFixed(2)}</td>
+            <td>${sRounds ? '$' + (sSpend / sRounds).toFixed(2) : ''}</td><td colspan="2"></td></tr>` : '';
+    document.getElementById('ammo-empty').style.display = ammo.length ? 'none' : 'block';
+}
+
+// ── Manual add / edit modal ──
+function openAmmoModal(docId) {
+    const p = docId ? ammo.find(x => x._docId === docId) : null;
+    document.getElementById('ammo-modal-title').textContent = p ? 'Edit Ammo Purchase' : 'Log Ammo Purchase';
+    document.getElementById('ammo-edit-doc-id').value = docId || '';
+    const set = (id, v) => { document.getElementById(id).value = v ?? ''; };
+    set('am-date', p ? p.purchaseDate : new Date().toISOString().slice(0, 10));
+    set('am-retailer', p && p.retailer); set('am-brand', p && p.brand); set('am-caliber', p && p.caliber);
+    set('am-grain', p && p.grainWeight); set('am-bullet-type', p && p.bulletType); set('am-case', p && p.caseMaterial);
+    set('am-lot', p && p.lotNumber); set('am-packages', p ? p.packages : 1); set('am-rpp', p && p.roundsPerPackage);
+    set('am-total-rounds', p && p.totalRounds); set('am-price', p && p.price); set('am-notes', p && p.notes);
+    delete document.getElementById('am-total-rounds').dataset.manual;
+    const link = document.getElementById('ammo-receipt-link');
+    if (p && p.receiptUrl) { link.href = p.receiptUrl; link.style.display = 'inline-flex'; } else { link.style.display = 'none'; }
+    document.getElementById('ammo-modal').style.display = 'flex';
+}
+
+function closeAmmoModal() { document.getElementById('ammo-modal').style.display = 'none'; }
+
+async function saveAmmoPurchase() {
+    const brand = document.getElementById('am-brand').value.trim();
+    const caliber = document.getElementById('am-caliber').value.trim();
+    if (!brand && !caliber) { toast('Enter at least a brand or caliber.', 'error'); return; }
+    const packages = ammoInt(document.getElementById('am-packages').value);
+    const rpp = ammoInt(document.getElementById('am-rpp').value);
+    let totalRounds = ammoInt(document.getElementById('am-total-rounds').value);
+    if (!totalRounds && packages && rpp) totalRounds = packages * rpp;
+    const data = {
+        purchaseDate: document.getElementById('am-date').value || '',
+        retailer: document.getElementById('am-retailer').value.trim(),
+        brand, caliber,
+        grainWeight: document.getElementById('am-grain').value.trim(),
+        bulletType: document.getElementById('am-bullet-type').value.trim(),
+        caseMaterial: document.getElementById('am-case').value.trim(),
+        lotNumber: document.getElementById('am-lot').value.trim(),
+        packages, roundsPerPackage: rpp, totalRounds,
+        price: ammoNum(document.getElementById('am-price').value),
+        notes: document.getElementById('am-notes').value.trim(),
+    };
+    const docId = document.getElementById('ammo-edit-doc-id').value;
+    try {
+        if (docId) {
+            await db.collection('armory_ammo').doc(docId).update(data);
+            toast('Purchase updated.', 'success');
+        } else {
+            await db.collection('armory_ammo').add({ ...data, source: 'manual', createdAt: new Date().toISOString() });
+            toast('Purchase logged.', 'success');
+        }
+        closeAmmoModal();
+    } catch (err) { toast('Save failed: ' + err.message, 'error'); }
+}
+
+async function deleteAmmoPurchase(docId) {
+    const p = ammo.find(x => x._docId === docId); if (!p) return;
+    const label = [p.brand, p.caliber, p.totalRounds ? p.totalRounds + ' rds' : ''].filter(Boolean).join(' ');
+    if (!confirm(`Delete this purchase${label ? ' (' + label + ')' : ''}? The receipt file (if any) stays in storage.`)) return;
+    try { await db.collection('armory_ammo').doc(docId).delete(); toast('Purchase deleted.'); }
+    catch (err) { toast('Delete failed: ' + err.message, 'error'); }
+}
+
+// ── Receipt intake: photos, PDFs, and saved emails ──
+let ammoIntakeBusy = false;
+
+async function onAmmoReceiptsSelected(src) {
+    const files = Array.from((src && src.files) || []);
+    if (!files.length) return;
+    if (ammoIntakeBusy) { toast('Still working through the previous receipts — one moment.', 'error'); return; }
+    if (!apiKey) { toast('Set your Anthropic API key in Settings first.', 'error'); return; }
+    ammoIntakeBusy = true;
+    const statusEl = document.getElementById('ammo-intake-status');
+    statusEl.innerHTML = '';
+    const row = (name, msg, tone) => {
+        const colors = { work: ['#1e40af', '#dbeafe', '#3b82f6'], ok: ['#166534', '#dcfce7', '#22c55e'], err: ['#b91c1c', '#fee2e2', '#ef4444'] };
+        const el = document.createElement('div');
+        el.style.cssText = 'display:flex;gap:8px;align-items:center;padding:7px 12px;border:1px solid;border-radius:6px;margin-bottom:5px;font-size:0.83rem;';
+        el.innerHTML = `<span style="flex-shrink:0;"></span><span style="font-weight:600;flex-shrink:0;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(name)}</span><span></span>`;
+        statusEl.appendChild(el);
+        const apply = (msg2, tone2) => {
+            const [fg, bg, bd] = colors[tone2];
+            el.style.color = fg; el.style.background = bg; el.style.borderColor = bd;
+            el.querySelectorAll('span')[0].textContent = tone2 === 'work' ? '⏳' : tone2 === 'ok' ? '✅' : '❌';
+            el.querySelectorAll('span')[2].textContent = msg2;
+        };
+        apply(msg, tone);
+        return apply;
+    };
+    let added = 0;
+    try {
+        for (const file of files) {
+            const update = row(file.name, 'reading receipt…', 'work');
+            try {
+                const n = await processAmmoReceipt(file, update);
+                added += n;
+                update(n ? `logged ${n} purchase${n === 1 ? '' : 's'}` : 'no ammo line items found on this receipt', n ? 'ok' : 'err');
+            } catch (err) {
+                update(err.message || 'failed', 'err');
+            }
+        }
+    } finally { ammoIntakeBusy = false; }
+    if (added) toast(`🎯 ${added} ammo purchase${added === 1 ? '' : 's'} logged from receipts.`, 'success');
+}
+
+async function processAmmoReceipt(file, update) {
+    const lower = (file.name || '').toLowerCase();
+    const isPdf = file.type === 'application/pdf' || lower.endsWith('.pdf');
+    const isText = lower.endsWith('.eml') || lower.endsWith('.txt') || file.type === 'message/rfc822' || file.type === 'text/plain';
+    const isImage = !isPdf && !isText && (file.type.startsWith('image/') || /\.(png|jpe?g|gif|webp)$/.test(lower));
+    if (!isPdf && !isText && !isImage) throw new Error('unsupported file type — use a photo, PDF, or .eml/.txt email');
+
+    // Build what the AI sees
+    let media = null, emailText = '';
+    if (isText) {
+        emailText = (await file.text()).slice(0, 60000);
+        if (!emailText.trim()) throw new Error('file is empty');
+    } else if (isPdf) {
+        if (file.size > 4.5 * 1024 * 1024) throw new Error('PDF too large for AI reading (max ~4.5 MB) — try a photo of the receipt instead');
+        const dataUrl = await new Promise(r => { const fr = new FileReader(); fr.onload = e => r(e.target.result); fr.readAsDataURL(file); });
+        media = { base64: dataUrl.split(',')[1], mimeType: 'application/pdf' };
+    } else {
+        const dataUrl = await compressImage(file) || await new Promise(r => { const fr = new FileReader(); fr.onload = e => r(e.target.result); fr.readAsDataURL(file); });
+        media = { base64: dataUrl.split(',')[1], mimeType: 'image/jpeg' };
+    }
+
+    if (update) update('extracting ammo details with AI…', 'work');
+    const prompt = `${emailText ? 'Below is the text of an emailed receipt or order confirmation.\n\n--- EMAIL ---\n' + emailText + '\n--- END EMAIL ---\n\n' : 'This is a retail receipt, invoice, or order confirmation.\n'}
+Find every AMMUNITION line item (ignore firearms, accessories, tax, shipping, and non-ammo goods). Return ONLY valid JSON, no markdown fences:
+{
+ "retailer":"store/seller name or empty",
+ "purchaseDate":"YYYY-MM-DD or empty",
+ "items":[
+   {"brand":"ammo manufacturer, e.g. Federal, CCI, Hornady",
+    "caliber":"e.g. 9mm Luger, .223 Remington, 12 Gauge",
+    "grainWeight":"bullet weight, e.g. 115 gr (or shot size/oz for shotshells), or empty",
+    "bulletType":"e.g. FMJ, JHP, SP, birdshot #8, or empty",
+    "caseMaterial":"Brass, Steel, Aluminum, or empty",
+    "packages": number of boxes/cases of this item bought,
+    "roundsPerPackage": rounds in ONE box/case (e.g. 50, 100, 500), or 0 if unclear,
+    "totalRounds": total rounds across all packages, or 0 if unclear,
+    "lineTotal": total price paid for this line item as a number,
+    "lotNumber":"lot # if printed, or empty",
+    "notes":"anything else relevant (muzzle velocity, +P, subsonic, match grade), or empty"}
+ ]
+}
+Rules: if a line reads "2 x 100rd box" then packages=2, roundsPerPackage=100, totalRounds=200. If only a total round count is shown, set packages=1 and roundsPerPackage=totalRounds. Use numbers (not strings) for packages, roundsPerPackage, totalRounds, lineTotal. If nothing on the receipt is ammunition, return {"retailer":"","purchaseDate":"","items":[]}.`;
+    const raw = await callClaude(media ? media.base64 : null, media ? media.mimeType : null, prompt, { maxTokens: 1500 });
+    if (!raw) throw new Error('AI returned nothing');
+    const m = raw.match(/\{[\s\S]*\}/);
+    if (!m) throw new Error('could not parse AI response');
+    const d = JSON.parse(m[0]);
+    const rawItems = Array.isArray(d.items) ? d.items : [];
+    if (!rawItems.length) return 0;
+
+    // Upload the receipt once, then log one purchase per line item
+    if (update) update('saving receipt & purchases…', 'work');
+    let receiptUrl = '', receiptName = file.name || 'receipt';
+    try {
+        const ext = (file.name && file.name.includes('.')) ? file.name.split('.').pop() : (isPdf ? 'pdf' : isText ? 'txt' : 'jpg');
+        const ref = storage.ref().child(`armory_ammo_receipts/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`);
+        await ref.put(file);
+        receiptUrl = await ref.getDownloadURL();
+    } catch (e) { console.warn('receipt upload failed', e); }
+
+    let added = 0;
+    for (const it of rawItems) {
+        const packages = ammoInt(it.packages) || 1;
+        let rpp = ammoInt(it.roundsPerPackage);
+        let totalRounds = ammoInt(it.totalRounds);
+        if (!totalRounds && rpp) totalRounds = packages * rpp;
+        if (!rpp && totalRounds && packages) rpp = Math.round(totalRounds / packages);
+        await db.collection('armory_ammo').add({
+            purchaseDate: /^\d{4}-\d{2}-\d{2}$/.test(String(d.purchaseDate || '').trim()) ? String(d.purchaseDate).trim() : '',
+            retailer: String(d.retailer || '').trim(),
+            brand: String(it.brand || '').trim(),
+            caliber: String(it.caliber || '').trim(),
+            grainWeight: String(it.grainWeight || '').trim(),
+            bulletType: String(it.bulletType || '').trim(),
+            caseMaterial: String(it.caseMaterial || '').trim(),
+            lotNumber: String(it.lotNumber || '').trim(),
+            packages, roundsPerPackage: rpp, totalRounds,
+            price: ammoNum(it.lineTotal),
+            notes: String(it.notes || '').trim(),
+            receiptUrl, receiptName,
+            source: 'receipt-ai', createdAt: new Date().toISOString(),
+        });
+        added++;
+    }
+    return added;
+}
+
 function toast(msg, type='', undoFn=null) {
     _toastUndoFn = undoFn;
     const el = document.getElementById('toast');

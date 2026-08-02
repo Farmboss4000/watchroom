@@ -1087,7 +1087,7 @@
                 <th onclick="ammoSortBy('retailer')" data-col="retailer">Retailer</th>
                 <th onclick="ammoSortBy('brand')" data-col="brand">Brand</th>
                 <th onclick="ammoSortBy('caliber')" data-col="caliber">Caliber</th>
-                <th onclick="ammoSortBy('grainWeight')" data-col="grainWeight">Grain</th>
+                <th onclick="ammoSortBy('grainWeight')" data-col="grainWeight">Grain / Shot</th>
                 <th onclick="ammoSortBy('bulletType')" data-col="bulletType">Type</th>
                 <th onclick="ammoSortBy('sku')" data-col="sku">SKU</th>
                 <th onclick="ammoSortBy('packages')" data-col="packages">Pkgs</th>
@@ -1116,7 +1116,7 @@
             <div class="form-group"><label>Retailer</label><input type="text" id="am-retailer" placeholder="e.g. Scheels, Palmetto State"></div>
             <div class="form-group"><label>Brand *</label><input type="text" id="am-brand" placeholder="e.g. Federal, CCI, Hornady"></div>
             <div class="form-group"><label>Caliber *</label><input type="text" id="am-caliber" list="cal-list" placeholder="e.g. 9mm Luger, .223 Rem"></div>
-            <div class="form-group"><label>Grain Weight</label><input type="text" id="am-grain" placeholder="e.g. 115 gr"></div>
+            <div class="form-group"><label>Grain / Shot</label><input type="text" id="am-grain" placeholder="e.g. 115 gr, or #7½ shot"></div>
             <div class="form-group"><label>Bullet Type</label><input type="text" id="am-bullet-type" placeholder="e.g. FMJ, JHP, SP"></div>
             <div class="form-group"><label>Case Material</label><input type="text" id="am-case" placeholder="e.g. Brass, Steel"></div>
             <div class="form-group"><label>Lot Number</label><input type="text" id="am-lot" placeholder="From the box, if noted"></div>
@@ -5723,7 +5723,7 @@ Find every AMMUNITION line item (ignore firearms, accessories, tax, shipping, an
  "items":[
    {"brand":"ammo manufacturer, e.g. Federal, CCI, Hornady",
     "caliber":"e.g. 9mm Luger, .223 Remington, 12 Gauge",
-    "grainWeight":"bullet weight, e.g. 115 gr (or shot size/oz for shotshells), or empty",
+    "grainWeight":"bullet weight for cartridges (e.g. 115 gr); for SHOTSHELLS use the shot size, with load if shown (e.g. #7½ or 1 oz #8) — or empty",
     "bulletType":"e.g. FMJ, JHP, SP, birdshot #8, or empty",
     "caseMaterial":"Brass, Steel, Aluminum, or empty",
     "packages": number of boxes/cases of this item bought,

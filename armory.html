@@ -999,8 +999,12 @@
     <div class="card" style="margin-bottom:16px;">
         <div class="card-title"><div class="card-title-left">📦 Purchased by Caliber</div></div>
         <div class="table-wrapper">
-            <table><thead><tr>
-                <th>Caliber</th><th>Packages</th><th>Rounds</th><th>Spend</th><th>Avg $/Round</th>
+            <table id="ammo-caliber-table"><thead><tr>
+                <th onclick="ammoCalSortBy('label')" data-col="label">Caliber</th>
+                <th onclick="ammoCalSortBy('pkgs')" data-col="pkgs">Packages</th>
+                <th onclick="ammoCalSortBy('rounds')" data-col="rounds">Rounds</th>
+                <th onclick="ammoCalSortBy('spend')" data-col="spend">Spend</th>
+                <th onclick="ammoCalSortBy('cpr')" data-col="cpr">Avg $/Round</th>
             </tr></thead><tbody id="ammo-caliber-tbody"></tbody></table>
         </div>
         <div id="ammo-caliber-empty" class="empty" style="display:none;"><div class="empty-icon">📦</div><p>No ammo logged yet.</p></div>
@@ -5261,6 +5265,15 @@ let unsubAmmo = null;
 function ammoNum(v) { const n = parseFloat(String(v ?? '').replace(/[^0-9.\-]/g, '')); return isFinite(n) ? n : 0; }
 function ammoInt(v) { return Math.max(0, Math.round(ammoNum(v))); }
 
+// ── Purchased-by-Caliber column sorting ──
+let ammoCalSortCol = 'rounds', ammoCalSortDir = 'desc';
+
+function ammoCalSortBy(col) {
+    ammoCalSortDir = ammoCalSortCol === col ? (ammoCalSortDir === 'asc' ? 'desc' : 'asc') : (col === 'label' ? 'asc' : 'desc');
+    ammoCalSortCol = col;
+    renderAmmo();
+}
+
 // ── Purchase-log column sorting ──
 let ammoSortCol = 'purchaseDate', ammoSortDir = 'desc';
 
@@ -5330,7 +5343,18 @@ function renderAmmo() {
         if (!byCal[key]) byCal[key] = { label: raw, pkgs: 0, rounds: 0, spend: 0 };
         byCal[key].pkgs += ammoInt(p.packages); byCal[key].rounds += ammoInt(p.totalRounds); byCal[key].spend += ammoNum(p.price);
     });
-    const calRows = Object.values(byCal).sort((a, b) => b.rounds - a.rounds);
+    const calVal = c => ammoCalSortCol === 'label' ? c.label.toLowerCase()
+        : ammoCalSortCol === 'cpr' ? (c.rounds ? c.spend / c.rounds : -1)
+        : c[ammoCalSortCol];
+    const calRows = Object.values(byCal).sort((a, b) => {
+        const va = calVal(a), vb = calVal(b);
+        const cmp = typeof va === 'number' ? va - vb : va.localeCompare(vb);
+        return ammoCalSortDir === 'asc' ? cmp : -cmp;
+    });
+    document.querySelectorAll('#ammo-caliber-table thead th').forEach(th => {
+        th.classList.remove('sort-asc', 'sort-desc');
+        if (th.dataset.col === ammoCalSortCol) th.classList.add(ammoCalSortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+    });
     document.getElementById('ammo-caliber-tbody').innerHTML = calRows.map(c => `
         <tr><td><strong>${escHtml(c.label)}</strong></td>
             <td>${c.pkgs.toLocaleString()}</td>

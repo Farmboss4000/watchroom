@@ -1005,6 +1005,76 @@
         <div id="ammo-caliber-empty" class="empty" style="display:none;"><div class="empty-icon">📦</div><p>No ammo logged yet.</p></div>
     </div>
 
+    <!-- Analytics: purchases over time -->
+    <div class="card" style="margin-bottom:16px;">
+        <div class="card-title" style="flex-wrap:wrap;gap:10px;">
+            <div class="card-title-left">📈 Ammo Over Time</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <div style="display:flex;border:1px solid var(--border);border-radius:7px;overflow:hidden;">
+                    <button id="ammo-mode-rounds" onclick="setAmmoChartMode('rounds')"
+                        style="padding:5px 14px;font-size:0.78rem;font-weight:600;border:none;cursor:pointer;background:var(--accent);color:#fff;transition:all 0.15s;"># Rounds</button>
+                    <button id="ammo-mode-spend" onclick="setAmmoChartMode('spend')"
+                        style="padding:5px 14px;font-size:0.78rem;font-weight:600;border:none;cursor:pointer;background:transparent;color:var(--text-secondary);transition:all 0.15s;">$ Spend</button>
+                </div>
+                <select id="ammo-chart-group" onchange="renderAmmoCharts(true)"
+                    style="font-size:0.8rem;padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-primary);">
+                    <option value="month">Monthly</option>
+                    <option value="quarter">Quarterly</option>
+                    <option value="year">Yearly</option>
+                </select>
+            </div>
+        </div>
+        <div style="position:relative;height:260px;">
+            <canvas id="ammo-time-chart"></canvas>
+            <div id="ammo-time-empty" style="display:none;position:absolute;inset:0;align-items:center;justify-content:center;color:var(--text-secondary);font-size:0.9rem;">No dated purchases to chart yet.</div>
+        </div>
+    </div>
+
+    <!-- Analytics: cost per round trend -->
+    <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">
+            <div class="card-title-left">💲 Cost per Round Trend</div>
+            <span style="font-size:0.78rem;color:var(--text-secondary);">monthly average — top calibers by volume</span>
+        </div>
+        <div style="position:relative;height:260px;">
+            <canvas id="ammo-cpr-chart"></canvas>
+            <div id="ammo-cpr-empty" style="display:none;position:absolute;inset:0;align-items:center;justify-content:center;color:var(--text-secondary);font-size:0.9rem;">Needs a few dated purchases with prices to chart.</div>
+        </div>
+    </div>
+
+    <!-- Analytics: spend breakdown -->
+    <div class="card" style="margin-bottom:16px;">
+        <div class="card-title" style="flex-wrap:wrap;gap:10px;">
+            <div class="card-title-left">🏪 Where the Money Goes</div>
+            <div style="display:flex;border:1px solid var(--border);border-radius:7px;overflow:hidden;">
+                <button id="ammo-dim-brand" onclick="setAmmoSpendDim('brand')"
+                    style="padding:5px 14px;font-size:0.78rem;font-weight:600;border:none;cursor:pointer;background:var(--accent);color:#fff;transition:all 0.15s;">Brand</button>
+                <button id="ammo-dim-retailer" onclick="setAmmoSpendDim('retailer')"
+                    style="padding:5px 14px;font-size:0.78rem;font-weight:600;border:none;cursor:pointer;background:transparent;color:var(--text-secondary);transition:all 0.15s;">Retailer</button>
+                <button id="ammo-dim-caliber" onclick="setAmmoSpendDim('caliber')"
+                    style="padding:5px 14px;font-size:0.78rem;font-weight:600;border:none;cursor:pointer;background:transparent;color:var(--text-secondary);transition:all 0.15s;">Caliber</button>
+            </div>
+        </div>
+        <div style="position:relative;min-height:140px;">
+            <canvas id="ammo-spend-chart"></canvas>
+            <div id="ammo-spend-empty" style="display:none;position:absolute;inset:0;align-items:center;justify-content:center;color:var(--text-secondary);font-size:0.9rem;">No spend to break down yet.</div>
+        </div>
+    </div>
+
+    <!-- Analytics: best price tracker -->
+    <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">
+            <div class="card-title-left">🏷 Best Price Tracker</div>
+            <span style="font-size:0.78rem;color:var(--text-secondary);">cheapest per-round price you've paid, and how the latest buy compares</span>
+        </div>
+        <div class="table-wrapper">
+            <table><thead><tr>
+                <th>Caliber</th><th>Rounds Bought</th><th>Best $/Rd</th><th>Where &amp; When</th><th>Latest $/Rd</th><th>Latest vs Best</th>
+            </tr></thead><tbody id="ammo-deals-tbody"></tbody></table>
+        </div>
+        <div id="ammo-deals-empty" class="empty" style="display:none;"><div class="empty-icon">🏷</div><p>Log a few priced purchases to start tracking your best deals.</p></div>
+    </div>
+
     <!-- Purchase log -->
     <div class="card">
         <div class="toolbar" style="margin-bottom:12px;">
@@ -5257,6 +5327,199 @@ function renderAmmo() {
             <td>${'$' + sSpend.toFixed(2)}</td>
             <td>${sRounds ? '$' + (sSpend / sRounds).toFixed(2) : ''}</td><td colspan="2"></td></tr>` : '';
     document.getElementById('ammo-empty').style.display = ammo.length ? 'none' : 'block';
+    renderAmmoCharts();
+}
+
+// ── Analytics charts ──
+let ammoTimeChart = null, ammoCprChart = null, ammoSpendChart = null;
+let ammoChartMode = 'rounds';   // 'rounds' | 'spend'
+let ammoSpendDim = 'brand';     // 'brand' | 'retailer' | 'caliber'
+let _ammoChartsFor = null;      // ammo array ref the charts were last built from
+
+// Categorical palette, fixed assignment order (CVD-validated)
+const AMMO_SERIES_COLORS = ['#3b82f6', '#f59e0b', '#14b8a6', '#8b5cf6', '#ec4899'];
+
+function _ammoToggle(activeId, ids) {
+    ids.forEach(id => {
+        const el = document.getElementById(id); if (!el) return;
+        const on = id === activeId;
+        el.style.background = on ? 'var(--accent)' : 'transparent';
+        el.style.color = on ? '#fff' : 'var(--text-secondary)';
+    });
+}
+
+function setAmmoChartMode(m) {
+    ammoChartMode = m;
+    _ammoToggle('ammo-mode-' + m, ['ammo-mode-rounds', 'ammo-mode-spend']);
+    renderAmmoCharts(true);
+}
+
+function setAmmoSpendDim(d) {
+    ammoSpendDim = d;
+    _ammoToggle('ammo-dim-' + d, ['ammo-dim-brand', 'ammo-dim-retailer', 'ammo-dim-caliber']);
+    renderAmmoCharts(true);
+}
+
+function ammoBucketKey(dateStr, groupBy) {
+    const d = new Date(dateStr + 'T00:00:00');
+    if (groupBy === 'year') return String(d.getFullYear());
+    if (groupBy === 'quarter') return `${d.getFullYear()} Q${Math.floor(d.getMonth() / 3) + 1}`;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function ammoBucketLabel(key, groupBy) {
+    if (groupBy !== 'month') return key;
+    const [yr, mo] = key.split('-');
+    return new Date(+yr, +mo - 1, 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+}
+
+function renderAmmoCharts(force) {
+    if (!document.getElementById('ammo-time-chart')) return;
+    if (!force && _ammoChartsFor === ammo) return;               // data unchanged — skip rebuild (e.g. search keystrokes)
+    _ammoChartsFor = ammo;
+
+    // ── 4) Best price tracker ──
+    const deals = {};
+    ammo.forEach(p => {
+        const c = String(p.caliber || '').trim(); const rounds = ammoInt(p.totalRounds); const price = ammoNum(p.price);
+        if (!c || !rounds || !price) return;
+        const k = c.toLowerCase(); const cpr = price / rounds;
+        if (!deals[k]) deals[k] = { label: c, rounds: 0, best: null, latest: null };
+        deals[k].rounds += rounds;
+        if (!deals[k].best || cpr < deals[k].best.cpr) deals[k].best = { cpr, retailer: p.retailer || '—', date: p.purchaseDate || '' };
+        const dateKey = p.purchaseDate || '0000';
+        if (!deals[k].latest || dateKey >= deals[k].latest.dateKey) deals[k].latest = { cpr, dateKey };
+    });
+    const dealRows = Object.values(deals).sort((a, b) => b.rounds - a.rounds);
+    document.getElementById('ammo-deals-tbody').innerHTML = dealRows.map(d => {
+        const diff = d.latest.cpr / d.best.cpr - 1;
+        const badge = diff <= 0.02
+            ? '<span style="color:#166534;background:#dcfce7;border-radius:99px;padding:2px 10px;font-size:0.74rem;font-weight:600;">✓ at best price</span>'
+            : `<span style="color:${diff > 0.25 ? '#b91c1c' : '#b45309'};background:${diff > 0.25 ? '#fee2e2' : '#fef3c7'};border-radius:99px;padding:2px 10px;font-size:0.74rem;font-weight:600;">▲ ${Math.round(diff * 100)}% above best</span>`;
+        return `<tr>
+            <td><strong>${escHtml(d.label)}</strong></td>
+            <td>${d.rounds.toLocaleString()}</td>
+            <td><strong>$${d.best.cpr.toFixed(2)}</strong></td>
+            <td style="color:var(--text-secondary);">${escHtml(d.best.retailer)}${d.best.date ? ' · ' + escHtml(d.best.date) : ''}</td>
+            <td>$${d.latest.cpr.toFixed(2)}</td>
+            <td>${badge}</td></tr>`;
+    }).join('');
+    document.getElementById('ammo-deals-empty').style.display = dealRows.length ? 'none' : 'block';
+
+    if (typeof Chart === 'undefined') return;                    // chart lib not loaded (offline) — the tracker table above still works
+
+    const grid = 'rgba(120,130,150,0.12)', tick = '#8a8f98';
+    const tooltipStyle = { backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1, titleColor: '#e2e8f0', bodyColor: '#cbd5e1' };
+    const dated = ammo.filter(p => /^\d{4}-\d{2}-\d{2}$/.test(String(p.purchaseDate || '')));
+
+    // ── 1) Rounds / spend over time ──
+    const groupBy = (document.getElementById('ammo-chart-group') || {}).value || 'month';
+    const buckets = {};
+    dated.forEach(p => {
+        const k = ammoBucketKey(p.purchaseDate, groupBy);
+        if (!buckets[k]) buckets[k] = { rounds: 0, spend: 0 };
+        buckets[k].rounds += ammoInt(p.totalRounds);
+        buckets[k].spend += ammoNum(p.price);
+    });
+    const tKeys = Object.keys(buckets).sort();
+    document.getElementById('ammo-time-empty').style.display = tKeys.length ? 'none' : 'flex';
+    if (ammoTimeChart) { ammoTimeChart.destroy(); ammoTimeChart = null; }
+    if (tKeys.length) {
+        const isRounds = ammoChartMode === 'rounds';
+        ammoTimeChart = new Chart(document.getElementById('ammo-time-chart'), {
+            type: 'bar',
+            data: { labels: tKeys.map(k => ammoBucketLabel(k, groupBy)), datasets: [{
+                label: isRounds ? 'Rounds Purchased' : 'Ammo Spend ($)',
+                data: tKeys.map(k => isRounds ? buckets[k].rounds : buckets[k].spend),
+                backgroundColor: isRounds ? 'rgba(245,158,11,0.75)' : 'rgba(59,130,246,0.75)',
+                borderColor: isRounds ? '#f59e0b' : '#3b82f6',
+                borderWidth: 1.5, borderRadius: 4, maxBarThickness: 46,
+            }]},
+            options: { responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { labels: { color: tick, font: { size: 11 } } },
+                    tooltip: { ...tooltipStyle, callbacks: { label: ctx => {
+                        const b = buckets[tKeys[ctx.dataIndex]];
+                        return [` ${b.rounds.toLocaleString()} rounds`, ` $${b.spend.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} spent`];
+                    } } } },
+                scales: { x: { grid: { display: false }, ticks: { color: tick, font: { size: 10 }, maxRotation: 45 } },
+                          y: { beginAtZero: true, grid: { color: grid }, ticks: { color: tick, font: { size: 10 },
+                               callback: v => isRounds ? v.toLocaleString() : '$' + v.toLocaleString() } } } }
+        });
+    }
+
+    // ── 2) Cost-per-round trend by caliber (top 5 by rounds, monthly avg) ──
+    const calTotals = {};
+    ammo.forEach(p => {
+        const c = String(p.caliber || '').trim(); if (!c) return;
+        const k = c.toLowerCase();
+        if (!calTotals[k]) calTotals[k] = { label: c, rounds: 0 };
+        calTotals[k].rounds += ammoInt(p.totalRounds);
+    });
+    const topCals = Object.values(calTotals).sort((a, b) => b.rounds - a.rounds).slice(0, 5).map(c => c.label);
+    const cprSeries = topCals.map(label => {
+        const rows = dated.filter(p => String(p.caliber || '').trim().toLowerCase() === label.toLowerCase() && ammoInt(p.totalRounds) > 0 && ammoNum(p.price) > 0);
+        const byMonth = {};
+        rows.forEach(p => { const k = ammoBucketKey(p.purchaseDate, 'month'); if (!byMonth[k]) byMonth[k] = { rounds: 0, spend: 0 }; byMonth[k].rounds += ammoInt(p.totalRounds); byMonth[k].spend += ammoNum(p.price); });
+        return { label, byMonth };
+    }).filter(s => Object.keys(s.byMonth).length);
+    const cprMonths = [...new Set(cprSeries.flatMap(s => Object.keys(s.byMonth)))].sort();
+    document.getElementById('ammo-cpr-empty').style.display = cprMonths.length ? 'none' : 'flex';
+    if (ammoCprChart) { ammoCprChart.destroy(); ammoCprChart = null; }
+    if (cprMonths.length) {
+        ammoCprChart = new Chart(document.getElementById('ammo-cpr-chart'), {
+            type: 'line',
+            data: { labels: cprMonths.map(k => ammoBucketLabel(k, 'month')), datasets: cprSeries.map((s, i) => ({
+                label: s.label,
+                data: cprMonths.map(k => s.byMonth[k] ? +(s.byMonth[k].spend / s.byMonth[k].rounds).toFixed(3) : null),
+                borderColor: AMMO_SERIES_COLORS[i % AMMO_SERIES_COLORS.length],
+                backgroundColor: AMMO_SERIES_COLORS[i % AMMO_SERIES_COLORS.length],
+                borderWidth: 2, pointRadius: 4, pointHoverRadius: 6, spanGaps: true, tension: 0.3,
+            })) },
+            options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+                plugins: { legend: { labels: { color: tick, font: { size: 11 }, usePointStyle: true, pointStyle: 'circle' } },
+                    tooltip: { ...tooltipStyle, callbacks: { label: ctx => ctx.parsed.y == null ? null : ` ${ctx.dataset.label}: $${ctx.parsed.y.toFixed(2)}/rd` } } },
+                scales: { x: { grid: { display: false }, ticks: { color: tick, font: { size: 10 } } },
+                          y: { beginAtZero: true, grid: { color: grid }, ticks: { color: tick, font: { size: 10 }, callback: v => '$' + Number(v).toFixed(2) } } } }
+        });
+    }
+
+    // ── 3) Spend breakdown by brand / retailer / caliber ──
+    const dims = {};
+    ammo.forEach(p => {
+        const raw = String(p[ammoSpendDim === 'brand' ? 'brand' : ammoSpendDim === 'retailer' ? 'retailer' : 'caliber'] || '').trim() || 'Unknown';
+        const k = raw.toLowerCase();
+        if (!dims[k]) dims[k] = { label: raw, spend: 0, rounds: 0 };
+        dims[k].spend += ammoNum(p.price); dims[k].rounds += ammoInt(p.totalRounds);
+    });
+    let dimRows = Object.values(dims).filter(d => d.spend > 0).sort((a, b) => b.spend - a.spend);
+    if (dimRows.length > 8) {
+        const other = dimRows.slice(8).reduce((acc, d) => ({ label: 'Other', spend: acc.spend + d.spend, rounds: acc.rounds + d.rounds }), { label: 'Other', spend: 0, rounds: 0 });
+        dimRows = [...dimRows.slice(0, 8), other];
+    }
+    document.getElementById('ammo-spend-empty').style.display = dimRows.length ? 'none' : 'flex';
+    if (ammoSpendChart) { ammoSpendChart.destroy(); ammoSpendChart = null; }
+    if (dimRows.length) {
+        const canvas = document.getElementById('ammo-spend-chart');
+        const h = Math.max(140, dimRows.length * 36 + 40);
+        canvas.parentElement.style.minHeight = h + 'px'; canvas.height = h;
+        ammoSpendChart = new Chart(canvas, {
+            type: 'bar',
+            data: { labels: dimRows.map(d => d.label), datasets: [{
+                label: 'Spend ($)', data: dimRows.map(d => +d.spend.toFixed(2)),
+                backgroundColor: 'rgba(59,130,246,0.75)', borderColor: '#3b82f6',
+                borderWidth: 1.5, borderRadius: 4, maxBarThickness: 26,
+            }]},
+            options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false },
+                    tooltip: { ...tooltipStyle, callbacks: { label: ctx => {
+                        const d = dimRows[ctx.dataIndex];
+                        return [` $${d.spend.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, ` ${d.rounds.toLocaleString()} rounds${d.rounds ? ' · $' + (d.spend / d.rounds).toFixed(2) + '/rd' : ''}`];
+                    } } } },
+                scales: { x: { beginAtZero: true, grid: { color: grid }, ticks: { color: tick, font: { size: 10 }, callback: v => '$' + v.toLocaleString() } },
+                          y: { grid: { display: false }, ticks: { color: tick, font: { size: 11 } } } } }
+        });
+    }
+
 }
 
 // ── Manual add / edit modal ──

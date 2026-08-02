@@ -5269,6 +5269,20 @@ function ammoSortBy(col) {
     renderAmmo();
 }
 
+// SKU → retailer product-search link (falls back to a Google search)
+function ammoSkuUrl(p) {
+    const sku = String(p.sku || '').trim(); if (!sku) return '';
+    const r = String(p.retailer || '').toLowerCase();
+    const q = encodeURIComponent(sku);
+    if (r.includes('scheels'))                        return `https://www.scheels.com/search?q=${q}`;
+    if (r.includes('midway'))                         return `https://www.midwayusa.com/s?searchTerm=${q}`;
+    if (r.includes('palmetto') || /\bpsa\b/.test(r))  return `https://palmettostatearmory.com/catalogsearch/result/?q=${q}`;
+    if (r.includes('brownells'))                      return `https://www.brownells.com/search/index.htm?k=${q}`;
+    if (r.includes('sportsman'))                      return `https://www.sportsmans.com/search?text=${q}`;
+    if (r.includes('optics planet') || r.includes('opticsplanet')) return `https://www.opticsplanet.com/search?searchterm=${q}`;
+    return `https://www.google.com/search?q=${encodeURIComponent([p.retailer, p.brand, sku].filter(Boolean).join(' '))}`;
+}
+
 function ammoSortVal(p, col) {
     switch (col) {
         case 'packages': case 'roundsPerPackage': case 'totalRounds': return ammoInt(p[col]);
@@ -5346,7 +5360,7 @@ function renderAmmo() {
             <td><strong>${escHtml(p.caliber || '—')}</strong></td>
             <td>${escHtml(p.grainWeight || '—')}</td>
             <td>${escHtml(p.bulletType || '—')}</td>
-            <td style="color:var(--text-secondary);font-size:0.82em;">${escHtml(p.sku || '—')}</td>
+            <td style="font-size:0.82em;">${p.sku ? `<a href="${escHtml(ammoSkuUrl(p))}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;border-bottom:1px dotted var(--accent);" title="Search ${escHtml(p.retailer || 'the web')} for ${escHtml(p.sku)}">${escHtml(p.sku)}</a>` : '<span style="color:var(--text-secondary);">—</span>'}</td>
             <td>${ammoInt(p.packages).toLocaleString()}</td>
             <td>${ammoInt(p.roundsPerPackage).toLocaleString()}</td>
             <td><strong>${rounds.toLocaleString()}</strong></td>

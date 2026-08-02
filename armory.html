@@ -1120,7 +1120,8 @@
             <div class="form-group"><label>Bullet Type</label><input type="text" id="am-bullet-type" placeholder="e.g. FMJ, JHP, SP"></div>
             <div class="form-group"><label>Case Material</label><input type="text" id="am-case" placeholder="e.g. Brass, Steel"></div>
             <div class="form-group"><label>Lot Number</label><input type="text" id="am-lot" placeholder="From the box, if noted"></div>
-            <div class="form-group" style="grid-column:1/-1;"><label>SKU / Item #</label><input type="text" id="am-sku" placeholder="Manufacturer part # or retailer SKU, e.g. WE20GT7"></div>
+            <div class="form-group"><label>SKU / Item # (retailer's code)</label><input type="text" id="am-sku" placeholder="e.g. 02089201902"></div>
+            <div class="form-group"><label>MPN (maker's part #)</label><input type="text" id="am-mpn" placeholder="e.g. WE20GT7"></div>
             <div class="form-group"><label>Packages *</label><input type="number" id="am-packages" min="0" step="1" value="1" oninput="ammoRecalcRounds()"></div>
             <div class="form-group"><label>Rounds per Package *</label><input type="number" id="am-rpp" min="0" step="1" placeholder="e.g. 50, 100" oninput="ammoRecalcRounds()"></div>
             <div class="form-group"><label>Total Rounds</label><input type="number" id="am-total-rounds" min="0" step="1" oninput="document.getElementById('am-total-rounds').dataset.manual='1'"></div>
@@ -5271,7 +5272,7 @@ function ammoSortBy(col) {
 
 // SKU → retailer product-search link (falls back to a Google search)
 function ammoSkuUrl(p) {
-    const sku = String(p.sku || '').trim(); if (!sku) return '';
+    const sku = String(p.sku || p.mpn || '').trim(); if (!sku) return '';
     const r = String(p.retailer || '').toLowerCase();
     const q = encodeURIComponent(sku);
     if (r.includes('scheels'))                        return `https://www.scheels.com/search?q=${q}`;
@@ -5289,6 +5290,7 @@ function ammoSortVal(p, col) {
         case 'price': return ammoNum(p.price);
         case 'cpr': { const r = ammoInt(p.totalRounds); return r ? ammoNum(p.price) / r : -1; }
         case 'grainWeight': { const n = parseFloat(String(p.grainWeight || '').replace(/[^0-9.]/g, '')); return isFinite(n) ? n : -1; }
+        case 'sku': return String(p.sku || p.mpn || '').toLowerCase();
         default: return String(p[col] || '').toLowerCase();
     }
 }
@@ -5340,7 +5342,7 @@ function renderAmmo() {
     // ── Purchase log (search filters this table only; headers sort it) ──
     const q = (document.getElementById('ammo-search').value || '').toLowerCase().trim();
     const shown = (q ? sorted.filter(p =>
-        [p.retailer, p.brand, p.caliber, p.bulletType, p.grainWeight, p.sku, p.notes]
+        [p.retailer, p.brand, p.caliber, p.bulletType, p.grainWeight, p.sku, p.mpn, p.notes]
             .some(v => String(v || '').toLowerCase().includes(q))) : sorted.slice())
         .sort((a, b) => {
             const va = ammoSortVal(a, ammoSortCol), vb = ammoSortVal(b, ammoSortCol);
@@ -5360,7 +5362,7 @@ function renderAmmo() {
             <td><strong>${escHtml(p.caliber || '—')}</strong></td>
             <td>${escHtml(p.grainWeight || '—')}</td>
             <td>${escHtml(p.bulletType || '—')}</td>
-            <td style="font-size:0.82em;">${p.sku ? `<a href="${escHtml(ammoSkuUrl(p))}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;border-bottom:1px dotted var(--accent);" title="Search ${escHtml(p.retailer || 'the web')} for ${escHtml(p.sku)}">${escHtml(p.sku)}</a>` : '<span style="color:var(--text-secondary);">—</span>'}</td>
+            <td style="font-size:0.82em;">${(p.sku || p.mpn) ? `<a href="${escHtml(ammoSkuUrl(p))}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;border-bottom:1px dotted var(--accent);" title="Search ${escHtml(p.retailer || 'the web')} for ${escHtml(p.sku || p.mpn)}${p.sku && p.mpn ? ' · MPN ' + escHtml(p.mpn) : ''}">${escHtml(p.sku || p.mpn)}</a>` : '<span style="color:var(--text-secondary);">—</span>'}</td>
             <td>${ammoInt(p.packages).toLocaleString()}</td>
             <td>${ammoInt(p.roundsPerPackage).toLocaleString()}</td>
             <td><strong>${rounds.toLocaleString()}</strong></td>
@@ -5587,7 +5589,7 @@ function openAmmoModal(docId) {
     set('am-date', p ? p.purchaseDate : new Date().toISOString().slice(0, 10));
     set('am-retailer', p && p.retailer); set('am-brand', p && p.brand); set('am-caliber', p && p.caliber);
     set('am-grain', p && p.grainWeight); set('am-bullet-type', p && p.bulletType); set('am-case', p && p.caseMaterial);
-    set('am-lot', p && p.lotNumber); set('am-sku', p && p.sku); set('am-packages', p ? p.packages : 1); set('am-rpp', p && p.roundsPerPackage);
+    set('am-lot', p && p.lotNumber); set('am-sku', p && p.sku); set('am-mpn', p && p.mpn); set('am-packages', p ? p.packages : 1); set('am-rpp', p && p.roundsPerPackage);
     set('am-total-rounds', p && p.totalRounds); set('am-price', p && p.price); set('am-notes', p && p.notes);
     delete document.getElementById('am-total-rounds').dataset.manual;
     const link = document.getElementById('ammo-receipt-link');
@@ -5623,6 +5625,7 @@ async function saveAmmoPurchase() {
         caseMaterial: document.getElementById('am-case').value.trim(),
         lotNumber: document.getElementById('am-lot').value.trim(),
         sku: document.getElementById('am-sku').value.trim(),
+        mpn: document.getElementById('am-mpn').value.trim(),
         packages, roundsPerPackage: rpp, totalRounds,
         price: ammoNum(document.getElementById('am-price').value),
         notes: document.getElementById('am-notes').value.trim(),
@@ -5728,11 +5731,12 @@ Find every AMMUNITION line item (ignore firearms, accessories, tax, shipping, an
     "totalRounds": total rounds across all packages, or 0 if unclear,
     "lineTotal": total price paid for this line item as a number,
     "lotNumber":"lot # if printed, or empty",
-    "sku":"manufacturer part number (MPN), retailer SKU, item #, or UPC printed on the line, or empty",
+    "sku":"the RETAILER's SKU / item number for this line — the store's own product code, often long and numeric (e.g. 02089201902 from a SKU column) — or empty",
+    "mpn":"the MANUFACTURER's part number / model # (e.g. WE20GT7 from an MPN or Model column), or empty",
     "notes":"anything else relevant (muzzle velocity, +P, subsonic, match grade), or empty"}
  ]
 }
-Rules: if a line reads "2 x 100rd box" then packages=2, roundsPerPackage=100, totalRounds=200. If only a total round count is shown, set packages=1 and roundsPerPackage=totalRounds. Use numbers (not strings) for packages, roundsPerPackage, totalRounds, lineTotal. If nothing on the receipt is ammunition, return {"retailer":"","purchaseDate":"","items":[]}.`;
+Rules: if a line reads "2 x 100rd box" then packages=2, roundsPerPackage=100, totalRounds=200. If only a total round count is shown, set packages=1 and roundsPerPackage=totalRounds. Use numbers (not strings) for packages, roundsPerPackage, totalRounds, lineTotal. SKU and MPN are DIFFERENT codes — when the receipt shows both columns, sku gets the SKU column value and mpn gets the MPN column value; NEVER put the MPN in sku. If only one code is printed and it's clearly the maker's model number, it goes in mpn and sku stays empty. If nothing on the receipt is ammunition, return {"retailer":"","purchaseDate":"","items":[]}.`;
     const raw = await callClaude(media ? media.base64 : null, media ? media.mimeType : null, prompt, { maxTokens: 1700 });
     if (!raw) throw new Error('AI returned nothing');
     const m = raw.match(/\{[\s\S]*\}/);
@@ -5768,6 +5772,7 @@ Rules: if a line reads "2 x 100rd box" then packages=2, roundsPerPackage=100, to
             caseMaterial: String(it.caseMaterial || '').trim(),
             lotNumber: String(it.lotNumber || '').trim(),
             sku: String(it.sku || '').trim(),
+            mpn: String(it.mpn || '').trim(),
             packages, roundsPerPackage: rpp, totalRounds,
             price: ammoNum(it.lineTotal),
             notes: String(it.notes || '').trim(),
@@ -5779,19 +5784,39 @@ Rules: if a line reads "2 x 100rd box" then packages=2, roundsPerPackage=100, to
     return added;
 }
 
-// ── SKU backfill: mine notes, then re-read stored receipts ──
+// ── SKU/MPN backfill: mine notes, then re-read stored receipts ──
 let ammoBackfillBusy = false;
 
-function ammoSkuFromNotes(notes) {
-    const m = String(notes || '').match(/(?:MPN|SKU|UPC|Item\s*(?:no\.?|number|#)?|Part\s*(?:no\.?|number|#)?|Model\s*#)\s*[:#]?\s*([A-Za-z0-9][A-Za-z0-9\-\/\.]{2,24})/i);
-    return m ? m[1].replace(/[.,;]+$/, '') : '';
+function ammoCodesFromNotes(notes) {
+    const t = String(notes || '');
+    const grab = re => { const m = t.match(re); return m ? m[1].replace(/[.,;]+$/, '') : ''; };
+    return {
+        sku: grab(/(?:SKU|UPC|Item\s*(?:no\.?|number|#)?)\s*[:#]?\s*([A-Za-z0-9][A-Za-z0-9\-\/\.]{2,24})/i),
+        mpn: grab(/(?:MPN|Model\s*#|Part\s*(?:no\.?|number|#)?)\s*[:#]?\s*([A-Za-z0-9][A-Za-z0-9\-\/\.]{2,24})/i),
+    };
+}
+
+function ammoNormCode(v) { return String(v || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
+
+// An entry needs backfill work if it has no SKU, or its "SKU" is really an MPN
+// (same value as its MPN field, or its notes label that exact code as an MPN).
+function ammoNeedsCodeFix(p) {
+    const s = ammoNormCode(p.sku);
+    if (!s) return true;
+    if (ammoNormCode(p.mpn) && s === ammoNormCode(p.mpn)) return true;
+    if (ammoNormCode(ammoCodesFromNotes(p.notes).mpn) === s) return true;
+    return false;
 }
 
 function ammoMatchScore(p, it) {
-    const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const norm = ammoNormCode;
     const calA = norm(p.caliber), calB = norm(it.caliber);
     if (calA && calB && calA !== calB && !calA.includes(calB) && !calB.includes(calA)) return -1;
     let s = 0;
+    // A code already on the entry matching the line item's code is the strongest signal
+    const codesA = [norm(p.sku), norm(p.mpn)].filter(Boolean);
+    const codesB = [norm(it.sku), norm(it.mpn)].filter(Boolean);
+    if (codesA.some(a => codesB.includes(a))) s += 3;
     if (ammoInt(it.totalRounds) && ammoInt(it.totalRounds) === ammoInt(p.totalRounds)) s += 2;
     if (ammoNum(it.lineTotal) && Math.abs(ammoNum(it.lineTotal) - ammoNum(p.price)) < 0.01) s += 2;
     const bA = norm(p.brand), bB = norm(it.brand);
@@ -5803,8 +5828,8 @@ async function backfillAmmoSkus() {
     if (ammoBackfillBusy) return;
     const btn = document.getElementById('btn-ammo-backfill');
     const statusEl = document.getElementById('ammo-intake-status');
-    const missing = ammo.filter(p => !String(p.sku || '').trim());
-    if (!missing.length) { toast('Every entry already has a SKU.', 'success'); return; }
+    const missing = ammo.filter(ammoNeedsCodeFix);
+    if (!missing.length) { toast('Every entry already has a proper SKU.', 'success'); return; }
     ammoBackfillBusy = true;
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Backfilling…'; }
     statusEl.innerHTML = '';
@@ -5818,21 +5843,39 @@ async function backfillAmmoSkus() {
     };
     let fromNotes = 0, fromReceipts = 0, unresolved = 0;
     try {
-        // Pass 1: SKUs already sitting in the notes (e.g. "MPN WE20GT7") — no AI needed
+        // Pass 1: codes already sitting in the notes — no AI needed.
+        // "SKU:/Item #" labels fill sku; "MPN/Model #/Part #" labels fill mpn.
+        // If the current sku turns out to BE the MPN, move it to mpn and clear sku
+        // (the receipt pass restores the true retailer SKU when one is printed).
         const rest = [];
         for (const p of missing) {
-            const sku = ammoSkuFromNotes(p.notes);
-            if (sku) {
-                try { await db.collection('armory_ammo').doc(p._docId).update({ sku }); fromNotes++; continue; }
-                catch (e) { console.warn('sku notes update', e); }
+            const codes = ammoCodesFromNotes(p.notes);
+            const upd = {};
+            if (codes.sku && !ammoNormCode(p.sku)) upd.sku = codes.sku;
+            if (codes.mpn && !ammoNormCode(p.mpn)) upd.mpn = codes.mpn;
+            const skuAfter = 'sku' in upd ? upd.sku : p.sku;
+            const mpnAfter = 'mpn' in upd ? upd.mpn : p.mpn;
+            if (ammoNormCode(skuAfter) && ammoNormCode(skuAfter) === ammoNormCode(mpnAfter)) upd.sku = '';
+            if (Object.keys(upd).length) {
+                try {
+                    await db.collection('armory_ammo').doc(p._docId).update(upd);
+                    fromNotes++;
+                    const merged = { ...p, ...upd };
+                    if (ammoNeedsCodeFix(merged)) rest.push(merged);   // still missing a true SKU — try its receipt
+                    continue;
+                } catch (e) { console.warn('notes code update', e); }
             }
-            rest.push(p);
+            rest.push({ ...p, ...upd });
         }
-        if (fromNotes) say(`✓ ${fromNotes} SKU${fromNotes === 1 ? '' : 's'} recovered from entry notes`, 'ok');
+        if (fromNotes) say(`✓ ${fromNotes} entr${fromNotes === 1 ? 'y' : 'ies'} updated from their notes`, 'ok');
 
         // Pass 2: re-read each stored receipt once and match line items back to entries
         const byReceipt = {};
-        rest.forEach(p => { if (p.receiptUrl) { (byReceipt[p.receiptUrl] = byReceipt[p.receiptUrl] || []).push(p); } else unresolved++; });
+        rest.forEach(p => {
+            if (!ammoNeedsCodeFix(p)) return;
+            if (p.receiptUrl) { (byReceipt[p.receiptUrl] = byReceipt[p.receiptUrl] || []).push(p); }
+            else if (!ammoNormCode(p.sku) && !ammoNormCode(p.mpn)) unresolved++;
+        });
         const urls = Object.keys(byReceipt);
         if (urls.length && !apiKey) {
             say(`${urls.length} receipt${urls.length === 1 ? '' : 's'} to re-read, but no API key is set — add one in Settings and run again.`, 'err');
@@ -5864,39 +5907,47 @@ async function backfillAmmoSkus() {
                         media = { base64: dataUrl.split(',')[1], mimeType: 'image/jpeg' };
                     }
                     const prompt = `${emailText ? 'Below is the text of an emailed receipt.\n\n--- EMAIL ---\n' + emailText + '\n--- END EMAIL ---\n\n' : 'This is a retail receipt, invoice, or order confirmation.\n'}
-For every AMMUNITION line item, extract identifying details AND any product code. Return ONLY valid JSON, no markdown fences:
-{"items":[{"brand":"","caliber":"","totalRounds":0,"lineTotal":0,"sku":"manufacturer part number (MPN), retailer SKU, item #, or UPC printed for this line, or empty"}]}
-Use numbers for totalRounds and lineTotal. If no product codes are printed anywhere, return items with empty sku.`;
-                    const raw = await callClaude(media ? media.base64 : null, media ? media.mimeType : null, prompt, { maxTokens: 1200 });
+For every AMMUNITION line item, extract identifying details AND its product codes. Return ONLY valid JSON, no markdown fences:
+{"items":[{"brand":"","caliber":"","totalRounds":0,"lineTotal":0,"sku":"the RETAILER's SKU / item # — the store's own code, often long and numeric (e.g. 02089201902 from a SKU column) — or empty","mpn":"the MANUFACTURER's part number / model # (e.g. WE20GT7 from an MPN column), or empty"}]}
+SKU and MPN are DIFFERENT codes — when the receipt shows both columns, keep them separate and NEVER put the MPN in sku. Use numbers for totalRounds and lineTotal.`;
+                    const raw = await callClaude(media ? media.base64 : null, media ? media.mimeType : null, prompt, { maxTokens: 1400 });
                     const m = raw && raw.match(/\{[\s\S]*\}/);
                     const items = m ? (JSON.parse(m[0]).items || []) : [];
-                    const withSku = items.filter(it => String(it.sku || '').trim());
+                    const withCodes = items.filter(it => String(it.sku || '').trim() || String(it.mpn || '').trim());
                     let matched = 0;
                     for (const p of group) {
                         let best = null, bestScore = -1;
-                        for (const it of withSku) {
+                        for (const it of withCodes) {
                             const s = ammoMatchScore(p, it);
                             if (s > bestScore) { bestScore = s; best = it; }
                         }
-                        // Lone entry + lone coded line item on the same receipt is an unambiguous match
-                        const unambiguous = group.length === 1 && withSku.length === 1 && bestScore >= 0;
+                        const unambiguous = group.length === 1 && withCodes.length === 1 && bestScore >= 0;
                         if (best && (bestScore >= 1 || unambiguous)) {
-                            try { await db.collection('armory_ammo').doc(p._docId).update({ sku: String(best.sku).trim() }); fromReceipts++; matched++; }
-                            catch (e) { console.warn('sku receipt update', e); }
+                            const exSku = String(best.sku || '').trim(), exMpn = String(best.mpn || '').trim();
+                            const upd = {};
+                            if (exSku && exSku !== String(p.sku || '')) upd.sku = exSku;
+                            if (exMpn && !ammoNormCode(p.mpn)) upd.mpn = exMpn;
+                            // Receipt only prints an MPN and the entry's sku IS that MPN → move it over
+                            if (!exSku && exMpn && ammoNormCode(p.sku) === ammoNormCode(exMpn)) { upd.mpn = exMpn; upd.sku = ''; }
+                            if (Object.keys(upd).length) {
+                                try { await db.collection('armory_ammo').doc(p._docId).update(upd); fromReceipts++; matched++; }
+                                catch (e) { console.warn('receipt code update', e); }
+                            } else matched++;   // already correct — nothing to write
                         } else unresolved++;
                     }
-                    say(matched ? `✓ ${name}: ${matched} SKU${matched === 1 ? '' : 's'} filled in` : `— ${name}: no product codes found on this receipt`, matched ? 'ok' : 'err');
+                    say(matched ? `✓ ${name}: ${matched} entr${matched === 1 ? 'y' : 'ies'} resolved` : `— ${name}: no product codes found on this receipt`, matched ? 'ok' : 'err');
                 } catch (err) {
                     unresolved += group.length;
                     say(`✗ ${name}: ${err.message}`, 'err');
                 }
             }
         }
+        const total = fromNotes + fromReceipts;
         const bits = [];
         if (fromNotes) bits.push(`${fromNotes} from notes`);
         if (fromReceipts) bits.push(`${fromReceipts} from receipts`);
-        say(`Done — ${fromNotes + fromReceipts} of ${missing.length} missing SKUs filled in${bits.length ? ' (' + bits.join(', ') + ')' : ''}${unresolved ? `; ${unresolved} couldn't be resolved (no receipt on file or no code printed)` : ''}.`, fromNotes + fromReceipts ? 'ok' : 'err');
-        toast(fromNotes + fromReceipts ? `🔎 ${fromNotes + fromReceipts} SKUs backfilled.` : 'No SKUs could be recovered.', fromNotes + fromReceipts ? 'success' : 'error');
+        say(`Done — ${total} of ${missing.length} entries updated${bits.length ? ' (' + bits.join(', ') + ')' : ''}${unresolved ? `; ${unresolved} couldn't be resolved (no receipt on file or no code printed)` : ''}.`, total ? 'ok' : 'err');
+        toast(total ? `🔎 ${total} entries updated with SKU/MPN.` : 'No codes could be recovered.', total ? 'success' : 'error');
     } finally {
         ammoBackfillBusy = false;
         if (btn) { btn.disabled = false; btn.textContent = '🔎 Backfill SKUs'; }

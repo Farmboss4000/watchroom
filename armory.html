@@ -968,6 +968,7 @@
             <span style="font-size:0.82rem;color:var(--text-secondary);">Track ammo buys — packages, rounds, calibers, and spend</span>
         </div>
         <div style="display:flex;gap:8px;">
+            <button class="btn btn-ghost btn-sm" id="btn-ammo-backfill" onclick="backfillAmmoSkus()" title="Re-read stored receipts and fill in missing SKUs">🔎 Backfill SKUs</button>
             <button class="btn btn-primary btn-sm" onclick="openAmmoModal()">+ Log Purchase</button>
         </div>
     </div>
@@ -5762,6 +5763,130 @@ Rules: if a line reads "2 x 100rd box" then packages=2, roundsPerPackage=100, to
         added++;
     }
     return added;
+}
+
+// ── SKU backfill: mine notes, then re-read stored receipts ──
+let ammoBackfillBusy = false;
+
+function ammoSkuFromNotes(notes) {
+    const m = String(notes || '').match(/(?:MPN|SKU|UPC|Item\s*(?:no\.?|number|#)?|Part\s*(?:no\.?|number|#)?|Model\s*#)\s*[:#]?\s*([A-Za-z0-9][A-Za-z0-9\-\/\.]{2,24})/i);
+    return m ? m[1].replace(/[.,;]+$/, '') : '';
+}
+
+function ammoMatchScore(p, it) {
+    const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const calA = norm(p.caliber), calB = norm(it.caliber);
+    if (calA && calB && calA !== calB && !calA.includes(calB) && !calB.includes(calA)) return -1;
+    let s = 0;
+    if (ammoInt(it.totalRounds) && ammoInt(it.totalRounds) === ammoInt(p.totalRounds)) s += 2;
+    if (ammoNum(it.lineTotal) && Math.abs(ammoNum(it.lineTotal) - ammoNum(p.price)) < 0.01) s += 2;
+    const bA = norm(p.brand), bB = norm(it.brand);
+    if (bA && bB && (bA.includes(bB) || bB.includes(bA))) s += 1;
+    return s;
+}
+
+async function backfillAmmoSkus() {
+    if (ammoBackfillBusy) return;
+    const btn = document.getElementById('btn-ammo-backfill');
+    const statusEl = document.getElementById('ammo-intake-status');
+    const missing = ammo.filter(p => !String(p.sku || '').trim());
+    if (!missing.length) { toast('Every entry already has a SKU.', 'success'); return; }
+    ammoBackfillBusy = true;
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Backfilling…'; }
+    statusEl.innerHTML = '';
+    const say = (msg, tone) => {
+        const colors = { work: ['#1e40af', '#dbeafe', '#3b82f6'], ok: ['#166534', '#dcfce7', '#22c55e'], err: ['#b91c1c', '#fee2e2', '#ef4444'] };
+        const [fg, bg, bd] = colors[tone || 'work'];
+        const el = document.createElement('div');
+        el.style.cssText = `padding:7px 12px;border:1px solid ${bd};border-radius:6px;margin-bottom:5px;font-size:0.83rem;color:${fg};background:${bg};`;
+        el.textContent = msg;
+        statusEl.appendChild(el);
+    };
+    let fromNotes = 0, fromReceipts = 0, unresolved = 0;
+    try {
+        // Pass 1: SKUs already sitting in the notes (e.g. "MPN WE20GT7") — no AI needed
+        const rest = [];
+        for (const p of missing) {
+            const sku = ammoSkuFromNotes(p.notes);
+            if (sku) {
+                try { await db.collection('armory_ammo').doc(p._docId).update({ sku }); fromNotes++; continue; }
+                catch (e) { console.warn('sku notes update', e); }
+            }
+            rest.push(p);
+        }
+        if (fromNotes) say(`✓ ${fromNotes} SKU${fromNotes === 1 ? '' : 's'} recovered from entry notes`, 'ok');
+
+        // Pass 2: re-read each stored receipt once and match line items back to entries
+        const byReceipt = {};
+        rest.forEach(p => { if (p.receiptUrl) { (byReceipt[p.receiptUrl] = byReceipt[p.receiptUrl] || []).push(p); } else unresolved++; });
+        const urls = Object.keys(byReceipt);
+        if (urls.length && !apiKey) {
+            say(`${urls.length} receipt${urls.length === 1 ? '' : 's'} to re-read, but no API key is set — add one in Settings and run again.`, 'err');
+            unresolved += urls.reduce((s, u) => s + byReceipt[u].length, 0);
+        }
+        if (urls.length && apiKey) {
+            let done = 0;
+            for (const url of urls) {
+                const group = byReceipt[url];
+                const name = group[0].receiptName || 'receipt';
+                done++;
+                say(`⏳ Re-reading receipt ${done}/${urls.length} — ${name}…`, 'work');
+                try {
+                    const res = await fetch(url);
+                    if (!res.ok) throw new Error('could not download receipt (HTTP ' + res.status + ')');
+                    const blob = await res.blob();
+                    const lower = name.toLowerCase();
+                    const isPdf = blob.type === 'application/pdf' || lower.endsWith('.pdf');
+                    const isText = /^text\/|rfc822/.test(blob.type) || /\.(eml|txt)$/.test(lower);
+                    let media = null, emailText = '';
+                    if (isText) {
+                        emailText = (await blob.text()).slice(0, 60000);
+                    } else if (isPdf) {
+                        if (blob.size > 4.5 * 1024 * 1024) throw new Error('PDF too large for AI reading');
+                        const dataUrl = await new Promise(r => { const fr = new FileReader(); fr.onload = e => r(e.target.result); fr.readAsDataURL(blob); });
+                        media = { base64: dataUrl.split(',')[1], mimeType: 'application/pdf' };
+                    } else {
+                        const dataUrl = await compressImage(blob) || await new Promise(r => { const fr = new FileReader(); fr.onload = e => r(e.target.result); fr.readAsDataURL(blob); });
+                        media = { base64: dataUrl.split(',')[1], mimeType: 'image/jpeg' };
+                    }
+                    const prompt = `${emailText ? 'Below is the text of an emailed receipt.\n\n--- EMAIL ---\n' + emailText + '\n--- END EMAIL ---\n\n' : 'This is a retail receipt, invoice, or order confirmation.\n'}
+For every AMMUNITION line item, extract identifying details AND any product code. Return ONLY valid JSON, no markdown fences:
+{"items":[{"brand":"","caliber":"","totalRounds":0,"lineTotal":0,"sku":"manufacturer part number (MPN), retailer SKU, item #, or UPC printed for this line, or empty"}]}
+Use numbers for totalRounds and lineTotal. If no product codes are printed anywhere, return items with empty sku.`;
+                    const raw = await callClaude(media ? media.base64 : null, media ? media.mimeType : null, prompt, { maxTokens: 1200 });
+                    const m = raw && raw.match(/\{[\s\S]*\}/);
+                    const items = m ? (JSON.parse(m[0]).items || []) : [];
+                    const withSku = items.filter(it => String(it.sku || '').trim());
+                    let matched = 0;
+                    for (const p of group) {
+                        let best = null, bestScore = -1;
+                        for (const it of withSku) {
+                            const s = ammoMatchScore(p, it);
+                            if (s > bestScore) { bestScore = s; best = it; }
+                        }
+                        // Lone entry + lone coded line item on the same receipt is an unambiguous match
+                        const unambiguous = group.length === 1 && withSku.length === 1 && bestScore >= 0;
+                        if (best && (bestScore >= 1 || unambiguous)) {
+                            try { await db.collection('armory_ammo').doc(p._docId).update({ sku: String(best.sku).trim() }); fromReceipts++; matched++; }
+                            catch (e) { console.warn('sku receipt update', e); }
+                        } else unresolved++;
+                    }
+                    say(matched ? `✓ ${name}: ${matched} SKU${matched === 1 ? '' : 's'} filled in` : `— ${name}: no product codes found on this receipt`, matched ? 'ok' : 'err');
+                } catch (err) {
+                    unresolved += group.length;
+                    say(`✗ ${name}: ${err.message}`, 'err');
+                }
+            }
+        }
+        const bits = [];
+        if (fromNotes) bits.push(`${fromNotes} from notes`);
+        if (fromReceipts) bits.push(`${fromReceipts} from receipts`);
+        say(`Done — ${fromNotes + fromReceipts} of ${missing.length} missing SKUs filled in${bits.length ? ' (' + bits.join(', ') + ')' : ''}${unresolved ? `; ${unresolved} couldn't be resolved (no receipt on file or no code printed)` : ''}.`, fromNotes + fromReceipts ? 'ok' : 'err');
+        toast(fromNotes + fromReceipts ? `🔎 ${fromNotes + fromReceipts} SKUs backfilled.` : 'No SKUs could be recovered.', fromNotes + fromReceipts ? 'success' : 'error');
+    } finally {
+        ammoBackfillBusy = false;
+        if (btn) { btn.disabled = false; btn.textContent = '🔎 Backfill SKUs'; }
+    }
 }
 
 function toast(msg, type='', undoFn=null) {

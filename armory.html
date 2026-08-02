@@ -1081,9 +1081,20 @@
             <input type="text" id="ammo-search" placeholder="🔍 Search retailer, brand, caliber..." oninput="renderAmmo()" style="flex:1;min-width:220px;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:0.88rem;">
         </div>
         <div class="table-wrapper">
-            <table><thead><tr>
-                <th>Date</th><th>Retailer</th><th>Brand</th><th>Caliber</th><th>Grain</th><th>Type</th>
-                <th>Pkgs</th><th>Rds/Pkg</th><th>Rounds</th><th>Price</th><th>$/Rd</th><th class="no-sort">Receipt</th><th class="no-sort">Actions</th>
+            <table id="ammo-table"><thead><tr>
+                <th onclick="ammoSortBy('purchaseDate')" data-col="purchaseDate">Date</th>
+                <th onclick="ammoSortBy('retailer')" data-col="retailer">Retailer</th>
+                <th onclick="ammoSortBy('brand')" data-col="brand">Brand</th>
+                <th onclick="ammoSortBy('caliber')" data-col="caliber">Caliber</th>
+                <th onclick="ammoSortBy('grainWeight')" data-col="grainWeight">Grain</th>
+                <th onclick="ammoSortBy('bulletType')" data-col="bulletType">Type</th>
+                <th onclick="ammoSortBy('sku')" data-col="sku">SKU</th>
+                <th onclick="ammoSortBy('packages')" data-col="packages">Pkgs</th>
+                <th onclick="ammoSortBy('roundsPerPackage')" data-col="roundsPerPackage">Rds/Pkg</th>
+                <th onclick="ammoSortBy('totalRounds')" data-col="totalRounds">Rounds</th>
+                <th onclick="ammoSortBy('price')" data-col="price">Price</th>
+                <th onclick="ammoSortBy('cpr')" data-col="cpr">$/Rd</th>
+                <th class="no-sort">Receipt</th><th class="no-sort">Actions</th>
             </tr></thead><tbody id="ammo-tbody"></tbody><tfoot id="ammo-tfoot"></tfoot></table>
         </div>
         <div id="ammo-empty" class="empty" style="display:none;">
@@ -1108,6 +1119,7 @@
             <div class="form-group"><label>Bullet Type</label><input type="text" id="am-bullet-type" placeholder="e.g. FMJ, JHP, SP"></div>
             <div class="form-group"><label>Case Material</label><input type="text" id="am-case" placeholder="e.g. Brass, Steel"></div>
             <div class="form-group"><label>Lot Number</label><input type="text" id="am-lot" placeholder="From the box, if noted"></div>
+            <div class="form-group" style="grid-column:1/-1;"><label>SKU / Item #</label><input type="text" id="am-sku" placeholder="Manufacturer part # or retailer SKU, e.g. WE20GT7"></div>
             <div class="form-group"><label>Packages *</label><input type="number" id="am-packages" min="0" step="1" value="1" oninput="ammoRecalcRounds()"></div>
             <div class="form-group"><label>Rounds per Package *</label><input type="number" id="am-rpp" min="0" step="1" placeholder="e.g. 50, 100" oninput="ammoRecalcRounds()"></div>
             <div class="form-group"><label>Total Rounds</label><input type="number" id="am-total-rounds" min="0" step="1" oninput="document.getElementById('am-total-rounds').dataset.manual='1'"></div>
@@ -5247,6 +5259,25 @@ let unsubAmmo = null;
 function ammoNum(v) { const n = parseFloat(String(v ?? '').replace(/[^0-9.\-]/g, '')); return isFinite(n) ? n : 0; }
 function ammoInt(v) { return Math.max(0, Math.round(ammoNum(v))); }
 
+// ── Purchase-log column sorting ──
+let ammoSortCol = 'purchaseDate', ammoSortDir = 'desc';
+
+function ammoSortBy(col) {
+    ammoSortDir = ammoSortCol === col ? (ammoSortDir === 'asc' ? 'desc' : 'asc') : 'asc';
+    ammoSortCol = col;
+    renderAmmo();
+}
+
+function ammoSortVal(p, col) {
+    switch (col) {
+        case 'packages': case 'roundsPerPackage': case 'totalRounds': return ammoInt(p[col]);
+        case 'price': return ammoNum(p.price);
+        case 'cpr': { const r = ammoInt(p.totalRounds); return r ? ammoNum(p.price) / r : -1; }
+        case 'grainWeight': { const n = parseFloat(String(p.grainWeight || '').replace(/[^0-9.]/g, '')); return isFinite(n) ? n : -1; }
+        default: return String(p[col] || '').toLowerCase();
+    }
+}
+
 function ammoRecalcRounds() {
     const totalEl = document.getElementById('am-total-rounds');
     if (totalEl.dataset.manual === '1' && totalEl.value.trim() !== '') return;
@@ -5291,11 +5322,20 @@ function renderAmmo() {
             <td>${c.rounds ? '$' + (c.spend / c.rounds).toFixed(2) : '—'}</td></tr>`).join('');
     document.getElementById('ammo-caliber-empty').style.display = calRows.length ? 'none' : 'block';
 
-    // ── Purchase log (search filters this table only) ──
+    // ── Purchase log (search filters this table only; headers sort it) ──
     const q = (document.getElementById('ammo-search').value || '').toLowerCase().trim();
-    const shown = q ? sorted.filter(p =>
-        [p.retailer, p.brand, p.caliber, p.bulletType, p.grainWeight, p.notes]
-            .some(v => String(v || '').toLowerCase().includes(q))) : sorted;
+    const shown = (q ? sorted.filter(p =>
+        [p.retailer, p.brand, p.caliber, p.bulletType, p.grainWeight, p.sku, p.notes]
+            .some(v => String(v || '').toLowerCase().includes(q))) : sorted.slice())
+        .sort((a, b) => {
+            const va = ammoSortVal(a, ammoSortCol), vb = ammoSortVal(b, ammoSortCol);
+            const c = typeof va === 'number' ? va - vb : va.localeCompare(vb);
+            return ammoSortDir === 'asc' ? c : -c;
+        });
+    document.querySelectorAll('#ammo-table thead th').forEach(th => {
+        th.classList.remove('sort-asc', 'sort-desc');
+        if (th.dataset.col === ammoSortCol) th.classList.add(ammoSortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+    });
     document.getElementById('ammo-tbody').innerHTML = shown.map(p => {
         const rounds = ammoInt(p.totalRounds), price = ammoNum(p.price);
         return `
@@ -5305,6 +5345,7 @@ function renderAmmo() {
             <td><strong>${escHtml(p.caliber || '—')}</strong></td>
             <td>${escHtml(p.grainWeight || '—')}</td>
             <td>${escHtml(p.bulletType || '—')}</td>
+            <td style="color:var(--text-secondary);font-size:0.82em;">${escHtml(p.sku || '—')}</td>
             <td>${ammoInt(p.packages).toLocaleString()}</td>
             <td>${ammoInt(p.roundsPerPackage).toLocaleString()}</td>
             <td><strong>${rounds.toLocaleString()}</strong></td>
@@ -5321,7 +5362,7 @@ function renderAmmo() {
     const sSpend  = shown.reduce((s, p) => s + ammoNum(p.price), 0);
     document.getElementById('ammo-tfoot').innerHTML = shown.length ? `
         <tr style="font-weight:700;border-top:2px solid var(--border);">
-            <td colspan="6">Total${q ? ' (filtered)' : ''}</td>
+            <td colspan="7">Total${q ? ' (filtered)' : ''}</td>
             <td>${sPkgs.toLocaleString()}</td><td></td>
             <td>${sRounds.toLocaleString()}</td>
             <td>${'$' + sSpend.toFixed(2)}</td>
@@ -5531,7 +5572,7 @@ function openAmmoModal(docId) {
     set('am-date', p ? p.purchaseDate : new Date().toISOString().slice(0, 10));
     set('am-retailer', p && p.retailer); set('am-brand', p && p.brand); set('am-caliber', p && p.caliber);
     set('am-grain', p && p.grainWeight); set('am-bullet-type', p && p.bulletType); set('am-case', p && p.caseMaterial);
-    set('am-lot', p && p.lotNumber); set('am-packages', p ? p.packages : 1); set('am-rpp', p && p.roundsPerPackage);
+    set('am-lot', p && p.lotNumber); set('am-sku', p && p.sku); set('am-packages', p ? p.packages : 1); set('am-rpp', p && p.roundsPerPackage);
     set('am-total-rounds', p && p.totalRounds); set('am-price', p && p.price); set('am-notes', p && p.notes);
     delete document.getElementById('am-total-rounds').dataset.manual;
     const link = document.getElementById('ammo-receipt-link');
@@ -5566,6 +5607,7 @@ async function saveAmmoPurchase() {
         bulletType: document.getElementById('am-bullet-type').value.trim(),
         caseMaterial: document.getElementById('am-case').value.trim(),
         lotNumber: document.getElementById('am-lot').value.trim(),
+        sku: document.getElementById('am-sku').value.trim(),
         packages, roundsPerPackage: rpp, totalRounds,
         price: ammoNum(document.getElementById('am-price').value),
         notes: document.getElementById('am-notes').value.trim(),
@@ -5671,11 +5713,12 @@ Find every AMMUNITION line item (ignore firearms, accessories, tax, shipping, an
     "totalRounds": total rounds across all packages, or 0 if unclear,
     "lineTotal": total price paid for this line item as a number,
     "lotNumber":"lot # if printed, or empty",
+    "sku":"manufacturer part number (MPN), retailer SKU, item #, or UPC printed on the line, or empty",
     "notes":"anything else relevant (muzzle velocity, +P, subsonic, match grade), or empty"}
  ]
 }
 Rules: if a line reads "2 x 100rd box" then packages=2, roundsPerPackage=100, totalRounds=200. If only a total round count is shown, set packages=1 and roundsPerPackage=totalRounds. Use numbers (not strings) for packages, roundsPerPackage, totalRounds, lineTotal. If nothing on the receipt is ammunition, return {"retailer":"","purchaseDate":"","items":[]}.`;
-    const raw = await callClaude(media ? media.base64 : null, media ? media.mimeType : null, prompt, { maxTokens: 1500 });
+    const raw = await callClaude(media ? media.base64 : null, media ? media.mimeType : null, prompt, { maxTokens: 1700 });
     if (!raw) throw new Error('AI returned nothing');
     const m = raw.match(/\{[\s\S]*\}/);
     if (!m) throw new Error('could not parse AI response');
@@ -5709,6 +5752,7 @@ Rules: if a line reads "2 x 100rd box" then packages=2, roundsPerPackage=100, to
             bulletType: String(it.bulletType || '').trim(),
             caseMaterial: String(it.caseMaterial || '').trim(),
             lotNumber: String(it.lotNumber || '').trim(),
+            sku: String(it.sku || '').trim(),
             packages, roundsPerPackage: rpp, totalRounds,
             price: ammoNum(it.lineTotal),
             notes: String(it.notes || '').trim(),

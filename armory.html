@@ -6190,7 +6190,7 @@ function renderAccessories() {
         if (th.dataset.col === accCatSortCol) th.classList.add(accCatSortDir === 'asc' ? 'sort-asc' : 'sort-desc');
     });
     document.getElementById('acc-cat-tbody').innerHTML = catRows.map(c => `
-        <tr><td><strong>${escHtml(c.label)}</strong></td>
+        <tr><td><a href="#" onclick="accSearchFor('${accJsStr(c.label)}');return false;" style="color:var(--accent);text-decoration:none;font-weight:600;" title="View ${escHtml(c.label)} purchases">${escHtml(c.label)}</a></td>
             <td>${c.qty.toLocaleString()}</td>
             <td>${moneyFmt(c.spend)}</td>
             <td><div style="display:flex;align-items:center;gap:8px;"><div style="flex:0 0 120px;height:6px;background:var(--border);border-radius:99px;overflow:hidden;"><div style="height:100%;width:${tSpend ? Math.round(c.spend / tSpend * 100) : 0}%;background:var(--accent);border-radius:99px;"></div></div><span style="font-size:0.78rem;color:var(--text-secondary);">${tSpend ? Math.round(c.spend / tSpend * 100) : 0}%</span></div></td></tr>`).join('');
@@ -6319,6 +6319,12 @@ async function enrichAccMissing() {
 }
 
 // ── Stat-tile drill-downs (reuses the dashboard's stat-overview modal) ──
+// Escape a value for use inside a single-quoted JS string in an inline onclick
+// attribute: \xNN escapes survive both HTML attribute decoding and JS parsing.
+function accJsStr(s) {
+    return String(s ?? '').replace(/[\\'"&<>]/g, ch => '\\x' + ch.charCodeAt(0).toString(16).padStart(2, '0'));
+}
+
 function accSearchFor(term) {
     closeStatOverview();
     document.getElementById('acc-search').value = term;
@@ -6337,7 +6343,7 @@ function openAccOverview(kind) {
     const thR = t => `<th style="text-align:right;padding:8px;border-bottom:2px solid var(--border);color:var(--text-secondary);">${t}</th>`;
     const td = t => `<td style="padding:7px 8px;border-bottom:1px solid var(--border);">${t}</td>`;
     const tdR = t => `<td style="padding:7px 8px;text-align:right;border-bottom:1px solid var(--border);">${t}</td>`;
-    const searchLink = t => `<a href="#" onclick="accSearchFor('${escHtmlStat(t).replace(/'/g, "\\'")}');return false;" style="color:var(--accent);text-decoration:none;font-weight:500;">${escHtmlStat(t)}</a>`;
+    const searchLink = t => `<a href="#" onclick="accSearchFor('${accJsStr(t)}');return false;" style="color:var(--accent);text-decoration:none;font-weight:500;">${escHtmlStat(t)}</a>`;
     const money = n => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const table = (heads, rows) => `<table style="width:100%;border-collapse:collapse;font-size:0.88rem;"><thead><tr>${heads}</tr></thead><tbody>${rows}</tbody></table>`;
     const byDateDesc = accessories.slice().sort((a, b) => String(b.purchaseDate || '').localeCompare(String(a.purchaseDate || '')));

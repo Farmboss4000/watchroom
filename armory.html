@@ -571,6 +571,7 @@
         <button onclick="showView('add-item')">Add Item</button>
         <button onclick="showView('inventory')">Inventory</button>
         <button onclick="showView('ammo')">🎯 Ammo</button>
+        <button onclick="showView('accessories')">🧰 Accessories</button>
         <button onclick="showView('reports')">Reports</button>
         <button onclick="showView('categories')">Categories</button>
         <button onclick="showView('packing-list')">Packing List</button>
@@ -1136,6 +1137,107 @@
             <button type="button" class="btn btn-primary" onclick="saveAmmoPurchase()">💾 Save Purchase</button>
             <button type="button" class="btn btn-ghost" onclick="closeAmmoModal()">Cancel</button>
             <a id="ammo-receipt-link" href="" target="_blank" class="btn btn-ghost" style="display:none;margin-left:auto;">🧾 Open Receipt</a>
+        </div>
+    </div>
+</div>
+
+<!-- ══ ACCESSORIES ══ -->
+<div id="view-accessories" class="view">
+    <div class="toolbar">
+        <div class="toolbar-left">
+            <h2 style="font-size:1.1rem;font-weight:700;">🧰 Accessory Purchases</h2>
+            <span style="font-size:0.82rem;color:var(--text-secondary);">Optics, mags, cases, cleaning gear — tracked and auto-categorized</span>
+        </div>
+        <div style="display:flex;gap:8px;">
+            <button class="btn btn-primary btn-sm" onclick="openAccModal()">+ Log Purchase</button>
+        </div>
+    </div>
+
+    <div class="stats-grid" id="acc-stats"></div>
+
+    <!-- Receipt intake -->
+    <div class="card" style="margin-bottom:16px;">
+        <div class="card-title"><div class="card-title-left">🧾 Add from Receipts</div></div>
+        <p style="font-size:0.84rem;color:var(--text-secondary);margin-bottom:10px;">
+            Drop in receipts as <strong>PDFs, photos, or saved emails</strong> (.eml/.txt) — AI logs every accessory line item it finds:
+            vendor, brand, description, quantity, and cost, and sorts each into a category. Firearms and ammo lines are skipped
+            (those belong in Inventory and 🎯 Ammo).
+        </p>
+        <div id="acc-dropzone" style="border:2px dashed var(--border);border-radius:10px;padding:22px;text-align:center;cursor:pointer;transition:border-color 0.15s, background 0.15s;"
+             onclick="document.getElementById('acc-receipt-input').click()"
+             ondragover="event.preventDefault();this.style.borderColor='var(--accent)';this.style.background='rgba(59,130,246,0.05)';"
+             ondragleave="this.style.borderColor='var(--border)';this.style.background='';"
+             ondrop="event.preventDefault();this.style.borderColor='var(--border)';this.style.background='';onAccReceiptsSelected(event.dataTransfer);">
+            <div style="font-size:1.6rem;">🧾</div>
+            <div style="font-size:0.9rem;font-weight:600;margin-top:4px;">Drop receipts here or click to browse</div>
+            <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:2px;">PDF · JPG · PNG · EML · TXT — multiple files OK</div>
+        </div>
+        <input type="file" id="acc-receipt-input" accept="image/*,application/pdf,.eml,.txt,message/rfc822,text/plain" multiple style="display:none;" onchange="onAccReceiptsSelected(this);this.value='';">
+        <div id="acc-intake-status" style="margin-top:10px;"></div>
+    </div>
+
+    <!-- Spend by category -->
+    <div class="card" style="margin-bottom:16px;">
+        <div class="card-title"><div class="card-title-left">🗂 Spend by Category</div></div>
+        <div class="table-wrapper">
+            <table id="acc-cat-table"><thead><tr>
+                <th onclick="accCatSortBy('label')" data-col="label">Category</th>
+                <th onclick="accCatSortBy('qty')" data-col="qty">Items</th>
+                <th onclick="accCatSortBy('spend')" data-col="spend">Spend</th>
+                <th onclick="accCatSortBy('share')" data-col="share">Share</th>
+            </tr></thead><tbody id="acc-cat-tbody"></tbody></table>
+        </div>
+        <div id="acc-cat-empty" class="empty" style="display:none;"><div class="empty-icon">🗂</div><p>No accessories logged yet.</p></div>
+    </div>
+
+    <!-- Purchase log -->
+    <div class="card">
+        <div class="toolbar" style="margin-bottom:12px;">
+            <input type="text" id="acc-search" placeholder="🔍 Search vendor, brand, description, category..." oninput="renderAccessories()" style="flex:1;min-width:220px;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:0.88rem;">
+        </div>
+        <div class="table-wrapper">
+            <table id="acc-table"><thead><tr>
+                <th onclick="accSortBy('purchaseDate')" data-col="purchaseDate">Date</th>
+                <th onclick="accSortBy('vendor')" data-col="vendor">Vendor</th>
+                <th onclick="accSortBy('brand')" data-col="brand">Brand</th>
+                <th onclick="accSortBy('description')" data-col="description">Description</th>
+                <th onclick="accSortBy('category')" data-col="category">Category</th>
+                <th onclick="accSortBy('quantity')" data-col="quantity">Qty</th>
+                <th onclick="accSortBy('unit')" data-col="unit">Unit $</th>
+                <th onclick="accSortBy('price')" data-col="price">Cost</th>
+                <th onclick="accSortBy('sku')" data-col="sku">SKU</th>
+                <th class="no-sort">Receipt</th><th class="no-sort">Actions</th>
+            </tr></thead><tbody id="acc-tbody"></tbody><tfoot id="acc-tfoot"></tfoot></table>
+        </div>
+        <div id="acc-empty" class="empty" style="display:none;">
+            <div class="empty-icon">🧰</div>
+            <p>No purchases yet. Drop a receipt above or <a href="#" onclick="openAccModal();return false;" style="color:var(--accent);">log one manually</a>.</p>
+        </div>
+    </div>
+</div>
+
+<!-- ══ ACCESSORY MODAL ══ -->
+<div class="modal-overlay" id="acc-modal" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;align-items:flex-start;justify-content:center;z-index:9500;padding:20px;overflow-y:auto;">
+    <div class="modal" style="background:#fff;border-radius:10px;padding:24px;width:100%;max-width:640px;margin:20px auto;max-height:none;">
+        <div class="modal-title" id="acc-modal-title" style="font-size:1.15rem;font-weight:700;margin-bottom:4px;">Log Accessory Purchase</div>
+        <div class="modal-sub" style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:16px;">Cost is the line total — unit price is computed from quantity if left blank.</div>
+        <input type="hidden" id="acc-edit-doc-id">
+        <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+            <div class="form-group"><label>Purchase Date</label><input type="date" id="ac-date"></div>
+            <div class="form-group"><label>Vendor (source)</label><input type="text" id="ac-vendor" placeholder="e.g. Scheels, MidwayUSA"></div>
+            <div class="form-group"><label>Brand</label><input type="text" id="ac-brand" placeholder="e.g. Magpul, Vortex, Pelican"></div>
+            <div class="form-group"><label>Category</label><input type="text" id="ac-category" list="acc-cat-list" placeholder="e.g. Optics, Magazines, Cases"><datalist id="acc-cat-list"></datalist></div>
+            <div class="form-group" style="grid-column:1/-1;"><label>Description *</label><input type="text" id="ac-description" placeholder="Product as printed on the receipt"></div>
+            <div class="form-group"><label>Quantity</label><input type="number" id="ac-quantity" min="0" step="1" value="1"></div>
+            <div class="form-group"><label>Total Cost ($)</label><input type="number" id="ac-price" min="0" step="0.01" placeholder="Line total"></div>
+            <div class="form-group"><label>SKU / Item # (retailer's code)</label><input type="text" id="ac-sku" placeholder="e.g. 01581354169"></div>
+            <div class="form-group"><label>MPN (maker's part #)</label><input type="text" id="ac-mpn" placeholder="e.g. MAG557-BLK"></div>
+            <div class="form-group" style="grid-column:1/-1;"><label>Notes</label><textarea id="ac-notes" rows="2" placeholder="Anything worth remembering."></textarea></div>
+        </div>
+        <div class="modal-actions" style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;">
+            <button type="button" class="btn btn-primary" onclick="saveAccPurchase()">💾 Save Purchase</button>
+            <button type="button" class="btn btn-ghost" onclick="closeAccModal()">Cancel</button>
+            <a id="acc-receipt-link" href="" target="_blank" class="btn btn-ghost" style="display:none;margin-left:auto;">🧾 Open Receipt</a>
         </div>
     </div>
 </div>
@@ -1794,7 +1896,7 @@ let formPhotos = {
     form4:     { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false }
 };
 
-const VIEWS = ['dashboard','add-item','inventory','ammo','reports','categories','packing-list','gun-trusts','settings','recycle-bin','diary'];
+const VIEWS = ['dashboard','add-item','inventory','ammo','accessories','reports','categories','packing-list','gun-trusts','settings','recycle-bin','diary'];
 
 // Gun Trusts state
 let trusts = [];
@@ -1821,7 +1923,8 @@ auth.onAuthStateChanged(user => {
         if (unsubItems) { unsubItems(); unsubItems = null; }
         if (unsubTrusts) { unsubTrusts(); unsubTrusts = null; }
         if (unsubAmmo) { unsubAmmo(); unsubAmmo = null; }
-        items = []; trusts = []; ammo = [];
+        if (unsubAcc) { unsubAcc(); unsubAcc = null; }
+        items = []; trusts = []; ammo = []; accessories = [];
     }
 });
 
@@ -1892,6 +1995,10 @@ async function initApp() {
             ammo = snap.docs.map(doc => ({ _docId:doc.id, ...doc.data() }));
             renderAmmo(); renderDashboard();
         }, err => console.warn('ammo snap err', err));
+        unsubAcc = db.collection('armory_accessories').onSnapshot(snap => {
+            accessories = snap.docs.map(doc => ({ _docId:doc.id, ...doc.data() }));
+            renderAccessories();
+        }, err => console.warn('accessories snap err', err));
         document.getElementById('loading-screen').style.display = 'none';
         document.getElementById('app').style.display            = 'flex';
         populateCatSelect(); populateMfrList(); populateCalList(); syncCatFilters();
@@ -1953,6 +2060,7 @@ function showView(v) {
     if (v === 'packing-list') { syncCatFilters(); renderPackingPicker(); }
     if (v === 'gun-trusts') renderTrustsList();
     if (v === 'ammo') renderAmmo();
+    if (v === 'accessories') renderAccessories();
 }
 
 // ═══════════════════════════════════════
@@ -5988,6 +6096,316 @@ SKU and MPN are DIFFERENT codes — when the receipt shows both columns, keep th
         ammoBackfillBusy = false;
         if (btn) { btn.disabled = false; btn.textContent = '🔎 Backfill SKUs'; }
     }
+}
+
+// ═══════════════════════════════════════
+//  ACCESSORY PURCHASES
+// ═══════════════════════════════════════
+let accessories = [];
+let unsubAcc = null;
+
+const ACC_SEED_CATEGORIES = ['Optics', 'Magazines', 'Cases & Storage', 'Holsters & Slings', 'Cleaning & Maintenance', 'Ear & Eye Protection', 'Tools', 'Parts & Upgrades', 'Targets', 'Range Gear'];
+
+function accCategories() {
+    const seen = new Map();
+    ACC_SEED_CATEGORIES.forEach(c => seen.set(c.toLowerCase(), c));
+    accessories.forEach(a => { const c = String(a.category || '').trim(); if (c && !seen.has(c.toLowerCase())) seen.set(c.toLowerCase(), c); });
+    return [...seen.values()];
+}
+
+// ── Sorting state ──
+let accSortCol = 'purchaseDate', accSortDir = 'desc';
+let accCatSortCol = 'spend', accCatSortDir = 'desc';
+
+function accSortBy(col) {
+    accSortDir = accSortCol === col ? (accSortDir === 'asc' ? 'desc' : 'asc') : (['quantity', 'unit', 'price'].includes(col) ? 'desc' : 'asc');
+    accSortCol = col;
+    renderAccessories();
+}
+
+function accCatSortBy(col) {
+    accCatSortDir = accCatSortCol === col ? (accCatSortDir === 'asc' ? 'desc' : 'asc') : (col === 'label' ? 'asc' : 'desc');
+    accCatSortCol = col;
+    renderAccessories();
+}
+
+function accSortVal(p, col) {
+    switch (col) {
+        case 'quantity': return ammoInt(p.quantity);
+        case 'price': return ammoNum(p.price);
+        case 'unit': { const q = ammoInt(p.quantity); return q ? ammoNum(p.price) / q : ammoNum(p.price); }
+        case 'sku': return String(p.sku || p.mpn || '').toLowerCase();
+        default: return String(p[col] || '').toLowerCase();
+    }
+}
+
+function renderAccessories() {
+    const statsEl = document.getElementById('acc-stats'); if (!statsEl) return;
+    const all = accessories.slice();
+
+    // ── Stat tiles ──
+    const thisYear = String(new Date().getFullYear());
+    const tQty = all.reduce((s, p) => s + (ammoInt(p.quantity) || 1), 0);
+    const tSpend = all.reduce((s, p) => s + ammoNum(p.price), 0);
+    const ytd = all.filter(p => String(p.purchaseDate || '').startsWith(thisYear)).reduce((s, p) => s + ammoNum(p.price), 0);
+    const catKeys = new Set(all.map(p => String(p.category || '').trim().toLowerCase()).filter(Boolean));
+    const vendKeys = new Set(all.map(p => String(p.vendor || '').trim().toLowerCase()).filter(Boolean));
+    statsEl.innerHTML = `
+        <div class="stat-card"><div class="stat-value">${tQty.toLocaleString()}</div><div class="stat-label">Accessories</div></div>
+        <div class="stat-card"><div class="stat-value">${catKeys.size}</div><div class="stat-label">Categories</div></div>
+        <div class="stat-card"><div class="stat-value">${vendKeys.size}</div><div class="stat-label">Vendors</div></div>
+        <div class="stat-card"><div class="stat-value">${moneyFmt(tSpend)}</div><div class="stat-label">Total Spend</div></div>
+        <div class="stat-card"><div class="stat-value">${moneyFmt(ytd)}</div><div class="stat-label">YTD Spend</div></div>`;
+
+    // ── Spend by category ──
+    const byCat = {};
+    all.forEach(p => {
+        const raw = String(p.category || '').trim() || 'Uncategorized';
+        const k = raw.toLowerCase();
+        if (!byCat[k]) byCat[k] = { label: raw, qty: 0, spend: 0 };
+        byCat[k].qty += ammoInt(p.quantity) || 1; byCat[k].spend += ammoNum(p.price);
+    });
+    const catVal = c => accCatSortCol === 'label' ? c.label.toLowerCase()
+        : accCatSortCol === 'share' ? (tSpend ? c.spend / tSpend : 0)
+        : c[accCatSortCol];
+    const catRows = Object.values(byCat).sort((a, b) => {
+        const va = catVal(a), vb = catVal(b);
+        const cmp = typeof va === 'number' ? va - vb : va.localeCompare(vb);
+        return accCatSortDir === 'asc' ? cmp : -cmp;
+    });
+    document.querySelectorAll('#acc-cat-table thead th').forEach(th => {
+        th.classList.remove('sort-asc', 'sort-desc');
+        if (th.dataset.col === accCatSortCol) th.classList.add(accCatSortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+    });
+    document.getElementById('acc-cat-tbody').innerHTML = catRows.map(c => `
+        <tr><td><strong>${escHtml(c.label)}</strong></td>
+            <td>${c.qty.toLocaleString()}</td>
+            <td>${moneyFmt(c.spend)}</td>
+            <td><div style="display:flex;align-items:center;gap:8px;"><div style="flex:0 0 120px;height:6px;background:var(--border);border-radius:99px;overflow:hidden;"><div style="height:100%;width:${tSpend ? Math.round(c.spend / tSpend * 100) : 0}%;background:var(--accent);border-radius:99px;"></div></div><span style="font-size:0.78rem;color:var(--text-secondary);">${tSpend ? Math.round(c.spend / tSpend * 100) : 0}%</span></div></td></tr>`).join('');
+    document.getElementById('acc-cat-empty').style.display = catRows.length ? 'none' : 'block';
+
+    // ── Purchase log ──
+    const q = (document.getElementById('acc-search').value || '').toLowerCase().trim();
+    const shown = (q ? all.filter(p =>
+        [p.vendor, p.brand, p.description, p.category, p.sku, p.mpn, p.notes]
+            .some(v => String(v || '').toLowerCase().includes(q))) : all)
+        .sort((a, b) => {
+            const va = accSortVal(a, accSortCol), vb = accSortVal(b, accSortCol);
+            const c = typeof va === 'number' ? va - vb : va.localeCompare(vb);
+            const primary = accSortDir === 'asc' ? c : -c;
+            return primary || String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+        });
+    document.querySelectorAll('#acc-table thead th').forEach(th => {
+        th.classList.remove('sort-asc', 'sort-desc');
+        if (th.dataset.col === accSortCol) th.classList.add(accSortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+    });
+    document.getElementById('acc-tbody').innerHTML = shown.map(p => {
+        const qty = ammoInt(p.quantity) || 1, price = ammoNum(p.price);
+        return `
+        <tr><td style="white-space:nowrap;">${escHtml(p.purchaseDate || '—')}</td>
+            <td>${escHtml(p.vendor || '—')}</td>
+            <td>${escHtml(p.brand || '—')}</td>
+            <td style="max-width:260px;">${escHtml(p.description || '—')}</td>
+            <td><span style="font-size:0.76rem;background:var(--bg-card);border:1px solid var(--border);border-radius:99px;padding:2px 10px;white-space:nowrap;">${escHtml(p.category || 'Uncategorized')}</span></td>
+            <td>${qty.toLocaleString()}</td>
+            <td>${price ? '$' + (price / qty).toFixed(2) : '—'}</td>
+            <td><strong>${price ? '$' + price.toFixed(2) : '—'}</strong></td>
+            <td style="font-size:0.82em;">${(p.sku || p.mpn) ? `<a href="${escHtml(ammoSkuUrl({ ...p, retailer: p.vendor }))}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;border-bottom:1px dotted var(--accent);" title="Search ${escHtml(p.vendor || 'the web')} for ${escHtml(p.sku || p.mpn)}${p.sku && p.mpn ? ' · MPN ' + escHtml(p.mpn) : ''}">${escHtml(p.sku || p.mpn)}</a>` : '<span style="color:var(--text-secondary);">—</span>'}</td>
+            <td>${p.receiptUrl ? `<a href="${escHtml(p.receiptUrl)}" target="_blank" title="${escHtml(p.receiptName || 'Receipt')}">🧾</a>` : '—'}</td>
+            <td style="white-space:nowrap;">
+                <button class="btn btn-ghost btn-sm" onclick="openAccModal('${p._docId}')" title="Edit">✏️</button>
+                <button class="btn btn-ghost btn-sm" style="color:#b91c1c;" onclick="deleteAccPurchase('${p._docId}')" title="Delete">🗑</button>
+            </td></tr>`;
+    }).join('');
+    const sQty = shown.reduce((s, p) => s + (ammoInt(p.quantity) || 1), 0);
+    const sSpend = shown.reduce((s, p) => s + ammoNum(p.price), 0);
+    document.getElementById('acc-tfoot').innerHTML = shown.length ? `
+        <tr style="font-weight:700;border-top:2px solid var(--border);">
+            <td colspan="5">Total${q ? ' (filtered)' : ''}</td>
+            <td>${sQty.toLocaleString()}</td><td></td>
+            <td>${'$' + sSpend.toFixed(2)}</td>
+            <td colspan="3"></td></tr>` : '';
+    document.getElementById('acc-empty').style.display = accessories.length ? 'none' : 'block';
+}
+
+// ── Manual add / edit modal ──
+function openAccModal(docId) {
+    const p = docId ? accessories.find(x => x._docId === docId) : null;
+    document.getElementById('acc-modal-title').textContent = p ? 'Edit Accessory Purchase' : 'Log Accessory Purchase';
+    document.getElementById('acc-edit-doc-id').value = docId || '';
+    document.getElementById('acc-cat-list').innerHTML = accCategories().map(c => `<option value="${escHtml(c)}">`).join('');
+    const set = (id, v) => { document.getElementById(id).value = v ?? ''; };
+    set('ac-date', p ? p.purchaseDate : new Date().toISOString().slice(0, 10));
+    set('ac-vendor', p && p.vendor); set('ac-brand', p && p.brand); set('ac-category', p && p.category);
+    set('ac-description', p && p.description); set('ac-quantity', p ? p.quantity : 1); set('ac-price', p && p.price);
+    set('ac-sku', p && p.sku); set('ac-mpn', p && p.mpn); set('ac-notes', p && p.notes);
+    const link = document.getElementById('acc-receipt-link');
+    if (p && p.receiptUrl) { link.href = p.receiptUrl; link.style.display = 'inline-flex'; } else { link.style.display = 'none'; }
+    const mo = document.getElementById('acc-modal');
+    mo.style.display = 'flex';
+    void mo.offsetWidth;
+    mo.classList.add('show');
+}
+
+function closeAccModal() {
+    const mo = document.getElementById('acc-modal');
+    mo.classList.remove('show');
+    mo.style.display = 'none';
+}
+document.getElementById('acc-modal').addEventListener('click', e => { if (e.target === document.getElementById('acc-modal')) closeAccModal(); });
+
+async function saveAccPurchase() {
+    const description = document.getElementById('ac-description').value.trim();
+    if (!description) { toast('Enter a description.', 'error'); return; }
+    const data = {
+        purchaseDate: document.getElementById('ac-date').value || '',
+        vendor: document.getElementById('ac-vendor').value.trim(),
+        brand: document.getElementById('ac-brand').value.trim(),
+        category: document.getElementById('ac-category').value.trim(),
+        description,
+        quantity: ammoInt(document.getElementById('ac-quantity').value) || 1,
+        price: ammoNum(document.getElementById('ac-price').value),
+        sku: document.getElementById('ac-sku').value.trim(),
+        mpn: document.getElementById('ac-mpn').value.trim(),
+        notes: document.getElementById('ac-notes').value.trim(),
+    };
+    const docId = document.getElementById('acc-edit-doc-id').value;
+    try {
+        if (docId) {
+            await db.collection('armory_accessories').doc(docId).update(data);
+            toast('Purchase updated.', 'success');
+        } else {
+            await db.collection('armory_accessories').add({ ...data, source: 'manual', createdAt: new Date().toISOString() });
+            toast('Purchase logged.', 'success');
+        }
+        closeAccModal();
+    } catch (err) { toast('Save failed: ' + err.message, 'error'); }
+}
+
+async function deleteAccPurchase(docId) {
+    const p = accessories.find(x => x._docId === docId); if (!p) return;
+    if (!confirm(`Delete "${p.description || 'this purchase'}"? The receipt file (if any) stays in storage.`)) return;
+    try { await db.collection('armory_accessories').doc(docId).delete(); toast('Purchase deleted.'); }
+    catch (err) { toast('Delete failed: ' + err.message, 'error'); }
+}
+
+// ── Receipt intake ──
+let accIntakeBusy = false;
+
+async function onAccReceiptsSelected(src) {
+    const files = Array.from((src && src.files) || []);
+    if (!files.length) return;
+    if (accIntakeBusy) { toast('Still working through the previous receipts — one moment.', 'error'); return; }
+    if (!apiKey) { toast('Set your Anthropic API key in Settings first.', 'error'); return; }
+    accIntakeBusy = true;
+    const statusEl = document.getElementById('acc-intake-status');
+    statusEl.innerHTML = '';
+    const row = (name, msg, tone) => {
+        const colors = { work: ['#1e40af', '#dbeafe', '#3b82f6'], ok: ['#166534', '#dcfce7', '#22c55e'], err: ['#b91c1c', '#fee2e2', '#ef4444'] };
+        const el = document.createElement('div');
+        el.style.cssText = 'display:flex;gap:8px;align-items:center;padding:7px 12px;border:1px solid;border-radius:6px;margin-bottom:5px;font-size:0.83rem;';
+        el.innerHTML = `<span style="flex-shrink:0;"></span><span style="font-weight:600;flex-shrink:0;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(name)}</span><span></span>`;
+        statusEl.appendChild(el);
+        const apply = (msg2, tone2) => {
+            const [fg, bg, bd] = colors[tone2];
+            el.style.color = fg; el.style.background = bg; el.style.borderColor = bd;
+            el.querySelectorAll('span')[0].textContent = tone2 === 'work' ? '⏳' : tone2 === 'ok' ? '✅' : '❌';
+            el.querySelectorAll('span')[2].textContent = msg2;
+        };
+        apply(msg, tone);
+        return apply;
+    };
+    let added = 0;
+    try {
+        for (const file of files) {
+            const update = row(file.name, 'reading receipt…', 'work');
+            try {
+                const n = await processAccReceipt(file, update);
+                added += n;
+                update(n ? `logged ${n} accessor${n === 1 ? 'y' : 'ies'}` : 'no accessory line items found on this receipt', n ? 'ok' : 'err');
+            } catch (err) {
+                update(err.message || 'failed', 'err');
+            }
+        }
+    } finally { accIntakeBusy = false; }
+    if (added) toast(`🧰 ${added} accessor${added === 1 ? 'y' : 'ies'} logged from receipts.`, 'success');
+}
+
+async function processAccReceipt(file, update) {
+    const lower = (file.name || '').toLowerCase();
+    const isPdf = file.type === 'application/pdf' || lower.endsWith('.pdf');
+    const isText = lower.endsWith('.eml') || lower.endsWith('.txt') || file.type === 'message/rfc822' || file.type === 'text/plain';
+    const isImage = !isPdf && !isText && (file.type.startsWith('image/') || /\.(png|jpe?g|gif|webp)$/.test(lower));
+    if (!isPdf && !isText && !isImage) throw new Error('unsupported file type — use a PDF, photo, or .eml/.txt email');
+
+    let media = null, emailText = '';
+    if (isText) {
+        emailText = (await file.text()).slice(0, 60000);
+        if (!emailText.trim()) throw new Error('file is empty');
+    } else if (isPdf) {
+        if (file.size > 4.5 * 1024 * 1024) throw new Error('PDF too large for AI reading (max ~4.5 MB) — try a photo of the receipt instead');
+        const dataUrl = await new Promise(r => { const fr = new FileReader(); fr.onload = e => r(e.target.result); fr.readAsDataURL(file); });
+        media = { base64: dataUrl.split(',')[1], mimeType: 'application/pdf' };
+    } else {
+        const dataUrl = await compressImage(file) || await new Promise(r => { const fr = new FileReader(); fr.onload = e => r(e.target.result); fr.readAsDataURL(file); });
+        media = { base64: dataUrl.split(',')[1], mimeType: 'image/jpeg' };
+    }
+
+    if (update) update('extracting accessory details with AI…', 'work');
+    const catList = accCategories().join(', ');
+    const prompt = `${emailText ? 'Below is the text of an emailed receipt or order confirmation.\n\n--- EMAIL ---\n' + emailText + '\n--- END EMAIL ---\n\n' : 'This is a retail receipt, invoice, or order confirmation.\n'}
+Find every FIREARM ACCESSORY line item — optics, scopes, magazines, cases, holsters, slings, cleaning gear, tools, parts and upgrades, ear/eye protection, storage, targets, range gear, and similar. IGNORE ammunition, firearms themselves (guns/receivers), tax, and shipping. Return ONLY valid JSON, no markdown fences:
+{
+ "vendor":"store/seller name or empty",
+ "purchaseDate":"YYYY-MM-DD or empty",
+ "items":[
+   {"brand":"product manufacturer, e.g. Magpul, Vortex, Pelican, or empty",
+    "description":"short product description as printed on the line",
+    "category":"the best fit from: ${catList} — or invent a NEW short category name (1-2 words) if none fits",
+    "quantity": count purchased as a number,
+    "lineTotal": total price paid for this line as a number,
+    "sku":"the RETAILER's SKU / item number — the store's own code, often long and numeric — or empty",
+    "mpn":"the MANUFACTURER's part number / model #, or empty",
+    "notes":"anything else relevant (color, size, fitment), or empty"}
+ ]
+}
+Rules: use numbers for quantity and lineTotal. SKU and MPN are DIFFERENT codes — when the receipt shows both columns, keep them separate and NEVER put the MPN in sku; a lone maker's model number goes in mpn. If nothing on the receipt is a firearm accessory, return {"vendor":"","purchaseDate":"","items":[]}.`;
+    const raw = await callClaude(media ? media.base64 : null, media ? media.mimeType : null, prompt, { maxTokens: 1700 });
+    if (!raw) throw new Error('AI returned nothing');
+    const m = raw.match(/\{[\s\S]*\}/);
+    if (!m) throw new Error('could not parse AI response');
+    const d = JSON.parse(m[0]);
+    const rawItems = Array.isArray(d.items) ? d.items : [];
+    if (!rawItems.length) return 0;
+
+    if (update) update('saving receipt & purchases…', 'work');
+    let receiptUrl = '', receiptName = file.name || 'receipt';
+    try {
+        const ext = (file.name && file.name.includes('.')) ? file.name.split('.').pop() : (isPdf ? 'pdf' : isText ? 'txt' : 'jpg');
+        const ref = storage.ref().child(`armory_accessory_receipts/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`);
+        await ref.put(file);
+        receiptUrl = await ref.getDownloadURL();
+    } catch (e) { console.warn('receipt upload failed', e); }
+
+    let added = 0;
+    for (const it of rawItems) {
+        await db.collection('armory_accessories').add({
+            purchaseDate: /^\d{4}-\d{2}-\d{2}$/.test(String(d.purchaseDate || '').trim()) ? String(d.purchaseDate).trim() : '',
+            vendor: String(d.vendor || '').trim(),
+            brand: String(it.brand || '').trim(),
+            description: String(it.description || '').trim(),
+            category: String(it.category || '').trim(),
+            quantity: ammoInt(it.quantity) || 1,
+            price: ammoNum(it.lineTotal),
+            sku: String(it.sku || '').trim(),
+            mpn: String(it.mpn || '').trim(),
+            notes: String(it.notes || '').trim(),
+            receiptUrl, receiptName,
+            source: 'receipt-ai', createdAt: new Date().toISOString(),
+        });
+        added++;
+    }
+    return added;
 }
 
 function toast(msg, type='', undoFn=null) {

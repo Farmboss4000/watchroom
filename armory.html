@@ -2000,7 +2000,7 @@ async function initApp() {
         }, err => console.warn('ammo snap err', err));
         unsubAcc = db.collection('armory_accessories').onSnapshot(snap => {
             accessories = snap.docs.map(doc => ({ _docId:doc.id, ...doc.data() }));
-            renderAccessories();
+            renderAccessories(); renderDashboard();
         }, err => console.warn('accessories snap err', err));
         document.getElementById('loading-screen').style.display = 'none';
         document.getElementById('app').style.display            = 'flex';
@@ -2570,6 +2570,13 @@ function renderDashboard() {
         : '—';
     const ammoYtdRounds = ammoThisYear.reduce((s, p) => s + (Number(p.totalRounds) || 0), 0);
     const ammoYtdRoundsLabel = (typeof ammo !== 'undefined' && ammo.length) ? ammoYtdRounds.toLocaleString() : '—';
+    const invSpendAll = items.reduce((s, i) => s + (Number(i.price) || 0), 0);
+    const ammoSpendAll = (typeof ammo !== 'undefined' ? ammo : []).reduce((s, p) => s + (Number(p.price) || 0), 0);
+    const accSpendAll = (typeof accessories !== 'undefined' ? accessories : []).reduce((s, p) => s + (Number(p.price) || 0), 0);
+    const grandSpend = invSpendAll + ammoSpendAll + accSpendAll;
+    const grandSpendLabel = grandSpend
+        ? '$' + grandSpend.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})
+        : '—';
     const FIREARM_CATS = new Set(['pistol','rifle','revolver','shotgun']);
     const totalFirearms = items
         .filter(i => FIREARM_CATS.has((i.category||'').toLowerCase()))
@@ -2597,6 +2604,11 @@ function renderDashboard() {
         <div class="stat-card" style="border-color:#f59e0b;cursor:pointer;" onclick="showView('ammo')" title="View ammo purchases">
             <div class="stat-value" style="color:#f59e0b;">${ammoYtdRoundsLabel}</div>
             <div class="stat-label">YTD Rounds Purchased <span style="font-size:0.65rem;opacity:0.6;">(${thisYear})</span></div>
+        </div>
+        <div class="stat-card" style="border-color:#0d9488;" onclick="toggleBlur('dash-grand-spend')" title="Click to reveal">
+            <div class="stat-value stat-value-blurred" id="dash-grand-spend" style="color:#0d9488;font-size:1.4rem;">${grandSpendLabel}</div>
+            <div class="stat-label">Total Spend — All Time<div style="font-size:0.65rem;opacity:0.55;font-weight:400;margin-top:2px;">Guns · Ammo · Accessories</div></div>
+            <div class="reveal-hint" id="dash-grand-spend-hint">👁 Click to reveal</div>
         </div>`;
 
     const counts = {};

@@ -2559,12 +2559,14 @@ function renderDashboard() {
         : '—';
     const priceLabel = priced.length ? `Total Purchase Price <span style="font-size:0.65rem;opacity:0.6;">(${priced.length}/${totalLines})</span>` : 'Total Purchase Price';
     const thisYear = String(new Date().getFullYear());
-    const ammoYtd = (typeof ammo !== 'undefined' ? ammo : [])
-        .filter(p => String(p.purchaseDate || '').startsWith(thisYear))
-        .reduce((s, p) => s + (Number(p.price) || 0), 0);
+    const ammoThisYear = (typeof ammo !== 'undefined' ? ammo : [])
+        .filter(p => String(p.purchaseDate || '').startsWith(thisYear));
+    const ammoYtd = ammoThisYear.reduce((s, p) => s + (Number(p.price) || 0), 0);
     const ammoYtdLabel = (typeof ammo !== 'undefined' && ammo.length)
         ? '$' + ammoYtd.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})
         : '—';
+    const ammoYtdRounds = ammoThisYear.reduce((s, p) => s + (Number(p.totalRounds) || 0), 0);
+    const ammoYtdRoundsLabel = (typeof ammo !== 'undefined' && ammo.length) ? ammoYtdRounds.toLocaleString() : '—';
     const FIREARM_CATS = new Set(['pistol','rifle','revolver','shotgun']);
     const totalFirearms = items
         .filter(i => FIREARM_CATS.has((i.category||'').toLowerCase()))
@@ -2588,6 +2590,10 @@ function renderDashboard() {
             <div class="stat-value stat-value-blurred" id="dash-ammo-ytd" style="color:#f59e0b;font-size:1.4rem;">${ammoYtdLabel}</div>
             <div class="stat-label">YTD Ammo Spend <span style="font-size:0.65rem;opacity:0.6;">(${thisYear})</span></div>
             <div class="reveal-hint" id="dash-ammo-ytd-hint">👁 Click to reveal</div>
+        </div>
+        <div class="stat-card" style="border-color:#f59e0b;cursor:pointer;" onclick="showView('ammo')" title="View ammo purchases">
+            <div class="stat-value" style="color:#f59e0b;">${ammoYtdRoundsLabel}</div>
+            <div class="stat-label">YTD Rounds Purchased <span style="font-size:0.65rem;opacity:0.6;">(${thisYear})</span></div>
         </div>`;
 
     const counts = {};

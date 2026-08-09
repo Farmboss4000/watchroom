@@ -2629,7 +2629,7 @@ function renderDashboard() {
         ? rec.map(it => {
             const mainUrl = it.photos?.find(p=>p.slot==='main')?.url;
             const thumb = mainUrl
-                ? `<img loading="lazy" decoding="async" src="${mainUrl}" class="thumb" alt="" style="cursor:pointer" onclick="window.open('${mainUrl}','_blank')" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb-placeholder',innerHTML:'🔫'}))">`
+                ? `<img loading="lazy" decoding="async" referrerpolicy="no-referrer" src="${mainUrl}" class="thumb" alt="" style="cursor:pointer" onclick="window.open('${mainUrl}','_blank')" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb-placeholder',innerHTML:'🔫'}))">`
                 : `<div class="thumb-placeholder">🔫</div>`;
             return `<tr style="cursor:pointer" title="Click to edit" onclick="editItem('${it._docId}')">
                 <td>${thumb}</td>
@@ -3114,7 +3114,7 @@ function renderDocsList() {
             : (d.base64
                 ? `<img src="data:image/jpeg;base64,${d.base64}">`
                 : (d.existingUrl
-                    ? `<img src="${d.existingUrl}" onerror="this.parentNode.innerHTML='<span style=font-size:2rem>📷</span>'">`
+                    ? `<img src="${d.existingUrl}" referrerpolicy="no-referrer" onerror="this.parentNode.innerHTML='<span style=font-size:2rem>📷</span>'">`
                     : `<span style="font-size:2rem;">📷</span>`));
         const thumbAttrs = hasPreview ? `onclick="openDoc('${d._tempId}')" title="Click to open / download" style="cursor:pointer;border-color:var(--accent);"` : '';
         const summaryHtml = d.summary ? `<div class="doc-summary-text">${esc(d.summary)}</div>` : '';
@@ -3681,7 +3681,7 @@ function editItem(docId) {
         if (ph) {
             formPhotos[slot] = { file:null, base64:null, mimeType:null, existingUrl:ph.url, deleted:false };
             document.getElementById('prev-'+slot).innerHTML =
-                `<img src="${ph.url}" alt="${slot}"><button type="button" class="remove-photo" onclick="removePhoto('${slot}')">✕</button>`;
+                `<img src="${ph.url}" referrerpolicy="no-referrer" alt="${slot}"><button type="button" class="remove-photo" onclick="removePhoto('${slot}')">✕</button>`;
             if (slot==='main')      document.getElementById('btn-identify').disabled  = false;
             if (slot==='serial')    document.getElementById('btn-ocr').disabled       = false;
             if (slot==='paperwork') document.getElementById('btn-paperwork').disabled = false;
@@ -3911,7 +3911,7 @@ function renderInventory() {
     tbody.innerHTML = data.map(it => {
         const mainUrl = it.photos?.find(p=>p.slot==='main')?.url;
         const thumb = mainUrl
-            ? `<img loading="lazy" decoding="async" src="${mainUrl}" class="thumb" alt="" style="cursor:pointer" onclick="window.open('${mainUrl}','_blank')" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb-placeholder',innerHTML:'🔫'}))">`
+            ? `<img loading="lazy" decoding="async" referrerpolicy="no-referrer" src="${mainUrl}" class="thumb" alt="" style="cursor:pointer" onclick="window.open('${mainUrl}','_blank')" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb-placeholder',innerHTML:'🔫'}))">`
             : `<div class="thumb-placeholder">🔫</div>`;
         // Suppressor → show AI compatibility results (or fallback to assigned hosts)
         let suppHostBadge = '';
@@ -4020,7 +4020,7 @@ function renderPackingPicker() {
         tbody.innerHTML = data.map(it => {
             const mainUrl = it.photos?.find(p=>p.slot==='main')?.url;
             const thumb = mainUrl
-                ? `<img loading="lazy" decoding="async" src="${mainUrl}" class="thumb" style="width:36px;height:36px;" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb-placeholder',innerHTML:'🔫'}))">`
+                ? `<img loading="lazy" decoding="async" referrerpolicy="no-referrer" src="${mainUrl}" class="thumb" style="width:36px;height:36px;" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb-placeholder',innerHTML:'🔫'}))">`
                 : `<div class="thumb-placeholder">🔫</div>`;
             return `<tr>
                 <td style="text-align:center;width:36px;">
@@ -4841,6 +4841,22 @@ ${it.purchaseDate ? 'Purchase Date: ' + it.purchaseDate  : ''}`;
 // Items that already have a main photo are never touched.
 let findPhotosBusy = false;
 
+// Verify a candidate actually loads as a real image (no-referrer beats most
+// hotlink protection). Web search often produces guessed/dead image URLs, so
+// nothing is saved without passing this check.
+function testImageLoads(url, minPx = 100, timeoutMs = 8000) {
+    return new Promise(resolve => {
+        const img = new Image();
+        let done = false;
+        const finish = ok => { if (!done) { done = true; resolve(ok); } };
+        const timer = setTimeout(() => finish(false), timeoutMs);
+        img.referrerPolicy = 'no-referrer';
+        img.onload = () => { clearTimeout(timer); finish(img.naturalWidth >= minPx && img.naturalHeight >= Math.round(minPx / 2)); };
+        img.onerror = () => { clearTimeout(timer); finish(false); };
+        img.src = url;
+    });
+}
+
 async function findMissingItemPhotos() {
     if (findPhotosBusy) return;
     const hasMain = i => Array.isArray(i.photos) && i.photos.some(p => p && p.slot === 'main' && p.url);
@@ -4851,7 +4867,7 @@ async function findMissingItemPhotos() {
     const btn = document.getElementById('btn-find-photos');
     findPhotosBusy = true;
     if (btn) btn.disabled = true;
-    let found = 0, misses = 0, n = 0;
+    let found = 0, misses = 0, n = 0, apiError = '';
     try {
         for (const it of missing) {
             n++;
@@ -4859,20 +4875,41 @@ async function findMissingItemPhotos() {
             try {
                 const name = [it.manufacturer, it.model].filter(Boolean).join(' ');
                 if (!name) { misses++; continue; }
-                const prompt = `Find a product photo of this exact item: ${name}${it.caliber ? ' in ' + it.caliber : ''}${it.category ? ' (' + it.category + ')' : ''}.
-Use web search — prefer the MANUFACTURER's official website product imagery, otherwise a major retailer's. Return ONLY valid JSON, no markdown fences:
-{"imageUrl":"a DIRECT image URL (ideally ending .jpg/.jpeg/.png/.webp) showing this exact model on a clean background","productUrl":"the product page the image belongs to, or empty"}
-Use empty strings if nothing suitable is found — do not substitute a different model.`;
-                const raw = await callClaude(null, null, prompt, {
-                    maxTokens: 700,
-                    tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }],
-                });
-                const m = raw && raw.match(/\{[\s\S]*\}/);
-                const j = m ? JSON.parse(m[0]) : null;
-                const imageUrl = j && /^https?:\/\//i.test(String(j.imageUrl || '').trim()) ? String(j.imageUrl).trim() : '';
-                if (!imageUrl) { misses++; continue; }
-                // Try to copy the image into our own Storage so it's permanent (works when
-                // the host allows cross-origin reads); otherwise link to it directly.
+                const prompt = `Find product photos of this exact item: ${name}${it.caliber ? ' in ' + it.caliber : ''}${it.category ? ' (' + it.category + ')' : ''}.
+Use web search — prefer the MANUFACTURER's official website product imagery, otherwise major retailers'. Return ONLY valid JSON, no markdown fences:
+{"imageUrls":["up to 4 DIRECT image URLs (ending .jpg/.jpeg/.png/.webp where possible), best candidate first — each must show this exact model"],"productUrl":"the product page they belong to, or empty"}
+Only include URLs you actually saw referenced in search results (og:image tags, retailer CDN paths) — do not invent URL patterns. Return {"imageUrls":[],"productUrl":""} if nothing suitable exists; never substitute a different model.`;
+                let j = null;
+                try {
+                    const raw = await callClaude(null, null, prompt, {
+                        maxTokens: 800,
+                        tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }],
+                    });
+                    const m = raw && raw.match(/\{[\s\S]*\}/);
+                    j = m ? JSON.parse(m[0]) : null;
+                } catch (err) {
+                    if (!apiError) apiError = err.message || String(err);
+                    console.warn('photo search AI:', it._docId, err);
+                    misses++; continue;
+                }
+                const candidates = (Array.isArray(j && j.imageUrls) ? j.imageUrls : [])
+                    .map(u => String(u || '').trim()).filter(u => /^https?:\/\//i.test(u)).slice(0, 4);
+                // Take the first candidate that verifiably loads as a real image
+                let imageUrl = '', source = 'web-search', sourcePage = (j && String(j.productUrl || '').trim()) || '';
+                for (const cand of candidates) {
+                    if (await testImageLoads(cand)) { imageUrl = cand; break; }
+                }
+                // Fall back to license-safe Wikimedia Commons imagery (CORS-friendly, reliable)
+                if (!imageUrl) {
+                    let commons = (it.stockPhoto && it.stockPhoto.url) ? it.stockPhoto : null;
+                    if (!commons) { try { commons = await fetchCommonsImage(name); } catch (e) {} }
+                    if (commons && commons.url && await testImageLoads(commons.url)) {
+                        imageUrl = commons.url; source = 'wikimedia-commons'; sourcePage = commons.page || sourcePage;
+                    }
+                }
+                if (!imageUrl) { misses++; console.info('photo search: no verifiable image for', name, candidates); continue; }
+                // Copy into our own Storage when the host allows cross-origin reads
+                // (permanent); otherwise link to it directly.
                 let url = imageUrl, stored = false;
                 try {
                     const res = await fetch(imageUrl, { mode: 'cors' });
@@ -4888,14 +4925,17 @@ Use empty strings if nothing suitable is found — do not substitute a different
                     }
                 } catch (e) { /* cross-origin read blocked — hotlink instead */ }
                 const photos = [...(Array.isArray(it.photos) ? it.photos : []), {
-                    slot: 'main', url,
-                    source: 'web-search', sourcePage: (j && String(j.productUrl || '').trim()) || '', hotlink: !stored,
+                    slot: 'main', url, source, sourcePage, hotlink: !stored,
                 }];
                 await db.collection('items').doc(it._docId).update({ photos });
                 found++;
             } catch (err) { console.warn('photo search', err); misses++; }
         }
-        toast(found ? `🖼 Photos found for ${found} of ${missing.length} items${misses ? ` (${misses} had no confident match)` : ''}.` : 'No suitable photos found.', found ? 'success' : 'error');
+        if (!found && apiError) {
+            toast('Photo search failed: ' + apiError, 'error');
+        } else {
+            toast(found ? `🖼 Photos found for ${found} of ${missing.length} items${misses ? ` (${misses} had no verifiable match)` : ''}.` : 'No verifiable photos found — try again later or add them via Edit.', found ? 'success' : 'error');
+        }
     } finally {
         findPhotosBusy = false;
         if (btn) { btn.disabled = false; btn.textContent = '🖼 Find Missing Photos'; }
@@ -5242,7 +5282,7 @@ function showBarcode(docId) {
     document.getElementById('bc-item-name').textContent = label;
     const photos = it.photos||[];
     document.getElementById('bc-photos').innerHTML = photos.length
-        ? photos.map(p=>`<img src="${p.url}" alt="${p.slot}" onclick="window.open('${p.url}','_blank')" title="Click to enlarge">`).join('')
+        ? photos.map(p=>`<img src="${p.url}" referrerpolicy="no-referrer" alt="${p.slot}" onclick="window.open('${p.url}','_blank')" title="Click to enlarge">`).join('')
         : '';
     const code = `ARM${String(it.id).padStart(6,'0')}`;
     document.getElementById('bc-code').textContent = code;

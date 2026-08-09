@@ -4857,6 +4857,39 @@ function testImageLoads(url, minPx = 100, timeoutMs = 8000) {
     });
 }
 
+// Pull the product photo straight off a product page: every manufacturer /
+// retailer page declares its hero image in og:image / twitter:image meta tags.
+// Pages are fetched through public CORS proxies since browsers can't read
+// cross-origin HTML directly.
+async function fetchPageImage(pageUrl) {
+    const proxies = [
+        u => 'https://corsproxy.io/?url=' + encodeURIComponent(u),
+        u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
+    ];
+    for (const mk of proxies) {
+        try {
+            const opts = (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? { signal: AbortSignal.timeout(12000) } : {};
+            const res = await fetch(mk(pageUrl), opts);
+            if (!res.ok) continue;
+            const html = await res.text();
+            const found = [];
+            const metaRe = /<meta[^>]+(?:property|name)=["'](?:og:image(?::secure_url)?|twitter:image(?::src)?)["'][^>]*>/gi;
+            let m;
+            while ((m = metaRe.exec(html))) {
+                const c = /content=["']([^"']+)["']/i.exec(m[0]);
+                if (c) found.push(c[1]);
+            }
+            for (let u of found) {
+                u = u.replace(/&amp;/g, '&').trim();
+                if (u.startsWith('//')) u = 'https:' + u;
+                else if (u.startsWith('/')) { try { u = new URL(pageUrl).origin + u; } catch (e) { continue; } }
+                if (/^https?:\/\//i.test(u)) return u;
+            }
+        } catch (e) { /* proxy down or page unreadable — try the next one */ }
+    }
+    return '';
+}
+
 async function findMissingItemPhotos() {
     if (findPhotosBusy) return;
     const hasMain = i => Array.isArray(i.photos) && i.photos.some(p => p && p.slot === 'main' && p.url);
@@ -4877,8 +4910,8 @@ async function findMissingItemPhotos() {
                 if (!name) { misses++; continue; }
                 const prompt = `Find product photos of this exact item: ${name}${it.caliber ? ' in ' + it.caliber : ''}${it.category ? ' (' + it.category + ')' : ''}.
 Use web search — prefer the MANUFACTURER's official website product imagery, otherwise major retailers'. Return ONLY valid JSON, no markdown fences:
-{"imageUrls":["up to 4 DIRECT image URLs (ending .jpg/.jpeg/.png/.webp where possible), best candidate first — each must show this exact model"],"productUrl":"the product page they belong to, or empty"}
-Only include URLs you actually saw referenced in search results (og:image tags, retailer CDN paths) — do not invent URL patterns. Return {"imageUrls":[],"productUrl":""} if nothing suitable exists; never substitute a different model.`;
+{"imageUrls":["up to 4 DIRECT image URLs (ending .jpg/.jpeg/.png/.webp where possible), best candidate first — each must show this exact model"],"productUrl":"the exact product page URL on the manufacturer's or a major retailer's site — ALWAYS fill this in when you find the product, even if you found no direct image URLs"}
+Only include image URLs you actually saw referenced in search results (og:image tags, retailer CDN paths) — do not invent URL patterns. The productUrl matters most. Return {"imageUrls":[],"productUrl":""} only if the product itself can't be found; never substitute a different model.`;
                 let j = null;
                 try {
                     const raw = await callClaude(null, null, prompt, {
@@ -4898,6 +4931,11 @@ Only include URLs you actually saw referenced in search results (og:image tags, 
                 let imageUrl = '', source = 'web-search', sourcePage = (j && String(j.productUrl || '').trim()) || '';
                 for (const cand of candidates) {
                     if (await testImageLoads(cand)) { imageUrl = cand; break; }
+                }
+                // Next best: pull the hero image straight off the product page's og:image tag
+                if (!imageUrl && /^https?:\/\//i.test(sourcePage)) {
+                    const og = await fetchPageImage(sourcePage);
+                    if (og && await testImageLoads(og)) { imageUrl = og; source = 'product-page'; }
                 }
                 // Fall back to license-safe Wikimedia Commons imagery (CORS-friendly, reliable)
                 if (!imageUrl) {
@@ -7203,7 +7241,7 @@ async function fetchCommonsImage(term) {
         if (!ii) continue;
         if (!/image\/(jpeg|png)/.test(ii.mime || '')) continue;
         if ((ii.width || 0) < 320 || (ii.height || 0) < 220) continue;
-        if (/logo|diagram|patent|drawing|cartridge|ammo box/i.test(p.title || '')) continue;
+        if (/logo|diagram|patent|drawing|cartridge|ammo box|headstamp|\b(rounds?|bullets?|casings?|shells?|primers?|reload)\b/i.test(p.title || '')) continue;
         const md = ii.extmetadata || {};
         const license = (md.LicenseShortName && md.LicenseShortName.value) || '';
         if (!stockLicenseOk(license)) continue;

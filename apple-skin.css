@@ -558,7 +558,15 @@ img { background: transparent; }
 }
 
 /* ── Sticky table headers: column names stay visible while scrolling ── */
+/* Safari can't stick table headers inside a border-collapse:collapse table,
+   so tables switch to separate borders with zero spacing (visually identical
+   here — the site draws single-direction borders only). */
+table {
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+}
 thead th {
+    position: -webkit-sticky;
     position: sticky;
     top: var(--sticky-top, 0px);
     z-index: 20;

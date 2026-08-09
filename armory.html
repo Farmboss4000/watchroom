@@ -921,6 +921,7 @@
             </select>
             <button class="btn btn-primary btn-sm" onclick="showView('add-item');resetForm()">+ Add Item</button>
             <button class="btn btn-ghost btn-sm" onclick="openScanner()" title="Scan barcode">📷 Scan</button>
+            <button class="btn btn-ghost btn-sm" id="btn-find-photos" onclick="findMissingItemPhotos()" title="Web-search product photos (manufacturer sites first) for items with no main photo">🖼 Find Missing Photos</button>
             <button class="btn btn-ghost btn-sm" id="btn-refresh-all-mv" onclick="refreshAllMarketValues()" title="Re-estimate market value for all firearms">💲 Refresh All Values</button>
             <button class="btn btn-ghost btn-sm" onclick="exportCSV()">↓ Export CSV</button>
             <button class="btn btn-ghost btn-sm" onclick="showView('packing-list')">🎒 Packing List</button>
@@ -4833,6 +4834,71 @@ ${it.purchaseDate ? 'Purchase Date: ' + it.purchaseDate  : ''}`;
         const it2   = items.find(i => i._docId === docId);
         const cell2 = document.getElementById('mv-cell-' + docId);
         if (cell2 && it2) cell2.innerHTML = marketValueCell(it2);
+    }
+}
+
+// ── Find product photos for items with no main photo (AI web search) ──
+// Items that already have a main photo are never touched.
+let findPhotosBusy = false;
+
+async function findMissingItemPhotos() {
+    if (findPhotosBusy) return;
+    const hasMain = i => Array.isArray(i.photos) && i.photos.some(p => p && p.slot === 'main' && p.url);
+    const missing = items.filter(i => !i.deleted && !hasMain(i));
+    if (!missing.length) { toast('Every inventory item already has a main photo.', 'success'); return; }
+    if (!apiKey) { toast('Set your Anthropic API key in Settings first.', 'error'); return; }
+    if (!confirm(`Search the web for product photos for ${missing.length} item${missing.length === 1 ? '' : 's'} without a main photo? Items that already have one won't be touched.`)) return;
+    const btn = document.getElementById('btn-find-photos');
+    findPhotosBusy = true;
+    if (btn) btn.disabled = true;
+    let found = 0, misses = 0, n = 0;
+    try {
+        for (const it of missing) {
+            n++;
+            if (btn) btn.textContent = `⏳ Searching ${n}/${missing.length}…`;
+            try {
+                const name = [it.manufacturer, it.model].filter(Boolean).join(' ');
+                if (!name) { misses++; continue; }
+                const prompt = `Find a product photo of this exact item: ${name}${it.caliber ? ' in ' + it.caliber : ''}${it.category ? ' (' + it.category + ')' : ''}.
+Use web search — prefer the MANUFACTURER's official website product imagery, otherwise a major retailer's. Return ONLY valid JSON, no markdown fences:
+{"imageUrl":"a DIRECT image URL (ideally ending .jpg/.jpeg/.png/.webp) showing this exact model on a clean background","productUrl":"the product page the image belongs to, or empty"}
+Use empty strings if nothing suitable is found — do not substitute a different model.`;
+                const raw = await callClaude(null, null, prompt, {
+                    maxTokens: 700,
+                    tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }],
+                });
+                const m = raw && raw.match(/\{[\s\S]*\}/);
+                const j = m ? JSON.parse(m[0]) : null;
+                const imageUrl = j && /^https?:\/\//i.test(String(j.imageUrl || '').trim()) ? String(j.imageUrl).trim() : '';
+                if (!imageUrl) { misses++; continue; }
+                // Try to copy the image into our own Storage so it's permanent (works when
+                // the host allows cross-origin reads); otherwise link to it directly.
+                let url = imageUrl, stored = false;
+                try {
+                    const res = await fetch(imageUrl, { mode: 'cors' });
+                    if (res.ok) {
+                        const blob = await res.blob();
+                        if (blob.size > 2000 && /^image\//.test(blob.type || '')) {
+                            const ext = ((blob.type.split('/')[1] || 'jpg').split('+')[0]).replace('jpeg', 'jpg');
+                            const ref = storage.ref().child(`armory_photos/web_${Date.now()}_${it.id || n}.${ext}`);
+                            await ref.put(blob, { contentType: blob.type });
+                            url = await ref.getDownloadURL();
+                            stored = true;
+                        }
+                    }
+                } catch (e) { /* cross-origin read blocked — hotlink instead */ }
+                const photos = [...(Array.isArray(it.photos) ? it.photos : []), {
+                    slot: 'main', url,
+                    source: 'web-search', sourcePage: (j && String(j.productUrl || '').trim()) || '', hotlink: !stored,
+                }];
+                await db.collection('items').doc(it._docId).update({ photos });
+                found++;
+            } catch (err) { console.warn('photo search', err); misses++; }
+        }
+        toast(found ? `🖼 Photos found for ${found} of ${missing.length} items${misses ? ` (${misses} had no confident match)` : ''}.` : 'No suitable photos found.', found ? 'success' : 'error');
+    } finally {
+        findPhotosBusy = false;
+        if (btn) { btn.disabled = false; btn.textContent = '🖼 Find Missing Photos'; }
     }
 }
 

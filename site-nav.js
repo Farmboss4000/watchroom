@@ -83,4 +83,29 @@
         var anchor = keyInput.closest('.api-key-row') || keyInput.closest('.form-group') || keyInput.parentElement;
         if (anchor && anchor.parentElement) anchor.parentElement.insertBefore(note, anchor);
     }
+
+    // ── Sticky table headers: measure how much of the top stays pinned while
+    //    scrolling (site-switcher and/or page header) and expose it as
+    //    --sticky-top so thead cells can stick right below the pinned bars.
+    function updateStickyTop() {
+        var bottom = 0;
+        var bars = document.querySelectorAll('.site-switcher, header');
+        for (var i = 0; i < bars.length; i++) {
+            var cs = getComputedStyle(bars[i]);
+            if (cs.position === 'sticky' || cs.position === 'fixed') {
+                var topOffset = parseFloat(cs.top) || 0;
+                bottom = Math.max(bottom, topOffset + bars[i].getBoundingClientRect().height);
+            }
+        }
+        document.documentElement.style.setProperty('--sticky-top', bottom + 'px');
+    }
+    updateStickyTop();
+    window.addEventListener('resize', updateStickyTop);
+    setTimeout(updateStickyTop, 400);   // re-measure after fonts/wrapping settle
+    // Bars change size when the app appears after sign-in (the page header is
+    // hidden behind the login screen) — observe them so the offset stays true.
+    if (window.ResizeObserver) {
+        var ro = new ResizeObserver(updateStickyTop);
+        document.querySelectorAll('.site-switcher, header').forEach(function (el) { ro.observe(el); });
+    }
 })();

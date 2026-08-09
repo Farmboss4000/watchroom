@@ -424,6 +424,7 @@ table {
     background: #ffffff;
     border-radius: 12px;
     overflow: hidden;
+    overflow: clip;   /* clips like hidden without breaking position:sticky headers */
 }
 thead th {
     background: #fafafc !important;
@@ -554,4 +555,18 @@ img { background: transparent; }
         transition-duration: 0.01ms !important;
         scroll-behavior: auto !important;
     }
+}
+
+/* ── Sticky table headers: column names stay visible while scrolling ── */
+thead th {
+    position: sticky;
+    top: var(--sticky-top, 0px);
+    z-index: 20;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.07);
+}
+/* position:sticky can't escape a scroll container, so on desktop let table
+   wrappers grow naturally; below 900px they keep horizontal scrolling and
+   headers simply scroll with the page. */
+@media (min-width: 900px) {
+    .table-wrapper { overflow-x: visible; }
 }

@@ -508,6 +508,7 @@
         <button class="active" onclick="showView('dashboard')">Dashboard</button>
         <button onclick="showView('add-item')">Add Vehicle</button>
         <button onclick="showView('inventory')">Inventory</button>
+        <button onclick="showView('sold')">💵 Sold</button>
         <button onclick="showView('reports')">Reports</button>
         <button onclick="showView('categories')">Vehicle Types</button>
         <button onclick="showView('settings')">⚙ Settings</button>
@@ -951,6 +952,65 @@
 </div>
 
 <!-- ══ REPORTS ══ -->
+<!-- ══ SOLD VEHICLES ══ -->
+<div id="view-sold" class="view">
+    <div class="card">
+        <div class="card-title">
+            <div class="card-title-left">💵 Sold Vehicles</div>
+            <span id="sold-count" style="font-size:0.82rem;color:var(--text-secondary);"></span>
+        </div>
+        <p style="font-size:0.84rem;color:var(--text-secondary);margin-bottom:12px;">
+            Vehicles marked sold move here and drop out of the fleet — inventory, reports, and insurance
+            tracking all ignore them. Open ✎ to adjust the sale record, or ↩ to return one to the fleet.
+        </p>
+        <div class="table-wrapper">
+            <table id="sold-table"><thead><tr>
+                <th class="no-sort" style="width:52px;">Photo</th>
+                <th>Vehicle</th><th>VIN</th><th>Purchased</th><th>Paid</th>
+                <th>Sold</th><th>Sale Price</th><th>Gain / Loss</th><th>Buyer</th>
+                <th class="no-sort">Paperwork</th><th class="no-sort">Actions</th>
+            </tr></thead><tbody id="sold-tbody"></tbody><tfoot id="sold-tfoot"></tfoot></table>
+        </div>
+        <div id="sold-empty" class="empty" style="display:none;">
+            <div class="empty-icon">💵</div>
+            <p>No vehicles sold yet. Use the 💵 button on an inventory row to record a sale.</p>
+        </div>
+    </div>
+</div>
+
+<!-- ══ MARK SOLD MODAL ══ -->
+<div class="modal-overlay" id="sold-modal">
+    <div class="modal" style="max-width:640px;">
+        <div class="modal-title" id="sold-modal-title">Mark Vehicle Sold</div>
+        <div class="modal-sub" id="sold-modal-sub">Record the sale — upload the bill of sale and let AI fill in the details.</div>
+        <input type="hidden" id="sold-doc-id">
+
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:16px;">
+            <label style="display:block;font-size:0.8rem;font-weight:600;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.4px;">Sales Paperwork (bill of sale — PDF or photo)</label>
+            <input type="file" id="sold-paper-file" accept="image/*,application/pdf" onchange="onSoldPaperSelected(this)" style="margin-bottom:8px;">
+            <div id="sold-paper-preview" style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:10px;"></div>
+            <button type="button" class="btn btn-primary btn-sm" id="btn-sold-extract" onclick="extractSoldPaperwork()" disabled>🤖 Read Paperwork with AI</button>
+            <span id="sold-ai-status" style="font-size:0.82rem;margin-left:10px;color:var(--text-secondary);"></span>
+        </div>
+
+        <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+            <div class="form-group"><label>Sale Date *</label><input type="date" id="sf-date"></div>
+            <div class="form-group"><label>Sale Price ($) *</label><input type="number" id="sf-price" min="0" step="0.01" placeholder="Amount received"></div>
+            <div class="form-group"><label>Buyer</label><input type="text" id="sf-buyer" placeholder="Name of buyer / dealer"></div>
+            <div class="form-group"><label>Buyer Contact</label><input type="text" id="sf-buyer-contact" placeholder="Phone, email, or address"></div>
+            <div class="form-group"><label>Payment Method</label><input type="text" id="sf-method" placeholder="e.g. Cash, Check, Trade-in"></div>
+            <div class="form-group"><label>Odometer at Sale</label><input type="number" id="sf-odometer" min="0" step="1" placeholder="Miles"></div>
+            <div class="form-group" style="grid-column:1/-1;"><label>Notes</label><textarea id="sf-notes" rows="2" placeholder="Anything worth remembering about the sale."></textarea></div>
+        </div>
+
+        <div class="modal-actions" style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;">
+            <button type="button" class="btn btn-primary" onclick="saveSoldRecord()">💾 Save Sale</button>
+            <button type="button" class="btn btn-ghost" onclick="closeSoldModal()">Cancel</button>
+            <a id="sold-paper-link" href="" target="_blank" class="btn btn-ghost" style="display:none;margin-left:auto;">📄 Open Paperwork</a>
+        </div>
+    </div>
+</div>
+
 <div id="view-reports" class="view">
     <div class="card" style="margin-bottom:20px;">
         <div class="card-title">
@@ -1345,6 +1405,7 @@ const storage = firebase.storage();
 //  STATE
 // ═══════════════════════════════════════
 let items = [];
+let soldItems = [];
 let categories = ['ATV','Boat','Box Truck','Bus','Car','Dump Truck',
     'Flatbed Trailer','Jet Ski','Low Speed Vehicle','Minivan','Motorcycle',
     'Pickup Truck','RV / Motorhome','SUV','Semi Trailer','Tractor (Road)',
@@ -1381,7 +1442,7 @@ let formPhotos = {
     insurance: { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false }
 };
 
-const VIEWS = ['dashboard','add-item','inventory','reports','categories','settings','recycle-bin','vehicle-detail'];
+const VIEWS = ['dashboard','add-item','inventory','sold','reports','categories','settings','recycle-bin','vehicle-detail'];
 
 // ═══════════════════════════════════════
 //  AUTH
@@ -1398,7 +1459,7 @@ auth.onAuthStateChanged(user => {
         document.getElementById('loading-screen').style.display = 'none';
         document.getElementById('app').style.display            = 'none';
         if (unsubItems) { unsubItems(); unsubItems = null; }
-        items = [];
+        items = []; soldItems = [];
     }
 });
 
@@ -1450,7 +1511,12 @@ async function initApp() {
         }
         let firstLoad = true;
         unsubItems = db.collection('automotive_items').onSnapshot(snap => {
-            items = snap.docs.map(doc => ({ _docId:doc.id, ...doc.data() }));
+            const all = snap.docs.map(doc => ({ _docId:doc.id, ...doc.data() }));
+            // Sold vehicles live in their own section — every fleet view, report,
+            // and insurance banner works off active vehicles only.
+            soldItems = all.filter(i => i.sold);
+            items = all.filter(i => !i.sold);
+            renderSoldList();
             renderDashboard(); renderInventory(); renderReport();
             populateDriverList();
             if (currentDetailDocId) {
@@ -1548,6 +1614,7 @@ function showView(v) {
     if (v==='categories') renderCatTags();
     if (v==='add-item')   populateCatSelect();
     if (v==='recycle-bin') loadRecycleBin();
+    if (v==='sold') renderSoldList();
 }
 
 // ═══════════════════════════════════════
@@ -3022,6 +3089,7 @@ function renderInventory() {
                 <button class="btn btn-info btn-sm" onclick="showBarcode('${it._docId}')" title="Barcode/Photos">▣</button>
                 <button class="btn btn-ghost btn-sm" onclick="emailInsuranceCard('${it._docId}')" title="Email proof of insurance to driver">✉️</button>
                 <button class="btn btn-ghost btn-sm" onclick="editItem('${it._docId}')" title="Edit">✎</button>
+                <button class="btn btn-ghost btn-sm" onclick="openSoldModal('${it._docId}')" title="Mark as sold">💵</button>
                 <button class="btn btn-danger btn-sm" onclick="deleteItem('${it._docId}')" title="Delete">✗</button>
             </td></tr>`;}).join('');
 
@@ -4715,6 +4783,199 @@ function catClass(cat) {
 }
 function esc(s) { return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'):''; }
 let _toastUndoFn = null;
+
+// ═══════════════════════════════════════
+//  SOLD VEHICLES
+// ═══════════════════════════════════════
+let soldPaper = { file: null, base64: null, mimeType: null };
+
+function vehicleLabel(it) {
+    return [it.year, it.make, it.model].filter(Boolean).join(' ') || `Vehicle #${it.id}`;
+}
+
+function renderSoldList() {
+    const tbody = document.getElementById('sold-tbody'); if (!tbody) return;
+    const rows = soldItems.slice().sort((a, b) => String((b.sale && b.sale.date) || b.soldAt || '').localeCompare(String((a.sale && a.sale.date) || a.soldAt || '')));
+    document.getElementById('sold-count').textContent = `${rows.length} vehicle${rows.length !== 1 ? 's' : ''} sold`;
+    document.getElementById('sold-empty').style.display = rows.length ? 'none' : 'block';
+    const money = n => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    tbody.innerHTML = rows.map(it => {
+        const mainUrl = it.photos?.find(p => p.slot === 'main')?.url;
+        const paid = Number(it.price) || 0;
+        const sale = it.sale || {};
+        const got = Number(sale.price) || 0;
+        const gain = (paid && got) ? got - paid : null;
+        return `<tr>
+            <td>${mainUrl ? `<img loading="lazy" referrerpolicy="no-referrer" src="${esc(mainUrl)}" class="thumb" alt="">` : '<div class="thumb-placeholder">🚗</div>'}</td>
+            <td><strong>${esc(vehicleLabel(it))}</strong><div style="font-size:0.75rem;color:var(--text-secondary);">${esc(it.category || '')}</div></td>
+            <td style="font-family:monospace;font-size:0.8rem;">${esc(it.serialNumber || '—')}</td>
+            <td style="white-space:nowrap;">${esc(it.purchaseDate || '—')}</td>
+            <td>${paid ? money(paid) : '—'}</td>
+            <td style="white-space:nowrap;">${esc(sale.date || '—')}</td>
+            <td><strong>${got ? money(got) : '—'}</strong></td>
+            <td style="font-weight:700;color:${gain === null ? 'var(--text-secondary)' : gain >= 0 ? 'var(--success)' : 'var(--danger)'};">${gain === null ? '—' : (gain >= 0 ? '+' : '−') + money(Math.abs(gain))}</td>
+            <td>${esc(sale.buyer || '—')}${sale.buyerContact ? `<div style="font-size:0.75rem;color:var(--text-secondary);">${esc(sale.buyerContact)}</div>` : ''}</td>
+            <td>${(it.salePaperwork && it.salePaperwork.url) ? `<a href="${esc(it.salePaperwork.url)}" target="_blank" title="${esc(it.salePaperwork.name || 'Bill of sale')}">📄</a>` : '—'}</td>
+            <td style="white-space:nowrap;">
+                <button class="btn btn-ghost btn-sm" onclick="openSoldModal('${it._docId}')" title="Edit sale record">✎</button>
+                <button class="btn btn-ghost btn-sm" onclick="unmarkSold('${it._docId}')" title="Return to fleet">↩</button>
+            </td></tr>`;
+    }).join('');
+    const proceeds = rows.reduce((s, it) => s + (Number(it.sale && it.sale.price) || 0), 0);
+    const gains = rows.filter(it => Number(it.price) && Number(it.sale && it.sale.price))
+        .reduce((s, it) => s + (Number(it.sale.price) - Number(it.price)), 0);
+    document.getElementById('sold-tfoot').innerHTML = rows.length ? `
+        <tr style="font-weight:700;border-top:2px solid var(--border);">
+            <td colspan="6">Total</td>
+            <td>${money(proceeds)}</td>
+            <td style="color:${gains >= 0 ? 'var(--success)' : 'var(--danger)'};">${(gains >= 0 ? '+' : '−') + money(Math.abs(gains))}</td>
+            <td colspan="3"></td></tr>` : '';
+}
+
+function findVehicleAnywhere(docId) {
+    return items.find(i => i._docId === docId) || soldItems.find(i => i._docId === docId) || null;
+}
+
+function openSoldModal(docId) {
+    const it = findVehicleAnywhere(docId); if (!it) return;
+    soldPaper = { file: null, base64: null, mimeType: null };
+    document.getElementById('sold-doc-id').value = docId;
+    document.getElementById('sold-modal-title').textContent = it.sold ? 'Edit Sale Record' : 'Mark Vehicle Sold';
+    document.getElementById('sold-modal-sub').textContent = `${vehicleLabel(it)}${it.serialNumber ? ' · VIN ' + it.serialNumber : ''}`;
+    const sale = it.sale || {};
+    const set = (id, v) => { document.getElementById(id).value = v ?? ''; };
+    set('sf-date', sale.date || new Date().toISOString().slice(0, 10));
+    set('sf-price', sale.price); set('sf-buyer', sale.buyer); set('sf-buyer-contact', sale.buyerContact);
+    set('sf-method', sale.method); set('sf-odometer', sale.odometer); set('sf-notes', sale.notes);
+    document.getElementById('sold-paper-file').value = '';
+    document.getElementById('sold-paper-preview').innerHTML = '';
+    document.getElementById('btn-sold-extract').disabled = true;
+    document.getElementById('sold-ai-status').textContent = '';
+    const link = document.getElementById('sold-paper-link');
+    if (it.salePaperwork && it.salePaperwork.url) { link.href = it.salePaperwork.url; link.style.display = 'inline-flex'; }
+    else link.style.display = 'none';
+    const mo = document.getElementById('sold-modal');
+    mo.style.display = 'flex';
+    void mo.offsetWidth;
+    mo.classList.add('show');
+}
+
+function closeSoldModal() {
+    const mo = document.getElementById('sold-modal');
+    mo.classList.remove('show');
+    mo.style.display = 'none';
+}
+document.getElementById('sold-modal').addEventListener('click', e => { if (e.target === document.getElementById('sold-modal')) closeSoldModal(); });
+
+async function onSoldPaperSelected(input) {
+    const file = input.files[0]; if (!file) return;
+    soldPaper = { file, base64: null, mimeType: null };
+    const prev = document.getElementById('sold-paper-preview');
+    const sizeMB = file.size / 1048576;
+    if (file.type === 'application/pdf') {
+        if (sizeMB > 4.5) {
+            prev.innerHTML = '<span style="color:var(--danger);">⚠️ PDF too large for AI reading (max ~4.5 MB) — it will still be attached, but fill fields manually or use a photo.</span>';
+        } else {
+            const dataUrl = await new Promise(r => { const fr = new FileReader(); fr.onload = e => r(e.target.result); fr.readAsDataURL(file); });
+            soldPaper.base64 = dataUrl.split(',')[1]; soldPaper.mimeType = 'application/pdf';
+        }
+    } else {
+        const dataUrl = await compressImage(file) || await new Promise(r => { const fr = new FileReader(); fr.onload = e => r(e.target.result); fr.readAsDataURL(file); });
+        soldPaper.base64 = dataUrl.split(',')[1]; soldPaper.mimeType = 'image/jpeg';
+    }
+    if (!prev.innerHTML) prev.innerHTML = `📄 ${esc(file.name)} (${sizeMB >= 1 ? sizeMB.toFixed(1) + ' MB' : (file.size / 1024).toFixed(0) + ' KB'}) — attached on save`;
+    document.getElementById('btn-sold-extract').disabled = !soldPaper.base64;
+}
+
+async function extractSoldPaperwork() {
+    if (!soldPaper.base64) return;
+    const btn = document.getElementById('btn-sold-extract');
+    const status = document.getElementById('sold-ai-status');
+    btn.disabled = true; btn.textContent = '⏳ Reading…';
+    status.textContent = 'Reading the bill of sale…'; status.style.color = 'var(--text-secondary)';
+    try {
+        const prompt = `This is vehicle sales paperwork — a bill of sale, purchase agreement, or title transfer. Return ONLY valid JSON, no markdown fences:
+{"saleDate":"date of sale as YYYY-MM-DD or empty","salePrice":"total sale amount as a plain number, no symbols, or empty","buyerName":"buyer's full name or dealership, or empty","buyerContact":"buyer's phone, email, or address, or empty","paymentMethod":"e.g. Cash, Check, Wire, Trade-in, or empty","odometer":"odometer reading as a plain number, or empty","summary":"1-2 sentence plain-text summary of the transaction"}
+Only include values you can read with reasonable confidence; use empty strings when unsure.`;
+        const block = soldPaper.mimeType === 'application/pdf'
+            ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: soldPaper.base64 } }
+            : { type: 'image', source: { type: 'base64', media_type: soldPaper.mimeType, data: soldPaper.base64 } };
+        const raw = await callClaudeRaw([block, { type: 'text', text: prompt }], 700);
+        if (!raw) return;
+        const m = raw.match(/\{[\s\S]*\}/);
+        if (!m) throw new Error('Could not parse AI response');
+        const d = JSON.parse(m[0]);
+        const filled = [];
+        const setIfEmpty = (id, val, label) => {
+            if (val === undefined || val === null || String(val).trim() === '') return;
+            const el = document.getElementById(id);
+            if (!el || el.value.trim() !== '') return;
+            el.value = String(val).trim();
+            filled.push(label);
+        };
+        if (/^\d{4}-\d{2}-\d{2}$/.test(String(d.saleDate || '').trim())) {
+            const el = document.getElementById('sf-date');
+            // The date defaults to today — let the paperwork's date win over the default.
+            el.value = String(d.saleDate).trim(); filled.push('Date');
+        }
+        setIfEmpty('sf-price', String(d.salePrice ?? '').replace(/[^0-9.]/g, ''), 'Price');
+        setIfEmpty('sf-buyer', d.buyerName, 'Buyer');
+        setIfEmpty('sf-buyer-contact', d.buyerContact, 'Contact');
+        setIfEmpty('sf-method', d.paymentMethod, 'Payment');
+        setIfEmpty('sf-odometer', String(d.odometer ?? '').replace(/[^0-9]/g, ''), 'Odometer');
+        if (d.summary && !document.getElementById('sf-notes').value.trim()) {
+            document.getElementById('sf-notes').value = String(d.summary).trim();
+            filled.push('Notes');
+        }
+        status.textContent = filled.length ? `✅ Filled in: ${filled.join(', ')}. Review and adjust.` : '⚠️ Could not read usable details from this document.';
+        status.style.color = filled.length ? 'var(--success)' : 'var(--text-secondary)';
+    } catch (err) {
+        status.textContent = '❌ ' + err.message;
+        status.style.color = 'var(--danger)';
+    } finally {
+        btn.disabled = false; btn.textContent = '🤖 Read Paperwork with AI';
+    }
+}
+
+async function saveSoldRecord() {
+    const docId = document.getElementById('sold-doc-id').value;
+    const it = findVehicleAnywhere(docId); if (!it) return;
+    const date = document.getElementById('sf-date').value;
+    const price = parseFloat(document.getElementById('sf-price').value);
+    if (!date) { toast('Enter the sale date.', 'error'); return; }
+    if (!(price >= 0)) { toast('Enter the sale price.', 'error'); return; }
+    const sale = {
+        date, price,
+        buyer: document.getElementById('sf-buyer').value.trim(),
+        buyerContact: document.getElementById('sf-buyer-contact').value.trim(),
+        method: document.getElementById('sf-method').value.trim(),
+        odometer: parseInt(document.getElementById('sf-odometer').value, 10) || null,
+        notes: document.getElementById('sf-notes').value.trim(),
+    };
+    const upd = { sold: true, soldAt: it.soldAt || new Date().toISOString(), sale };
+    try {
+        if (soldPaper.file) {
+            const ext = (soldPaper.file.name && soldPaper.file.name.includes('.')) ? soldPaper.file.name.split('.').pop() : (soldPaper.file.type === 'application/pdf' ? 'pdf' : 'jpg');
+            const path = `automotive_sales/${Date.now()}_sale.${ext}`;
+            const ref = storage.ref().child(path);
+            await ref.put(soldPaper.file);
+            upd.salePaperwork = { url: await ref.getDownloadURL(), name: soldPaper.file.name || 'Bill of sale', path, uploadedAt: new Date().toISOString() };
+        }
+        await db.collection('automotive_items').doc(docId).update(upd);
+        closeSoldModal();
+        toast(`💵 ${vehicleLabel(it)} marked sold.`, 'success');
+    } catch (err) { toast('Save failed: ' + err.message, 'error'); }
+}
+
+async function unmarkSold(docId) {
+    const it = soldItems.find(i => i._docId === docId); if (!it) return;
+    if (!confirm(`Return ${vehicleLabel(it)} to the fleet? The sale record is kept and can be re-applied with the 💵 button.`)) return;
+    try {
+        await db.collection('automotive_items').doc(docId).update({ sold: false });
+        toast(`↩ ${vehicleLabel(it)} returned to the fleet.`);
+    } catch (err) { toast('Failed: ' + err.message, 'error'); }
+}
+
 function toast(msg, type='', undoFn=null) {
     _toastUndoFn = undoFn;
     const el = document.getElementById('toast');

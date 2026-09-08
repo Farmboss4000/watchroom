@@ -1157,7 +1157,6 @@
 <!-- SITE SWITCHER -->
 <div class="site-switcher">
         <a href="index.html" class="site-link active">🏠 HQ</a>
-        <a href="bills.html" class="site-link">🧾 Bills</a>
         <a href="armory.html" class="site-link">🔫 Armory</a>
         <a href="machinery.html" class="site-link">🚜 Machinery</a>
         <a href="automotive.html" class="site-link">🚗 Automotive</a>
@@ -1288,7 +1287,7 @@
             .att-info   .attention-num { color:var(--accent); }
         </style>
         <div class="hq-search-wrap">
-            <input type="text" id="hq-search" placeholder="🔍 Search everything — bills, machinery, firearms, vehicles, livestock, properties…" autocomplete="off">
+            <input type="text" id="hq-search" placeholder="🔍 Search everything — machinery, firearms, vehicles, livestock, properties…" autocomplete="off">
             <div id="hq-search-results" class="hq-search-results" style="display:none;"></div>
         </div>
 
@@ -1792,32 +1791,7 @@
         const grid = document.getElementById('attention-grid');
         if (!grid) return;
         try {
-            const [billsSnap, machSnap] = await Promise.all([
-                db.collection('bills').get(),
-                db.collection('machinery_items').get()
-            ]);
-            const bills = billsSnap.docs.map(d => d.data()).filter(b => !b.deleted);
-            const today = new Date().toISOString().slice(0, 10);
-            const soonCut = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
-
-            const unpaid = bills.filter(b => !b.paid);
-            const unpaidTotal = unpaid.reduce((s, b) => s + (Number(b.amount) || 0), 0);
-            const overdue = unpaid.filter(b => b.dueDate && b.dueDate < today);
-            const dueSoon = unpaid.filter(b => b.dueDate && b.dueDate >= today && b.dueDate <= soonCut);
-            const unfiled = bills.filter(b => !b.filed).length;
-
-            // Duplicate groups — same matching rules as the Bills app.
-            const map = {};
-            for (const b of bills) {
-                const vendor = (b.vendor || '').toLowerCase().replace(/\s+/g, ' ').trim();
-                const inv    = (b.invoice || '').toLowerCase().replace(/\s+/g, '').trim();
-                let k;
-                if (!vendor && !inv) continue;
-                else if (inv) k = 'inv|' + vendor + '|' + inv;
-                else k = 'vad|' + vendor + '|' + (Number(b.amount) || 0).toFixed(2) + '|' + (b.billDate || '');
-                (map[k] = map[k] || []).push(b);
-            }
-            const dupGroups = Object.values(map).filter(g => g.length > 1).length;
+            const machSnap = await db.collection('machinery_items').get();
 
             // Most recent maintenance entry across the fleet.
             let lastMaint = null;
@@ -1831,33 +1805,7 @@
                 });
             });
 
-            const dueClass = overdue.length ? 'att-danger' : (dueSoon.length ? 'att-warn' : 'att-ok');
-            const dueNum   = overdue.length + dueSoon.length;
-            const dueSub   = overdue.length
-                ? `${overdue.length} overdue${dueSoon.length ? `, ${dueSoon.length} due ≤ 3 days` : ''}`
-                : (dueSoon.length ? 'due in the next 3 days' : 'nothing due in 3 days');
-
             grid.innerHTML = `
-                <a class="attention-tile ${unpaid.length ? 'att-danger' : 'att-ok'}" href="bills.html#unpaid">
-                    <div class="attention-num">${hqMoney(unpaidTotal)}</div>
-                    <div class="attention-label">🧾 Unpaid Bills</div>
-                    <div class="attention-sub">${unpaid.length} bill${unpaid.length === 1 ? '' : 's'} outstanding</div>
-                </a>
-                <a class="attention-tile ${dueClass}" href="bills.html#unpaid">
-                    <div class="attention-num">${dueNum}</div>
-                    <div class="attention-label">⏰ Due / Overdue</div>
-                    <div class="attention-sub">${dueSub}</div>
-                </a>
-                <a class="attention-tile ${dupGroups ? 'att-warn' : 'att-ok'}" href="bills.html#duplicates">
-                    <div class="attention-num">${dupGroups}</div>
-                    <div class="attention-label">🔁 Duplicate Groups</div>
-                    <div class="attention-sub">${dupGroups ? 'review in Bills → Duplicates' : 'no duplicates found'}</div>
-                </a>
-                <a class="attention-tile att-info" href="bills.html#unfiled">
-                    <div class="attention-num">${unfiled}</div>
-                    <div class="attention-label">🗂 Unfiled Bills</div>
-                    <div class="attention-sub">${unfiled ? 'waiting to be filed' : 'all filed'}</div>
-                </a>
                 <a class="attention-tile att-info" href="machinery.html">
                     <div class="attention-num" style="font-size:1.05rem;padding-top:8px;">${lastMaint ? esc(lastMaint.type) : '—'}</div>
                     <div class="attention-label">🔧 Last Maintenance</div>
@@ -1872,7 +1820,6 @@
     let hqIndex = null;
     async function buildHqIndex() {
         const SRC = [
-            { col: 'bills',            url: 'bills.html#bills', icon: '🧾' },
             { col: 'items',            url: 'armory.html',     icon: '🔫' },
             { col: 'machinery_items',  url: 'machinery.html',  icon: '🚜' },
             { col: 'automotive_items', url: 'automotive.html', icon: '🚗' },

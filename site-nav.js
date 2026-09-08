@@ -18,7 +18,6 @@
 
     var PRIMARY = [
         ['index.html',      '🏠', 'HQ'],
-        ['bills.html',      '🧾', 'Bills'],
         ['machinery.html',  '🚜', 'Machinery'],
         ['armory.html',     '🔫', 'Armory'],
         ['automotive.html', '🚗', 'Automotive'],

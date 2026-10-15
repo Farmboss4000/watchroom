@@ -1109,6 +1109,30 @@
 <!-- ══ SETTINGS ══ -->
 <div id="view-settings" class="view">
     <div class="card">
+        <div class="card-title"><div class="card-title-left">👥 Shared Access — this Automotive page</div></div>
+        <p style="font-size:0.875rem;color:var(--text-secondary);margin-bottom:14px;line-height:1.6;">
+            Give someone their own password-protected sign-in that works <strong>only on this Automotive page</strong>.
+            They log in right here with the email and password you set below; every other Farmboss page will refuse their account.
+        </p>
+        <div id="guest-list" style="margin-bottom:14px;"></div>
+        <div class="api-key-row" style="flex-wrap:wrap;">
+            <div class="form-group">
+                <label>Guest Email</label>
+                <input type="email" id="guest-email" placeholder="name@example.com" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label>Guest Password</label>
+                <input type="text" id="guest-password" placeholder="At least 6 characters" autocomplete="off">
+            </div>
+            <button class="btn btn-primary" id="btn-add-guest" onclick="addAutoGuest()" style="height:38px;align-self:flex-end;">+ Create Guest</button>
+        </div>
+        <div id="guest-status" style="font-size:0.84rem;margin-top:10px;color:var(--text-secondary);"></div>
+        <p style="font-size:0.78rem;color:var(--text-secondary);margin-top:10px;line-height:1.5;">
+            Send guests this page's address plus the email &amp; password you created. <strong>Remove</strong> revokes their access
+            immediately; <strong>✉️ Reset</strong> emails them a password-reset link. Guests can view and edit Automotive data only.
+        </p>
+    </div>
+    <div class="card">
         <div class="card-title"><div class="card-title-left">🤖 AI Identification — Anthropic API Key</div></div>
         <div>
             <p style="font-size:0.875rem;color:var(--text-secondary);margin-bottom:16px;line-height:1.6;">
@@ -1613,6 +1637,7 @@ function showView(v) {
     if (v==='add-item')   populateCatSelect();
     if (v==='recycle-bin') loadRecycleBin();
     if (v==='sold') renderSoldList();
+    if (v==='settings') renderGuestList();
 }
 
 // ═══════════════════════════════════════
@@ -4971,6 +4996,92 @@ async function unmarkSold(docId) {
     try {
         await db.collection('automotive_items').doc(docId).update({ sold: false });
         toast(`↩ ${vehicleLabel(it)} returned to the fleet.`);
+    } catch (err) { toast('Failed: ' + err.message, 'error'); }
+}
+
+// ═══════════════════════════════════════
+//  SHARED ACCESS (guest sign-ins for this page only)
+// ═══════════════════════════════════════
+const ACCESS_PAGE_KEY = 'automotive.html';
+
+async function loadAccessDoc() {
+    try { const d = await db.collection('settings').doc('access').get(); return d.exists ? (d.data() || {}) : {}; }
+    catch (e) { return {}; }
+}
+
+async function renderGuestList() {
+    const el = document.getElementById('guest-list'); if (!el) return;
+    const d = await loadAccessDoc();
+    const guests = ((d.pages || {})[ACCESS_PAGE_KEY] || []);
+    if (!guests.length) {
+        el.innerHTML = '<div style="font-size:0.82rem;color:var(--text-secondary);font-style:italic;">No guests yet — create one below.</div>';
+        return;
+    }
+    el.innerHTML = guests.map(g => `
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:var(--bg-card);">
+            <span style="flex:0 0 auto;">👤</span>
+            <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:0.9rem;">${esc(g)}</span>
+            <button class="btn btn-ghost btn-sm" onclick="sendGuestReset('${esc(g)}')" title="Email a password-reset link">✉️ Reset</button>
+            <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="removeAutoGuest('${esc(g)}')" title="Revoke access">✕ Remove</button>
+        </div>`).join('');
+}
+
+async function addAutoGuest() {
+    const emailEl = document.getElementById('guest-email');
+    const pwEl = document.getElementById('guest-password');
+    const status = document.getElementById('guest-status');
+    const btn = document.getElementById('btn-add-guest');
+    const email = emailEl.value.trim().toLowerCase();
+    const pw = pwEl.value;
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { status.textContent = '⚠️ Enter a valid email address.'; status.style.color = 'var(--danger)'; return; }
+    if (pw.length < 6) { status.textContent = '⚠️ Password must be at least 6 characters.'; status.style.color = 'var(--danger)'; return; }
+    btn.disabled = true; status.style.color = 'var(--text-secondary)'; status.textContent = 'Creating guest account…';
+    // Create the account in a secondary Firebase app so the owner's own
+    // session is untouched (createUser normally signs the new user in).
+    let second = null;
+    try {
+        try {
+            second = firebase.initializeApp(firebase.app().options, 'guest-admin-' + Date.now());
+            await second.auth().createUserWithEmailAndPassword(email, pw);
+            await second.auth().signOut();
+        } catch (err) {
+            if (err && err.code === 'auth/email-already-in-use') {
+                // Account exists (e.g. re-adding a removed guest) — just grant access.
+            } else { throw err; }
+        } finally {
+            if (second) { try { await second.delete(); } catch (e) {} }
+        }
+        await db.collection('settings').doc('access').set(
+            { pages: { [ACCESS_PAGE_KEY]: firebase.firestore.FieldValue.arrayUnion(email) } },
+            { merge: true });
+        status.textContent = `✅ ${email} can now sign in on this page with the password you set.`;
+        status.style.color = 'var(--success)';
+        emailEl.value = ''; pwEl.value = '';
+        renderGuestList();
+    } catch (err) {
+        const msg = err && err.code === 'auth/weak-password' ? 'Password too weak — use at least 6 characters.'
+                  : err && err.code === 'auth/invalid-email' ? 'That email address is not valid.'
+                  : (err && err.message) || 'Could not create the guest.';
+        status.textContent = '❌ ' + msg;
+        status.style.color = 'var(--danger)';
+    } finally { btn.disabled = false; }
+}
+
+async function removeAutoGuest(email) {
+    if (!confirm(`Revoke ${email}'s access to this page? They will no longer be able to open any Farmboss page.`)) return;
+    try {
+        await db.collection('settings').doc('access').set(
+            { pages: { [ACCESS_PAGE_KEY]: firebase.firestore.FieldValue.arrayRemove(email) } },
+            { merge: true });
+        toast(`Access revoked for ${email}.`);
+        renderGuestList();
+    } catch (err) { toast('Failed: ' + err.message, 'error'); }
+}
+
+async function sendGuestReset(email) {
+    try {
+        await auth.sendPasswordResetEmail(email);
+        toast(`✉️ Password-reset email sent to ${email}.`, 'success');
     } catch (err) { toast('Failed: ' + err.message, 'error'); }
 }
 

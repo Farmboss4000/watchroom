@@ -83,6 +83,63 @@
         if (anchor && anchor.parentElement) anchor.parentElement.insertBefore(note, anchor);
     }
 
+    // ── Page access gate ──────────────────────────────────────
+    // Owners reach every page. Guest accounts (created in a page's
+    // "Shared Access" settings card) only reach pages whose allowlist in
+    // settings/access includes their email; everywhere else they get a
+    // full-screen "not shared with you" notice instead of the app.
+    var OWNER_EMAILS = ['jeff@stoebner.com', 'jeffmstoebner@gmail.com'];
+
+    function accessOverlay(email, page) {
+        var el = document.getElementById('fb-access-denied');
+        if (el) return el;
+        el = document.createElement('div');
+        el.id = 'fb-access-denied';
+        el.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:#f5f5f7;display:flex;align-items:center;justify-content:center;padding:24px;';
+        el.innerHTML =
+            '<div style="background:#fff;border:1px solid rgba(0,0,0,0.08);border-radius:16px;box-shadow:0 20px 48px rgba(16,20,28,0.10);padding:36px;max-width:430px;text-align:center;">' +
+              '<div style="font-size:2.2rem;margin-bottom:10px;">🔒</div>' +
+              '<div style="font-size:1.05rem;font-weight:700;color:#1d1d1f;margin-bottom:8px;">This page isn\u2019t shared with you</div>' +
+              '<div style="font-size:0.88rem;color:#6e6e73;line-height:1.5;margin-bottom:18px;">The account <strong>' + email.replace(/[<>&"]/g, '') + '</strong> doesn\u2019t have access to <strong>' + page.replace(/[<>&"]/g, '') + '</strong>. Open the page that was shared with you, or ask the owner to grant access.</div>' +
+              '<button id="fb-access-signout" style="background:#0071e3;color:#fff;border:none;border-radius:980px;padding:9px 22px;font-size:0.9rem;font-weight:600;cursor:pointer;">Sign out</button>' +
+            '</div>';
+        document.body.appendChild(el);
+        var btn = el.querySelector('#fb-access-signout');
+        btn.addEventListener('click', function () {
+            try { window.firebase.auth().signOut(); } catch (e) {}
+        });
+        return el;
+    }
+
+    function initAccessGate() {
+        if (!window.firebase || !window.firebase.auth || !window.firebase.firestore) return;
+        var page = (location.pathname.split('/').pop() || 'index.html').toLowerCase();
+        var lc = function (s) { return String(s || '').toLowerCase(); };
+        try {
+            window.firebase.auth().onAuthStateChanged(function (user) {
+                var el = document.getElementById('fb-access-denied');
+                if (!user || !user.email) { if (el) el.remove(); return; }
+                var email = lc(user.email);
+                if (OWNER_EMAILS.indexOf(email) !== -1) { if (el) el.remove(); return; }
+                window.firebase.firestore().collection('settings').doc('access').get().then(function (doc) {
+                    var d = (doc && doc.exists) ? doc.data() : {};
+                    var owners = (d.owners || []).map(lc);
+                    var pageList = ((d.pages || {})[page] || []).map(lc);
+                    var cur = document.getElementById('fb-access-denied');
+                    if (owners.indexOf(email) !== -1 || pageList.indexOf(email) !== -1) {
+                        if (cur) cur.remove();
+                    } else {
+                        accessOverlay(user.email, page);
+                    }
+                }).catch(function () {
+                    // Can't verify the allowlist — keep unverified guests out.
+                    accessOverlay(user.email, page);
+                });
+            });
+        } catch (e) { /* page without working firebase — nothing to gate */ }
+    }
+    initAccessGate();
+
     // ── Sticky table headers: measure how much of the top stays pinned while
     //    scrolling (site-switcher and/or page header) and expose it as
     //    --sticky-top so thead cells can stick right below the pinned bars.

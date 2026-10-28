@@ -1797,6 +1797,7 @@
             let lastMaint = null;
             machSnap.docs.forEach(doc => {
                 const it = doc.data();
+                if (it.sold) return;   // sold equipment has left the fleet
                 (it.maintenance || []).forEach(m => {
                     const when = m.date || (m.addedAt || '').slice(0, 10);
                     if (!lastMaint || when > lastMaint.when) {

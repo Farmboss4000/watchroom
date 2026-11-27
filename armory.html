@@ -572,6 +572,7 @@
         <button onclick="showView('ammo')">🎯 Ammo</button>
         <button onclick="showView('accessories')">🧰 Accessories</button>
         <button onclick="showView('reloads')">🧪 Loads</button>
+        <button onclick="showView('materials')">⚗️ Materials</button>
         <button onclick="showView('reports')">Reports</button>
         <button onclick="showView('categories')">Categories</button>
         <button onclick="showView('packing-list')">Packing List</button>
@@ -1392,6 +1393,104 @@
     </div>
 </div>
 
+<!-- ══ RELOADING MATERIALS ══ -->
+<div id="view-materials" class="view">
+    <div class="toolbar">
+        <div class="toolbar-left">
+            <h2 style="font-size:1.1rem;font-weight:700;">⚗️ Reloading Materials</h2>
+            <span style="font-size:0.82rem;color:var(--text-secondary);">Powder, primers, bullets, brass, and tooling purchases — upload receipts and AI files them</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <span id="mat-scan-status" style="font-size:0.8rem;color:var(--text-secondary);"></span>
+            <button class="btn btn-primary btn-sm" onclick="document.getElementById('mat-receipt-input').click()">📎 Upload Receipts</button>
+            <button class="btn btn-ghost btn-sm" onclick="openMatModal()">+ Add Material</button>
+            <input type="file" id="mat-receipt-input" accept="image/*,application/pdf,.eml,.txt,message/rfc822,text/plain" multiple style="display:none;" onchange="onMatReceiptsSelected(this);this.value='';">
+        </div>
+    </div>
+
+    <div class="stats-grid" id="mat-stats"></div>
+
+    <div class="card">
+        <div class="toolbar" style="margin-bottom:12px;flex-wrap:wrap;gap:10px;">
+            <input type="text" id="mat-search" placeholder="🔍 Search materials — brand, description, vendor, notes..." oninput="renderMaterials()" style="flex:1;min-width:220px;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:0.88rem;">
+            <select id="mat-filter-type" onchange="renderMaterials()" style="min-width:160px;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:0.88rem;">
+                <option value="">All Types</option>
+            </select>
+            <select id="mat-filter-vendor" onchange="renderMaterials()" style="min-width:160px;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:0.88rem;">
+                <option value="">All Vendors</option>
+            </select>
+        </div>
+        <div class="table-wrapper">
+            <table id="mat-table"><thead><tr>
+                <th onclick="matSortBy('date')" data-col="date">Date</th>
+                <th onclick="matSortBy('materialType')" data-col="materialType">Type</th>
+                <th onclick="matSortBy('brand')" data-col="brand">Brand</th>
+                <th onclick="matSortBy('description')" data-col="description">Description</th>
+                <th onclick="matSortBy('quantity')" data-col="quantity">Qty</th>
+                <th onclick="matSortBy('vendor')" data-col="vendor">Vendor</th>
+                <th onclick="matSortBy('cost')" data-col="cost">Cost</th>
+                <th class="no-sort">Actions</th>
+            </tr></thead><tbody id="mat-tbody"></tbody></table>
+        </div>
+        <div id="mat-empty" class="empty" style="display:none;">
+            <div class="empty-icon">⚗️</div>
+            <p>No materials logged yet. Upload a receipt or <a href="#" onclick="openMatModal();return false;" style="color:var(--accent);">add one manually</a>.</p>
+        </div>
+    </div>
+
+    <style>@media(max-width:800px){.mat-summaries{grid-template-columns:1fr !important;}}</style>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;" class="mat-summaries">
+        <div class="card">
+            <h3 style="font-size:0.95rem;font-weight:700;margin-bottom:10px;">Spend by Material Type</h3>
+            <div class="table-wrapper">
+                <table id="mat-type-table"><thead><tr>
+                    <th onclick="matTypeSortBy('type')" data-col="type">Type</th>
+                    <th onclick="matTypeSortBy('count')" data-col="count">Purchases</th>
+                    <th onclick="matTypeSortBy('qty')" data-col="qty">Qty</th>
+                    <th onclick="matTypeSortBy('total')" data-col="total">Total</th>
+                    <th onclick="matTypeSortBy('share')" data-col="share">%</th>
+                </tr></thead><tbody id="mat-type-tbody"></tbody></table>
+            </div>
+        </div>
+        <div class="card">
+            <h3 style="font-size:0.95rem;font-weight:700;margin-bottom:10px;">Spend by Vendor</h3>
+            <div class="table-wrapper">
+                <table id="mat-vendor-table"><thead><tr>
+                    <th onclick="matVendorSortBy('vendor')" data-col="vendor">Vendor</th>
+                    <th onclick="matVendorSortBy('count')" data-col="count">Purchases</th>
+                    <th onclick="matVendorSortBy('total')" data-col="total">Total</th>
+                    <th onclick="matVendorSortBy('share')" data-col="share">%</th>
+                </tr></thead><tbody id="mat-vendor-tbody"></tbody></table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ══ MATERIAL MODAL ══ -->
+<div class="modal-overlay" id="mat-modal">
+    <div class="modal" style="max-width:560px;">
+        <div class="modal-title" id="mat-modal-title">Add Material</div>
+        <div class="modal-sub">One reloading-supply purchase — a jug of powder, a brick of primers, a box of bullets…</div>
+        <input type="hidden" id="mat-doc-id">
+        <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="form-group"><label>Date</label><input type="date" id="mf-date"></div>
+            <div class="form-group"><label>Material Type *</label><input type="text" id="mf-type" list="mat-type-list" placeholder="e.g. Powder, Primers, Bullets"><datalist id="mat-type-list"></datalist></div>
+            <div class="form-group"><label>Brand</label><input type="text" id="mf-brand" placeholder="e.g. Hodgdon, CCI, Sierra"></div>
+            <div class="form-group"><label>Vendor</label><input type="text" id="mf-vendor" list="mat-vendor-list" placeholder="e.g. Scheels, Midway USA"><datalist id="mat-vendor-list"></datalist></div>
+            <div class="form-group" style="grid-column:1/-1;"><label>Description *</label><input type="text" id="mf-desc" placeholder="e.g. Varget 8 lb jug, BR-2 primers 1000ct"></div>
+            <div class="form-group"><label>Quantity</label><input type="number" id="mf-qty" min="0" step="0.01" placeholder="e.g. 2"></div>
+            <div class="form-group"><label>Unit</label><input type="text" id="mf-unit" placeholder="e.g. lb, ct, box, 100-pack"></div>
+            <div class="form-group"><label>Cost ($)</label><input type="number" id="mf-cost" min="0" step="0.01" placeholder="line total"></div>
+            <div class="form-group"><label>Lot #</label><input type="text" id="mf-lot" placeholder="lot number if printed"></div>
+            <div class="form-group" style="grid-column:1/-1;"><label>Notes</label><textarea id="mf-notes" rows="2" placeholder="Anything else worth keeping"></textarea></div>
+        </div>
+        <div class="modal-actions" style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;">
+            <button type="button" class="btn btn-primary" onclick="saveMaterial()">💾 Save</button>
+            <button type="button" class="btn btn-ghost" onclick="closeMatModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+
 <div id="view-reports" class="view">
 
     <!-- ── COLLECTION BROCHURE ── -->
@@ -2045,7 +2144,7 @@ let formPhotos = {
     form4:     { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false }
 };
 
-const VIEWS = ['dashboard','add-item','inventory','ammo','accessories','reloads','reports','categories','packing-list','gun-trusts','settings','recycle-bin','diary'];
+const VIEWS = ['dashboard','add-item','inventory','ammo','accessories','reloads','materials','reports','categories','packing-list','gun-trusts','settings','recycle-bin','diary'];
 
 // Gun Trusts state
 let trusts = [];
@@ -2074,7 +2173,8 @@ auth.onAuthStateChanged(user => {
         if (unsubAmmo) { unsubAmmo(); unsubAmmo = null; }
         if (unsubAcc) { unsubAcc(); unsubAcc = null; }
         if (unsubLoads) { unsubLoads(); unsubLoads = null; }
-        items = []; trusts = []; ammo = []; accessories = []; loads = [];
+        if (unsubMats) { unsubMats(); unsubMats = null; }
+        items = []; trusts = []; ammo = []; accessories = []; loads = []; materials = [];
     }
 });
 
@@ -2153,6 +2253,10 @@ async function initApp() {
             loads = snap.docs.map(doc => ({ _docId:doc.id, ...doc.data() }));
             renderLoads();
         }, err => console.warn('loads snap err', err));
+        unsubMats = db.collection('armory_reloading').onSnapshot(snap => {
+            materials = snap.docs.map(doc => ({ _docId:doc.id, ...doc.data() }));
+            renderMaterials();
+        }, err => console.warn('materials snap err', err));
         document.getElementById('loading-screen').style.display = 'none';
         document.getElementById('app').style.display            = 'flex';
         populateCatSelect(); populateMfrList(); populateCalList(); syncCatFilters();
@@ -2216,6 +2320,7 @@ function showView(v) {
     if (v === 'ammo') renderAmmo();
     if (v === 'accessories') renderAccessories();
     if (v === 'reloads') renderLoads();
+    if (v === 'materials') renderMaterials();
 }
 
 // ═══════════════════════════════════════
@@ -7485,6 +7590,316 @@ If the image shows a table of several charge weights (a ladder), transcribe the 
         // close on click outside
         document.getElementById('load-modal').addEventListener('click', e => {
             if (e.target === document.getElementById('load-modal')) closeLoadModal();
+        });
+
+        
+        // ══════════ RELOADING MATERIALS ENGINE ══════════
+        let materials = [];
+        let unsubMats = null;
+        let matSort = { col: 'date', dir: -1 };
+        let matTypeSort = { col: 'total', dir: -1 };
+        let matVendorSort = { col: 'total', dir: -1 };
+
+        const MAT_SEED_TYPES = ['Powder', 'Primers', 'Bullets', 'Brass', 'Dies & Tooling', 'Case Prep', 'Cleaning & Lube', 'Other'];
+        const matNum = v => { const n = parseFloat(v); return isNaN(n) ? null : n; };
+        const matMoney = v => matNum(v) !== null ? '$' + matNum(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
+
+        function matTypes() {
+            const s = new Set(MAT_SEED_TYPES);
+            materials.forEach(m => { if ((m.materialType || '').trim()) s.add(m.materialType.trim()); });
+            return [...s].sort((a, b) => a.localeCompare(b));
+        }
+
+        function matSortBy(col)       { matSort       = matSort.col       === col ? { col, dir: -matSort.dir }       : { col, dir: col === 'date' || col === 'cost' || col === 'quantity' ? -1 : 1 }; renderMaterials(); }
+        function matTypeSortBy(col)   { matTypeSort   = matTypeSort.col   === col ? { col, dir: -matTypeSort.dir }   : { col, dir: col === 'type' ? 1 : -1 }; renderMaterials(); }
+        function matVendorSortBy(col) { matVendorSort = matVendorSort.col === col ? { col, dir: -matVendorSort.dir } : { col, dir: col === 'vendor' ? 1 : -1 }; renderMaterials(); }
+
+        function matMarkSort(tableId, sort) {
+            document.querySelectorAll(`#${tableId} th[data-col]`).forEach(th => {
+                th.classList.remove('sort-asc', 'sort-desc');
+                if (th.dataset.col === sort.col) th.classList.add(sort.dir === 1 ? 'sort-asc' : 'sort-desc');
+            });
+        }
+
+        function renderMaterials() {
+            const tbody = document.getElementById('mat-tbody');
+            if (!tbody) return;
+
+            // datalists + filters (preserve selection)
+            const types = matTypes();
+            document.getElementById('mat-type-list').innerHTML = types.map(t => `<option value="${escHtml(t)}">`).join('');
+            const vendors = [...new Set(materials.map(m => (m.vendor || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+            const vlEl = document.getElementById('mat-vendor-list');
+            if (vlEl) vlEl.innerHTML = vendors.map(v => `<option value="${escHtml(v)}">`).join('');
+            const tSel = document.getElementById('mat-filter-type'), vSel = document.getElementById('mat-filter-vendor');
+            const prevT = tSel.value, prevV = vSel.value;
+            const usedTypes = [...new Set(materials.map(m => (m.materialType || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+            tSel.innerHTML = '<option value="">All Types</option>' + usedTypes.map(t => `<option${t === prevT ? ' selected' : ''}>${escHtml(t)}</option>`).join('');
+            vSel.innerHTML = '<option value="">All Vendors</option>' + vendors.map(v => `<option${v === prevV ? ' selected' : ''}>${escHtml(v)}</option>`).join('');
+
+            // stats
+            const total = materials.reduce((s, m) => s + (matNum(m.cost) || 0), 0);
+            const yr = new Date().getFullYear();
+            const ytd = materials.reduce((s, m) => s + ((String(m.date || '').startsWith(yr) ? matNum(m.cost) : 0) || 0), 0);
+            document.getElementById('mat-stats').innerHTML = `
+                <div class="stat-card"><div class="stat-value">${materials.length}</div><div class="stat-label">Purchases</div></div>
+                <div class="stat-card"><div class="stat-value">${usedTypes.length}</div><div class="stat-label">Material Types</div></div>
+                <div class="stat-card"><div class="stat-value">${matMoney(ytd)}</div><div class="stat-label">YTD Spend</div></div>
+                <div class="stat-card"><div class="stat-value">${matMoney(total)}</div><div class="stat-label">All-Time Spend</div></div>`;
+
+            // filter + search
+            const q = (document.getElementById('mat-search').value || '').toLowerCase();
+            let rows = materials.filter(m => {
+                if (tSel.value && (m.materialType || '').trim() !== tSel.value) return false;
+                if (vSel.value && (m.vendor || '').trim() !== vSel.value) return false;
+                if (q) {
+                    const hay = [m.materialType, m.brand, m.description, m.vendor, m.lot, m.notes].join(' ').toLowerCase();
+                    if (!hay.includes(q)) return false;
+                }
+                return true;
+            });
+
+            // sort main table
+            const { col, dir } = matSort;
+            const val = m => {
+                if (col === 'cost' || col === 'quantity') return matNum(m[col]);
+                return String(m[col] || '').toLowerCase();
+            };
+            rows.sort((a, b) => {
+                const va = val(a), vb = val(b);
+                if (va === null && vb === null) return 0;
+                if (va === null) return 1;
+                if (vb === null) return -1;
+                if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+                return String(va).localeCompare(String(vb), undefined, { numeric: true }) * dir;
+            });
+            matMarkSort('mat-table', matSort);
+
+            document.getElementById('mat-empty').style.display = materials.length ? 'none' : '';
+            tbody.innerHTML = rows.map(m => `<tr>
+                <td style="white-space:nowrap;">${escHtml(m.date || '—')}</td>
+                <td>${escHtml(m.materialType || '—')}</td>
+                <td>${escHtml(m.brand || '—')}</td>
+                <td><strong>${escHtml(m.description || '—')}</strong>${m.lot ? `<br><span style="font-size:0.72rem;color:var(--text-secondary);">Lot ${escHtml(m.lot)}</span>` : ''}${m.notes ? `<br><span style="font-size:0.72rem;color:var(--text-secondary);">${escHtml(m.notes)}</span>` : ''}</td>
+                <td>${matNum(m.quantity) !== null ? escHtml(String(m.quantity)) + (m.unit ? ' ' + escHtml(m.unit) : '') : '—'}</td>
+                <td>${escHtml(m.vendor || '—')}</td>
+                <td style="white-space:nowrap;">${matMoney(m.cost)}</td>
+                <td style="white-space:nowrap;">
+                    ${m.receiptUrl ? `<a class="icon-btn" title="View receipt" href="${escHtml(m.receiptUrl)}" target="_blank" rel="noopener" style="text-decoration:none;">📎</a>` : ''}
+                    <button class="icon-btn" title="Edit" onclick="openMatModal('${m._docId}')">✎</button>
+                    <button class="icon-btn" title="Delete" onclick="deleteMaterial('${m._docId}')">🗑</button>
+                </td>
+            </tr>`).join('');
+
+            // ── summary: by type ──
+            const byType = {};
+            materials.forEach(m => {
+                const t = (m.materialType || 'Uncategorized').trim() || 'Uncategorized';
+                byType[t] = byType[t] || { type: t, count: 0, qty: 0, total: 0 };
+                byType[t].count++;
+                byType[t].qty += matNum(m.quantity) || 0;
+                byType[t].total += matNum(m.cost) || 0;
+            });
+            let tRows = Object.values(byType).map(r => ({ ...r, share: total ? r.total / total : 0 }));
+            const tsort = matTypeSort;
+            tRows.sort((a, b) => (typeof a[tsort.col] === 'number'
+                ? (a[tsort.col] - b[tsort.col])
+                : String(a[tsort.col]).localeCompare(String(b[tsort.col]))) * tsort.dir);
+            matMarkSort('mat-type-table', matTypeSort);
+            document.getElementById('mat-type-tbody').innerHTML = tRows.map(r => `<tr>
+                <td><strong>${escHtml(r.type)}</strong></td><td>${r.count}</td>
+                <td>${r.qty ? (+r.qty.toFixed(2)).toLocaleString() : '—'}</td>
+                <td style="white-space:nowrap;">${matMoney(r.total)}</td><td>${(r.share * 100).toFixed(1)}%</td>
+            </tr>`).join('') || '<tr><td colspan="5" style="color:var(--text-secondary);">No data yet</td></tr>';
+
+            // ── summary: by vendor ──
+            const byVendor = {};
+            materials.forEach(m => {
+                const v = (m.vendor || 'Unknown').trim() || 'Unknown';
+                byVendor[v] = byVendor[v] || { vendor: v, count: 0, total: 0 };
+                byVendor[v].count++;
+                byVendor[v].total += matNum(m.cost) || 0;
+            });
+            let vRows = Object.values(byVendor).map(r => ({ ...r, share: total ? r.total / total : 0 }));
+            const vsort = matVendorSort;
+            vRows.sort((a, b) => (typeof a[vsort.col] === 'number'
+                ? (a[vsort.col] - b[vsort.col])
+                : String(a[vsort.col]).localeCompare(String(b[vsort.col]))) * vsort.dir);
+            matMarkSort('mat-vendor-table', matVendorSort);
+            document.getElementById('mat-vendor-tbody').innerHTML = vRows.map(r => `<tr>
+                <td><strong>${escHtml(r.vendor)}</strong></td><td>${r.count}</td>
+                <td style="white-space:nowrap;">${matMoney(r.total)}</td><td>${(r.share * 100).toFixed(1)}%</td>
+            </tr>`).join('') || '<tr><td colspan="4" style="color:var(--text-secondary);">No data yet</td></tr>';
+        }
+
+        const MAT_FIELDS = [
+            ['mf-date', 'date'], ['mf-type', 'materialType'], ['mf-brand', 'brand'], ['mf-vendor', 'vendor'],
+            ['mf-desc', 'description'], ['mf-qty', 'quantity'], ['mf-unit', 'unit'], ['mf-cost', 'cost'],
+            ['mf-lot', 'lot'], ['mf-notes', 'notes']
+        ];
+
+        function openMatModal(docId) {
+            const m = docId ? materials.find(x => x._docId === docId) : null;
+            document.getElementById('mat-modal-title').textContent = m ? 'Edit Material' : 'Add Material';
+            document.getElementById('mat-doc-id').value = m ? docId : '';
+            MAT_FIELDS.forEach(([id, key]) => {
+                document.getElementById(id).value = (m && m[key] !== undefined && m[key] !== null) ? m[key] : '';
+            });
+            if (!m) document.getElementById('mf-date').value = new Date().toISOString().slice(0, 10);
+            const el = document.getElementById('mat-modal');
+            el.style.display = 'flex';
+            void el.offsetWidth;
+            el.classList.add('show');
+        }
+
+        function closeMatModal() {
+            const el = document.getElementById('mat-modal');
+            el.classList.remove('show');
+            el.style.display = 'none';
+        }
+
+        async function saveMaterial() {
+            const data = {};
+            MAT_FIELDS.forEach(([id, key]) => {
+                const el = document.getElementById(id);
+                let v = el.value.trim();
+                if (el.type === 'number' && v !== '') { const n = parseFloat(v); v = isNaN(n) ? '' : n; }
+                data[key] = v;
+            });
+            if (!data.materialType) { toast('Pick a material type', 'error'); return; }
+            if (!data.description) { toast('Give it a description', 'error'); return; }
+            const docId = document.getElementById('mat-doc-id').value;
+            try {
+                if (docId) {
+                    await db.collection('armory_reloading').doc(docId).update(data);
+                    toast('Material updated ✓', 'success');
+                } else {
+                    data.createdAt = Date.now();
+                    await db.collection('armory_reloading').add(data);
+                    toast('Material saved ✓', 'success');
+                }
+                closeMatModal();
+            } catch (e) {
+                console.error('saveMaterial', e);
+                toast('Save failed: ' + e.message, 'error');
+            }
+        }
+
+        async function deleteMaterial(docId) {
+            const m = materials.find(x => x._docId === docId);
+            if (!m) return;
+            if (!confirm(`Delete "${m.description || m.materialType || 'this entry'}"?`)) return;
+            try {
+                await db.collection('armory_reloading').doc(docId).delete();
+                toast('Material deleted', 'success');
+            } catch (e) {
+                toast('Delete failed: ' + e.message, 'error');
+            }
+        }
+
+        // ── receipt upload: AI extracts every reloading line item ──
+        async function onMatReceiptsSelected(input) {
+            const files = [...(input.files || [])];
+            if (!files.length) return;
+            const status = document.getElementById('mat-scan-status');
+            let saved = 0, failed = 0;
+            for (let i = 0; i < files.length; i++) {
+                const f = files[i];
+                try {
+                    const n = await processMatReceipt(f, msg => {
+                        status.textContent = `(${i + 1}/${files.length}) ${f.name}: ${msg}`;
+                    });
+                    saved += n;
+                    if (!n) toast(`No reloading items found on ${f.name}`, '');
+                } catch (e) {
+                    console.error('processMatReceipt', f.name, e);
+                    failed++;
+                    toast(`${f.name}: ${e.message}`, 'error');
+                }
+            }
+            status.textContent = '';
+            if (saved) toast(`Filed ${saved} material purchase${saved === 1 ? '' : 's'} ✓`, 'success');
+            else if (failed) toast('No materials were saved — see errors above', 'error');
+        }
+
+        async function processMatReceipt(file, update) {
+            const lower = (file.name || '').toLowerCase();
+            const isPdf = file.type === 'application/pdf' || lower.endsWith('.pdf');
+            const isText = lower.endsWith('.eml') || lower.endsWith('.txt') || file.type === 'message/rfc822' || file.type === 'text/plain';
+            const isImage = !isPdf && !isText && (file.type.startsWith('image/') || /\.(png|jpe?g|gif|webp)$/.test(lower));
+            if (!isPdf && !isText && !isImage) throw new Error('unsupported file type — use a screenshot, PDF, or .eml/.txt email');
+
+            let media = null, emailText = '';
+            if (isText) {
+                emailText = (await file.text()).slice(0, 60000);
+                if (!emailText.trim()) throw new Error('file is empty');
+            } else if (isPdf) {
+                if (file.size > 4.5 * 1024 * 1024) throw new Error('PDF too large for AI reading (max ~4.5 MB) — try a screenshot instead');
+                const dataUrl = await new Promise(r => { const fr = new FileReader(); fr.onload = e => r(e.target.result); fr.readAsDataURL(file); });
+                media = { base64: dataUrl.split(',')[1], mimeType: 'application/pdf' };
+            } else {
+                const dataUrl = await compressImage(file) || await new Promise(r => { const fr = new FileReader(); fr.onload = e => r(e.target.result); fr.readAsDataURL(file); });
+                media = { base64: dataUrl.split(',')[1], mimeType: 'image/jpeg' };
+            }
+
+            if (update) update('extracting materials with AI…');
+            const prompt = `${emailText ? 'Below is the text of an emailed receipt or order confirmation.\n\n--- EMAIL ---\n' + emailText + '\n--- END EMAIL ---\n\n' : 'This is a retail receipt, invoice, or order confirmation.\n'}
+Find every RELOADING-SUPPLY line item: powder, primers, bullets/projectiles, brass/cases, dies, presses, case-prep tools, cleaning supplies, reloading manuals and similar. Ignore loaded ammunition, firearms, tax, and shipping. Return ONLY valid JSON, no markdown fences:
+{
+ "vendor":"store/seller name or empty",
+ "purchaseDate":"YYYY-MM-DD or empty",
+ "items":[
+   {"materialType":"one of ${JSON.stringify(MAT_SEED_TYPES)} — or a better short category name if none fits",
+    "brand":"maker, e.g. Hodgdon, CCI, Sierra, Lapua, RCBS",
+    "description":"what it is, with size, e.g. Varget 8 lb, BR-2 Large Rifle primers 1000ct, .308 168gr MatchKing 500ct",
+    "quantity": how many of this line item were bought, as a number (e.g. 2 jugs = 2),
+    "unit":"what one of them is, e.g. 8 lb jug, 1000ct brick, 500ct box, each — or empty",
+    "lineTotal": total price paid for this line as a number,
+    "lot":"lot # if printed, or empty",
+    "notes":"anything else relevant, or empty"}
+ ]
+}
+Rules: quantity and lineTotal must be plain JSON numbers. If nothing on the receipt is a reloading supply, return {"vendor":"","purchaseDate":"","items":[]}.`;
+            const raw = await callClaude(media ? media.base64 : null, media ? media.mimeType : null, prompt, { maxTokens: 1700 });
+            if (!raw) throw new Error('AI returned nothing');
+            const m = raw.match(/\{[\s\S]*\}/);
+            if (!m) throw new Error('could not parse AI response');
+            const d = JSON.parse(m[0]);
+            const items = Array.isArray(d.items) ? d.items : [];
+            if (!items.length) return 0;
+
+            if (update) update('saving receipt & materials…');
+            let receiptUrl = '', receiptName = file.name || 'receipt';
+            try {
+                const ext = (file.name && file.name.includes('.')) ? file.name.split('.').pop() : (isPdf ? 'pdf' : isText ? 'txt' : 'jpg');
+                const ref = storage.ref().child(`armory_reloading_receipts/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`);
+                await ref.put(file);
+                receiptUrl = await ref.getDownloadURL();
+            } catch (e) { console.warn('receipt upload failed', e); }
+
+            let saved = 0;
+            for (const it of items) {
+                await db.collection('armory_reloading').add({
+                    date: d.purchaseDate || new Date().toISOString().slice(0, 10),
+                    vendor: d.vendor || '',
+                    materialType: it.materialType || 'Other',
+                    brand: it.brand || '',
+                    description: it.description || '',
+                    quantity: matNum(it.quantity) !== null ? matNum(it.quantity) : '',
+                    unit: it.unit || '',
+                    cost: matNum(it.lineTotal) !== null ? matNum(it.lineTotal) : '',
+                    lot: it.lot || '',
+                    notes: it.notes || '',
+                    receiptUrl, receiptName,
+                    createdAt: Date.now()
+                });
+                saved++;
+            }
+            return saved;
+        }
+
+        document.getElementById('mat-modal').addEventListener('click', e => {
+            if (e.target === document.getElementById('mat-modal')) closeMatModal();
         });
 
         function toast(msg, type='', undoFn=null) {

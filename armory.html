@@ -570,6 +570,7 @@
         <button onclick="showView('inventory')">Inventory</button>
         <button onclick="showView('ammo')">🎯 Ammo</button>
         <button onclick="showView('accessories')">🧰 Accessories</button>
+        <button onclick="showView('reloads')">🧪 Loads</button>
         <button onclick="showView('reports')">Reports</button>
         <button onclick="showView('categories')">Categories</button>
         <button onclick="showView('packing-list')">Packing List</button>
@@ -1245,6 +1246,111 @@
 </div>
 
 <!-- ══ REPORTS ══ -->
+<!-- ══ RELOADS / LOAD DATA ══ -->
+<div id="view-reloads" class="view">
+    <div class="toolbar">
+        <div class="toolbar-left">
+            <h2 style="font-size:1.1rem;font-weight:700;">🧪 Ammo Loads</h2>
+            <span style="font-size:0.82rem;color:var(--text-secondary);">Your handload recipes by caliber — bullet, powder, primer, brass, dimensions, and results</span>
+        </div>
+        <div style="display:flex;gap:8px;">
+            <button class="btn btn-primary btn-sm" onclick="openLoadModal()">+ New Load</button>
+        </div>
+    </div>
+
+    <div class="stats-grid" id="loads-stats"></div>
+
+    <div class="card">
+        <div class="toolbar" style="margin-bottom:12px;flex-wrap:wrap;gap:10px;">
+            <input type="text" id="loads-search" placeholder="🔍 Search loads — bullet, powder, primer, brass, notes..." oninput="renderLoads()" style="flex:1;min-width:220px;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:0.88rem;">
+            <select id="loads-filter-cal" onchange="renderLoads()" style="min-width:170px;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:0.88rem;">
+                <option value="">All Calibers</option>
+            </select>
+            <select id="loads-filter-status" onchange="renderLoads()" style="min-width:140px;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:0.88rem;">
+                <option value="">All Statuses</option>
+                <option>Work-up</option><option>Proven</option><option>Favorite</option><option>Retired</option>
+            </select>
+        </div>
+        <div class="table-wrapper">
+            <table id="loads-table"><thead><tr>
+                <th onclick="loadsSortBy('caliber')" data-col="caliber">Caliber</th>
+                <th onclick="loadsSortBy('name')" data-col="name">Load</th>
+                <th onclick="loadsSortBy('bullet')" data-col="bullet">Bullet</th>
+                <th onclick="loadsSortBy('powder')" data-col="powder">Powder</th>
+                <th onclick="loadsSortBy('chargeGr')" data-col="chargeGr">Charge</th>
+                <th onclick="loadsSortBy('primer')" data-col="primer">Primer</th>
+                <th onclick="loadsSortBy('caseBrand')" data-col="caseBrand">Brass</th>
+                <th onclick="loadsSortBy('coal')" data-col="coal">COAL</th>
+                <th onclick="loadsSortBy('velocity')" data-col="velocity">Velocity</th>
+                <th onclick="loadsSortBy('groupSize')" data-col="groupSize">Group</th>
+                <th onclick="loadsSortBy('status')" data-col="status">Status</th>
+                <th class="no-sort">Actions</th>
+            </tr></thead><tbody id="loads-tbody"></tbody></table>
+        </div>
+        <div id="loads-empty" class="empty" style="display:none;">
+            <div class="empty-icon">🧪</div>
+            <p>No loads recorded yet. <a href="#" onclick="openLoadModal();return false;" style="color:var(--accent);">Record your first load</a>.</p>
+        </div>
+        <p style="font-size:0.74rem;color:var(--text-secondary);margin-top:12px;opacity:0.8;">
+            ⚠️ This is your personal record book. Always verify charge data against current published load manuals before loading.
+        </p>
+    </div>
+</div>
+
+<!-- ══ LOAD MODAL ══ -->
+<div class="modal-overlay" id="load-modal">
+    <div class="modal" style="max-width:760px;">
+        <div class="modal-title" id="load-modal-title">New Load</div>
+        <div class="modal-sub">Record every ingredient and measurement — duplicate a load to log the next step of a ladder.</div>
+        <input type="hidden" id="load-doc-id">
+
+        <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+            <div class="form-group" style="grid-column:1/3;"><label>Load Name *</label><input type="text" id="lf-name" placeholder="e.g. 168 Match — ladder step 3"></div>
+            <div class="form-group"><label>Status</label><select id="lf-status"><option>Work-up</option><option>Proven</option><option>Favorite</option><option>Retired</option></select></div>
+            <div class="form-group"><label>Caliber *</label><input type="text" id="lf-caliber" list="cal-list" placeholder="e.g. .308 Winchester"></div>
+            <div class="form-group"><label>Date</label><input type="date" id="lf-date"></div>
+            <div class="form-group"><label>Firearm</label><select id="lf-firearm"><option value="">—</option></select></div>
+
+            <div style="grid-column:1/-1;font-size:0.72rem;letter-spacing:1.5px;font-weight:700;color:var(--text-secondary);border-bottom:1px solid var(--border);padding-bottom:4px;margin-top:4px;">BULLET</div>
+            <div class="form-group"><label>Manufacturer</label><input type="text" id="lf-bullet-mfr" placeholder="e.g. Sierra, Hornady"></div>
+            <div class="form-group"><label>Bullet / Model</label><input type="text" id="lf-bullet" placeholder="e.g. MatchKing BTHP"></div>
+            <div class="form-group"><label>Weight (gr)</label><input type="number" id="lf-bullet-wt" min="0" step="0.1" placeholder="e.g. 168"></div>
+            <div class="form-group"><label>Diameter (in)</label><input type="number" id="lf-bullet-dia" min="0" step="0.001" placeholder="e.g. 0.308"></div>
+            <div class="form-group" style="grid-column:2/4;"><label>Bullet Lot / Notes</label><input type="text" id="lf-bullet-lot" placeholder="Lot #, BC, etc."></div>
+
+            <div style="grid-column:1/-1;font-size:0.72rem;letter-spacing:1.5px;font-weight:700;color:var(--text-secondary);border-bottom:1px solid var(--border);padding-bottom:4px;margin-top:4px;">POWDER &amp; PRIMER</div>
+            <div class="form-group"><label>Powder Maker</label><input type="text" id="lf-powder-mfr" placeholder="e.g. Hodgdon, Alliant"></div>
+            <div class="form-group"><label>Powder *</label><input type="text" id="lf-powder" placeholder="e.g. Varget"></div>
+            <div class="form-group"><label>Charge (gr) *</label><input type="number" id="lf-charge" min="0" step="0.1" placeholder="e.g. 42.0"></div>
+            <div class="form-group"><label>Powder Lot</label><input type="text" id="lf-powder-lot" placeholder="Lot #"></div>
+            <div class="form-group"><label>Primer</label><input type="text" id="lf-primer" placeholder="e.g. CCI BR-2"></div>
+            <div class="form-group"><label>Primer Type / Lot</label><input type="text" id="lf-primer-type" placeholder="e.g. Large Rifle · lot #"></div>
+
+            <div style="grid-column:1/-1;font-size:0.72rem;letter-spacing:1.5px;font-weight:700;color:var(--text-secondary);border-bottom:1px solid var(--border);padding-bottom:4px;margin-top:4px;">BRASS &amp; DIMENSIONS</div>
+            <div class="form-group"><label>Case Brand</label><input type="text" id="lf-case" placeholder="e.g. Lapua"></div>
+            <div class="form-group"><label>Times Fired</label><input type="number" id="lf-case-fired" min="0" step="1" placeholder="e.g. 2"></div>
+            <div class="form-group"><label>Trim Length (in)</label><input type="number" id="lf-trim" min="0" step="0.001" placeholder="e.g. 2.005"></div>
+            <div class="form-group"><label>COAL (in)</label><input type="number" id="lf-coal" min="0" step="0.001" placeholder="e.g. 2.800"></div>
+            <div class="form-group"><label>CBTO (in)</label><input type="number" id="lf-cbto" min="0" step="0.001" placeholder="base-to-ogive"></div>
+            <div class="form-group"><label>Crimp</label><input type="text" id="lf-crimp" placeholder="e.g. none, light taper"></div>
+
+            <div style="grid-column:1/-1;font-size:0.72rem;letter-spacing:1.5px;font-weight:700;color:var(--text-secondary);border-bottom:1px solid var(--border);padding-bottom:4px;margin-top:4px;">RESULTS</div>
+            <div class="form-group"><label>Avg Velocity (fps)</label><input type="number" id="lf-velocity" min="0" step="1" placeholder="chronograph avg"></div>
+            <div class="form-group"><label>ES (fps)</label><input type="number" id="lf-es" min="0" step="1" placeholder="extreme spread"></div>
+            <div class="form-group"><label>SD (fps)</label><input type="number" id="lf-sd" min="0" step="0.1" placeholder="std deviation"></div>
+            <div class="form-group"><label>Group Size (in)</label><input type="number" id="lf-group" min="0" step="0.01" placeholder="e.g. 0.75"></div>
+            <div class="form-group"><label>@ Distance (yd)</label><input type="number" id="lf-group-yd" min="0" step="1" placeholder="e.g. 100"></div>
+            <div class="form-group"><label>Rounds Loaded</label><input type="number" id="lf-rounds" min="0" step="1" placeholder="batch size"></div>
+            <div class="form-group" style="grid-column:1/-1;"><label>Notes</label><textarea id="lf-notes" rows="2" placeholder="Pressure signs, seating notes, conditions, next steps…"></textarea></div>
+        </div>
+
+        <div class="modal-actions" style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;">
+            <button type="button" class="btn btn-primary" onclick="saveLoad()">💾 Save Load</button>
+            <button type="button" class="btn btn-ghost" onclick="closeLoadModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+
 <div id="view-reports" class="view">
 
     <!-- ── COLLECTION BROCHURE ── -->
@@ -1898,7 +2004,7 @@ let formPhotos = {
     form4:     { file:null, base64:null, mimeType:null, existingUrl:null, deleted:false }
 };
 
-const VIEWS = ['dashboard','add-item','inventory','ammo','accessories','reports','categories','packing-list','gun-trusts','settings','recycle-bin','diary'];
+const VIEWS = ['dashboard','add-item','inventory','ammo','accessories','reloads','reports','categories','packing-list','gun-trusts','settings','recycle-bin','diary'];
 
 // Gun Trusts state
 let trusts = [];
@@ -1926,7 +2032,8 @@ auth.onAuthStateChanged(user => {
         if (unsubTrusts) { unsubTrusts(); unsubTrusts = null; }
         if (unsubAmmo) { unsubAmmo(); unsubAmmo = null; }
         if (unsubAcc) { unsubAcc(); unsubAcc = null; }
-        items = []; trusts = []; ammo = []; accessories = [];
+        if (unsubLoads) { unsubLoads(); unsubLoads = null; }
+        items = []; trusts = []; ammo = []; accessories = []; loads = [];
     }
 });
 
@@ -2001,6 +2108,10 @@ async function initApp() {
             accessories = snap.docs.map(doc => ({ _docId:doc.id, ...doc.data() }));
             renderAccessories(); renderDashboard();
         }, err => console.warn('accessories snap err', err));
+        unsubLoads = db.collection('armory_loads').onSnapshot(snap => {
+            loads = snap.docs.map(doc => ({ _docId:doc.id, ...doc.data() }));
+            renderLoads();
+        }, err => console.warn('loads snap err', err));
         document.getElementById('loading-screen').style.display = 'none';
         document.getElementById('app').style.display            = 'flex';
         populateCatSelect(); populateMfrList(); populateCalList(); syncCatFilters();
@@ -2063,6 +2174,7 @@ function showView(v) {
     if (v === 'gun-trusts') renderTrustsList();
     if (v === 'ammo') renderAmmo();
     if (v === 'accessories') renderAccessories();
+    if (v === 'reloads') renderLoads();
 }
 
 // ═══════════════════════════════════════
@@ -6754,7 +6866,218 @@ Rules: use numbers for quantity and lineTotal. SKU and MPN are DIFFERENT codes �
     return added;
 }
 
-function toast(msg, type='', undoFn=null) {
+
+        // ══════════ RELOADS / LOAD DATA ENGINE ══════════
+        let loads = [];
+        let unsubLoads = null;
+        let loadsSort = { col: 'caliber', dir: 1 };
+
+        const loadNum = v => { const n = parseFloat(v); return isNaN(n) ? null : n; };
+        const loadFmt = (v, suffix='') => (v === null || v === undefined || v === '') ? '—' : (v + suffix);
+
+        function loadsSortBy(col) {
+            if (loadsSort.col === col) loadsSort.dir = -loadsSort.dir;
+            else loadsSort = { col, dir: 1 };
+            renderLoads();
+        }
+
+        function loadsSortVal(l, col) {
+            switch (col) {
+                case 'chargeGr': case 'velocity': case 'groupSize': case 'coal':
+                    return loadNum(l[col]);
+                case 'bullet':
+                    return ((l.bulletWeight ? l.bulletWeight + 'gr ' : '') + (l.bulletMfr||'') + ' ' + (l.bullet||'')).trim().toLowerCase();
+                case 'powder':
+                    return ((l.powderMfr||'') + ' ' + (l.powder||'')).trim().toLowerCase();
+                case 'status': {
+                    const order = { 'Favorite': 0, 'Proven': 1, 'Work-up': 2, 'Retired': 3 };
+                    return order[l.status] !== undefined ? order[l.status] : 4;
+                }
+                default:
+                    return String(l[col] || '').toLowerCase();
+            }
+        }
+
+        const LOAD_STATUS_STYLE = {
+            'Favorite': 'background:rgba(255,159,10,0.14);color:#b25e00;',
+            'Proven':   'background:rgba(48,209,88,0.14);color:#1e7e3e;',
+            'Work-up':  'background:rgba(0,113,227,0.12);color:#0059b3;',
+            'Retired':  'background:rgba(142,142,147,0.16);color:#6e6e73;'
+        };
+
+        function renderLoads() {
+            const tbody = document.getElementById('loads-tbody');
+            if (!tbody) return;
+
+            // caliber filter options (preserve selection)
+            const calSel = document.getElementById('loads-filter-cal');
+            const prevCal = calSel.value;
+            const cals = [...new Set(loads.map(l => (l.caliber||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
+            calSel.innerHTML = '<option value="">All Calibers</option>' + cals.map(c => `<option${c===prevCal?' selected':''}>${escHtml(c)}</option>`).join('');
+
+            // stats
+            const favs = loads.filter(l => l.status === 'Favorite').length;
+            const proven = loads.filter(l => l.status === 'Proven').length;
+            const rounds = loads.reduce((s,l) => s + (loadNum(l.roundsLoaded) || 0), 0);
+            document.getElementById('loads-stats').innerHTML = `
+                <div class="stat-card"><div class="stat-value">${loads.length}</div><div class="stat-label">Loads Recorded</div></div>
+                <div class="stat-card"><div class="stat-value">${cals.length}</div><div class="stat-label">Calibers</div></div>
+                <div class="stat-card"><div class="stat-value">${proven + favs}</div><div class="stat-label">Proven / Favorite</div></div>
+                <div class="stat-card"><div class="stat-value">${rounds.toLocaleString()}</div><div class="stat-label">Rounds Loaded</div></div>`;
+
+            // filter + search
+            const q = (document.getElementById('loads-search').value || '').toLowerCase();
+            const fCal = calSel.value;
+            const fStatus = document.getElementById('loads-filter-status').value;
+            let rows = loads.filter(l => {
+                if (fCal && (l.caliber||'').trim() !== fCal) return false;
+                if (fStatus && l.status !== fStatus) return false;
+                if (q) {
+                    const hay = [l.name,l.caliber,l.firearm,l.bulletMfr,l.bullet,l.powderMfr,l.powder,l.primer,l.primerType,l.caseBrand,l.crimp,l.notes].join(' ').toLowerCase();
+                    if (!hay.includes(q)) return false;
+                }
+                return true;
+            });
+
+            // sort
+            const { col, dir } = loadsSort;
+            rows.sort((a,b) => {
+                const va = loadsSortVal(a, col), vb = loadsSortVal(b, col);
+                if (va === null && vb === null) return 0;
+                if (va === null) return 1;
+                if (vb === null) return -1;
+                if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+                return String(va).localeCompare(String(vb), undefined, { numeric: true }) * dir;
+            });
+            document.querySelectorAll('#loads-table th[data-col]').forEach(th => {
+                th.classList.remove('sort-asc','sort-desc');
+                if (th.dataset.col === col) th.classList.add(dir === 1 ? 'sort-asc' : 'sort-desc');
+            });
+
+            document.getElementById('loads-empty').style.display = loads.length ? 'none' : '';
+            tbody.innerHTML = rows.map(l => {
+                const bullet = [l.bulletWeight ? l.bulletWeight + 'gr' : '', l.bulletMfr, l.bullet].filter(Boolean).join(' ');
+                const powder = [l.powderMfr, l.powder].filter(Boolean).join(' ');
+                const group = loadNum(l.groupSize) !== null ? l.groupSize + '"' + (l.groupYards ? ' @ ' + l.groupYards : '') : '—';
+                const st = l.status || 'Work-up';
+                return `<tr>
+                    <td>${escHtml(l.caliber || '—')}</td>
+                    <td><strong>${escHtml(l.name || '—')}</strong>${l.firearm ? `<br><span style="font-size:0.75rem;color:var(--text-secondary);">${escHtml(l.firearm)}</span>` : ''}</td>
+                    <td>${escHtml(bullet || '—')}</td>
+                    <td>${escHtml(powder || '—')}</td>
+                    <td>${loadFmt(l.chargeGr, ' gr')}</td>
+                    <td>${escHtml(l.primer || '—')}</td>
+                    <td>${escHtml(l.caseBrand || '—')}${l.caseTimesFired ? ` <span style="font-size:0.72rem;color:var(--text-secondary);">(${escHtml(String(l.caseTimesFired))}×)</span>` : ''}</td>
+                    <td>${loadFmt(l.coal, '"')}</td>
+                    <td>${loadNum(l.velocity) !== null ? l.velocity + ' fps' + (loadNum(l.sd) !== null ? `<br><span style="font-size:0.72rem;color:var(--text-secondary);">SD ${l.sd}${loadNum(l.es) !== null ? ' · ES ' + l.es : ''}</span>` : '') : '—'}</td>
+                    <td>${group}</td>
+                    <td><span style="display:inline-block;padding:2px 9px;border-radius:980px;font-size:0.72rem;font-weight:600;${LOAD_STATUS_STYLE[st] || LOAD_STATUS_STYLE['Work-up']}">${escHtml(st)}</span></td>
+                    <td style="white-space:nowrap;">
+                        <button class="icon-btn" title="Edit" onclick="openLoadModal('${l._docId}')">✎</button>
+                        <button class="icon-btn" title="Duplicate (next ladder step)" onclick="duplicateLoad('${l._docId}')">📋</button>
+                        <button class="icon-btn" title="Delete" onclick="deleteLoad('${l._docId}')">🗑</button>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        const LOAD_FIELDS = [
+            ['lf-name','name'], ['lf-status','status'], ['lf-caliber','caliber'], ['lf-date','date'], ['lf-firearm','firearm'],
+            ['lf-bullet-mfr','bulletMfr'], ['lf-bullet','bullet'], ['lf-bullet-wt','bulletWeight'], ['lf-bullet-dia','bulletDiameter'], ['lf-bullet-lot','bulletLot'],
+            ['lf-powder-mfr','powderMfr'], ['lf-powder','powder'], ['lf-charge','chargeGr'], ['lf-powder-lot','powderLot'],
+            ['lf-primer','primer'], ['lf-primer-type','primerType'],
+            ['lf-case','caseBrand'], ['lf-case-fired','caseTimesFired'], ['lf-trim','trimLength'],
+            ['lf-coal','coal'], ['lf-cbto','cbto'], ['lf-crimp','crimp'],
+            ['lf-velocity','velocity'], ['lf-es','es'], ['lf-sd','sd'],
+            ['lf-group','groupSize'], ['lf-group-yd','groupYards'], ['lf-rounds','roundsLoaded'],
+            ['lf-notes','notes']
+        ];
+
+        function openLoadModal(docId, prefill) {
+            const l = docId ? loads.find(x => x._docId === docId) : null;
+            const src = l || prefill || {};
+            document.getElementById('load-modal-title').textContent = l ? 'Edit Load' : (prefill ? 'Duplicate Load' : 'New Load');
+            document.getElementById('load-doc-id').value = l ? docId : '';
+            // firearm dropdown from gun inventory
+            const fsel = document.getElementById('lf-firearm');
+            const guns = (items || []).filter(i => !i.deleted).map(i => [i.manufacturer, i.model].filter(Boolean).join(' ')).filter(Boolean).sort();
+            fsel.innerHTML = '<option value="">—</option>' + [...new Set(guns)].map(g => `<option>${escHtml(g)}</option>`).join('');
+            LOAD_FIELDS.forEach(([id, key]) => {
+                const el = document.getElementById(id);
+                el.value = (src[key] !== undefined && src[key] !== null) ? src[key] : '';
+            });
+            if (!src.status) document.getElementById('lf-status').value = 'Work-up';
+            if (!src.date && !l) document.getElementById('lf-date').value = new Date().toISOString().slice(0, 10);
+            if (src.firearm) fsel.value = src.firearm;
+            const m = document.getElementById('load-modal');
+            m.style.display = 'flex';
+            void m.offsetWidth;
+            m.classList.add('show');
+        }
+
+        function closeLoadModal() {
+            const m = document.getElementById('load-modal');
+            m.classList.remove('show');
+            m.style.display = 'none';
+        }
+
+        async function saveLoad() {
+            const data = {};
+            LOAD_FIELDS.forEach(([id, key]) => {
+                const el = document.getElementById(id);
+                let v = el.value.trim();
+                if (el.type === 'number' && v !== '') { const n = parseFloat(v); v = isNaN(n) ? '' : n; }
+                data[key] = v;
+            });
+            if (!data.name) { toast('Give the load a name', 'error'); return; }
+            if (!data.caliber) { toast('Caliber is required', 'error'); return; }
+            const docId = document.getElementById('load-doc-id').value;
+            try {
+                if (docId) {
+                    await db.collection('armory_loads').doc(docId).update(data);
+                    toast('Load updated ✓', 'success');
+                } else {
+                    data.createdAt = Date.now();
+                    await db.collection('armory_loads').add(data);
+                    toast('Load saved ✓', 'success');
+                }
+                closeLoadModal();
+            } catch (e) {
+                console.error('saveLoad', e);
+                toast('Save failed: ' + e.message, 'error');
+            }
+        }
+
+        function duplicateLoad(docId) {
+            const l = loads.find(x => x._docId === docId);
+            if (!l) return;
+            const copy = { ...l };
+            delete copy._docId; delete copy.createdAt;
+            copy.name = (l.name || 'Load') + ' (copy)';
+            copy.date = new Date().toISOString().slice(0, 10);
+            // results belong to the original test, not the new step
+            copy.velocity = ''; copy.es = ''; copy.sd = ''; copy.groupSize = ''; copy.groupYards = ''; copy.roundsLoaded = '';
+            openLoadModal(null, copy);
+        }
+
+        async function deleteLoad(docId) {
+            const l = loads.find(x => x._docId === docId);
+            if (!l) return;
+            if (!confirm(`Delete load "${l.name || ''}" (${l.caliber || ''})? This cannot be undone.`)) return;
+            try {
+                await db.collection('armory_loads').doc(docId).delete();
+                toast('Load deleted', 'success');
+            } catch (e) {
+                toast('Delete failed: ' + e.message, 'error');
+            }
+        }
+
+        // close on click outside
+        document.getElementById('load-modal').addEventListener('click', e => {
+            if (e.target === document.getElementById('load-modal')) closeLoadModal();
+        });
+
+        function toast(msg, type='', undoFn=null) {
     _toastUndoFn = undoFn;
     const el = document.getElementById('toast');
     if (undoFn) {

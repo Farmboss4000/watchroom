@@ -13,6 +13,7 @@
     <title>Farmboss Armory</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js" defer></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -7250,92 +7251,224 @@ If the image shows a table of several charge weights (a ladder), transcribe the 
             lfPhotoRefresh();
         }
 
-        // ── 3×5 printable Stoebner Armory Load Card ──
-        function buildLoadCardHtml(l) {
-            const esc = escHtml;
-            const sp = (label, val) => (val !== undefined && val !== null && val !== '')
-                ? `<div style="margin-bottom:2px;"><span style="font-size:6px;letter-spacing:0.8px;color:#8a8a8e;font-weight:700;">${label}</span><br><span style="font-size:8.5px;font-weight:600;color:#1d1d1f;line-height:1.2;">${esc(String(val))}</span></div>` : '';
-            const chip = (label, val, unit='') => (val !== undefined && val !== null && val !== '')
-                ? `<div style="text-align:center;padding:0 7px;"><div style="font-size:6px;letter-spacing:0.8px;color:#8a8a8e;font-weight:700;">${label}</div><div style="font-size:10.5px;font-weight:700;color:#1d1d1f;">${esc(String(val))}${unit}</div></div>` : '';
-            const thumbs = [['BULLET', l.bulletImg], ['POWDER', l.powderImg], ['PRIMER', l.primerImg], ['BRASS', l.caseImg]].filter(t => t[1]);
-            const st = l.status || 'Work-up';
-            const stColor = { 'Favorite': '#b25e00', 'Proven': '#1e7e3e', 'Work-up': '#0059b3', 'Retired': '#6e6e73' }[st] || '#0059b3';
-            const bulletLine = [l.bulletWeight ? l.bulletWeight + ' gr' : '', l.bulletMfr, l.bullet].filter(Boolean).join(' ');
-            const chargeLine = [l.chargeGr !== '' && l.chargeGr !== undefined && l.chargeGr !== null ? l.chargeGr + ' gr' : '', l.powder].filter(Boolean).join(' ');
-
-            return `
-            <div style="width:480px;height:288px;box-sizing:border-box;background:#fff;font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;display:flex;flex-direction:column;border:2.5px solid #1d1d1f;border-radius:6px;overflow:hidden;">
-                <div style="background:#1d1d1f;color:#fff;padding:5px 12px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
-                    <div style="font-size:10px;font-weight:800;letter-spacing:2.5px;">⭑ STOEBNER ARMORY</div>
-                    <div style="font-size:7px;letter-spacing:2px;color:#c7c7cc;font-weight:600;">LOAD DATA CARD</div>
-                </div>
-                <div style="display:flex;flex:1;min-height:0;">
-                    <div style="flex:1;padding:8px 12px 6px;display:flex;flex-direction:column;min-width:0;">
-                        <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px;">
-                            <div style="font-size:16px;font-weight:800;color:#1d1d1f;white-space:nowrap;">${esc(l.caliber || '—')}</div>
-                            <div style="font-size:9px;color:#6e6e73;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">${esc(l.name || '')}</div>
-                            <div style="font-size:7px;font-weight:800;letter-spacing:1px;color:${stColor};border:1px solid ${stColor};border-radius:980px;padding:1.5px 7px;white-space:nowrap;">${esc(st.toUpperCase())}</div>
-                        </div>
-                        <div style="display:flex;gap:6px;margin-bottom:5px;">
-                            <div style="flex:1.2;border:1.5px solid #1d1d1f;border-radius:5px;padding:3px 8px;">
-                                <div style="font-size:6px;letter-spacing:1px;color:#8a8a8e;font-weight:700;">POWDER CHARGE</div>
-                                <div style="font-size:13px;font-weight:800;color:#1d1d1f;">${esc(chargeLine || '—')}</div>
-                            </div>
-                            <div style="flex:1;border:1px solid #d2d2d7;border-radius:5px;padding:3px 8px;">
-                                <div style="font-size:6px;letter-spacing:1px;color:#8a8a8e;font-weight:700;">BULLET</div>
-                                <div style="font-size:10.5px;font-weight:700;color:#1d1d1f;">${esc(bulletLine || '—')}</div>
-                            </div>
-                        </div>
-                        <div style="display:flex;gap:10px;flex:1;min-height:0;overflow:hidden;">
-                            <div style="flex:1;">${sp('BULLET', [l.bulletMfr, l.bullet].filter(Boolean).join(' '))}${sp('WEIGHT / DIA', [l.bulletWeight ? l.bulletWeight + ' gr' : '', l.bulletDiameter ? l.bulletDiameter + '"' : ''].filter(Boolean).join(' · '))}${sp('BULLET LOT', l.bulletLot)}</div>
-                            <div style="flex:1;">${sp('POWDER', [l.powderMfr, l.powder].filter(Boolean).join(' '))}${sp('CHARGE', l.chargeGr !== '' && l.chargeGr !== undefined ? l.chargeGr + ' gr' : '')}${sp('POWDER LOT', l.powderLot)}</div>
-                            <div style="flex:1;">${sp('PRIMER', l.primer)}${sp('TYPE / LOT', l.primerType)}</div>
-                            <div style="flex:1;">${sp('BRASS', l.caseBrand)}${sp('TIMES FIRED', l.caseTimesFired)}${sp('TRIM', l.trimLength ? l.trimLength + '"' : '')}</div>
-                        </div>
-                        <div style="border-top:1px solid #e8e8ed;padding-top:4px;display:flex;justify-content:space-between;">
-                            ${chip('COAL', l.coal, '"')}${chip('CBTO', l.cbto, '"')}${chip('CRIMP', l.crimp)}${chip('VELOCITY', l.velocity, ' fps')}${chip('ES / SD', (l.es !== '' && l.es !== undefined && l.es !== null) || (l.sd !== '' && l.sd !== undefined && l.sd !== null) ? [l.es, l.sd].filter(v => v !== '' && v !== undefined && v !== null).join(' / ') : '')}${chip('GROUP', l.groupSize ? l.groupSize + '"' + (l.groupYards ? ' @ ' + l.groupYards : '') : '')}
-                        </div>
-                        <div style="border-top:1px solid #e8e8ed;margin-top:3px;padding-top:3px;display:flex;justify-content:space-between;align-items:center;">
-                            <div style="font-size:7px;color:#6e6e73;font-weight:600;">${esc([l.firearm, l.date].filter(Boolean).join(' · ') || '')}</div>
-                            <div style="font-size:5.5px;color:#aeaeb2;letter-spacing:0.3px;">HAND-RECORDED DATA — VERIFY AGAINST PUBLISHED LOAD MANUALS BEFORE USE</div>
-                        </div>
-                    </div>
-                    ${thumbs.length ? `<div style="width:58px;flex-shrink:0;border-left:1px solid #e8e8ed;padding:6px 5px;display:flex;flex-direction:column;gap:4px;align-items:center;background:#fafafa;">
-                        ${thumbs.map(t => `<div style="text-align:center;"><img src="${esc(t[1])}" crossorigin="anonymous" style="width:44px;height:40px;object-fit:cover;border-radius:4px;border:1px solid #d2d2d7;display:block;"><div style="font-size:5px;letter-spacing:0.8px;color:#8a8a8e;font-weight:700;margin-top:1px;">${t[0]}</div></div>`).join('')}
-                    </div>` : ''}
-                </div>
-            </div>`;
+        // ── 3×5 printable Stoebner Armory Load Card (vector, drawn with jsPDF) ──
+        function cardThumbData(url) {
+            return new Promise(resolve => {
+                if (!url) return resolve(null);
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.referrerPolicy = 'no-referrer';
+                const t = setTimeout(() => resolve(null), 8000);
+                img.onload = () => {
+                    clearTimeout(t);
+                    try {
+                        const W = 136, H = 120;   // 4× the 34×30pt box for crisp print
+                        const c = document.createElement('canvas');
+                        c.width = W; c.height = H;
+                        const ctx = c.getContext('2d');
+                        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+                        const s = Math.max(W / img.width, H / img.height);
+                        ctx.drawImage(img, (W - img.width * s) / 2, (H - img.height * s) / 2, img.width * s, img.height * s);
+                        resolve(c.toDataURL('image/jpeg', 0.88));
+                    } catch (e) { resolve(null); }   // tainted canvas → skip thumb
+                };
+                img.onerror = () => { clearTimeout(t); resolve(null); };
+                img.src = url;
+            });
         }
 
         async function printLoadCard(docId) {
             const l = loads.find(x => x._docId === docId);
             if (!l) return;
-            if (typeof html2pdf === 'undefined') { toast('PDF library still loading — try again in a moment', 'error'); return; }
+            if (!window.jspdf || !window.jspdf.jsPDF) { toast('PDF library still loading — try again in a moment', 'error'); return; }
             toast('Building load card…');
-            // html2pdf measures the source in a static container, so the card
-            // must stay in normal flow — positioning it absolute/fixed collapses
-            // the measuring container to 0 height and yields a blank PDF.
-            // Off-screen positioning therefore lives on a wrapper, not the card.
-            const wrap = document.createElement('div');
-            wrap.style.cssText = 'position:absolute;left:-9999px;top:0;width:480px;overflow:hidden;';
-            const root = document.createElement('div');
-            root.style.cssText = 'width:480px;height:288px;background:#fff;';
-            root.innerHTML = buildLoadCardHtml(l);
-            wrap.appendChild(root);
-            document.body.appendChild(wrap);
             try {
-                await Promise.all([...root.querySelectorAll('img')].map(img => new Promise(res => {
-                    if (img.complete) return res();
-                    img.onload = img.onerror = res;
-                    setTimeout(res, 8000);
-                })));
-                const blob = await html2pdf().set({
-                    margin: 0,
-                    image: { type: 'jpeg', quality: 0.95 },
-                    html2canvas: { scale: 3, useCORS: true, imageTimeout: 10000, logging: false, scrollX: 0, scrollY: 0 },
-                    jsPDF: { unit: 'px', format: [480, 288], orientation: 'landscape', hotfixes: ['px_scaling'] }
-                }).from(root).toPdf().output('blob');
-                if (!blob || blob.size < 8000) throw new Error('generated PDF came out empty — please try again');
+                const num = v => (v === '' || v === null || v === undefined || isNaN(Number(v))) ? null : Number(v);
+                const chargeTxt = num(l.chargeGr) !== null ? num(l.chargeGr).toFixed(1) + ' gr' : '';
+                const chargeLine = [chargeTxt, l.powder].filter(Boolean).join(' ');
+                const bulletLine = [num(l.bulletWeight) !== null ? l.bulletWeight + ' gr' : '', l.bulletMfr, l.bullet].filter(Boolean).join(' ');
+
+                const thumbsIn = [['BULLET', l.bulletImg], ['POWDER', l.powderImg], ['PRIMER', l.primerImg], ['BRASS', l.caseImg]].filter(t => t[1]);
+                const thumbData = await Promise.all(thumbsIn.map(t => cardThumbData(t[1])));
+                const thumbs = thumbsIn.map((t, i) => ({ label: t[0], data: thumbData[i] })).filter(t => t.data);
+
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF({ unit: 'pt', format: [360, 216], orientation: 'landscape' });
+
+                // palette
+                const DARK = [29, 29, 31], GRAY = [110, 110, 115], LABEL = [138, 142, 147],
+                      FAINT = [174, 174, 178], HAIR = [232, 232, 237], BOX = [210, 210, 215];
+                const STATUS_COLOR = { 'Favorite': [178, 94, 0], 'Proven': [30, 126, 62], 'Work-up': [0, 89, 179], 'Retired': [110, 110, 115] };
+                let _cs = 0;
+                const setT = (size, style, color, cs) => {
+                    doc.setFont('helvetica', style || 'normal');
+                    doc.setFontSize(size);
+                    doc.setTextColor(color[0], color[1], color[2]);
+                    _cs = cs || 0;
+                    doc.setCharSpace(_cs);
+                };
+                const tw = t => doc.getTextWidth(t) + _cs * Math.max(0, String(t).length - 1);
+                const fit = (t, maxW) => {
+                    t = String(t);
+                    if (tw(t) <= maxW) return t;
+                    while (t.length > 1 && tw(t + '…') > maxW) t = t.slice(0, -1);
+                    return t + '…';
+                };
+
+                const W = 360, H = 216, M = 14;
+                const hasRail = thumbs.length > 0;
+                const RX = 312;                       // rail left edge
+                const x1 = hasRail ? RX - 8 : W - M;  // content right boundary
+                const T = x1 - M;                     // content width
+
+                // header band (rounded top via outer radius; squared off below)
+                doc.setFillColor(DARK[0], DARK[1], DARK[2]);
+                doc.roundedRect(2.5, 2.5, W - 5, 30, 5, 5, 'F');
+                doc.rect(2.5, 18, W - 5, 10.5, 'F');
+                // small star
+                (function star(cx, cy, R, r) {
+                    const pts = [];
+                    for (let i = 0; i < 10; i++) {
+                        const a = -Math.PI / 2 + i * Math.PI / 5, rad = i % 2 ? r : R;
+                        pts.push([cx + rad * Math.cos(a), cy + rad * Math.sin(a)]);
+                    }
+                    const d = [];
+                    for (let i = 1; i < pts.length; i++) d.push([pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]]);
+                    doc.setFillColor(255, 255, 255);
+                    doc.lines(d, pts[0][0], pts[0][1], [1, 1], 'F', true);
+                })(17.5, 15.5, 4, 1.7);
+                setT(9.5, 'bold', [255, 255, 255], 2);
+                doc.text('STOEBNER ARMORY', 25, 19);
+                setT(6, 'bold', [199, 199, 204], 1.6);
+                doc.text('LOAD DATA CARD', W - M - tw('LOAD DATA CARD'), 18.5);
+
+                // thumbnail rail
+                if (hasRail) {
+                    doc.setFillColor(250, 250, 250);
+                    doc.rect(RX, 28.5, W - 2.5 - RX, H - 31, 'F');
+                    doc.setDrawColor(HAIR[0], HAIR[1], HAIR[2]);
+                    doc.setLineWidth(0.6);
+                    doc.line(RX, 28.5, RX, H - 2.5);
+                    let ty = 36;
+                    thumbs.slice(0, 4).forEach(t => {
+                        doc.addImage(t.data, 'JPEG', RX + 7, ty, 34, 30);
+                        doc.setDrawColor(BOX[0], BOX[1], BOX[2]);
+                        doc.setLineWidth(0.6);
+                        doc.roundedRect(RX + 7, ty, 34, 30, 2, 2, 'S');
+                        setT(4.5, 'bold', LABEL, 0.7);
+                        doc.text(t.label, RX + 7 + (34 - tw(t.label)) / 2, ty + 36);
+                        ty += 44;
+                    });
+                }
+
+                // status pill (right-aligned on the title row)
+                const st = l.status || 'Work-up';
+                const sc = STATUS_COLOR[st] || STATUS_COLOR['Work-up'];
+                setT(6, 'bold', sc, 0.8);
+                const stTxt = st.toUpperCase();
+                const pillW = tw(stTxt) + 12;
+                doc.setDrawColor(sc[0], sc[1], sc[2]);
+                doc.setLineWidth(0.8);
+                doc.roundedRect(x1 - pillW, 38.5, pillW, 11, 5.5, 5.5, 'S');
+                doc.text(stTxt, x1 - pillW + 6, 46);
+
+                // caliber + name
+                setT(15, 'bold', DARK, 0);
+                const calTxt = fit(l.caliber || '—', T * 0.55);
+                doc.text(calTxt, M, 48);
+                const calW = tw(calTxt);
+                setT(7.5, 'bold', GRAY, 0);
+                if (l.name) doc.text(fit(l.name, x1 - pillW - M - calW - 14), M + calW + 7, 48);
+
+                // charge + bullet highlight boxes
+                const by = 55, bh = 27, gap = 8;
+                const b1w = Math.round(T * 0.52), b2w = T - b1w - gap;
+                doc.setDrawColor(DARK[0], DARK[1], DARK[2]);
+                doc.setLineWidth(1.3);
+                doc.roundedRect(M, by, b1w, bh, 4, 4, 'S');
+                setT(5, 'bold', LABEL, 0.8);
+                doc.text('POWDER CHARGE', M + 7, by + 9);
+                setT(12, 'bold', DARK, 0);
+                doc.text(fit(chargeLine || '—', b1w - 14), M + 7, by + 21.5);
+                doc.setDrawColor(BOX[0], BOX[1], BOX[2]);
+                doc.setLineWidth(0.8);
+                doc.roundedRect(M + b1w + gap, by, b2w, bh, 4, 4, 'S');
+                setT(5, 'bold', LABEL, 0.8);
+                doc.text('BULLET', M + b1w + gap + 7, by + 9);
+                setT(9.5, 'bold', DARK, 0);
+                doc.text(fit(bulletLine || '—', b2w - 14), M + b1w + gap + 7, by + 21);
+
+                // component grid: 4 columns × up to 3 entries
+                const cols = [
+                    [['BULLET', [l.bulletMfr, l.bullet].filter(Boolean).join(' ')],
+                     ['WEIGHT / DIA', [num(l.bulletWeight) !== null ? l.bulletWeight + ' gr' : '', num(l.bulletDiameter) !== null ? l.bulletDiameter + '"' : ''].filter(Boolean).join(' · ')],
+                     ['BULLET LOT', l.bulletLot]],
+                    [['POWDER', [l.powderMfr, l.powder].filter(Boolean).join(' ')],
+                     ['CHARGE', chargeTxt],
+                     ['POWDER LOT', l.powderLot]],
+                    [['PRIMER', l.primer],
+                     ['TYPE / LOT', l.primerType]],
+                    [['BRASS', l.caseBrand],
+                     ['TIMES FIRED', l.caseTimesFired],
+                     ['TRIM', num(l.trimLength) !== null ? l.trimLength + '"' : '']]
+                ];
+                const colGap = 8, colW = (T - colGap * 3) / 4;
+                cols.forEach((entries, ci) => {
+                    const cx = M + ci * (colW + colGap);
+                    let cy = 97;
+                    entries.forEach(([lab, val]) => {
+                        if (val === '' || val === null || val === undefined) return;
+                        setT(5, 'bold', LABEL, 0.6);
+                        doc.text(lab, cx, cy);
+                        setT(7.5, 'bold', DARK, 0);
+                        doc.text(fit(String(val), colW - 2), cx, cy + 8.5);
+                        cy += 18.5;
+                    });
+                });
+
+                // dimensions & results strip
+                doc.setDrawColor(HAIR[0], HAIR[1], HAIR[2]);
+                doc.setLineWidth(0.6);
+                doc.line(M, 158, x1, 158);
+                const chips = [
+                    ['COAL', num(l.coal) !== null ? l.coal + '"' : null],
+                    ['CBTO', num(l.cbto) !== null ? l.cbto + '"' : null],
+                    ['CRIMP', l.crimp || null],
+                    ['VELOCITY', num(l.velocity) !== null ? l.velocity + ' fps' : null],
+                    ['ES / SD', (num(l.es) !== null || num(l.sd) !== null) ? [l.es, l.sd].filter(v => v !== '' && v !== null && v !== undefined).join(' / ') : null],
+                    ['GROUP', num(l.groupSize) !== null ? l.groupSize + '"' + (num(l.groupYards) !== null ? ' @ ' + l.groupYards : '') : null]
+                ].filter(c => c[1] !== null);
+                if (chips.length) {
+                    const step = T / chips.length;
+                    chips.forEach((c, i) => {
+                        const cx = M + step * i + step / 2;
+                        setT(4.8, 'bold', LABEL, 0.7);
+                        doc.text(c[0], cx - tw(c[0]) / 2, 166);
+                        setT(8.5, 'bold', DARK, 0);
+                        const v = fit(String(c[1]), step - 4);
+                        doc.text(v, cx - tw(v) / 2, 176);
+                    });
+                }
+
+                // footer
+                doc.setDrawColor(HAIR[0], HAIR[1], HAIR[2]);
+                doc.line(M, 184, x1, 184);
+                setT(6.5, 'bold', GRAY, 0);
+                const foot = [l.firearm, l.date].filter(Boolean).join(' · ');
+                if (foot) doc.text(fit(foot, T * 0.5), M, 193);
+                setT(4.6, 'normal', FAINT, 0.4);
+                const disc = 'HAND-RECORDED DATA — VERIFY AGAINST PUBLISHED LOAD MANUALS BEFORE USE';
+                doc.text(disc, x1 - tw(disc), 193);
+                setT(5.5, 'bold', LABEL, 0.6);
+                if (num(l.roundsLoaded) !== null) doc.text(l.roundsLoaded + ' ROUNDS LOADED', M, 202);
+
+                // outer border last, over the band edges
+                doc.setDrawColor(DARK[0], DARK[1], DARK[2]);
+                doc.setLineWidth(1.8);
+                doc.roundedRect(2.5, 2.5, W - 5, H - 5, 5, 5, 'S');
+
+                const blob = doc.output('blob');
+                if (!blob || blob.size < 1000) throw new Error('generated PDF came out empty — please try again');
                 const a = document.createElement('a');
                 a.href = URL.createObjectURL(blob);
                 a.download = `LoadCard_${(l.caliber || 'load').replace(/[^\w.-]+/g, '_')}_${(l.name || '').replace(/[^\w.-]+/g, '_').slice(0, 40) || 'card'}.pdf`;
@@ -7346,8 +7479,6 @@ If the image shows a table of several charge weights (a ladder), transcribe the 
             } catch (e) {
                 console.error('printLoadCard', e);
                 toast('Card failed: ' + e.message, 'error');
-            } finally {
-                wrap.remove();
             }
         }
 

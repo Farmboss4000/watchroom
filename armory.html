@@ -7312,10 +7312,17 @@ If the image shows a table of several charge weights (a ladder), transcribe the 
             if (!l) return;
             if (typeof html2pdf === 'undefined') { toast('PDF library still loading — try again in a moment', 'error'); return; }
             toast('Building load card…');
+            // html2pdf measures the source in a static container, so the card
+            // must stay in normal flow — positioning it absolute/fixed collapses
+            // the measuring container to 0 height and yields a blank PDF.
+            // Off-screen positioning therefore lives on a wrapper, not the card.
+            const wrap = document.createElement('div');
+            wrap.style.cssText = 'position:absolute;left:-9999px;top:0;width:480px;overflow:hidden;';
             const root = document.createElement('div');
-            root.style.cssText = 'position:fixed;left:-10000px;top:0;width:480px;height:288px;background:#fff;';
+            root.style.cssText = 'width:480px;height:288px;background:#fff;';
             root.innerHTML = buildLoadCardHtml(l);
-            document.body.appendChild(root);
+            wrap.appendChild(root);
+            document.body.appendChild(wrap);
             try {
                 await Promise.all([...root.querySelectorAll('img')].map(img => new Promise(res => {
                     if (img.complete) return res();
@@ -7325,21 +7332,22 @@ If the image shows a table of several charge weights (a ladder), transcribe the 
                 const blob = await html2pdf().set({
                     margin: 0,
                     image: { type: 'jpeg', quality: 0.95 },
-                    html2canvas: { scale: 3, useCORS: true, imageTimeout: 10000, logging: false, scrollX: 0, scrollY: 0, width: 480, windowWidth: 480 },
+                    html2canvas: { scale: 3, useCORS: true, imageTimeout: 10000, logging: false, scrollX: 0, scrollY: 0 },
                     jsPDF: { unit: 'px', format: [480, 288], orientation: 'landscape', hotfixes: ['px_scaling'] }
                 }).from(root).toPdf().output('blob');
-                if (!blob || blob.size < 1200) throw new Error('generated PDF came out empty — please try again');
+                if (!blob || blob.size < 8000) throw new Error('generated PDF came out empty — please try again');
                 const a = document.createElement('a');
                 a.href = URL.createObjectURL(blob);
                 a.download = `LoadCard_${(l.caliber || 'load').replace(/[^\w.-]+/g, '_')}_${(l.name || '').replace(/[^\w.-]+/g, '_').slice(0, 40) || 'card'}.pdf`;
+                document.body.appendChild(a);   // Safari needs the anchor in the DOM
                 a.click();
-                setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+                setTimeout(() => { a.remove(); URL.revokeObjectURL(a.href); }, 30000);
                 toast('Load card ready 🖨 — print at 100% scale on 3×5" card stock', 'success');
             } catch (e) {
                 console.error('printLoadCard', e);
                 toast('Card failed: ' + e.message, 'error');
             } finally {
-                root.remove();
+                wrap.remove();
             }
         }
 

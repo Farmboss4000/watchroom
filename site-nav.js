@@ -140,6 +140,35 @@
     }
     initAccessGate();
 
+    // ── Lazy third-party libraries ────────────────────────────
+    // Heavy tool libraries (PDF, barcode, diagram engines) are
+    // marked type="text/lazyjs" in each page's head. They are
+    // injected here, in page order, after the window load event,
+    // so first paint, app init, and data sync never compete with
+    // megabytes of tool code. Every call site already guards with
+    // a typeof check, and these finish loading seconds later.
+    function fbLoadLazyScripts() {
+        var tags = [].slice.call(document.querySelectorAll('script[type="text/lazyjs"]'));
+        var chain = Promise.resolve();
+        tags.forEach(function (t) {
+            chain = chain.then(function () {
+                return new Promise(function (res) {
+                    var s = document.createElement('script');
+                    var typ = t.getAttribute('data-type');
+                    if (typ) s.type = typ;
+                    s.src = t.getAttribute('data-src');
+                    s.onload = s.onerror = function () { res(); };
+                    document.head.appendChild(s);
+                });
+            });
+        });
+        chain.then(function () {
+            try { document.dispatchEvent(new Event('fb-lazy-libs-ready')); } catch (e) {}
+        });
+    }
+    if (document.readyState === 'complete') fbLoadLazyScripts();
+    else window.addEventListener('load', fbLoadLazyScripts);
+
     // ── Chart.js defaults for the dark theme ──────────────────
     // Per-page chart options still win; this only lifts the
     // library defaults (axis/legend text, grid lines) to colors

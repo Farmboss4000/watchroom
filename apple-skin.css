@@ -1,225 +1,192 @@
 /* ============================================================
-   APPLE SKIN v2 — sitewide reskin.
-   This file is loaded AFTER each page's inline <style> block,
-   so it wins the cascade. It redefines the common CSS variables
-   every page uses (--bg-primary, --accent, --text-primary, etc.)
-   to a clean modern system, then layers on universal typography
-   and component polish.
+   AGENCY SKIN v4 — sitewide dark "intelligence agency" theme.
+   Loaded AFTER each page's inline <style>, so it wins the
+   cascade. Redefines the common CSS variables every page uses,
+   then layers component styling.
 
-   Design language: calm light canvas (#f5f5f7), white surfaces
-   with hairline borders + feather shadows, one accent blue,
-   pill-shaped controls, frosted chrome, visible focus rings.
-
-   Per-page accent identity (gold, red, green, purple, etc.) is
-   intentionally unified to accent-blue here — the goal is one
-   coherent look across all pages.
+   Design language (cia.gov 2021 brutalism): near-black canvas,
+   stark white type, squared corners, flat hairline-bordered
+   panels, one brass/gold accent, uppercase letter-spaced labels,
+   no decorative shadows.
    ============================================================ */
 
-/* ── Design tokens / variable overrides ─────────────────────
-   Forces clean values on every common variable name used
-   across pages. Inline :root blocks lose because we're later
-   in the cascade and we use !important. */
+/* ── Design tokens / variable overrides ───────────────────── */
 :root {
-    /* Standard names */
-    --bg-primary:    #f5f5f7 !important;
-    --bg-secondary:  #ffffff !important;
-    --bg-card:       #f6f6f8 !important;
-    --bg-raised:     #ffffff !important;
-    --bg:            #f5f5f7 !important;
-    --bg2:           #ffffff !important;
-    --bg3:           #f6f6f8 !important;
-    --card:          #ffffff !important;
-    --surface:      #ffffff !important;
-    --surface-2:    #f6f6f8 !important;
+    --bg-primary:    #0b0d12 !important;
+    --bg-secondary:  #12151d !important;
+    --bg-card:       #12151d !important;
+    --bg-raised:     #171b24 !important;
+    --bg:            #0b0d12 !important;
+    --bg2:           #12151d !important;
+    --bg3:           #171b24 !important;
+    --card:          #12151d !important;
+    --surface:       #12151d !important;
+    --surface-2:     #171b24 !important;
 
-    --text-primary:    #1d1d1f !important;
-    --text-secondary:  #6e6e73 !important;
-    --text-tertiary:   #98989d !important;
-    --text:            #1d1d1f !important;
-    --text2:           #6e6e73 !important;
-    --text3:           #98989d !important;
+    --text-primary:    #e7e9ee !important;
+    --text-secondary:  #9aa3b2 !important;
+    --text-tertiary:   #6b7484 !important;
+    --text:            #e7e9ee !important;
+    --text2:           #9aa3b2 !important;
+    --text3:           #6b7484 !important;
 
-    --border:        rgba(0,0,0,0.07) !important;
-    --border2:       rgba(0,0,0,0.12) !important;
-    --border-strong: rgba(0,0,0,0.12) !important;
+    --border:        rgba(255,255,255,0.10) !important;
+    --border2:       rgba(255,255,255,0.18) !important;
+    --border-strong: rgba(255,255,255,0.18) !important;
 
-    --accent:         #0071e3 !important;
-    --accent-hover:   #0077ed !important;
-    --accent-pressed: #0063c1 !important;
-    --accent-dim:     rgba(0,113,227,0.09) !important;
-    --accent-soft:    rgba(0,113,227,0.09) !important;
-    --accent2:        #0077ed !important;
-    --dim:            rgba(0,113,227,0.09) !important;
+    --accent:         #c9a35c !important;
+    --accent-hover:   #d9b573 !important;
+    --accent-pressed: #b08c47 !important;
+    --accent-dim:     rgba(201,163,92,0.12) !important;
+    --accent-soft:    rgba(201,163,92,0.12) !important;
+    --accent2:        #d9b573 !important;
+    --dim:            rgba(201,163,92,0.12) !important;
 
-    --success:  #248a3d !important;
-    --danger:   #e02d2d !important;
-    --warn:     #c96a00 !important;
-    --warning:  #c96a00 !important;
-    --info:     #0071e3 !important;
-    --green:    #248a3d !important;
-    --red:      #e02d2d !important;
-    --yellow:   #c96a00 !important;
+    --success:  #4cc38a !important;
+    --danger:   #f2555a !important;
+    --warn:     #e5a13d !important;
+    --warning:  #e5a13d !important;
+    --info:     #7fb3e8 !important;
+    --green:    #4cc38a !important;
+    --red:      #f2555a !important;
+    --yellow:   #e5a13d !important;
 
-    /* Page-specific brand vars repointed to accent-blue */
-    --gold:     #0071e3 !important;
-    --gold2:    #0077ed !important;
-    --gold-dim: rgba(0,113,227,0.09) !important;
-    --purple:   #0071e3 !important;
+    --gold:     #c9a35c !important;
+    --gold2:    #d9b573 !important;
+    --gold-dim: rgba(201,163,92,0.12) !important;
+    --purple:   #c9a35c !important;
 
-    /* Headers / nav background — unified near-black */
-    --hdr-bg:   #16181d !important;
-    --navy:     #16181d !important;
-    --navy2:    #23262e !important;
-    --navy3:    #1a4d7a !important;
+    --hdr-bg:   #0e1117 !important;
+    --navy:     #0e1117 !important;
+    --navy2:    #151a22 !important;
+    --navy3:    #1d2634 !important;
 
-    /* Shadow + radius tokens */
-    --shadow-sm: 0 1px 2px rgba(16,20,28,0.04) !important;
-    --shadow-md: 0 1px 2px rgba(16,20,28,0.04), 0 8px 24px rgba(16,20,28,0.06) !important;
-    --shadow-lg: 0 2px 6px rgba(16,20,28,0.05), 0 20px 48px rgba(16,20,28,0.10) !important;
-    --shadow:    0 1px 2px rgba(16,20,28,0.04), 0 8px 24px rgba(16,20,28,0.06) !important;
-    --radius:    16px !important;
-    --radius-sm: 10px !important;
-    --radius-md: 16px !important;
-    --radius-lg: 20px !important;
-    --radius-pill: 980px !important;
+    --shadow-sm: 0 1px 0 rgba(0,0,0,0.4) !important;
+    --shadow-md: 0 1px 0 rgba(0,0,0,0.4) !important;
+    --shadow-lg: 0 12px 40px rgba(0,0,0,0.55) !important;
+    --shadow:    0 1px 0 rgba(0,0,0,0.4) !important;
+    --radius:    4px !important;
+    --radius-sm: 3px !important;
+    --radius-md: 4px !important;
+    --radius-lg: 6px !important;
+    --radius-pill: 3px !important;
 }
 
-/* ── Page canvas & typography ───────────────────────────── */
+/* ── Page canvas & typography ─────────────────────────────── */
 html, body {
-    background: #f5f5f7 !important;
-    color: #1d1d1f !important;
+    background: #0b0d12 !important;
+    color: #e7e9ee !important;
     font-family:
         "SF Pro Display","SF Pro Text",
         -apple-system, BlinkMacSystemFont,
         "Inter","Helvetica Neue","Segoe UI",Roboto,Arial,sans-serif !important;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    letter-spacing: -0.011em;
+    letter-spacing: -0.008em;
     font-feature-settings: "kern","liga","calt","tnum";
     text-rendering: optimizeLegibility;
 }
+body {
+    background-image:
+        radial-gradient(900px 360px at 50% -120px, rgba(201,163,92,0.05), transparent 70%) !important;
+    background-attachment: fixed !important;
+}
 
-/* Headline tightening */
 h1, h2, h3, h4, h5, h6,
-.login-title, .login-subtitle,
-.modal-title, .modal-sub,
-.section-title, .section-title *,
-.hero h2, .hero p,
-.veh-title, .veh-sub,
-.ins-card-title,
-.page-name, .ann-title,
-.card-title-left, .stat-value,
-header h1, header h2 {
-    letter-spacing: -0.022em;
+.login-title, .modal-title, .section-title,
+.page-name, .stat-value, header h1, header h2 {
+    letter-spacing: -0.02em;
+    color: #f2f3f7;
 }
-
-/* Numbers align in tables & stats */
-td, .stat-value, .amount, .vendor-amt {
-    font-variant-numeric: tabular-nums;
-}
-
-/* Mono */
+td, .stat-value, .amount, .vendor-amt { font-variant-numeric: tabular-nums; }
 .mono, code, kbd, samp, pre, .vin-display, .serial-display {
     font-family: "SF Mono", ui-monospace, Menlo, Monaco, "Cascadia Mono",
                  "Roboto Mono", Consolas, monospace !important;
-    font-feature-settings: "ss01","ss02","calt";
 }
 
-/* ── Selection & focus ──────────────────────────────────── */
-::selection      { background: rgba(0,113,227,0.20); color: inherit; }
-::-moz-selection { background: rgba(0,113,227,0.20); color: inherit; }
-
-/* Visible, consistent keyboard-focus ring everywhere */
+::selection      { background: rgba(201,163,92,0.35); color: inherit; }
+::-moz-selection { background: rgba(201,163,92,0.35); color: inherit; }
 :focus { outline: none; }
 :focus-visible {
     outline: none;
-    box-shadow: 0 0 0 4px rgba(0,113,227,0.28) !important;
-    border-radius: 8px;
+    box-shadow: 0 0 0 3px rgba(201,163,92,0.45) !important;
+    border-radius: 3px;
 }
 
-/* ── Header (per-page top app-bar) → frosted white ──────── */
+/* ── Header (per-page top app-bar) — dark panel, gold rule ── */
 body > header,
 #app > header,
 header.app-header,
 header[id]:not(.site-switcher) {
-    background: rgba(255,255,255,0.78) !important;
-    color: #1d1d1f !important;
-    border-bottom: 1px solid rgba(0,0,0,0.07) !important;
+    background: rgba(14,17,23,0.92) !important;
+    color: #e7e9ee !important;
+    border-bottom: 1px solid rgba(201,163,92,0.35) !important;
     box-shadow: none !important;
-    -webkit-backdrop-filter: saturate(180%) blur(24px);
-    backdrop-filter: saturate(180%) blur(24px);
+    -webkit-backdrop-filter: saturate(140%) blur(18px);
+    backdrop-filter: saturate(140%) blur(18px);
 }
-body > header *,
-#app > header *,
-header.app-header * {
-    /* Pull text colors back to dark on the now-light header.
-       Don't recolor links or accent-bearing pills — they keep
-       their existing rule via inheritance/specificity. */
-    color: #1d1d1f;
-}
-body > header a,
-#app > header a {
-    color: #0071e3;
-}
+body > header *, #app > header *, header.app-header * { color: #e7e9ee; }
+body > header a, #app > header a { color: #d9b573; }
 
-/* Page tabs inside the header → quiet pills */
+/* Page tabs — squared, underline for active (wayfinding style) */
 header nav button {
-    border-radius: 980px !important;
+    border-radius: 3px !important;
     font-weight: 500;
+    letter-spacing: 0.01em;
 }
 header nav button:hover {
-    background: rgba(0,0,0,0.05) !important;
-    color: #1d1d1f !important;
+    background: rgba(255,255,255,0.07) !important;
+    color: #ffffff !important;
 }
 header nav button.active {
-    background: #0071e3 !important;
-    color: #ffffff !important;
-    font-weight: 600;
+    background: rgba(201,163,92,0.14) !important;
+    color: #e8c98f !important;
+    font-weight: 700;
+    box-shadow: inset 0 -2px 0 #c9a35c !important;
 }
 
-/* Sign-out & user badge → subtle neutral chips */
 .btn-signout {
-    border: 1px solid rgba(0,0,0,0.12) !important;
-    color: #6e6e73 !important;
-    border-radius: 980px !important;
+    border: 1px solid rgba(255,255,255,0.22) !important;
+    color: #9aa3b2 !important;
+    border-radius: 3px !important;
+    background: transparent !important;
 }
-.btn-signout:hover { color: #e02d2d !important; border-color: rgba(224,45,45,0.45) !important; }
+.btn-signout:hover { color: #f2555a !important; border-color: rgba(242,85,90,0.6) !important; }
 .user-badge {
-    background: rgba(0,0,0,0.045) !important;
-    color: #6e6e73 !important;
-    border-radius: 980px !important;
+    background: rgba(255,255,255,0.06) !important;
+    color: #9aa3b2 !important;
+    border-radius: 3px !important;
 }
 
-/* ── Site-switcher (cross-app bar) → dark glass, pill links ── */
+/* ── Site-switcher — solid black command bar ──────────────── */
 .site-switcher {
     position: sticky;
     top: 0;
     z-index: 100;
-    background: rgba(15,17,23,0.82) !important;
-    -webkit-backdrop-filter: saturate(180%) blur(24px);
-    backdrop-filter: saturate(180%) blur(24px);
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+    background: #05070b !important;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border-bottom: 1px solid rgba(255,255,255,0.10);
     padding-top: 6px !important;
     padding-bottom: 6px !important;
 }
 .site-switcher .site-link {
-    border-radius: 980px !important;
-    color: rgba(255,255,255,0.62) !important;
+    border-radius: 3px !important;
+    color: rgba(255,255,255,0.55) !important;
     font-weight: 500;
+    letter-spacing: 0.02em;
 }
 .site-switcher .site-link:hover {
-    background: rgba(255,255,255,0.10) !important;
+    background: rgba(255,255,255,0.09) !important;
     color: #ffffff !important;
 }
 .site-switcher .site-link.active {
-    background: rgba(255,255,255,0.16) !important;
-    color: #ffffff !important;
-    font-weight: 600;
+    background: rgba(201,163,92,0.16) !important;
+    color: #e8c98f !important;
+    font-weight: 700;
 }
 
-/* Base geometry (matches the per-page inline styles, so pages that lack
-   them — e.g. family.html — still render a proper bar), plus wrapping so
-   the "More" dropdown below is never clipped. */
+/* Base geometry + wrapping (pages without their own bar styles) */
 .site-switcher {
     display: flex;
     align-items: center;
@@ -240,13 +207,13 @@ header nav button.active {
     white-space: nowrap;
 }
 
-/* "More" dropdown in the switcher (built by site-nav.js) */
+/* "More" dropdown (built by site-nav.js) */
 .site-more { position: relative; display: inline-flex; }
 .site-more summary { list-style: none; cursor: pointer; user-select: none; }
 .site-more summary::-webkit-details-marker { display: none; }
 .site-more[open] summary {
-    background: rgba(255,255,255,0.16) !important;
-    color: #ffffff !important;
+    background: rgba(201,163,92,0.16) !important;
+    color: #e8c98f !important;
 }
 .site-more-menu {
     position: absolute;
@@ -257,297 +224,338 @@ header nav button.active {
     gap: 2px;
     min-width: 210px;
     padding: 6px;
-    background: rgba(22,24,30,0.96);
-    -webkit-backdrop-filter: saturate(180%) blur(24px);
-    backdrop-filter: saturate(180%) blur(24px);
-    border: 1px solid rgba(255,255,255,0.09);
-    border-radius: 14px;
-    box-shadow: 0 20px 48px rgba(0,0,0,0.45);
+    background: #0d1016;
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 4px;
+    box-shadow: 0 20px 48px rgba(0,0,0,0.6);
     z-index: 400;
 }
 .site-more-menu .site-link {
     display: flex;
     padding: 8px 12px !important;
-    border-radius: 9px !important;
+    border-radius: 3px !important;
 }
 
-/* Shared-settings note (injected by site-nav.js on AI settings cards) */
 .shared-settings-note {
     font-size: 0.8rem;
-    color: #6e6e73;
-    background: rgba(0,113,227,0.07);
-    border: 1px solid rgba(0,113,227,0.18);
-    border-radius: 10px;
+    color: #9aa3b2;
+    background: rgba(201,163,92,0.08);
+    border: 1px solid rgba(201,163,92,0.25);
+    border-radius: 4px;
     padding: 8px 12px;
     margin: 0 0 14px;
 }
 
-/* ── Cards / surfaces — hairline border + feather shadow ── */
-.card,
-.modal,
-.login-box,
-.veh-card,
-.ins-card,
-.page-row,
-.stat-card,
-.dash-card,
-.section-card,
-.form-card {
-    background: #ffffff !important;
-    border-radius: 16px !important;
-    border: 1px solid rgba(0,0,0,0.06) !important;
-    box-shadow: 0 1px 2px rgba(16,20,28,0.04), 0 8px 24px rgba(16,20,28,0.05) !important;
-    transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
+/* ── Cards / surfaces — flat panels, hairline borders ─────── */
+.card, .modal, .login-box,
+.veh-card, .ins-card, .page-row,
+.stat-card, .dash-card, .section-card, .form-card {
+    background: #12151d !important;
+    border-radius: 4px !important;
+    border: 1px solid rgba(255,255,255,0.10) !important;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.4) !important;
+    transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
 }
-.card:hover,
-.veh-card:hover,
-.ins-card:hover,
-.page-row:hover {
-    border-color: rgba(0,0,0,0.10) !important;
-    box-shadow: 0 2px 4px rgba(16,20,28,0.05), 0 14px 36px rgba(16,20,28,0.08) !important;
+.card:hover, .veh-card:hover, .ins-card:hover, .page-row:hover {
+    border-color: rgba(255,255,255,0.20) !important;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.4) !important;
 }
 
-/* Stat tiles: quieter labels, strong numerals */
+/* Stat tiles — white numerals, gold micro-labels */
 .stat-card { text-align: center; }
-.stat-label { font-weight: 600 !important; color: #98989d !important; }
+.stat-card:hover { border-color: rgba(201,163,92,0.45) !important; }
+.stat-value {
+    font-weight: 800 !important;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+}
+.stat-label {
+    font-weight: 700 !important;
+    color: #c9a35c !important;
+    text-transform: uppercase;
+    font-size: 0.66rem !important;
+    letter-spacing: 0.12em !important;
+}
 
-/* ── Buttons ─────────────────────────────────────────────── */
+/* ── Buttons — squared, utilitarian ───────────────────────── */
 button, .btn, .signout-btn, .login-btn {
-    transition:
-        background-color 0.16s ease,
-        color 0.16s ease,
-        border-color 0.16s ease,
-        box-shadow 0.16s ease,
-        transform 0.1s ease,
-        opacity 0.16s ease !important;
+    transition: background-color 0.15s ease, color 0.15s ease,
+        border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease !important;
     font-family: inherit !important;
 }
-button:active, .btn:active, .login-btn:active, .signout-btn:active {
-    transform: scale(0.98);
-}
+button:active, .btn:active, .login-btn:active { transform: translateY(1px); }
 
-/* Primary buttons → solid accent, pill-shaped */
-.btn-primary,
-button.btn-primary,
-.login-btn,
-.btn-ai {
-    background: #0071e3 !important;
-    color: #ffffff !important;
+.btn-primary, button.btn-primary, .login-btn, .btn-ai {
+    background: #c9a35c !important;
+    color: #10120a !important;
     border: none !important;
-    border-radius: 980px !important;
+    border-radius: 3px !important;
     box-shadow: none !important;
-    font-weight: 600 !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.02em;
 }
-.btn-primary:hover,
-.login-btn:hover,
-.btn-ai:hover {
-    background: #0077ed !important;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 14px rgba(0,113,227,0.30) !important;
+.btn-primary:hover, .login-btn:hover, .btn-ai:hover {
+    background: #d9b573 !important;
+    box-shadow: 0 0 0 1px rgba(201,163,92,0.4) !important;
 }
-
-/* Ghost buttons → hairline neutral */
 .btn-ghost {
     background: transparent !important;
-    color: #1d1d1f !important;
-    border: 1px solid rgba(0,0,0,0.12) !important;
-    border-radius: 980px !important;
+    color: #e7e9ee !important;
+    border: 1px solid rgba(255,255,255,0.22) !important;
+    border-radius: 3px !important;
 }
 .btn-ghost:hover {
-    background: rgba(0,0,0,0.045) !important;
-    border-color: rgba(0,0,0,0.18) !important;
+    background: rgba(255,255,255,0.07) !important;
+    border-color: rgba(255,255,255,0.35) !important;
 }
-
-/* Danger buttons */
 .btn-danger {
-    background: #e02d2d !important;
+    background: #a33236 !important;
     color: #ffffff !important;
     border: none !important;
-    border-radius: 980px !important;
+    border-radius: 3px !important;
 }
-.btn-danger:hover { background: #f04438 !important; }
-
-/* Info buttons */
+.btn-danger:hover { background: #c23c41 !important; }
 .btn-info {
-    background: #0071e3 !important;
-    color: #ffffff !important;
-    border: none !important;
-    border-radius: 980px !important;
+    background: #1d2634 !important;
+    color: #cfe0f5 !important;
+    border: 1px solid rgba(127,179,232,0.35) !important;
+    border-radius: 3px !important;
 }
-
-/* Small buttons keep the pill but slimmer */
 .btn-sm { padding: 6px 12px !important; font-size: 0.82rem !important; }
 
-/* ── Inputs ──────────────────────────────────────────────── */
-input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
-textarea,
-select {
-    background: #ffffff !important;
-    border: 1px solid rgba(0,0,0,0.12) !important;
-    border-radius: 10px !important;
-    color: #1d1d1f !important;
+/* Icon row-action buttons */
+.icon-btn {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 3px !important;
+    width: 30px; height: 30px;
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 0 !important;
+    opacity: 0.75;
+    filter: grayscale(0.2);
+}
+.icon-btn:hover { background: rgba(255,255,255,0.10) !important; opacity: 1; transform: none; }
+
+/* ── Inputs — dark wells, gold focus ──────────────────────── */
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]),
+textarea {
+    background: #0d1016 !important;
+    border: 1px solid rgba(255,255,255,0.14) !important;
+    border-radius: 3px !important;
+    color: #e7e9ee !important;
     font-family: inherit !important;
     transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
-input::placeholder, textarea::placeholder { color: #98989d !important; }
-input:focus, textarea:focus, select:focus {
+input::placeholder, textarea::placeholder { color: #6b7484 !important; }
+input:focus, textarea:focus {
     outline: none !important;
-    background: #ffffff !important;
-    border-color: #0071e3 !important;
-    box-shadow: 0 0 0 4px rgba(0,113,227,0.14) !important;
+    background: #0d1016 !important;
+    border-color: #c9a35c !important;
+    box-shadow: 0 0 0 3px rgba(201,163,92,0.22) !important;
 }
-input[type="checkbox"], input[type="radio"] { accent-color: #0071e3; }
+select {
+    background: #0d1016 !important;
+    border: 1px solid rgba(255,255,255,0.14) !important;
+    border-radius: 3px !important;
+    color: #e7e9ee !important;
+    font-family: inherit !important;
+}
+select:not([multiple]) {
+    background: #0d1016
+        url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1.5 1.75 6 6.25l4.5-4.5' fill='none' stroke='%239aa3b2' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+        no-repeat right 12px center !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    padding-right: 32px !important;
+}
+select:focus {
+    outline: none !important;
+    border-color: #c9a35c !important;
+    box-shadow: 0 0 0 3px rgba(201,163,92,0.22) !important;
+}
+select option { background: #12151d; color: #e7e9ee; }
+input[type="checkbox"], input[type="radio"] { accent-color: #c9a35c; }
+input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.8); }
 
-/* ── Modals ──────────────────────────────────────────────── */
+.form-group > label {
+    font-size: 0.68rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #8a9099 !important;
+}
+
+/* ── Modals ───────────────────────────────────────────────── */
 .modal-overlay {
-    background: rgba(12,14,18,0.40) !important;
+    background: rgba(2,3,6,0.72) !important;
     -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
 }
 .modal {
-    border-radius: 20px !important;
-    box-shadow: 0 2px 6px rgba(16,20,28,0.06), 0 32px 72px rgba(16,20,28,0.22) !important;
+    border-radius: 6px !important;
+    border: 1px solid rgba(255,255,255,0.16) !important;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.7) !important;
 }
 
-/* ── Toast: dark glass pill ─────────────────────────────── */
+/* ── Toast ────────────────────────────────────────────────── */
 .toast {
-    border-radius: 980px !important;
-    background: rgba(24,26,32,0.90) !important;
-    color: #f5f5f7 !important;
-    box-shadow: 0 8px 28px rgba(16,20,28,0.28) !important;
-    -webkit-backdrop-filter: saturate(180%) blur(20px);
-    backdrop-filter: saturate(180%) blur(20px);
+    border-radius: 3px !important;
+    background: #171b24 !important;
+    color: #e7e9ee !important;
+    border: 1px solid rgba(201,163,92,0.4) !important;
+    box-shadow: 0 12px 36px rgba(0,0,0,0.6) !important;
 }
 
-/* ── Tables ──────────────────────────────────────────────── */
+/* ── Tables — ledger style ────────────────────────────────── */
 table {
-    background: #ffffff;
-    border-radius: 12px;
+    background: transparent;
+    border-radius: 3px;
     overflow: hidden;
-    overflow: clip;   /* clips like hidden without breaking position:sticky headers */
+    overflow: clip;
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
 }
 thead th {
-    background: #fafafc !important;
-    color: #98989d !important;
-    font-weight: 600 !important;
-    font-size: 0.72rem !important;
+    background: rgba(13,16,22,0.92) !important;
+    color: #c9a35c !important;
+    font-weight: 700 !important;
+    font-size: 0.68rem !important;
     text-transform: uppercase;
-    letter-spacing: 0.07em;
+    letter-spacing: 0.1em;
     border: none !important;
-    border-bottom: 1px solid rgba(0,0,0,0.07) !important;
+    border-bottom: 1px solid rgba(201,163,92,0.35) !important;
+    -webkit-backdrop-filter: saturate(140%) blur(10px);
+    backdrop-filter: saturate(140%) blur(10px);
 }
-tbody tr { border-top: 1px solid rgba(0,0,0,0.05); transition: background 0.12s ease; }
-tbody tr:hover { background: #f5f7fb !important; }
-tbody td {
-    border: none !important;
-    color: #1d1d1f !important;
+tbody tr { border-top: 1px solid rgba(255,255,255,0.06) !important; transition: background 0.12s ease; }
+tbody tr:hover { background: rgba(201,163,92,0.07) !important; }
+tbody td { border: none !important; color: #e7e9ee !important; padding-top: 10px !important; padding-bottom: 10px !important; }
+th[onclick] { cursor: pointer; user-select: none; }
+th[onclick]:hover { color: #e8c98f !important; }
+
+/* Sticky headers (Safari needs separate borders — kept above) */
+thead th {
+    position: -webkit-sticky;
+    position: sticky;
+    top: var(--sticky-top, 0px);
+    z-index: 20;
+    box-shadow: 0 1px 0 rgba(201,163,92,0.25);
+}
+@media (min-width: 900px) {
+    .table-wrapper { overflow-x: visible; }
 }
 
-/* ── Badges / chips ──────────────────────────────────────── */
-.badge, .chip {
-    font-weight: 600 !important;
-    letter-spacing: 0.02em;
-    border-radius: 6px !important;
+/* ── Badges / chips — squared, stamped ────────────────────── */
+.badge, .chip, .tag {
+    font-weight: 700 !important;
+    letter-spacing: 0.04em;
+    border-radius: 2px !important;
+    text-transform: uppercase;
+    font-size: 0.68rem;
 }
 
-/* ── Links ──────────────────────────────────────────────── */
-a { color: #0071e3; transition: color 0.15s ease, opacity 0.15s ease; }
-a:hover { color: #0077ed; }
+/* ── Links ────────────────────────────────────────────────── */
+a { color: #d9b573; transition: color 0.15s ease; }
+a:hover { color: #e8c98f; }
 
-/* ── Spinner ────────────────────────────────────────────── */
+/* ── Spinner ──────────────────────────────────────────────── */
 .spinner {
-    border-color: rgba(0,113,227,0.14) !important;
-    border-top-color: #0071e3 !important;
+    border-color: rgba(201,163,92,0.18) !important;
+    border-top-color: #c9a35c !important;
 }
 
-/* ── Scrollbars — slim & quiet ──────────────────────────── */
-::-webkit-scrollbar         { width: 10px; height: 10px; }
-::-webkit-scrollbar-track   { background: transparent; }
+/* ── Scrollbars ───────────────────────────────────────────── */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-    background: rgba(0,0,0,0.16);
-    border-radius: 980px;
+    background: rgba(255,255,255,0.18);
+    border-radius: 2px;
     border: 3px solid transparent;
     background-clip: padding-box;
-    transition: background 0.2s ease;
 }
 ::-webkit-scrollbar-thumb:hover {
-    background: rgba(0,0,0,0.30);
+    background: rgba(255,255,255,0.32);
     border: 3px solid transparent;
     background-clip: padding-box;
 }
-* { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.22) transparent; }
+* { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.25) transparent; }
 
-/* ── Specific dark-page rescue: force them light ────────── */
-/* Pages that originally had #08080e / #0f0f1a / #0f172a
-   backgrounds declared on body directly get overridden by the
-   html/body !important rule above. */
-
-/* Photo / image containers stay neutral */
+/* ── Empty states / misc ──────────────────────────────────── */
+.empty { color: #6b7484 !important; }
+.empty .empty-icon, .empty-icon { opacity: 0.45; filter: grayscale(0.5); }
+summary { cursor: pointer; }
+hr { border: none; border-top: 1px solid rgba(255,255,255,0.10); }
+.card img, td img { border-radius: 3px; background: #0d1016; }
 img { background: transparent; }
+.toolbar h2 { font-weight: 700 !important; }
 
-/* ── Login screens — clean light gate ───────────────────── */
-#login-screen,
-.login-screen,
-[id$="-login-screen"] {
-    background: #f5f5f7 !important;
+/* ── Views: subtle rise-in ────────────────────────────────── */
+@keyframes fbViewIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: none; }
+}
+.view.active, .view[style*="display: block"], .view[style*="display:block"] {
+    animation: fbViewIn 0.24s ease;
+}
+
+/* ── Login screens — black gate, gold keyline ─────────────── */
+#login-screen, .login-screen, [id$="-login-screen"] {
+    background: #07090d !important;
     background-image:
-        radial-gradient(1200px 500px at 50% -10%, rgba(0,113,227,0.06), transparent) !important;
-    color: #1d1d1f !important;
+        radial-gradient(1000px 440px at 50% -10%, rgba(201,163,92,0.08), transparent 70%) !important;
+    color: #e7e9ee !important;
 }
 .login-box {
-    background: #ffffff !important;
-    color: #1d1d1f !important;
-    border: 1px solid rgba(0,0,0,0.06) !important;
-    box-shadow: 0 2px 6px rgba(16,20,28,0.05), 0 24px 64px rgba(16,20,28,0.12) !important;
-    border-radius: 20px !important;
+    background: #12151d !important;
+    color: #e7e9ee !important;
+    border: 1px solid rgba(255,255,255,0.14) !important;
+    border-top: 2px solid #c9a35c !important;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.6) !important;
+    border-radius: 6px !important;
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
 }
-.login-title, .login-subtitle, .login-label {
-    color: #1d1d1f !important;
-}
-.login-subtitle, .login-label {
-    color: #6e6e73 !important;
-}
+.login-title { color: #f2f3f7 !important; }
+.login-subtitle, .login-label { color: #9aa3b2 !important; }
+.login-label { text-transform: uppercase; letter-spacing: 0.1em; font-size: 0.68rem !important; font-weight: 700 !important; }
 .login-input {
-    background: #ffffff !important;
-    border: 1px solid rgba(0,0,0,0.12) !important;
-    color: #1d1d1f !important;
-    border-radius: 10px !important;
+    background: #0d1016 !important;
+    border: 1px solid rgba(255,255,255,0.14) !important;
+    color: #e7e9ee !important;
+    border-radius: 3px !important;
 }
-.login-input::placeholder { color: #98989d !important; }
+.login-input::placeholder { color: #6b7484 !important; }
 .login-input:focus {
-    background: #ffffff !important;
-    border-color: #0071e3 !important;
-    box-shadow: 0 0 0 4px rgba(0,113,227,0.14) !important;
+    background: #0d1016 !important;
+    border-color: #c9a35c !important;
+    box-shadow: 0 0 0 3px rgba(201,163,92,0.22) !important;
     outline: none !important;
 }
-.login-error { color: #e02d2d !important; }
-.login-reset { color: #0071e3 !important; }
+.login-error { color: #f2555a !important; }
+.login-reset { color: #d9b573 !important; }
 .login-links a, .login-site-links a {
-    color: rgba(29,29,31,0.55) !important;
-    border-color: rgba(0,0,0,0.10) !important;
-    border-radius: 980px !important;
-    background: rgba(255,255,255,0.65) !important;
+    color: rgba(255,255,255,0.5) !important;
+    border-color: rgba(255,255,255,0.16) !important;
+    border-radius: 3px !important;
+    background: rgba(255,255,255,0.04) !important;
 }
 .login-links a:hover, .login-site-links a:hover {
-    color: #0071e3 !important;
-    border-color: rgba(0,113,227,0.55) !important;
-    background: #ffffff !important;
+    color: #e8c98f !important;
+    border-color: rgba(201,163,92,0.6) !important;
+    background: rgba(201,163,92,0.10) !important;
 }
 .login-links a.active, .login-site-links a.active {
-    color: #0071e3 !important;
-    border-color: #0071e3 !important;
-    background: #ffffff !important;
+    color: #e8c98f !important;
+    border-color: #c9a35c !important;
+    background: rgba(201,163,92,0.14) !important;
 }
 
-/* ── Loading screens — light too ─────────────────────────── */
 #loading-screen, .loading-screen {
-    background: #f5f5f7 !important;
-    color: #6e6e73 !important;
+    background: #0b0d12 !important;
+    color: #9aa3b2 !important;
 }
 
-/* ── Motion: honor users who prefer less of it ──────────── */
+/* ── Motion: honor reduced-motion users ───────────────────── */
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
         animation-duration: 0.01ms !important;
@@ -556,204 +564,18 @@ img { background: transparent; }
         scroll-behavior: auto !important;
     }
 }
-
-/* ── Sticky table headers: column names stay visible while scrolling ── */
-/* Safari can't stick table headers inside a border-collapse:collapse table,
-   so tables switch to separate borders with zero spacing (visually identical
-   here — the site draws single-direction borders only). */
-table {
-    border-collapse: separate !important;
-    border-spacing: 0 !important;
-}
-thead th {
-    position: -webkit-sticky;
-    position: sticky;
-    top: var(--sticky-top, 0px);
-    z-index: 20;
-    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.07);
-}
-/* position:sticky can't escape a scroll container, so on desktop let table
-   wrappers grow naturally; below 900px they keep horizontal scrolling and
-   headers simply scroll with the page. */
-@media (min-width: 900px) {
-    .table-wrapper { overflow-x: visible; }
-}
-
-/* ============================================================
-   APPLE SKIN v3 — crisp & clean refresh.
-   Layered after v2 (later rules win among equal importance).
-   Goals: sharper surfaces, filled inputs, frosted sticky table
-   headers, stronger numerals, calmer chrome, gentle motion.
-   ============================================================ */
-
-/* ── Canvas: whisper of light at the top, crisp neutral below ── */
-body {
-    background-image:
-        radial-gradient(1100px 420px at 50% -120px, rgba(0,113,227,0.045), transparent 70%) !important;
-    background-attachment: fixed !important;
-}
-
-/* ── Surfaces: tighter, crisper shadow recipe ───────────────── */
-.card,
-.veh-card,
-.ins-card,
-.page-row,
-.stat-card,
-.dash-card,
-.section-card,
-.form-card {
-    border: 1px solid rgba(0,0,0,0.055) !important;
-    box-shadow:
-        0 1px 1px rgba(16,20,28,0.03),
-        0 4px 14px rgba(16,20,28,0.045) !important;
-}
-.card:hover,
-.veh-card:hover,
-.ins-card:hover,
-.page-row:hover {
-    border-color: rgba(0,0,0,0.09) !important;
-    box-shadow:
-        0 1px 2px rgba(16,20,28,0.04),
-        0 10px 28px rgba(16,20,28,0.08) !important;
-}
-
-/* ── Stat tiles: strong numerals, micro-label, gentle lift ──── */
-.stat-card {
-    transition: transform 0.22s cubic-bezier(.2,.7,.3,1), box-shadow 0.22s ease, border-color 0.22s ease !important;
-}
-.stat-card:hover {
-    transform: translateY(-2px);
-    border-color: rgba(0,0,0,0.09) !important;
-    box-shadow: 0 2px 4px rgba(16,20,28,0.04), 0 14px 32px rgba(16,20,28,0.09) !important;
-}
-.stat-value {
-    font-weight: 800 !important;
-    letter-spacing: -0.03em;
-    font-variant-numeric: tabular-nums;
-}
-.stat-label {
-    text-transform: uppercase;
-    font-size: 0.68rem !important;
-    letter-spacing: 0.08em !important;
-}
-
-/* ── Inputs: soft-filled at rest, white + ring in focus ─────── */
-input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]),
-textarea {
-    background: rgba(120,120,128,0.085) !important;
-    border: 1px solid transparent !important;
-}
-input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):hover,
-textarea:hover {
-    background: rgba(120,120,128,0.12) !important;
-}
-input:focus, textarea:focus {
-    background: #ffffff !important;
-    border-color: #0071e3 !important;
-    box-shadow: 0 0 0 4px rgba(0,113,227,0.14) !important;
-}
-
-/* Selects: same fill + a real chevron */
-select:not([multiple]) {
-    background: rgba(120,120,128,0.085)
-        url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1.5 1.75 6 6.25l4.5-4.5' fill='none' stroke='%236e6e73' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
-        no-repeat right 12px center !important;
-    border: 1px solid transparent !important;
-    -webkit-appearance: none !important;
-    appearance: none !important;
-    padding-right: 32px !important;
-}
-select:not([multiple]):hover { background-color: rgba(120,120,128,0.12) !important; }
-select:not([multiple]):focus {
-    background-color: #ffffff !important;
-    border-color: #0071e3 !important;
-    box-shadow: 0 0 0 4px rgba(0,113,227,0.14) !important;
-}
-
-/* Labels above fields: quiet micro-caps */
-.form-group > label {
-    font-size: 0.7rem !important;
-    font-weight: 600 !important;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: #86868b !important;
-}
-
-/* ── Tables: airier rows, frosted sticky header ─────────────── */
-thead th {
-    background: rgba(250,250,252,0.88) !important;
-    -webkit-backdrop-filter: saturate(180%) blur(12px);
-    backdrop-filter: saturate(180%) blur(12px);
-}
-tbody td { padding-top: 10px !important; padding-bottom: 10px !important; }
-tbody tr { border-top: 1px solid rgba(0,0,0,0.045) !important; }
-tbody tr:hover { background: rgba(0,113,227,0.035) !important; }
-tbody tr:last-child td:first-child { border-bottom-left-radius: 12px; }
-tbody tr:last-child td:last-child  { border-bottom-right-radius: 12px; }
-
-/* Sortable header affordance */
-th[onclick] { cursor: pointer; user-select: none; transition: color 0.15s ease, background 0.15s ease; }
-th[onclick]:hover { color: #1d1d1f !important; }
-
-/* ── Icon row-action buttons: quiet circles ─────────────────── */
-.icon-btn {
-    background: transparent !important;
-    border: none !important;
-    border-radius: 980px !important;
-    width: 30px; height: 30px;
-    display: inline-flex; align-items: center; justify-content: center;
-    padding: 0 !important;
-    opacity: 0.72;
-}
-.icon-btn:hover {
-    background: rgba(0,0,0,0.06) !important;
-    opacity: 1;
-    transform: none;
-}
-
-/* ── Badges & chips → pills ─────────────────────────────────── */
-.badge, .chip, .tag {
-    border-radius: 980px !important;
-    padding-left: 10px; padding-right: 10px;
-}
-
-/* ── Toolbar headings ───────────────────────────────────────── */
-.toolbar h2 { font-weight: 700 !important; }
-
-/* ── Views: subtle rise-in when switching sections ──────────── */
-@keyframes fbViewIn {
-    from { opacity: 0; transform: translateY(6px); }
-    to   { opacity: 1; transform: none; }
-}
-.view.active, .view[style*="display: block"], .view[style*="display:block"] {
-    animation: fbViewIn 0.26s cubic-bezier(.2,.7,.3,1);
-}
-
-/* ── Modals: deeper glass backdrop, crisper sheet ───────────── */
-.modal-overlay {
-    background: rgba(10,12,16,0.44) !important;
-    -webkit-backdrop-filter: saturate(140%) blur(14px);
-    backdrop-filter: saturate(140%) blur(14px);
-}
-.modal {
-    border: 1px solid rgba(0,0,0,0.05) !important;
-}
-
-/* ── Empty states ───────────────────────────────────────────── */
-.empty { color: #98989d !important; }
-.empty .empty-icon, .empty-icon { opacity: 0.5; filter: grayscale(0.3); }
-
-/* ── Details/summary (collapsibles) ─────────────────────────── */
-summary { cursor: pointer; }
-summary:hover { opacity: 0.85; }
-
-/* ── Horizontal rules & soft dividers ───────────────────────── */
-hr { border: none; border-top: 1px solid rgba(0,0,0,0.07); }
-
-/* ── Images in cards: consistent rounding ───────────────────── */
-.card img, td img { border-radius: 8px; }
-
-/* ── Smooth anchor scrolling (motion-safe) ──────────────────── */
 @media (prefers-reduced-motion: no-preference) {
     html { scroll-behavior: smooth; }
+}
+
+/* ── Gradient-clipped titles: pages paint some headings with a
+   background-clip:text gradient (dark on dark now). Repaint them
+   as solid light text; -webkit-text-fill-color beats color. ── */
+.login-title, .login-box h1, .login-box h2,
+header h1, .page-name {
+    background: none !important;
+    -webkit-background-clip: initial !important;
+    background-clip: initial !important;
+    -webkit-text-fill-color: #f2f3f7 !important;
+    color: #f2f3f7 !important;
 }

@@ -1255,6 +1255,8 @@
         </div>
         <div style="display:flex;gap:8px;">
             <button class="btn btn-primary btn-sm" onclick="openLoadModal()">+ New Load</button>
+            <button class="btn btn-ghost btn-sm" id="load-scan-btn" onclick="document.getElementById('load-scan-input').click()">📷 Scan Recipe</button>
+            <input type="file" id="load-scan-input" accept="image/*,application/pdf" style="display:none;" onchange="onLoadScanSelected(this);this.value='';">
         </div>
     </div>
 
@@ -1303,6 +1305,8 @@
         <div class="modal-title" id="load-modal-title">New Load</div>
         <div class="modal-sub">Record every ingredient and measurement — duplicate a load to log the next step of a ladder.</div>
         <input type="hidden" id="load-doc-id">
+        <input type="hidden" id="lf-recipe-url">
+        <div id="lf-recipe-note" style="display:none;margin:8px 0 2px;padding:8px 12px;background:rgba(0,113,227,0.07);border:1px solid rgba(0,113,227,0.18);border-radius:8px;font-size:0.8rem;color:var(--text-secondary);">📎 Scanned recipe image attached — <strong>review every value against the original before saving.</strong></div>
 
         <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
             <div class="form-group" style="grid-column:1/3;"><label>Load Name *</label><input type="text" id="lf-name" placeholder="e.g. 168 Match — ladder step 3"></div>
@@ -6962,7 +6966,7 @@ Rules: use numbers for quantity and lineTotal. SKU and MPN are DIFFERENT codes �
                 const st = l.status || 'Work-up';
                 return `<tr>
                     <td>${escHtml(l.caliber || '—')}</td>
-                    <td><strong>${escHtml(l.name || '—')}</strong>${l.firearm ? `<br><span style="font-size:0.75rem;color:var(--text-secondary);">${escHtml(l.firearm)}</span>` : ''}</td>
+                    <td><strong>${escHtml(l.name || '—')}</strong>${l.recipeUrl ? ` <a href="${escHtml(l.recipeUrl)}" target="_blank" rel="noopener" title="View scanned recipe" style="text-decoration:none;">📎</a>` : ''}${l.firearm ? `<br><span style="font-size:0.75rem;color:var(--text-secondary);">${escHtml(l.firearm)}</span>` : ''}</td>
                     <td>${escHtml(bullet || '—')}</td>
                     <td>${escHtml(powder || '—')}</td>
                     <td>${loadFmt(l.chargeGr, ' gr')}</td>
@@ -6990,7 +6994,8 @@ Rules: use numbers for quantity and lineTotal. SKU and MPN are DIFFERENT codes �
             ['lf-coal','coal'], ['lf-cbto','cbto'], ['lf-crimp','crimp'],
             ['lf-velocity','velocity'], ['lf-es','es'], ['lf-sd','sd'],
             ['lf-group','groupSize'], ['lf-group-yd','groupYards'], ['lf-rounds','roundsLoaded'],
-            ['lf-notes','notes']
+            ['lf-notes','notes'],
+            ['lf-recipe-url','recipeUrl']
         ];
 
         function openLoadModal(docId, prefill) {
@@ -7006,6 +7011,7 @@ Rules: use numbers for quantity and lineTotal. SKU and MPN are DIFFERENT codes �
                 const el = document.getElementById(id);
                 el.value = (src[key] !== undefined && src[key] !== null) ? src[key] : '';
             });
+            document.getElementById('lf-recipe-note').style.display = src.recipeUrl ? '' : 'none';
             if (!src.status) document.getElementById('lf-status').value = 'Work-up';
             if (!src.date && !l) document.getElementById('lf-date').value = new Date().toISOString().slice(0, 10);
             if (src.firearm) fsel.value = src.firearm;
@@ -7070,6 +7076,101 @@ Rules: use numbers for quantity and lineTotal. SKU and MPN are DIFFERENT codes �
             } catch (e) {
                 toast('Delete failed: ' + e.message, 'error');
             }
+        }
+
+        async function onLoadScanSelected(input) {
+            const file = input.files && input.files[0];
+            if (!file) return;
+            const btn = document.getElementById('load-scan-btn');
+            const orig = btn.textContent;
+            btn.disabled = true;
+            try {
+                btn.textContent = '⏳ Reading recipe…';
+                const prefill = await scanLoadRecipe(file);
+                btn.textContent = orig;
+                btn.disabled = false;
+                openLoadModal(null, prefill);
+                document.getElementById('load-modal-title').textContent = 'Scanned Load — review before saving';
+                toast('Recipe read — verify every value against the original before saving', 'success');
+            } catch (e) {
+                console.error('scanLoadRecipe', e);
+                btn.textContent = orig;
+                btn.disabled = false;
+                toast('Scan failed: ' + e.message, 'error');
+            }
+        }
+
+        async function scanLoadRecipe(file) {
+            const lower = (file.name || '').toLowerCase();
+            const isPdf = file.type === 'application/pdf' || lower.endsWith('.pdf');
+            const isImage = !isPdf && (file.type.startsWith('image/') || /\.(png|jpe?g|gif|webp|heic)$/.test(lower));
+            if (!isPdf && !isImage) throw new Error('use a screenshot/photo or a PDF');
+
+            let media;
+            if (isPdf) {
+                if (file.size > 4.5 * 1024 * 1024) throw new Error('PDF too large for AI reading (max ~4.5 MB) — try a screenshot instead');
+                const dataUrl = await new Promise(r => { const fr = new FileReader(); fr.onload = e => r(e.target.result); fr.readAsDataURL(file); });
+                media = { base64: dataUrl.split(',')[1], mimeType: 'application/pdf' };
+            } else {
+                const dataUrl = await compressImage(file) || await new Promise(r => { const fr = new FileReader(); fr.onload = e => r(e.target.result); fr.readAsDataURL(file); });
+                media = { base64: dataUrl.split(',')[1], mimeType: 'image/jpeg' };
+            }
+
+            const prompt = `This image shows a handloading / reloading recipe (a load-data card, notebook page, app screenshot, or published-manual excerpt).
+TRANSCRIBE ONLY what is visibly written. Never guess, infer, or fill in a charge weight, powder, or any other value that is not explicitly shown — leave missing fields as empty strings. Return ONLY valid JSON, no markdown fences:
+{
+ "name":"a short label for this load if one is written, else build one like \"168gr MatchKing / Varget 42.0gr\" from visible values",
+ "caliber":"cartridge name, e.g. .308 Winchester, 6.5 Creedmoor, 9mm Luger, or empty",
+ "date":"date written on it as YYYY-MM-DD, or empty",
+ "firearm":"the rifle/pistol named, or empty",
+ "bulletMfr":"bullet maker, e.g. Sierra, Hornady, Berger, or empty",
+ "bullet":"bullet model/name, e.g. MatchKing BTHP, ELD-M, or empty",
+ "bulletWeight": bullet weight in grains as a number, or "",
+ "bulletDiameter": diameter in inches as a number (e.g. 0.308), or "",
+ "bulletLot":"bullet lot #, or empty",
+ "powderMfr":"powder maker, e.g. Hodgdon, Alliant, Vihtavuori, or empty",
+ "powder":"powder name, e.g. Varget, H4350, or empty",
+ "chargeGr": powder charge in grains as a number, or "",
+ "powderLot":"powder lot #, or empty",
+ "primer":"primer make/model, e.g. CCI BR-2, Federal 210M, or empty",
+ "primerType":"size/type and lot, e.g. Large Rifle, SRP Magnum · lot 123, or empty",
+ "caseBrand":"brass brand, e.g. Lapua, Winchester, or empty",
+ "caseTimesFired": times fired as a number, or "",
+ "trimLength": case trim length in inches as a number, or "",
+ "coal": cartridge overall length in inches as a number, or "",
+ "cbto": base-to-ogive length in inches as a number, or "",
+ "crimp":"crimp notes, or empty",
+ "velocity": average velocity in fps as a number, or "",
+ "es": extreme spread in fps as a number, or "",
+ "sd": standard deviation in fps as a number, or "",
+ "groupSize": group size in inches as a number, or "",
+ "groupYards": group distance in yards as a number, or "",
+ "roundsLoaded": rounds loaded as a number, or "",
+ "notes":"anything else written: pressure signs, seating depth notes, conditions, source of the data, or empty"
+}
+If the image shows a table of several charge weights (a ladder), transcribe the single row that is marked, circled, or highlighted; if none is marked, use the row with results (velocity/group) recorded, and mention the other charge weights in notes. Numbers must be plain JSON numbers, never strings with units.`;
+
+            const raw = await callClaude(media.base64, media.mimeType, prompt, { maxTokens: 1500 });
+            if (!raw) throw new Error('AI returned nothing');
+            const m = raw.match(/\{[\s\S]*\}/);
+            if (!m) throw new Error('could not parse AI response');
+            const d = JSON.parse(m[0]);
+
+            // Attach the screenshot to the load so the original stays on file
+            try {
+                const ext = (file.name && file.name.includes('.')) ? file.name.split('.').pop() : (isPdf ? 'pdf' : 'jpg');
+                const ref = storage.ref().child(`armory_load_recipes/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`);
+                await ref.put(file);
+                d.recipeUrl = await ref.getDownloadURL();
+            } catch (e) { console.warn('recipe upload failed', e); }
+
+            const prefill = {};
+            LOAD_FIELDS.forEach(([, key]) => {
+                const v = d[key];
+                if (v !== undefined && v !== null && v !== '') prefill[key] = v;
+            });
+            if (!prefill.status) prefill.status = 'Work-up';
+            return prefill;
         }
 
         // close on click outside

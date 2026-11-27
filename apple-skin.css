@@ -578,3 +578,182 @@ thead th {
 @media (min-width: 900px) {
     .table-wrapper { overflow-x: visible; }
 }
+
+/* ============================================================
+   APPLE SKIN v3 — crisp & clean refresh.
+   Layered after v2 (later rules win among equal importance).
+   Goals: sharper surfaces, filled inputs, frosted sticky table
+   headers, stronger numerals, calmer chrome, gentle motion.
+   ============================================================ */
+
+/* ── Canvas: whisper of light at the top, crisp neutral below ── */
+body {
+    background-image:
+        radial-gradient(1100px 420px at 50% -120px, rgba(0,113,227,0.045), transparent 70%) !important;
+    background-attachment: fixed !important;
+}
+
+/* ── Surfaces: tighter, crisper shadow recipe ───────────────── */
+.card,
+.veh-card,
+.ins-card,
+.page-row,
+.stat-card,
+.dash-card,
+.section-card,
+.form-card {
+    border: 1px solid rgba(0,0,0,0.055) !important;
+    box-shadow:
+        0 1px 1px rgba(16,20,28,0.03),
+        0 4px 14px rgba(16,20,28,0.045) !important;
+}
+.card:hover,
+.veh-card:hover,
+.ins-card:hover,
+.page-row:hover {
+    border-color: rgba(0,0,0,0.09) !important;
+    box-shadow:
+        0 1px 2px rgba(16,20,28,0.04),
+        0 10px 28px rgba(16,20,28,0.08) !important;
+}
+
+/* ── Stat tiles: strong numerals, micro-label, gentle lift ──── */
+.stat-card {
+    transition: transform 0.22s cubic-bezier(.2,.7,.3,1), box-shadow 0.22s ease, border-color 0.22s ease !important;
+}
+.stat-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(0,0,0,0.09) !important;
+    box-shadow: 0 2px 4px rgba(16,20,28,0.04), 0 14px 32px rgba(16,20,28,0.09) !important;
+}
+.stat-value {
+    font-weight: 800 !important;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+}
+.stat-label {
+    text-transform: uppercase;
+    font-size: 0.68rem !important;
+    letter-spacing: 0.08em !important;
+}
+
+/* ── Inputs: soft-filled at rest, white + ring in focus ─────── */
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]),
+textarea {
+    background: rgba(120,120,128,0.085) !important;
+    border: 1px solid transparent !important;
+}
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):hover,
+textarea:hover {
+    background: rgba(120,120,128,0.12) !important;
+}
+input:focus, textarea:focus {
+    background: #ffffff !important;
+    border-color: #0071e3 !important;
+    box-shadow: 0 0 0 4px rgba(0,113,227,0.14) !important;
+}
+
+/* Selects: same fill + a real chevron */
+select:not([multiple]) {
+    background: rgba(120,120,128,0.085)
+        url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1.5 1.75 6 6.25l4.5-4.5' fill='none' stroke='%236e6e73' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+        no-repeat right 12px center !important;
+    border: 1px solid transparent !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    padding-right: 32px !important;
+}
+select:not([multiple]):hover { background-color: rgba(120,120,128,0.12) !important; }
+select:not([multiple]):focus {
+    background-color: #ffffff !important;
+    border-color: #0071e3 !important;
+    box-shadow: 0 0 0 4px rgba(0,113,227,0.14) !important;
+}
+
+/* Labels above fields: quiet micro-caps */
+.form-group > label {
+    font-size: 0.7rem !important;
+    font-weight: 600 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #86868b !important;
+}
+
+/* ── Tables: airier rows, frosted sticky header ─────────────── */
+thead th {
+    background: rgba(250,250,252,0.88) !important;
+    -webkit-backdrop-filter: saturate(180%) blur(12px);
+    backdrop-filter: saturate(180%) blur(12px);
+}
+tbody td { padding-top: 10px !important; padding-bottom: 10px !important; }
+tbody tr { border-top: 1px solid rgba(0,0,0,0.045) !important; }
+tbody tr:hover { background: rgba(0,113,227,0.035) !important; }
+tbody tr:last-child td:first-child { border-bottom-left-radius: 12px; }
+tbody tr:last-child td:last-child  { border-bottom-right-radius: 12px; }
+
+/* Sortable header affordance */
+th[onclick] { cursor: pointer; user-select: none; transition: color 0.15s ease, background 0.15s ease; }
+th[onclick]:hover { color: #1d1d1f !important; }
+
+/* ── Icon row-action buttons: quiet circles ─────────────────── */
+.icon-btn {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 980px !important;
+    width: 30px; height: 30px;
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 0 !important;
+    opacity: 0.72;
+}
+.icon-btn:hover {
+    background: rgba(0,0,0,0.06) !important;
+    opacity: 1;
+    transform: none;
+}
+
+/* ── Badges & chips → pills ─────────────────────────────────── */
+.badge, .chip, .tag {
+    border-radius: 980px !important;
+    padding-left: 10px; padding-right: 10px;
+}
+
+/* ── Toolbar headings ───────────────────────────────────────── */
+.toolbar h2 { font-weight: 700 !important; }
+
+/* ── Views: subtle rise-in when switching sections ──────────── */
+@keyframes fbViewIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: none; }
+}
+.view.active, .view[style*="display: block"], .view[style*="display:block"] {
+    animation: fbViewIn 0.26s cubic-bezier(.2,.7,.3,1);
+}
+
+/* ── Modals: deeper glass backdrop, crisper sheet ───────────── */
+.modal-overlay {
+    background: rgba(10,12,16,0.44) !important;
+    -webkit-backdrop-filter: saturate(140%) blur(14px);
+    backdrop-filter: saturate(140%) blur(14px);
+}
+.modal {
+    border: 1px solid rgba(0,0,0,0.05) !important;
+}
+
+/* ── Empty states ───────────────────────────────────────────── */
+.empty { color: #98989d !important; }
+.empty .empty-icon, .empty-icon { opacity: 0.5; filter: grayscale(0.3); }
+
+/* ── Details/summary (collapsibles) ─────────────────────────── */
+summary { cursor: pointer; }
+summary:hover { opacity: 0.85; }
+
+/* ── Horizontal rules & soft dividers ───────────────────────── */
+hr { border: none; border-top: 1px solid rgba(0,0,0,0.07); }
+
+/* ── Images in cards: consistent rounding ───────────────────── */
+.card img, td img { border-radius: 8px; }
+
+/* ── Smooth anchor scrolling (motion-safe) ──────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+    html { scroll-behavior: smooth; }
+}
